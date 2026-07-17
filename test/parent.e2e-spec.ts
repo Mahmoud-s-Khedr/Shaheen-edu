@@ -98,6 +98,24 @@ describe('Parent (e2e)', () => {
     expect(response.statusCode).toBe(401);
   });
 
+  it('rejects malformed parent phone numbers with a validation error', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/parents/login',
+      payload: { nationalId: childA.nationalId, parentPhone: '01312345678' },
+    });
+    expect(response.statusCode).toBe(400);
+  });
+
+  it('accepts a country-code-form parent phone', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/parents/login',
+      payload: { nationalId: childA.nationalId, parentPhone: '+20 10 6666 2222' },
+    });
+    expect(response.statusCode).toBe(201);
+  });
+
   it('lists multiple children for the same parent phone', async () => {
     const loginResponse = await app.inject({
       method: 'POST',

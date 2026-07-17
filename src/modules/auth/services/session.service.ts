@@ -75,37 +75,6 @@ export class SessionService {
     userAgent?: string;
   }): Promise<RotateResult> {
     const refreshTokenHash = this.tokenService.hashOpaqueToken(params.rawToken);
-    const session = await this.prisma.authSession.findUnique({
-      where: { refreshTokenHash },
-      include: { user: true },
-    });
-
-    if (!session) {
-      throw new UnauthorizedException('Unauthorized');
-    }
-
-    if (session.revoked) {
-      // Reuse of an already-rotated (or otherwise revoked) token: treat as
-      // compromise and revoke the whole rotation family.
-      await this.prisma.authSession.updateMany({
-        where: { familyId: session.familyId, revoked: false },
-        data: { revoked: true, revokedAt: new Date() },
-      });
-      throw new UnauthorizedException('Unauthorized');
-    }
-
-    if (session.expiresAt < new Date()) {
-      await this.prisma.authSession.update({
-        where: { id: session.id },
-        data: { revoked: true, revokedAt: new Date() },
-      });
-      throw new UnauthorizedException('Unauthorized');
-    }
-
-    if (session.user.status !== AccountStatus.ACTIVE) {
-      throw new UnauthorizedException('Unauthorized');
-    }
-
     const newRefreshToken = this.tokenService.generateOpaqueRefreshToken();
     const newRefreshTokenHash =
       this.tokenService.hashOpaqueToken(newRefreshToken);
@@ -113,7 +82,41 @@ export class SessionService {
       Date.now() + this.tokenService.refreshTtlSeconds * 1000,
     );
 
-    const newSession = await this.prisma.$transaction(async (tx) => {
+    const rotation = await this.prisma.$transaction(async (tx) => {
+      const session = await tx.authSession.findUnique({
+        where: { refreshTokenHash },
+        include: { user: true },
+      });
+      if (!session) {
+        return { kind: 'not-found' as const };
+      }
+
+      if (session.revoked) {
+        return { kind: 'reuse' as const, familyId: session.familyId };
+      }
+
+      if (session.expiresAt < new Date()) {
+        await tx.authSession.updateMany({
+          where: { id: session.id, revoked: false },
+          data: { revoked: true, revokedAt: new Date() },
+        });
+        return { kind: 'unauthorized' as const };
+      }
+
+      if (session.user.status !== AccountStatus.ACTIVE) {
+        return { kind: 'unauthorized' as const };
+      }
+
+      // Claim the source row before creating a successor. A concurrent caller
+      // that read the same token will update zero rows once this commits.
+      const claimed = await tx.authSession.updateMany({
+        where: { id: session.id, refreshTokenHash, revoked: false },
+        data: { revoked: true, revokedAt: new Date() },
+      });
+      if (claimed.count !== 1) {
+        return { kind: 'reuse' as const, familyId: session.familyId };
+      }
+
       const created = await tx.authSession.create({
         data: {
           userId: session.userId,
@@ -127,25 +130,34 @@ export class SessionService {
       await tx.authSession.update({
         where: { id: session.id },
         data: {
-          revoked: true,
-          revokedAt: new Date(),
           replacedBySessionId: created.id,
         },
       });
-      return created;
+      return { kind: 'success' as const, session, newSession: created };
     });
 
+    if (rotation.kind === 'reuse') {
+      await this.prisma.authSession.updateMany({
+        where: { familyId: rotation.familyId, revoked: false },
+        data: { revoked: true, revokedAt: new Date() },
+      });
+      throw new UnauthorizedException('Unauthorized');
+    }
+    if (rotation.kind !== 'success') {
+      throw new UnauthorizedException('Unauthorized');
+    }
+
     const accessToken = this.tokenService.signUserAccessToken({
-      userId: session.user.id,
-      role: session.user.role,
-      sessionId: newSession.id,
+      userId: rotation.session.user.id,
+      role: rotation.session.user.role,
+      sessionId: rotation.newSession.id,
     });
 
     return {
       accessToken,
       refreshToken: newRefreshToken,
-      user: session.user,
-      session: newSession,
+      user: rotation.session.user,
+      session: rotation.newSession,
     };
   }
 

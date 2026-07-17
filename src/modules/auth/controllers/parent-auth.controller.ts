@@ -1,5 +1,6 @@
 import {
   Body,
+  BadRequestException,
   Controller,
   Get,
   Post,
@@ -20,7 +21,10 @@ import { ParentSessionService } from '../services/parent-session.service';
 import { AuthRateLimitService } from '../services/auth-rate-limit.service';
 import { ParentLoginDto } from '../dto/login.dto';
 import { SelectChildDto } from '../dto/select-child.dto';
-import { normalizeEgyptianPhone } from '../../../common/utils/phone.util';
+import {
+  isValidEgyptianPhone,
+  normalizeEgyptianPhone,
+} from '../../../common/utils/phone.util';
 import type { RequestParentSession } from '../../../common/types/request-with-user.types';
 
 /**
@@ -46,18 +50,25 @@ export class ParentAuthController {
       dto.nationalId,
     );
     const normalizedParentPhone = normalizeEgyptianPhone(dto.parentPhone);
+    if (!isValidEgyptianPhone(normalizedParentPhone)) {
+      throw new BadRequestException('Invalid phone number format');
+    }
 
     const hashedIdentifier = AuthRateLimitService.hashParentIdentifier(
       normalizedNationalId,
       normalizedParentPhone,
     );
-    await this.rateLimitService.assertNotLimited(
+    await this.rateLimitService.assertLoginAllowed(
       'parent-login',
       hashedIdentifier,
       req.ip,
     );
 
     if (!this.nationalIdService.validateFormat(normalizedNationalId)) {
+      await this.rateLimitService.recordLoginFailure(
+        'parent-login',
+        hashedIdentifier,
+      );
       throw new UnauthorizedException('Invalid credentials');
     }
     const nationalIdHash = this.nationalIdService.hash(normalizedNationalId);
@@ -67,8 +78,17 @@ export class ParentAuthController {
     });
 
     if (!student || student.parentPhoneNormalized !== normalizedParentPhone) {
+      await this.rateLimitService.recordLoginFailure(
+        'parent-login',
+        hashedIdentifier,
+      );
       throw new UnauthorizedException('Invalid credentials');
     }
+
+    await this.rateLimitService.clearLoginFailures(
+      'parent-login',
+      hashedIdentifier,
+    );
 
     const { accessToken } = await this.parentSessionService.createSession({
       parentPhoneNormalized: normalizedParentPhone,

@@ -1,4 +1,4 @@
-import { Body, Controller, Post, Req, Res } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Post, Req, Res } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { ApiTags } from '@nestjs/swagger';
 import type { FastifyReply, FastifyRequest } from 'fastify';
@@ -8,7 +8,10 @@ import { AuthService } from '../services/auth.service';
 import { RegisterStudentDto } from '../dto/register-student.dto';
 import { StudentLoginDto } from '../dto/login.dto';
 import { Role } from '../../../common/types/roles.enum';
-import { normalizeEgyptianPhone } from '../../../common/utils/phone.util';
+import {
+  isValidEgyptianPhone,
+  normalizeEgyptianPhone,
+} from '../../../common/utils/phone.util';
 import { setRefreshCookie } from '../utils/refresh-cookie.util';
 import type { AppConfig } from '../../../config/configuration';
 
@@ -45,6 +48,9 @@ export class StudentAuthController {
     @Res({ passthrough: true }) reply: FastifyReply,
   ) {
     const normalizedPhone = normalizeEgyptianPhone(dto.phone);
+    if (!isValidEgyptianPhone(normalizedPhone)) {
+      throw new BadRequestException('Invalid phone number format');
+    }
     const result = await this.authService.loginWithPassword({
       loginIdentifier: normalizedPhone,
       password: dto.password,

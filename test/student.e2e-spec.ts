@@ -39,6 +39,42 @@ describe('Student (e2e)', () => {
     expect(response.body).not.toContain('29902020212345');
   });
 
+  it('accepts a country-code-form phone and persists the canonical identifier', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/students/register',
+      payload: {
+        ...baseRegisterPayload,
+        nationalId: '29902020222222',
+        phone: '+20 10 1111 2222',
+        parentPhone: '00201033334444',
+      },
+    });
+    expect(response.statusCode).toBe(201);
+    expect(JSON.parse(response.body).user.loginIdentifier).toBe('01011112222');
+  });
+
+  it('rejects malformed student and parent phone numbers during registration', async () => {
+    const malformedStudent = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/students/register',
+      payload: { ...baseRegisterPayload, nationalId: '29902020233333', phone: '01312345678' },
+    });
+    expect(malformedStudent.statusCode).toBe(400);
+
+    const malformedParent = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/students/register',
+      payload: {
+        ...baseRegisterPayload,
+        nationalId: '29902020244444',
+        phone: '01044445555',
+        parentPhone: 'not-a-phone',
+      },
+    });
+    expect(malformedParent.statusCode).toBe(400);
+  });
+
   it('rejects a duplicate phone number', async () => {
     const response = await app.inject({
       method: 'POST',
@@ -74,6 +110,15 @@ describe('Student (e2e)', () => {
     });
     expect(response.statusCode).toBe(201);
     expect(JSON.parse(response.body).accessToken).toBeDefined();
+  });
+
+  it('rejects malformed student login phone numbers', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/students/login',
+      payload: { phone: '01312345678', password: baseRegisterPayload.password },
+    });
+    expect(response.statusCode).toBe(400);
   });
 
   it('cannot set role via PATCH /students/me (whitelist rejects unknown fields)', async () => {

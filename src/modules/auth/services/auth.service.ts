@@ -2,6 +2,7 @@ import {
   Injectable,
   UnauthorizedException,
   ConflictException,
+  BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../../../database/prisma.service';
 import { PasswordService } from './password.service';
@@ -9,10 +10,13 @@ import { SessionService } from './session.service';
 import { NationalIdService } from './national-id.service';
 import {
   AuthRateLimitService,
-  type RateLimitPurpose,
+  type LoginRateLimitPurpose,
 } from './auth-rate-limit.service';
 import { AccountStatus, Role } from '../../../common/types/roles.enum';
-import { normalizeEgyptianPhone } from '../../../common/utils/phone.util';
+import {
+  isValidEgyptianPhone,
+  normalizeEgyptianPhone,
+} from '../../../common/utils/phone.util';
 import type { RegisterStudentDto } from '../dto/register-student.dto';
 import type { User } from '@prisma/client';
 
@@ -57,12 +61,12 @@ export class AuthService {
     allowedRoles: Role[];
     ip?: string;
     userAgent?: string;
-    purpose: RateLimitPurpose;
+    purpose: LoginRateLimitPurpose;
   }): Promise<LoginResult> {
     const hashedIdentifier = AuthRateLimitService.hashIdentifier(
       params.loginIdentifier,
     );
-    await this.rateLimitService.assertNotLimited(
+    await this.rateLimitService.assertLoginAllowed(
       params.purpose,
       hashedIdentifier,
       params.ip,
@@ -85,6 +89,10 @@ export class AuthService {
           params.password,
         )
         .catch(() => false);
+      await this.rateLimitService.recordLoginFailure(
+        params.purpose,
+        hashedIdentifier,
+      );
       throw new UnauthorizedException('Invalid credentials');
     }
 
@@ -93,8 +101,17 @@ export class AuthService {
       params.password,
     );
     if (!passwordOk) {
+      await this.rateLimitService.recordLoginFailure(
+        params.purpose,
+        hashedIdentifier,
+      );
       throw new UnauthorizedException('Invalid credentials');
     }
+
+    await this.rateLimitService.clearLoginFailures(
+      params.purpose,
+      hashedIdentifier,
+    );
 
     if (this.passwordService.needsRehash(user.passwordHash)) {
       const rehashed = await this.passwordService.hash(params.password);
@@ -130,6 +147,13 @@ export class AuthService {
     const normalizedNationalId = this.nationalIdService.normalize(
       dto.nationalId,
     );
+
+    if (
+      !isValidEgyptianPhone(normalizedPhone) ||
+      !isValidEgyptianPhone(normalizedParentPhone)
+    ) {
+      throw new BadRequestException('Invalid phone number format');
+    }
 
     if (!this.nationalIdService.validateFormat(normalizedNationalId)) {
       throw new ConflictException('Invalid national ID format');

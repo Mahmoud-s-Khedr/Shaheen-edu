@@ -11,6 +11,11 @@ export type RateLimitPurpose =
   | 'refresh'
   | 'password-change';
 
+export type LoginRateLimitPurpose = Extract<
+  RateLimitPurpose,
+  'student-login' | 'admin-login' | 'partner-login' | 'parent-login'
+>;
+
 interface Threshold {
   maxAttempts: number;
   windowSeconds: number;
@@ -68,6 +73,59 @@ export class AuthRateLimitService {
         IP_THRESHOLD,
       );
     }
+  }
+
+  /**
+   * Login lockout is keyed to failed credentials only. The IP counter still
+   * applies to every request so a caller cannot bypass volumetric protection
+   * by cycling through identifiers.
+   */
+  async assertLoginAllowed(
+    purpose: LoginRateLimitPurpose,
+    hashedIdentifier: string,
+    ip: string | undefined,
+  ): Promise<void> {
+    const identifierKey = this.identifierKey(purpose, hashedIdentifier);
+    const identifierThreshold = IDENTIFIER_THRESHOLDS[purpose];
+    const currentCount = Number(
+      (await this.redisService.client.get(identifierKey)) ?? 0,
+    );
+    if (currentCount >= identifierThreshold.maxAttempts) {
+      const ttl = await this.redisService.client.ttl(identifierKey);
+      throw new RateLimitException(
+        ttl > 0 ? ttl : identifierThreshold.windowSeconds,
+      );
+    }
+
+    if (ip) {
+      await this.checkAndIncrement(
+        `ratelimit:login:${purpose}:ip:${ip}`,
+        IP_THRESHOLD,
+      );
+    }
+  }
+
+  async recordLoginFailure(
+    purpose: LoginRateLimitPurpose,
+    hashedIdentifier: string,
+  ): Promise<void> {
+    await this.checkAndIncrement(
+      this.identifierKey(purpose, hashedIdentifier),
+      IDENTIFIER_THRESHOLDS[purpose],
+    );
+  }
+
+  async clearLoginFailures(
+    purpose: LoginRateLimitPurpose,
+    hashedIdentifier: string,
+  ): Promise<void> {
+    await this.redisService.client.del(
+      this.identifierKey(purpose, hashedIdentifier),
+    );
+  }
+
+  private identifierKey(purpose: RateLimitPurpose, hashedIdentifier: string) {
+    return `ratelimit:login:${purpose}:${hashedIdentifier}`;
   }
 
   private async checkAndIncrement(

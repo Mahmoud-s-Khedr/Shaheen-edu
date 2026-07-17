@@ -98,6 +98,36 @@ describe('Sessions (e2e)', () => {
     expect(followUpResponse.statusCode).toBe(401);
   });
 
+  it('allows only one concurrent refresh and revokes its successor on reuse', async () => {
+    const { refreshToken } = await registerFreshStudent('1007');
+
+    const responses = await Promise.all(
+      [1, 2].map(() =>
+        app.inject({
+          method: 'POST',
+          url: '/api/v1/auth/refresh',
+          cookies: { refresh_token: refreshToken },
+        }),
+      ),
+    );
+    expect(responses.map((response) => response.statusCode).sort()).toEqual([
+      201,
+      401,
+    ]);
+
+    const successfulResponse = responses.find(
+      (response) => response.statusCode === 201,
+    );
+    if (!successfulResponse) throw new Error('Expected one successful refresh');
+
+    const followUpResponse = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/refresh',
+      cookies: { refresh_token: extractCookie(successfulResponse) },
+    });
+    expect(followUpResponse.statusCode).toBe(401);
+  });
+
   it('logout revokes the current session', async () => {
     const { refreshToken, accessToken } = await registerFreshStudent('1003');
 
