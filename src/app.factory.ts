@@ -65,6 +65,11 @@ export async function createApp(
       )
       .setVersion('1.0')
       .addBearerAuth()
+      .addCookieAuth(
+        'refresh_token',
+        { type: 'apiKey', in: 'cookie' },
+        'refresh_token',
+      )
       .build();
     SwaggerModule.setup(
       'api/docs',

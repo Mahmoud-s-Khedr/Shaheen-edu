@@ -6,6 +6,7 @@ import { cleanDatabase, flushTestRedis, seedSuperAdmin } from './utils/db';
 describe('Admin (e2e)', () => {
   let app: NestFastifyApplication;
   let adminToken: string;
+  let superAdminToken: string;
   let otherAdminId: string;
 
   beforeAll(async () => {
@@ -22,6 +23,7 @@ describe('Admin (e2e)', () => {
       payload: { email: superAdminEmail, password: superAdminPassword },
     });
     const { accessToken: saToken } = JSON.parse(saLogin.body);
+    superAdminToken = saToken;
 
     // Create the admin under test.
     await app.inject({
@@ -66,6 +68,30 @@ describe('Admin (e2e)', () => {
       payload: { email: 'blocked-admin@example.com', password: 'AdminP@ss1!' },
     });
     expect(response.statusCode).toBe(403);
+  });
+
+  it('paginates administrators and partners', async () => {
+    const adminsResponse = await app.inject({
+      method: 'GET',
+      url: '/api/v1/admin/admins?page=1&limit=1',
+      headers: { authorization: `Bearer ${superAdminToken}` },
+    });
+    expect(adminsResponse.statusCode).toBe(200);
+    expect(JSON.parse(adminsResponse.body)).toMatchObject({
+      data: [expect.objectContaining({ role: 'ADMIN' })],
+      meta: { page: 1, limit: 1, total: 2, totalPages: 2 },
+    });
+
+    const partnersResponse = await app.inject({
+      method: 'GET',
+      url: '/api/v1/admin/partners?page=3&limit=1',
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(partnersResponse.statusCode).toBe(200);
+    expect(JSON.parse(partnersResponse.body)).toEqual({
+      data: [],
+      meta: { page: 3, limit: 1, total: 0, totalPages: 0 },
+    });
   });
 
   it('CANNOT suspend another admin (403)', async () => {

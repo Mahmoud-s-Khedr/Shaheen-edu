@@ -4,12 +4,19 @@ import {
   Controller,
   Get,
   Post,
+  Query,
   Req,
   UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
-import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiCreatedResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiTags,
+} from '@nestjs/swagger';
 import type { FastifyRequest } from 'fastify';
 import { Public } from '../../../common/decorators/public.decorator';
 import { ParentAuthGuard } from '../../../common/guards/parent-auth.guard';
@@ -26,6 +33,13 @@ import {
   normalizeEgyptianPhone,
 } from '../../../common/utils/phone.util';
 import type { RequestParentSession } from '../../../common/types/request-with-user.types';
+import { PaginationQueryDto } from '../../../common/dto/pagination-query.dto';
+import { ApiStandardErrors } from '../../../common/decorators/api-standard-errors.decorator';
+import {
+  PaginatedParentChildResponseDto,
+  ParentAccessTokenResponseDto,
+  ParentChildDto,
+} from '../../../common/dto/api-response.dto';
 
 /**
  * All routes on this controller are @Public() to skip the global
@@ -45,6 +59,9 @@ export class ParentAuthController {
   @Public()
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @Post('login')
+  @ApiOperation({ summary: 'Log in as a parent' })
+  @ApiCreatedResponse({ type: ParentAccessTokenResponseDto })
+  @ApiStandardErrors(400, 401, 429)
   async login(@Body() dto: ParentLoginDto, @Req() req: FastifyRequest) {
     const normalizedNationalId = this.nationalIdService.normalize(
       dto.nationalId,
@@ -102,9 +119,19 @@ export class ParentAuthController {
   @UseGuards(ParentAuthGuard)
   @ApiBearerAuth()
   @Get('children')
-  async children(@CurrentParentSession() parentSession: RequestParentSession) {
+  @ApiOperation({
+    summary: 'List children linked to the authenticated parent',
+    description: 'Returns children newest first using offset pagination.',
+  })
+  @ApiOkResponse({ type: PaginatedParentChildResponseDto })
+  @ApiStandardErrors(400, 401)
+  async children(
+    @CurrentParentSession() parentSession: RequestParentSession,
+    @Query() pagination: PaginationQueryDto,
+  ) {
     return this.parentSessionService.listChildren(
       parentSession.parentPhoneNormalized,
+      pagination,
     );
   }
 
@@ -112,6 +139,9 @@ export class ParentAuthController {
   @UseGuards(ParentAuthGuard)
   @ApiBearerAuth()
   @Post('select-child')
+  @ApiOperation({ summary: 'Select the active child for a parent session' })
+  @ApiCreatedResponse({ type: ParentAccessTokenResponseDto })
+  @ApiStandardErrors(400, 401, 403)
   async selectChild(
     @CurrentParentSession() parentSession: RequestParentSession,
     @Body() dto: SelectChildDto,
@@ -127,6 +157,9 @@ export class ParentAuthController {
   @UseGuards(ParentAuthGuard, ParentSelectedChildGuard)
   @ApiBearerAuth()
   @Get('selected-child')
+  @ApiOperation({ summary: 'Get the selected child for a parent session' })
+  @ApiOkResponse({ type: ParentChildDto })
+  @ApiStandardErrors(401, 403)
   async selectedChild(
     @CurrentParentSession() parentSession: RequestParentSession,
   ) {

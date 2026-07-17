@@ -111,7 +111,10 @@ describe('Parent (e2e)', () => {
     const response = await app.inject({
       method: 'POST',
       url: '/api/v1/auth/parents/login',
-      payload: { nationalId: childA.nationalId, parentPhone: '+20 10 6666 2222' },
+      payload: {
+        nationalId: childA.nationalId,
+        parentPhone: '+20 10 6666 2222',
+      },
     });
     expect(response.statusCode).toBe(201);
   });
@@ -134,7 +137,43 @@ describe('Parent (e2e)', () => {
     });
     expect(response.statusCode).toBe(200);
     const children = JSON.parse(response.body);
-    expect(children.length).toBe(2);
+    expect(children.data).toHaveLength(2);
+    expect(children.meta).toEqual({
+      page: 1,
+      limit: 20,
+      total: 2,
+      totalPages: 1,
+    });
+  });
+
+  it('paginates children and rejects invalid pagination input', async () => {
+    const loginResponse = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/parents/login',
+      payload: {
+        nationalId: childA.nationalId,
+        parentPhone: childA.parentPhone,
+      },
+    });
+    const { accessToken } = JSON.parse(loginResponse.body);
+
+    const pagedResponse = await app.inject({
+      method: 'GET',
+      url: '/api/v1/auth/parents/children?page=2&limit=1',
+      headers: { authorization: `Bearer ${accessToken}` },
+    });
+    expect(pagedResponse.statusCode).toBe(200);
+    expect(JSON.parse(pagedResponse.body)).toMatchObject({
+      data: [expect.any(Object)],
+      meta: { page: 2, limit: 1, total: 2, totalPages: 2 },
+    });
+
+    const invalidResponse = await app.inject({
+      method: 'GET',
+      url: '/api/v1/auth/parents/children?page=0',
+      headers: { authorization: `Bearer ${accessToken}` },
+    });
+    expect(invalidResponse.statusCode).toBe(400);
   });
 
   it('selects a child and can then read the selected child', async () => {

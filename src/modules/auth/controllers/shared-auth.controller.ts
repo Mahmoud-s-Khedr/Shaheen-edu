@@ -8,7 +8,14 @@ import {
   Res,
   UnauthorizedException,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiCookieAuth,
+  ApiCreatedResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiTags,
+} from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { Public } from '../../../common/decorators/public.decorator';
@@ -25,6 +32,12 @@ import {
 } from '../utils/refresh-cookie.util';
 import type { RequestUser } from '../../../common/types/request-with-user.types';
 import type { AppConfig } from '../../../config/configuration';
+import { ApiStandardErrors } from '../../../common/decorators/api-standard-errors.decorator';
+import {
+  AuthTokenResponseDto,
+  CurrentUserDto,
+  SuccessResponseDto,
+} from '../../../common/dto/api-response.dto';
 
 @ApiTags('auth')
 @Controller({ path: 'auth', version: '1' })
@@ -39,6 +52,23 @@ export class SharedAuthController {
 
   @Public()
   @Post('refresh')
+  @ApiOperation({
+    summary: 'Refresh user access token',
+    description:
+      'Rotates the HttpOnly refresh_token cookie and returns a new bearer access token.',
+  })
+  @ApiCookieAuth('refresh_token')
+  @ApiCreatedResponse({
+    type: AuthTokenResponseDto,
+    description: 'Access token issued and refresh_token cookie rotated.',
+    headers: {
+      'Set-Cookie': {
+        description: 'Rotated HttpOnly refresh_token cookie.',
+        schema: { type: 'string' },
+      },
+    },
+  })
+  @ApiStandardErrors(401, 429)
   async refresh(
     @Req() req: FastifyRequest,
     @Res({ passthrough: true }) reply: FastifyReply,
@@ -71,6 +101,22 @@ export class SharedAuthController {
   }
 
   @Post('logout')
+  @ApiOperation({
+    summary: 'Log out of the current browser session',
+    description:
+      'Requires a bearer access token. When a refresh_token cookie is present, its session is revoked; the cookie is always cleared.',
+  })
+  @ApiBearerAuth()
+  @ApiCreatedResponse({
+    type: SuccessResponseDto,
+    headers: {
+      'Set-Cookie': {
+        description: 'Clears the refresh_token cookie.',
+        schema: { type: 'string' },
+      },
+    },
+  })
+  @ApiStandardErrors(401)
   async logout(
     @Req() req: FastifyRequest,
     @Res({ passthrough: true }) reply: FastifyReply,
@@ -84,6 +130,22 @@ export class SharedAuthController {
   }
 
   @Post('logout-all')
+  @ApiOperation({
+    summary: 'Log out of all user sessions',
+    description:
+      'Revokes every refresh session for the authenticated user and clears the browser refresh_token cookie.',
+  })
+  @ApiBearerAuth()
+  @ApiCreatedResponse({
+    type: SuccessResponseDto,
+    headers: {
+      'Set-Cookie': {
+        description: 'Clears the refresh_token cookie.',
+        schema: { type: 'string' },
+      },
+    },
+  })
+  @ApiStandardErrors(401)
   async logoutAll(
     @CurrentUser() user: RequestUser,
     @Res({ passthrough: true }) reply: FastifyReply,
@@ -95,6 +157,9 @@ export class SharedAuthController {
 
   @ApiBearerAuth()
   @Get('me')
+  @ApiOperation({ summary: 'Get the authenticated user' })
+  @ApiOkResponse({ type: CurrentUserDto })
+  @ApiStandardErrors(401)
   async me(@CurrentUser() user: RequestUser) {
     const dbUser = await this.prisma.user.findUnique({
       where: { id: user.id },
@@ -112,6 +177,12 @@ export class SharedAuthController {
 
   @ApiBearerAuth()
   @Post('change-password')
+  @ApiOperation({
+    summary: 'Change the authenticated user password',
+    description: 'Revokes all active sessions and clears the refresh cookie.',
+  })
+  @ApiCreatedResponse({ type: SuccessResponseDto })
+  @ApiStandardErrors(400, 401, 429)
   async changePassword(
     @CurrentUser() user: RequestUser,
     @Body() dto: ChangePasswordDto,

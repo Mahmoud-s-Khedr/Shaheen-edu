@@ -11,6 +11,10 @@ import { Role, AccountStatus } from '../../common/types/roles.enum';
 import type { CreatePartnerDto } from './dto/create-partner.dto';
 import type { UpdatePartnerDto } from './dto/update-partner.dto';
 import type { RequestUser } from '../../common/types/request-with-user.types';
+import {
+  toPaginationMeta,
+  type PaginationQueryDto,
+} from '../../common/dto/pagination-query.dto';
 
 /**
  * Admin-side methods here are reached only via routes guarded by
@@ -70,13 +74,22 @@ export class PartnersService {
     return this.getById(user.id);
   }
 
-  async list() {
-    const partners = await this.prisma.user.findMany({
-      where: { role: Role.PARTNER },
-      include: { partnerProfile: true },
-      orderBy: { createdAt: 'desc' },
-    });
-    return partners.map((p) => this.toSummary(p));
+  async list(pagination: PaginationQueryDto) {
+    const where = { role: Role.PARTNER };
+    const [partners, total] = await this.prisma.$transaction([
+      this.prisma.user.findMany({
+        where,
+        include: { partnerProfile: true },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        skip: (pagination.page - 1) * pagination.limit,
+        take: pagination.limit,
+      }),
+      this.prisma.user.count({ where }),
+    ]);
+    return {
+      data: partners.map((partner) => this.toSummary(partner)),
+      meta: toPaginationMeta(pagination.page, pagination.limit, total),
+    };
   }
 
   async getById(id: string) {

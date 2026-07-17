@@ -12,6 +12,10 @@ import { Role, AccountStatus } from '../../common/types/roles.enum';
 import type { CreateAdminDto } from './dto/create-admin.dto';
 import type { UpdateAdminDto } from './dto/update-admin.dto';
 import type { RequestUser } from '../../common/types/request-with-user.types';
+import {
+  toPaginationMeta,
+  type PaginationQueryDto,
+} from '../../common/dto/pagination-query.dto';
 
 /**
  * Every mutating method re-checks actor.role===SUPER_ADMIN even though
@@ -87,13 +91,22 @@ export class AdminsService {
     return this.toSummary(created);
   }
 
-  async list(actor: RequestUser) {
+  async list(actor: RequestUser, pagination: PaginationQueryDto) {
     this.assertActorIsSuperAdmin(actor);
-    const admins = await this.prisma.user.findMany({
-      where: { role: Role.ADMIN },
-      orderBy: { createdAt: 'desc' },
-    });
-    return admins.map((admin) => this.toSummary(admin));
+    const where = { role: Role.ADMIN };
+    const [admins, total] = await this.prisma.$transaction([
+      this.prisma.user.findMany({
+        where,
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        skip: (pagination.page - 1) * pagination.limit,
+        take: pagination.limit,
+      }),
+      this.prisma.user.count({ where }),
+    ]);
+    return {
+      data: admins.map((admin) => this.toSummary(admin)),
+      meta: toPaginationMeta(pagination.page, pagination.limit, total),
+    };
   }
 
   async getById(actor: RequestUser, targetId: string) {

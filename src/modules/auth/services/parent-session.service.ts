@@ -6,6 +6,10 @@ import {
 import { PrismaService } from '../../../database/prisma.service';
 import { TokenService } from './token.service';
 import type { ParentAccessSession } from '@prisma/client';
+import {
+  toPaginationMeta,
+  type PaginationQueryDto,
+} from '../../../common/dto/pagination-query.dto';
 
 @Injectable()
 export class ParentSessionService {
@@ -38,16 +42,30 @@ export class ParentSessionService {
     return { accessToken, session };
   }
 
-  async listChildren(parentPhoneNormalized: string) {
-    return this.prisma.studentProfile.findMany({
-      where: { parentPhoneNormalized },
-      select: {
-        userId: true,
-        fullName: true,
-        governorate: true,
-        center: true,
-      },
-    });
+  async listChildren(
+    parentPhoneNormalized: string,
+    pagination: PaginationQueryDto,
+  ) {
+    const where = { parentPhoneNormalized };
+    const [children, total] = await this.prisma.$transaction([
+      this.prisma.studentProfile.findMany({
+        where,
+        select: {
+          userId: true,
+          fullName: true,
+          governorate: true,
+          center: true,
+        },
+        orderBy: [{ createdAt: 'desc' }, { userId: 'desc' }],
+        skip: (pagination.page - 1) * pagination.limit,
+        take: pagination.limit,
+      }),
+      this.prisma.studentProfile.count({ where }),
+    ]);
+    return {
+      data: children,
+      meta: toPaginationMeta(pagination.page, pagination.limit, total),
+    };
   }
 
   /**

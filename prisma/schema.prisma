@@ -41,6 +41,7 @@ model User {
   auditLogsActor   AdminAuditLog[]
 
   @@index([role])
+  @@index([role, createdAt, id])
 }
 
 model StudentProfile {
@@ -60,6 +61,7 @@ model StudentProfile {
   updatedAt             DateTime @updatedAt
 
   @@index([parentPhoneNormalized])
+  @@index([parentPhoneNormalized, createdAt, userId])
 }
 
 model PartnerProfile {
