@@ -13,23 +13,36 @@ implemented — see [Out of scope](#out-of-scope) below.
 
 ## Prerequisites
 
-- Node.js 22+
+- Node.js 24 LTS
 - pnpm 10+
 - Docker + Docker Compose (for local Postgres/Redis)
 
 ## Setup
 
+The supported local-development workflow manages the API, PostgreSQL, and
+Redis as one Docker Compose stack. Docker Compose is required; Node.js/pnpm
+are only needed for running commands and tests outside the container.
+
 ```bash
-pnpm install
-cp .env.example .env         # adjust values if needed - defaults match docker-compose.yml
-docker compose up -d         # starts postgres (host port 5433) and redis (host port 6380)
-pnpm prisma:migrate          # applies the schema to the dev database
-pnpm prisma:seed             # idempotent - creates the SUPER_ADMIN from .env
-pnpm start:dev               # http://localhost:3000
+pnpm install                 # once, to install command and test dependencies
+pnpm dev:start               # creates .env if needed, builds, migrates, seeds, and starts everything
 ```
 
 Health check: `GET http://localhost:3000/health`
 Swagger UI: `http://localhost:3000/api/docs`
+
+### Development lifecycle
+
+```bash
+pnpm dev:start    # initial build/start, or a fast restart after dev:stop
+pnpm dev:stop     # stop services and retain all development data
+pnpm dev:update   # rebuild API from current code, run migrations, retain data
+pnpm dev:clear    # delete the entire local stack and PostgreSQL/Redis data
+```
+
+`dev:clear` only removes Docker resources belonging to this project. It does
+not change source files or `.env`; the next `dev:start` creates a fresh data
+store. The Compose Postgres/Redis ports are `5433`/`6380` on the host.
 
 Note: the docker-compose Postgres/Redis ports are mapped to **5433/6380** on
 the host (not the default 5432/6379), because those default ports were
@@ -43,39 +56,34 @@ defaults.
 All variables are validated at boot via Joi (`src/config/env.validation.ts`).
 See `.env.example` for a fully worked, non-secret example set. Summary:
 
-| Variable | Purpose |
-|---|---|
-| `NODE_ENV`, `PORT`, `HOST` | Basic app config |
-| `DATABASE_URL` | Postgres connection string (Prisma) |
-| `REDIS_URL` | Redis connection string (rate limiting) |
-| `CORS_ORIGINS` | Comma-separated allowed CORS origins |
-| `COOKIE_SECURE` | Whether the refresh cookie requires HTTPS |
-| `COOKIE_SECRET` | Signing secret for `@fastify/cookie` |
-| `JWT_ACCESS_SECRET` / `JWT_ACCESS_TTL_SECONDS` | User access token (15 min default) |
-| `JWT_REFRESH_TTL_SECONDS` | Opaque refresh token TTL (30 days default) |
-| `JWT_PARENT_ACCESS_SECRET` / `JWT_PARENT_ACCESS_TTL_SECONDS` | Parent access token (30 min default) |
-| `NATIONAL_ID_HMAC_SECRET` | HMAC key for the deterministic National ID lookup hash |
-| `NATIONAL_ID_ENCRYPTION_KEY` | Key material for AES-256-GCM National ID encryption |
-| `NATIONAL_ID_KEY_VERSION` | Recorded alongside encrypted National IDs for future key rotation |
-| `SUPER_ADMIN_EMAIL` / `SUPER_ADMIN_PASSWORD` | Used only by `prisma/seed.ts` |
+| Variable                                                     | Purpose                                                           |
+| ------------------------------------------------------------ | ----------------------------------------------------------------- |
+| `NODE_ENV`, `PORT`, `HOST`                                   | Basic app config                                                  |
+| `DATABASE_URL`                                               | Postgres connection string (Prisma)                               |
+| `REDIS_URL`                                                  | Redis connection string (rate limiting)                           |
+| `CORS_ORIGINS`                                               | Comma-separated allowed CORS origins                              |
+| `COOKIE_SECURE`                                              | Whether the refresh cookie requires HTTPS                         |
+| `COOKIE_SECRET`                                              | Signing secret for `@fastify/cookie`                              |
+| `JWT_ACCESS_SECRET` / `JWT_ACCESS_TTL_SECONDS`               | User access token (15 min default)                                |
+| `JWT_REFRESH_TTL_SECONDS`                                    | Opaque refresh token TTL (30 days default)                        |
+| `JWT_PARENT_ACCESS_SECRET` / `JWT_PARENT_ACCESS_TTL_SECONDS` | Parent access token (30 min default)                              |
+| `NATIONAL_ID_HMAC_SECRET`                                    | HMAC key for the deterministic National ID lookup hash            |
+| `NATIONAL_ID_ENCRYPTION_KEY`                                 | Key material for AES-256-GCM National ID encryption               |
+| `NATIONAL_ID_KEY_VERSION`                                    | Recorded alongside encrypted National IDs for future key rotation |
+| `SUPER_ADMIN_EMAIL` / `SUPER_ADMIN_PASSWORD`                 | Used only by `prisma/seed.ts`                                     |
 
 ## Tests
 
 ```bash
 pnpm test          # unit tests (co-located *.spec.ts)
-pnpm test:e2e       # e2e tests (test/*.e2e-spec.ts) against a REAL Postgres + Redis
+pnpm test:e2e       # e2e tests against disposable Postgres + Redis Testcontainers
+pnpm test:all       # unit tests, e2e tests, then a production build
 ```
 
-The e2e suite uses a **separate test database** (`edu_test`) and a separate
-Redis logical DB (`redis://.../1`) so it never touches your dev data. One-time
-setup (already applied in this environment, re-run if you reset your DB):
-
-```bash
-docker compose exec postgres psql -U edu -d postgres -c "CREATE DATABASE edu_test;"
-cp .env .env.test && sed -i 's#/edu?#/edu_test?#; s#6380#6380/1#' .env.test  # or hand-edit
-DATABASE_URL=<edu_test URL> pnpm prisma migrate deploy
-pnpm test:e2e
-```
+The e2e suite starts its own PostgreSQL 16 and Redis 7 containers, applies
+Prisma migrations, and removes them afterwards. It never reads `.env.test` or
+touches the development stack. Docker must be running; failures to start it
+include an actionable error.
 
 e2e tests drive the app via Fastify's native `app.inject()` (no supertest -
 it's Express-oriented and not installed).
@@ -85,23 +93,23 @@ it's Express-oriented and not installed).
 All routes are mounted under `/api/v1/...` except `/health`, which is
 intentionally unversioned/unprefixed (`GET /health`).
 
-| Endpoint | Notes |
-|---|---|
-| `POST /api/v1/auth/students/register` | Public |
-| `POST /api/v1/auth/students/login` | Public, rate-limited |
-| `POST /api/v1/auth/admins/login` | Public, rate-limited (SUPER_ADMIN or ADMIN) |
-| `POST /api/v1/auth/partners/login` | Public, rate-limited |
-| `POST /api/v1/auth/parents/login` | Public, strictly rate-limited (nationalId + parentPhone) |
-| `GET /api/v1/auth/parents/children` | Parent-session scoped |
-| `POST /api/v1/auth/parents/select-child` | Parent-session scoped |
-| `GET /api/v1/auth/parents/selected-child` | Parent-session scoped, requires a selected child |
-| `POST /api/v1/auth/refresh` | Public (cookie-based rotation) |
-| `POST /api/v1/auth/logout`, `/logout-all`, `GET /api/v1/auth/me` | Requires user access token |
-| `POST /api/v1/auth/change-password` | Requires user access token, rate-limited |
-| `/api/v1/admin/admins/*` | SUPER_ADMIN only |
-| `/api/v1/admin/partners/*` | SUPER_ADMIN or ADMIN |
-| `GET/PATCH /api/v1/students/me` | STUDENT only, structural ownership |
-| `GET /api/v1/partners/me` | PARTNER only, structural ownership |
+| Endpoint                                                         | Notes                                                    |
+| ---------------------------------------------------------------- | -------------------------------------------------------- |
+| `POST /api/v1/auth/students/register`                            | Public                                                   |
+| `POST /api/v1/auth/students/login`                               | Public, rate-limited                                     |
+| `POST /api/v1/auth/admins/login`                                 | Public, rate-limited (SUPER_ADMIN or ADMIN)              |
+| `POST /api/v1/auth/partners/login`                               | Public, rate-limited                                     |
+| `POST /api/v1/auth/parents/login`                                | Public, strictly rate-limited (nationalId + parentPhone) |
+| `GET /api/v1/auth/parents/children`                              | Parent-session scoped                                    |
+| `POST /api/v1/auth/parents/select-child`                         | Parent-session scoped                                    |
+| `GET /api/v1/auth/parents/selected-child`                        | Parent-session scoped, requires a selected child         |
+| `POST /api/v1/auth/refresh`                                      | Public (cookie-based rotation)                           |
+| `POST /api/v1/auth/logout`, `/logout-all`, `GET /api/v1/auth/me` | Requires user access token                               |
+| `POST /api/v1/auth/change-password`                              | Requires user access token, rate-limited                 |
+| `/api/v1/admin/admins/*`                                         | SUPER_ADMIN only                                         |
+| `/api/v1/admin/partners/*`                                       | SUPER_ADMIN or ADMIN                                     |
+| `GET/PATCH /api/v1/students/me`                                  | STUDENT only, structural ownership                       |
+| `GET /api/v1/partners/me`                                        | PARTNER only, structural ownership                       |
 
 ## Implementation decisions
 
@@ -115,7 +123,7 @@ intentionally unversioned/unprefixed (`GET /health`).
   one session.
 - `UserAuthGuard` is registered as a global `APP_GUARD` (deny-by-default);
   routes opt out with `@Public()`. Parent-scoped routes are `@Public()` (to
-  skip the *user* guard, since a parent access token is a structurally
+  skip the _user_ guard, since a parent access token is a structurally
   different token) and separately apply `ParentAuthGuard` locally.
 - National IDs are never stored or logged in plaintext: a HMAC-SHA256 hash
   is used for lookup/uniqueness, and a separate AES-256-GCM ciphertext is
@@ -134,14 +142,14 @@ intentionally unversioned/unprefixed (`GET /health`).
 - `/students/me` and `/partners/me` never accept an id param — ownership is
   structural (`req.user.id`), and `UpdateStudentDto` is whitelist-only
   (combined with the global `ValidationPipe({whitelist:true,
-  forbidNonWhitelisted:true})`) so a student can never smuggle in
+forbidNonWhitelisted:true})`) so a student can never smuggle in
   `role`/`status`/`nationalId`/`password` fields.
 
 ## Known open items / unresolved product decisions
 
 - **Egyptian National ID checksum is validated structurally only** (length,
   digit-only, century marker in `{2,3}`, valid month/day) — the final
-  checksum digit is *not* verified. This is a documented v1 shortcut.
+  checksum digit is _not_ verified. This is a documented v1 shortcut.
 - Rate-limit thresholds (`AuthRateLimitService`) are illustrative,
   env-independent constants in code, not yet exposed as configuration.
 - `AccountStatus.DISABLED` exists in the Prisma enum but has no toggle

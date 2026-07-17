@@ -1,14 +1,20 @@
-# Production image (not required for local dev; local dev uses docker-compose for postgres/redis only)
-FROM node:22-alpine AS build
+FROM node:24-alpine AS build
 WORKDIR /app
 RUN corepack enable
 COPY package.json pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile
 COPY . .
 RUN pnpm prisma generate
-RUN pnpm build
+RUN rm -rf dist tsconfig.build.tsbuildinfo && pnpm build
 
-FROM node:22-alpine AS runtime
+# Local development image. It intentionally retains development dependencies so
+# migrations and the TypeScript seed script can run inside the Compose stack.
+FROM build AS development
+ENV NODE_ENV=development
+EXPOSE 3000
+CMD ["sh", "-c", "pnpm prisma migrate deploy && pnpm prisma:seed && node dist/main"]
+
+FROM node:24-alpine AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 RUN corepack enable
