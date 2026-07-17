@@ -1,0 +1,90 @@
+import {
+  Injectable,
+  UnauthorizedException,
+  ForbiddenException,
+} from '@nestjs/common';
+import { PrismaService } from '../../../database/prisma.service';
+import { TokenService } from './token.service';
+import type { ParentAccessSession } from '@prisma/client';
+
+@Injectable()
+export class ParentSessionService {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly tokenService: TokenService,
+  ) {}
+
+  async createSession(params: {
+    parentPhoneNormalized: string;
+    ipAddress?: string;
+    userAgent?: string;
+  }): Promise<{ accessToken: string; session: ParentAccessSession }> {
+    const expiresAt = new Date(
+      Date.now() + this.tokenService.parentAccessTtlSeconds * 1000,
+    );
+    const session = await this.prisma.parentAccessSession.create({
+      data: {
+        parentPhoneNormalized: params.parentPhoneNormalized,
+        activeStudentId: null,
+        expiresAt,
+        ipAddress: params.ipAddress,
+        userAgent: params.userAgent,
+      },
+    });
+    const accessToken = this.tokenService.signParentAccessToken({
+      parentSessionId: session.id,
+      activeStudentId: null,
+    });
+    return { accessToken, session };
+  }
+
+  async listChildren(parentPhoneNormalized: string) {
+    return this.prisma.studentProfile.findMany({
+      where: { parentPhoneNormalized },
+      select: {
+        userId: true,
+        fullName: true,
+        governorate: true,
+        center: true,
+      },
+    });
+  }
+
+  /**
+   * Re-signs the parent access token with the updated `active` claim after
+   * verifying the target student actually belongs to this parent phone.
+   */
+  async selectChild(params: {
+    parentSessionId: string;
+    parentPhoneNormalized: string;
+    studentUserId: string;
+  }): Promise<{ accessToken: string }> {
+    const student = await this.prisma.studentProfile.findUnique({
+      where: { userId: params.studentUserId },
+    });
+    if (
+      !student ||
+      student.parentPhoneNormalized !== params.parentPhoneNormalized
+    ) {
+      throw new ForbiddenException('Student is not linked to this parent');
+    }
+
+    const session = await this.prisma.parentAccessSession.findUnique({
+      where: { id: params.parentSessionId },
+    });
+    if (!session || session.revoked || session.expiresAt < new Date()) {
+      throw new UnauthorizedException('Unauthorized');
+    }
+
+    await this.prisma.parentAccessSession.update({
+      where: { id: session.id },
+      data: { activeStudentId: student.userId },
+    });
+
+    const accessToken = this.tokenService.signParentAccessToken({
+      parentSessionId: session.id,
+      activeStudentId: student.userId,
+    });
+    return { accessToken };
+  }
+}

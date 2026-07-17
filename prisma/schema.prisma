@@ -1,0 +1,122 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  SUPER_ADMIN
+  ADMIN
+  PARTNER
+  STUDENT
+}
+
+enum AccountStatus {
+  ACTIVE
+  SUSPENDED
+  DISABLED
+}
+
+enum PartnerType {
+  CONTENT_PUBLISHER
+  REFERRAL_PARTNER
+}
+
+model User {
+  id               String        @id @default(cuid())
+  role             Role
+  status           AccountStatus @default(ACTIVE)
+  loginIdentifier  String        @unique
+  passwordHash     String
+  lastLoginAt      DateTime?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  studentProfile   StudentProfile?
+  partnerProfile   PartnerProfile?
+  authSessions     AuthSession[]
+  auditLogsActor   AdminAuditLog[]
+
+  @@index([role])
+}
+
+model StudentProfile {
+  userId               String   @id
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fullName             String
+  nationalIdHash        String   @unique
+  nationalIdEncrypted   String?
+  nationalIdLast4       String
+  nationalIdKeyVersion  Int      @default(1)
+  academicGradeId       String?
+  gradeTransitional     String?
+  governorate           String
+  center                String?
+  parentPhoneNormalized String
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@index([parentPhoneNormalized])
+}
+
+model PartnerProfile {
+  userId          String      @id
+  user            User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  partnerType     PartnerType
+  displayName     String
+  legalName       String?
+  phone           String?
+  createdByAdminId String
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+}
+
+model AuthSession {
+  id                   String    @id @default(cuid())
+  userId               String
+  user                 User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  refreshTokenHash     String    @unique
+  familyId             String
+  revoked              Boolean   @default(false)
+  revokedAt            DateTime?
+  replacedBySessionId  String?
+  ipAddress            String?
+  userAgent            String?
+  expiresAt            DateTime
+  createdAt            DateTime  @default(now())
+
+  @@index([userId])
+  @@index([familyId])
+}
+
+model ParentAccessSession {
+  id                     String    @id @default(cuid())
+  parentPhoneNormalized  String
+  activeStudentId        String?
+  revoked                Boolean   @default(false)
+  revokedAt              DateTime?
+  ipAddress              String?
+  userAgent              String?
+  expiresAt              DateTime
+  createdAt              DateTime  @default(now())
+
+  @@index([parentPhoneNormalized])
+}
+
+model AdminAuditLog {
+  id            String   @id @default(cuid())
+  actorUserId   String
+  actor         User     @relation(fields: [actorUserId], references: [id])
+  action        String
+  targetType    String
+  targetId      String
+  metadata      Json?
+  correlationId String?
+  createdAt     DateTime @default(now())
+
+  @@index([actorUserId])
+  @@index([targetType, targetId])
+}

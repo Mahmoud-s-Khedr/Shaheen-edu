@@ -1,0 +1,57 @@
+import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { ClsModule } from 'nestjs-cls';
+import { randomUUID } from 'crypto';
+import { ConfigModule } from './config/config.module';
+import { LoggerModule } from './common/logging/logger.module';
+import { DatabaseModule } from './database/database.module';
+import { RedisModule } from './redis/redis.module';
+import { HealthModule } from './health/health.module';
+import { AuthModule } from './modules/auth/auth.module';
+import { UsersModule } from './modules/users/users.module';
+import { AdminsModule } from './modules/admins/admins.module';
+import { PartnersModule } from './modules/partners/partners.module';
+import { StudentsModule } from './modules/students/students.module';
+import { ParentsModule } from './modules/parents/parents.module';
+import { AuditModule } from './modules/audit/audit.module';
+import { UserAuthGuard } from './common/guards/user-auth.guard';
+import type { IncomingMessage } from 'http';
+
+@Module({
+  imports: [
+    ConfigModule,
+    LoggerModule,
+    ClsModule.forRoot({
+      global: true,
+      middleware: {
+        mount: true,
+        generateId: true,
+        idGenerator: (req: IncomingMessage) =>
+          (req.headers['x-correlation-id'] as string | undefined) ??
+          randomUUID(),
+      },
+    }),
+    ThrottlerModule.forRoot({
+      throttlers: [{ ttl: 60_000, limit: 30 }],
+    }),
+    DatabaseModule,
+    RedisModule,
+    HealthModule,
+    AuthModule,
+    UsersModule,
+    AdminsModule,
+    PartnersModule,
+    StudentsModule,
+    ParentsModule,
+    AuditModule,
+  ],
+  providers: [
+    // Global deny-by-default auth guard - @Public() opts a route out.
+    { provide: APP_GUARD, useClass: UserAuthGuard },
+    // Generic per-route in-memory rate limiting (separate from the
+    // Redis-backed AuthRateLimitService used for login lockout/backoff).
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
+  ],
+})
+export class AppModule {}
