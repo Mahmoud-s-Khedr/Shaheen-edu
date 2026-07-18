@@ -2,10 +2,10 @@ import { assert, expectStatus } from '../lib/assertions.js';
 import type { JourneyDefinition } from '../lib/types.js';
 
 export const parentJourney: JourneyDefinition = {
-  id: 'AUTH-005', name: 'Parent multi-child scoped access', category: 'auth', dependsOn: ['AUTH-001'],
+  id: 'AUTH-005', name: 'Parent multi-child scoped access', category: 'auth', dependsOn: ['AUTH-004'],
   async run({ clients, context, factory, step }) {
     const parentPhone = factory.phone();
-    const child = () => ({ fullName: factory.title('Child'), nationalId: factory.nationalId(), phone: factory.phone(), parentPhone, governorate: 'Giza', password: factory.password('Child') });
+    const child = () => ({ fullName: factory.title('Child'), nationalId: factory.nationalId(), phone: factory.phone(), parentPhone, governorate: 'Giza', academicGradeId: context.academic.gradeId, password: factory.password('Child') });
     const childA = child(); const childB = child(); let childAId = ''; let childBId = ''; let unrelatedId = '';
     await step('Registering two children under one parent', async () => {
       for (const [index, data] of [childA, childB].entries()) { const r = await clients.public.request<any>('POST', '/auth/students/register', data); expectStatus(r, 201); if (index === 0) childAId = r.body.user.id; else childBId = r.body.user.id; context.students.push({ id: r.body.user.id, phone: data.phone, password: data.password, nationalId: data.nationalId, parentPhone }); context.created.students.push(r.body.user.id); }

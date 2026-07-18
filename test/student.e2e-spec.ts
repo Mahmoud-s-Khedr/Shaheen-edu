@@ -1,7 +1,13 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access -- e2e tests parse raw JSON response bodies */
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import { createTestApp } from './utils/create-test-app';
-import { cleanDatabase, flushTestRedis } from './utils/db';
+import {
+  cleanDatabase,
+  flushTestRedis,
+  seedDraftAcademicGrade,
+  seedPublishedAcademicGrade,
+} from './utils/db';
+import { PrismaService } from '../src/database/prisma.service';
 
 const baseRegisterPayload = {
   fullName: 'Student E2E',
@@ -14,11 +20,15 @@ const baseRegisterPayload = {
 
 describe('Student (e2e)', () => {
   let app: NestFastifyApplication;
+  let academicGradeId: string;
 
   beforeAll(async () => {
     app = await createTestApp();
     await cleanDatabase(app);
     await flushTestRedis(app);
+    academicGradeId = (
+      await seedPublishedAcademicGrade(app, 'student-e2e-grade')
+    ).id;
   });
 
   afterAll(async () => {
@@ -29,7 +39,7 @@ describe('Student (e2e)', () => {
     const response = await app.inject({
       method: 'POST',
       url: '/api/v1/auth/students/register',
-      payload: baseRegisterPayload,
+      payload: { ...baseRegisterPayload, academicGradeId },
     });
     expect(response.statusCode).toBe(201);
     const body = JSON.parse(response.body);
@@ -39,6 +49,71 @@ describe('Student (e2e)', () => {
     expect(response.body).not.toContain('29902020212345');
   });
 
+  it('stores the required academic grade during registration', async () => {
+    const prisma = app.get(PrismaService);
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/students/register',
+      payload: {
+        ...baseRegisterPayload,
+        nationalId: '29902020211111',
+        phone: '01077776666',
+        parentPhone: '01066665555',
+        academicGradeId,
+      },
+    });
+
+    expect(response.statusCode).toBe(201);
+    const { user } = JSON.parse(response.body);
+    const studentProfile = await prisma.studentProfile.findUnique({
+      where: { userId: user.id },
+    });
+    expect(studentProfile?.academicGradeId).toBe(academicGradeId);
+  });
+
+  it('requires a published academic grade during registration', async () => {
+    const missing = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/students/register',
+      payload: {
+        ...baseRegisterPayload,
+        nationalId: '29902020255555',
+        phone: '01055556666',
+        parentPhone: '01066667777',
+      },
+    });
+    expect(missing.statusCode).toBe(400);
+
+    const invalid = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/students/register',
+      payload: {
+        ...baseRegisterPayload,
+        nationalId: '29902020266666',
+        phone: '01066667777',
+        parentPhone: '01077778888',
+        academicGradeId: 'missing-grade-id',
+      },
+    });
+    expect(invalid.statusCode).toBe(404);
+
+    const draftGradeId = (
+      await seedDraftAcademicGrade(app, 'student-e2e-draft-grade')
+    ).id;
+    const draft = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/students/register',
+      payload: {
+        ...baseRegisterPayload,
+        nationalId: '29902020277777',
+        phone: '01077778888',
+        parentPhone: '01088889999',
+        academicGradeId: draftGradeId,
+      },
+    });
+    expect(draft.statusCode).toBe(404);
+  });
+
   it('accepts a country-code-form phone and persists the canonical identifier', async () => {
     const response = await app.inject({
       method: 'POST',
@@ -46,6 +121,7 @@ describe('Student (e2e)', () => {
       payload: {
         ...baseRegisterPayload,
         nationalId: '29902020222222',
+        academicGradeId,
         phone: '+20 10 1111 2222',
         parentPhone: '00201033334444',
       },
@@ -58,7 +134,12 @@ describe('Student (e2e)', () => {
     const malformedStudent = await app.inject({
       method: 'POST',
       url: '/api/v1/auth/students/register',
-      payload: { ...baseRegisterPayload, nationalId: '29902020233333', phone: '01312345678' },
+      payload: {
+        ...baseRegisterPayload,
+        academicGradeId,
+        nationalId: '29902020233333',
+        phone: '01312345678',
+      },
     });
     expect(malformedStudent.statusCode).toBe(400);
 
@@ -67,6 +148,7 @@ describe('Student (e2e)', () => {
       url: '/api/v1/auth/students/register',
       payload: {
         ...baseRegisterPayload,
+        academicGradeId,
         nationalId: '29902020244444',
         phone: '01044445555',
         parentPhone: 'not-a-phone',
@@ -81,6 +163,7 @@ describe('Student (e2e)', () => {
       url: '/api/v1/auth/students/register',
       payload: {
         ...baseRegisterPayload,
+        academicGradeId,
         nationalId: '29902020298765',
       },
     });
@@ -93,6 +176,7 @@ describe('Student (e2e)', () => {
       url: '/api/v1/auth/students/register',
       payload: {
         ...baseRegisterPayload,
+        academicGradeId,
         phone: '01011112222',
       },
     });

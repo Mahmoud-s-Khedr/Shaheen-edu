@@ -1,7 +1,11 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access -- e2e tests parse raw JSON response bodies */
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import { createTestApp } from './utils/create-test-app';
-import { cleanDatabase, flushTestRedis } from './utils/db';
+import {
+  cleanDatabase,
+  flushTestRedis,
+  seedPublishedAcademicGrade,
+} from './utils/db';
 import { PrismaService } from '../src/database/prisma.service';
 
 const studentPayload = {
@@ -23,11 +27,15 @@ function extractCookie(response: {
 
 describe('Sessions (e2e)', () => {
   let app: NestFastifyApplication;
+  let academicGradeId: string;
 
   beforeAll(async () => {
     app = await createTestApp();
     await cleanDatabase(app);
     await flushTestRedis(app);
+    academicGradeId = (
+      await seedPublishedAcademicGrade(app, 'sessions-e2e-grade')
+    ).id;
   });
 
   afterAll(async () => {
@@ -41,6 +49,7 @@ describe('Sessions (e2e)', () => {
   async function registerFreshStudent(phoneSuffix: string) {
     const payload = {
       ...studentPayload,
+      academicGradeId,
       phone: `0107777${phoneSuffix}`,
       nationalId: `2990404041${phoneSuffix}`,
     };
@@ -111,8 +120,7 @@ describe('Sessions (e2e)', () => {
       ),
     );
     expect(responses.map((response) => response.statusCode).sort()).toEqual([
-      201,
-      401,
+      201, 401,
     ]);
 
     const successfulResponse = responses.find(

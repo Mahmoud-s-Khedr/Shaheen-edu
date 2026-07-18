@@ -21,6 +21,7 @@ import type { UpdateAcademicGradeDto } from './dto/update-academic-grade.dto';
 import type { QueryAcademicGradeDto } from './dto/query-academic-grade.dto';
 import type { ReorderAcademicGradeDto } from './dto/reorder-academic-grade.dto';
 import type { VersionOnlyDto } from '../../common/dto/version-only.dto';
+import type { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
 
 /**
  * NOTE: this level models only the DRAFT/PUBLISHED/ARCHIVED lifecycle and the
@@ -112,6 +113,23 @@ export class AcademicGradesService {
     };
   }
 
+  async listPublished(query: PaginationQueryDto) {
+    const where = { status: ContentStatus.PUBLISHED };
+    const [items, total] = await this.prisma.$transaction([
+      this.prisma.academicGrade.findMany({
+        where,
+        orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
+        skip: (query.page - 1) * query.limit,
+        take: query.limit,
+      }),
+      this.prisma.academicGrade.count({ where }),
+    ]);
+    return {
+      data: items.map((item) => this.toSummary(item)),
+      meta: toPaginationMeta(query.page, query.limit, total),
+    };
+  }
+
   async update(actor: RequestUser, id: string, dto: UpdateAcademicGradeDto) {
     this.assertActorRole(actor);
     const record = await this.getOrThrow(id);
@@ -170,7 +188,11 @@ export class AcademicGradesService {
         for (const phase1 of plan.phase1) {
           const result = await tx.academicGrade.updateMany({
             where: { id: phase1.id, version: versionById.get(phase1.id) },
-            data: { sortOrder: phase1.sortOrder, updatedById: actor.id, version: { increment: 1 } },
+            data: {
+              sortOrder: phase1.sortOrder,
+              updatedById: actor.id,
+              version: { increment: 1 },
+            },
           });
           if (result.count === 0) versionConflict();
         }

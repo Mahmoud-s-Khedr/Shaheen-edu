@@ -2,7 +2,7 @@ import { assert, expectStatus } from '../lib/assertions.js';
 import type { JourneyDefinition } from '../lib/types.js';
 
 export const hierarchyJourney: JourneyDefinition = {
-  id: 'CONTENT-001', name: 'Academic hierarchy administration lifecycle', category: 'content', dependsOn: ['AUTH-002'],
+  id: 'CONTENT-001', name: 'Academic hierarchy administration lifecycle', category: 'content', dependsOn: ['AUTH-004'],
   async run({ clients, context, factory, step }) {
     const admin = clients.admin; const create = async (path: string, body: unknown) => { const r = await admin.request<any>('POST', path, body); expectStatus(r, 201); return r.body; };
     let grade: any; let subject: any; let course: any; let chapter: any; let lesson: any; let section: any;
@@ -20,8 +20,7 @@ export const hierarchyJourney: JourneyDefinition = {
       const read = await admin.request<any>('GET', `/admin/sections/${section.id}`); expectStatus(read, 200); assert(read.body.lessonId === lesson.id, 'Section read must retain parent');
       const update = await admin.request<any>('PATCH', `/admin/lessons/${lesson.id}`, { title: factory.title('Updated lesson'), version: lesson.version }); expectStatus(update, 200); lesson = update.body; assert(lesson.version === 2, 'Update must increment version');
       const invalid = await admin.request<any>('POST', '/admin/subjects', { title: factory.title('Invalid subject'), academicGradeId: 'missing-parent-id' }); expectStatus(invalid, 404);
-      const studentForbidden = await clients.public.request<any>('POST', '/auth/students/register', { fullName: factory.title('Mutation student'), nationalId: factory.nationalId(), phone: factory.phone(), parentPhone: factory.phone(), governorate: 'Cairo', password: factory.password('Student') }); expectStatus(studentForbidden, 201);
-      const denied = await clients.public.request<any>('POST', '/admin/academic-grades', { title: factory.title('Denied') }, { accessToken: studentForbidden.body.accessToken }); expectStatus(denied, 403);
+      const denied = await clients.student.request<any>('POST', '/admin/academic-grades', { title: factory.title('Denied') }); expectStatus(denied, 403);
     });
     await step('Enforcing publish parent ordering', async () => {
       const early = await admin.request<any>('POST', `/admin/sections/${section.id}/publish`, { version: section.version }); expectStatus(early, 409);

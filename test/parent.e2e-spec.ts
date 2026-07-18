@@ -1,7 +1,11 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access -- e2e tests parse raw JSON response bodies */
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import { createTestApp } from './utils/create-test-app';
-import { cleanDatabase, flushTestRedis } from './utils/db';
+import {
+  cleanDatabase,
+  flushTestRedis,
+  seedPublishedAcademicGrade,
+} from './utils/db';
 
 const childA = {
   fullName: 'Child A',
@@ -39,12 +43,15 @@ describe('Parent (e2e)', () => {
     app = await createTestApp();
     await cleanDatabase(app);
     await flushTestRedis(app);
+    const academicGradeId = (
+      await seedPublishedAcademicGrade(app, 'parent-e2e-grade')
+    ).id;
 
     for (const payload of [childA, childB, unrelatedChild]) {
       const response = await app.inject({
         method: 'POST',
         url: '/api/v1/auth/students/register',
-        payload,
+        payload: { ...payload, academicGradeId },
       });
       const body = JSON.parse(response.body);
       if (payload === childA) childAUserId = body.user.id;

@@ -43,7 +43,7 @@ export class StudentAuthController {
     type: AuthTokenResponseDto,
     headers: { 'Set-Cookie': { schema: { type: 'string' } } },
   })
-  @ApiStandardErrors(400, 409)
+  @ApiStandardErrors(400, 404, 409)
   async register(
     @Body() dto: RegisterStudentDto,
     @Req() req: FastifyRequest,

@@ -32,6 +32,23 @@ describe('Swagger (e2e)', () => {
       ]),
     );
 
+    const studentRegistrationSchema =
+      document.components.schemas.RegisterStudentDto;
+    expect(studentRegistrationSchema.properties.academicGradeId).toMatchObject({
+      type: 'string',
+      description: 'ID of the academic grade the student is enrolled in',
+    });
+    expect(studentRegistrationSchema.required).toContain('academicGradeId');
+
+    const publicGrades = document.paths['/api/v1/academic-grades'].get;
+    expect(publicGrades.summary).toBe('List published academic grades');
+    expect(publicGrades.parameters).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: 'page', in: 'query' }),
+        expect.objectContaining({ name: 'limit', in: 'query' }),
+      ]),
+    );
+
     const refresh = document.paths['/api/v1/auth/refresh'].post;
     expect(refresh.summary).toBe('Refresh user access token');
     expect(refresh.security).toEqual([{ refresh_token: [] }]);

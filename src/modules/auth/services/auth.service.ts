@@ -3,6 +3,7 @@ import {
   UnauthorizedException,
   ConflictException,
   BadRequestException,
+  NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../../database/prisma.service';
 import { PasswordService } from './password.service';
@@ -12,7 +13,11 @@ import {
   AuthRateLimitService,
   type LoginRateLimitPurpose,
 } from './auth-rate-limit.service';
-import { AccountStatus, Role } from '../../../common/types/roles.enum';
+import {
+  AccountStatus,
+  ContentStatus,
+  Role,
+} from '../../../common/types/roles.enum';
 import {
   isValidEgyptianPhone,
   normalizeEgyptianPhone,
@@ -175,6 +180,18 @@ export class AuthService {
       throw new ConflictException('National ID already registered');
     }
 
+    {
+      const academicGrade = await this.prisma.academicGrade.findFirst({
+        where: {
+          id: dto.academicGradeId,
+          status: ContentStatus.PUBLISHED,
+        },
+      });
+      if (!academicGrade) {
+        throw new NotFoundException('Academic grade not found');
+      }
+    }
+
     const passwordHash = await this.passwordService.hash(dto.password);
     const nationalIdEncrypted =
       this.nationalIdService.encrypt(normalizedNationalId);
@@ -196,6 +213,7 @@ export class AuthService {
           nationalIdHash,
           nationalIdEncrypted,
           nationalIdLast4,
+          academicGradeId: dto.academicGradeId,
           governorate: dto.governorate,
           center: dto.center,
           parentPhoneNormalized: normalizedParentPhone,

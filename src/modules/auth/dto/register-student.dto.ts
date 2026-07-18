@@ -40,6 +40,13 @@ export class RegisterStudentDto {
   @IsNotEmpty()
   governorate!: string;
 
+  @ApiProperty({
+    description: 'ID of the academic grade the student is enrolled in',
+  })
+  @IsString()
+  @IsNotEmpty()
+  academicGradeId!: string;
+
   @ApiProperty({ example: 'Nasr City Center', required: false })
   @IsOptional()
   @IsString()

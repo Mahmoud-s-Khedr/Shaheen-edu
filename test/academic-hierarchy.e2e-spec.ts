@@ -8,6 +8,7 @@ describe('Academic hierarchy (e2e)', () => {
   let adminToken: string;
   let studentToken: string;
   let partnerToken: string;
+  let registrationGradeId: string;
 
   async function json(response: { body: string }) {
     return JSON.parse(response.body);
@@ -48,6 +49,21 @@ describe('Academic hierarchy (e2e)', () => {
     });
     adminToken = (await json(adminLogin)).accessToken;
 
+    const registrationGrade = await app.inject({
+      method: 'POST',
+      url: '/api/v1/admin/academic-grades',
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { title: 'Registration Grade' },
+    });
+    const registrationGradeBody = await json(registrationGrade);
+    registrationGradeId = registrationGradeBody.id;
+    await app.inject({
+      method: 'POST',
+      url: `/api/v1/admin/academic-grades/${registrationGradeBody.id}/publish`,
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { version: registrationGradeBody.version },
+    });
+
     const studentRegister = await app.inject({
       method: 'POST',
       url: '/api/v1/auth/students/register',
@@ -57,6 +73,7 @@ describe('Academic hierarchy (e2e)', () => {
         phone: '01055559999',
         parentPhone: '01066668888',
         governorate: 'Cairo',
+        academicGradeId: registrationGradeBody.id,
         password: 'StudentP@ss1!',
       },
     });
@@ -115,6 +132,17 @@ describe('Academic hierarchy (e2e)', () => {
       expect(body.slug).toBe('grade-10');
       gradeId = body.id;
       gradeVersion = body.version;
+
+      const publicGrades = await app.inject({
+        method: 'GET',
+        url: '/api/v1/academic-grades',
+      });
+      expect(publicGrades.statusCode).toBe(200);
+      const publicBody = await json(publicGrades);
+      expect(publicBody.meta).toMatchObject({ page: 1, limit: 20, total: 1 });
+      expect(
+        publicBody.data.map((grade: { id: string }) => grade.id),
+      ).not.toContain(gradeId);
     });
 
     it('creates a subject under the grade', async () => {
@@ -200,6 +228,19 @@ describe('Academic hierarchy (e2e)', () => {
         payload: { version: gradeVersion },
       });
       expect(publishGrade.statusCode).toBe(201);
+
+      const publicGrades = await app.inject({
+        method: 'GET',
+        url: '/api/v1/academic-grades?page=1&limit=1',
+      });
+      expect(publicGrades.statusCode).toBe(200);
+      expect((await json(publicGrades)).meta).toMatchObject({
+        page: 1,
+        limit: 1,
+        total: 2,
+        totalPages: 2,
+      });
+      expect((await json(publicGrades)).data[0].id).toBe(registrationGradeId);
 
       const publishSubject = await app.inject({
         method: 'POST',

@@ -2,7 +2,11 @@ import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import * as argon2 from 'argon2';
 import { PrismaService } from '../../src/database/prisma.service';
 import { RedisService } from '../../src/redis/redis.service';
-import { Role, AccountStatus } from '../../src/common/types/roles.enum';
+import {
+  Role,
+  AccountStatus,
+  ContentStatus,
+} from '../../src/common/types/roles.enum';
 
 /** Deletes all app-owned rows, in FK-safe order. Run at the start of each e2e suite. */
 export async function cleanDatabase(
@@ -49,4 +53,44 @@ export async function seedSuperAdmin(
     },
   });
   return { id: user.id, loginIdentifier: user.loginIdentifier };
+}
+
+export async function seedPublishedAcademicGrade(
+  app: NestFastifyApplication,
+  slug: string,
+): Promise<{ id: string }> {
+  return seedAcademicGrade(app, slug, ContentStatus.PUBLISHED);
+}
+
+export async function seedDraftAcademicGrade(
+  app: NestFastifyApplication,
+  slug: string,
+): Promise<{ id: string }> {
+  return seedAcademicGrade(app, slug, ContentStatus.DRAFT);
+}
+
+async function seedAcademicGrade(
+  app: NestFastifyApplication,
+  slug: string,
+  status: ContentStatus,
+): Promise<{ id: string }> {
+  const owner = await seedSuperAdmin(
+    app,
+    `${slug}-owner@example.com`,
+    'SuperAdminP@ss1!',
+  );
+  const prisma = app.get(PrismaService);
+  const sortOrder = (await prisma.academicGrade.count()) + 1;
+  return prisma.academicGrade.create({
+    data: {
+      title: slug,
+      slug,
+      sortOrder,
+      status,
+      publishedAt: status === ContentStatus.PUBLISHED ? new Date() : null,
+      createdById: owner.id,
+      updatedById: owner.id,
+    },
+    select: { id: true },
+  });
 }
