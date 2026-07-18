@@ -1,0 +1,80 @@
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
+import {
+  IsBoolean,
+  IsEnum,
+  IsInt,
+  IsOptional,
+  IsString,
+  IsUrl,
+  MaxLength,
+  Min,
+  MinLength,
+  ValidateNested,
+} from 'class-validator';
+import {
+  ContentAccessLevel,
+  ContentItemType,
+} from '../../../common/types/roles.enum';
+import {
+  ContentPlacementTargetDto,
+  ExactlyOneContentPlacementTargetConstraint,
+} from './content-placement-target.dto';
+import { Validate } from 'class-validator';
+
+export class CreateContentItemDto {
+  @ApiProperty({ enum: ContentItemType })
+  @IsEnum(ContentItemType)
+  type!: ContentItemType;
+
+  @ApiProperty()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(200)
+  title!: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  description?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(100000)
+  textBody?: string;
+
+  @ApiPropertyOptional({ description: 'HTTPS URL for EXTERNAL_LINK content' })
+  @IsOptional()
+  @IsUrl({ protocols: ['https'], require_protocol: true })
+  externalUrl?: string;
+
+  @ApiPropertyOptional({
+    enum: ContentAccessLevel,
+    default: ContentAccessLevel.ENTITLED,
+  })
+  @IsOptional()
+  @IsEnum(ContentAccessLevel)
+  accessLevel?: ContentAccessLevel;
+
+  @ApiPropertyOptional({ default: false })
+  @IsOptional()
+  @IsBoolean()
+  isPreview?: boolean;
+
+  @ApiPropertyOptional({
+    description: 'Estimated duration in seconds',
+    minimum: 0,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  estimatedDuration?: number;
+
+  @ApiProperty({ type: ContentPlacementTargetDto })
+  @ValidateNested()
+  @Type(() => ContentPlacementTargetDto)
+  @Validate(ExactlyOneContentPlacementTargetConstraint)
+  placement!: ContentPlacementTargetDto;
+}

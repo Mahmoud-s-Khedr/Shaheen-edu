@@ -4,6 +4,8 @@ import {
   ContentStatus,
   PartnerType,
   Role,
+  ContentItemType,
+  ContentAccessLevel,
 } from '../types/roles.enum';
 
 export class ApiErrorResponseDto {
@@ -276,6 +278,89 @@ export class PaginatedLessonResponseDto {
 export class PaginatedSectionResponseDto {
   @ApiProperty({ type: [SectionSummaryDto] })
   data!: SectionSummaryDto[];
+
+  @ApiProperty({ type: PaginationMetaDto })
+  meta!: PaginationMetaDto;
+}
+
+export class ContentPlacementSummaryDto {
+  @ApiProperty()
+  id!: string;
+
+  @ApiPropertyOptional({ nullable: true })
+  courseId!: string | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  chapterId!: string | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  lessonId!: string | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  sectionId!: string | null;
+
+  @ApiProperty()
+  sortOrder!: number;
+
+  @ApiProperty({
+    description: 'Placement version used for move and reorder operations.',
+  })
+  version!: number;
+}
+
+export class ContentItemSummaryDto {
+  @ApiProperty()
+  id!: string;
+
+  @ApiProperty({ enum: ContentItemType })
+  type!: ContentItemType;
+
+  @ApiProperty()
+  title!: string;
+
+  @ApiPropertyOptional({ nullable: true })
+  description!: string | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  textBody!: string | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  externalUrl!: string | null;
+
+  @ApiProperty({ enum: ContentAccessLevel })
+  accessLevel!: ContentAccessLevel;
+
+  @ApiProperty()
+  isPreview!: boolean;
+
+  @ApiPropertyOptional({ nullable: true })
+  estimatedDuration!: number | null;
+
+  @ApiProperty({ enum: ContentStatus })
+  status!: ContentStatus;
+
+  @ApiProperty({ type: ContentPlacementSummaryDto })
+  placement!: ContentPlacementSummaryDto;
+
+  @ApiProperty({ type: String, format: 'date-time' })
+  createdAt!: Date;
+
+  @ApiProperty({ type: String, format: 'date-time' })
+  updatedAt!: Date;
+
+  @ApiPropertyOptional({ type: String, format: 'date-time', nullable: true })
+  publishedAt!: Date | null;
+
+  @ApiPropertyOptional({ type: String, format: 'date-time', nullable: true })
+  archivedAt!: Date | null;
+
+  @ApiProperty()
+  version!: number;
+}
+
+export class PaginatedContentItemResponseDto {
+  @ApiProperty({ type: [ContentItemSummaryDto] })
+  data!: ContentItemSummaryDto[];
 
   @ApiProperty({ type: PaginationMetaDto })
   meta!: PaginationMetaDto;

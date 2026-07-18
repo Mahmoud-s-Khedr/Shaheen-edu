@@ -31,6 +31,22 @@ enum ContentStatus {
   ARCHIVED
 }
 
+enum ContentItemType {
+  TEXT
+  EXTERNAL_LINK
+  VIDEO
+  PDF
+  IMAGE
+  DOCUMENT
+  DOWNLOADABLE_FILE
+}
+
+enum ContentAccessLevel {
+  PUBLIC
+  AUTHENTICATED
+  ENTITLED
+}
+
 model User {
   id               String        @id @default(cuid())
   role             Role
@@ -58,6 +74,8 @@ model User {
   lessonsUpdated        Lesson[]        @relation("LessonUpdatedBy")
   sectionsCreated       Section[]       @relation("SectionCreatedBy")
   sectionsUpdated       Section[]       @relation("SectionUpdatedBy")
+  contentItemsCreated   ContentItem[]   @relation("ContentItemCreatedBy")
+  contentItemsUpdated   ContentItem[]   @relation("ContentItemUpdatedBy")
 
   @@index([role])
   @@index([role, createdAt, id])
@@ -222,6 +240,7 @@ model Course {
   updatedBy User @relation("CourseUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
 
   chapters Chapter[]
+  contentPlacements ContentPlacement[] @relation("ContentPlacementCourse")
 
   @@unique([subjectId, slug])
   @@unique([subjectId, sortOrder])
@@ -251,6 +270,7 @@ model Chapter {
   updatedBy User @relation("ChapterUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
 
   lessons Lesson[]
+  contentPlacements ContentPlacement[] @relation("ContentPlacementChapter")
 
   @@unique([courseId, slug])
   @@unique([courseId, sortOrder])
@@ -280,6 +300,7 @@ model Lesson {
   updatedBy User @relation("LessonUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
 
   sections Section[]
+  contentPlacements ContentPlacement[] @relation("ContentPlacementLesson")
 
   @@unique([chapterId, slug])
   @@unique([chapterId, sortOrder])
@@ -308,7 +329,60 @@ model Section {
   createdBy User @relation("SectionCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
   updatedBy User @relation("SectionUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
 
+  contentPlacements ContentPlacement[] @relation("ContentPlacementSection")
+
   @@unique([lessonId, slug])
   @@unique([lessonId, sortOrder])
   @@index([lessonId, status, sortOrder, id])
+}
+
+model ContentItem {
+  id                String             @id @default(cuid())
+  type              ContentItemType
+  title             String
+  description       String?
+  textBody          String?
+  externalUrl       String?
+  accessLevel       ContentAccessLevel @default(ENTITLED)
+  isPreview         Boolean            @default(false)
+  estimatedDuration Int?
+  status            ContentStatus      @default(DRAFT)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  publishedAt DateTime?
+  archivedAt  DateTime?
+  createdById String
+  updatedById String
+  version     Int      @default(1)
+
+  createdBy User @relation("ContentItemCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  updatedBy User @relation("ContentItemUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
+  placement ContentPlacement?
+
+  @@index([status, createdAt, id])
+}
+
+model ContentPlacement {
+  id            String   @id @default(cuid())
+  contentItemId String   @unique
+  courseId      String?
+  chapterId     String?
+  lessonId      String?
+  sectionId     String?
+  sortOrder     Int
+  version       Int      @default(1)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  contentItem ContentItem @relation(fields: [contentItemId], references: [id], onDelete: Cascade)
+  course      Course? @relation("ContentPlacementCourse", fields: [courseId], references: [id], onDelete: Restrict)
+  chapter     Chapter? @relation("ContentPlacementChapter", fields: [chapterId], references: [id], onDelete: Restrict)
+  lesson      Lesson? @relation("ContentPlacementLesson", fields: [lessonId], references: [id], onDelete: Restrict)
+  section     Section? @relation("ContentPlacementSection", fields: [sectionId], references: [id], onDelete: Restrict)
+
+  @@index([courseId, sortOrder, id])
+  @@index([chapterId, sortOrder, id])
+  @@index([lessonId, sortOrder, id])
+  @@index([sectionId, sortOrder, id])
 }

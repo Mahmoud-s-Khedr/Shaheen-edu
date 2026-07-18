@@ -54,16 +54,21 @@ Allow manual text and external-resource authoring at course, chapter, lesson, or
 
 ### Data model and rules
 
-- Add `ContentItem` with `type` (`TEXT`, `EXTERNAL_LINK`, `VIDEO`, `PDF`, `IMAGE`, `DOCUMENT`, `DOWNLOADABLE_FILE`), title, description, `textBody`, `externalUrl`, `accessLevel` (`PUBLIC`, `AUTHENTICATED`, `ENTITLED`), `isPreview`, estimated duration, lifecycle fields, audit actors, and `version`.
-- Add `ContentPlacement`, with exactly one non-null target among course, chapter, lesson, and section. Enforce this with a PostgreSQL `CHECK` constraint as well as DTO validation.
+> Phase note: asset, primary-asset, and `AssetReference` relations are deferred to Phase 3, when `Asset` and ready-asset upload semantics are introduced. Phase 2 retains asset-backed content types as draft-only placeholders. Content publication endpoints and full publication validation are deferred to Phase 5.
+
+- [x] Add `ContentItem` with `type` (`TEXT`, `EXTERNAL_LINK`, `VIDEO`, `PDF`, `IMAGE`, `DOCUMENT`, `DOWNLOADABLE_FILE`), title, description, `textBody`, `externalUrl`, `accessLevel` (`PUBLIC`, `AUTHENTICATED`, `ENTITLED`), `isPreview`, estimated duration, lifecycle fields, audit actors, and `version`.
+- [x] Add `ContentPlacement`, with exactly one non-null target among course, chapter, lesson, and section. Enforce this with a PostgreSQL `CHECK` constraint as well as DTO validation.
 - A content item has one optional primary asset. Ordered optional attachments use `AssetReference`, with a typed relationship and explicit foreign keys; do not use an unenforceable polymorphic target. Hierarchy cover images use dedicated relations, not `AssetReference`.
-- `TEXT` requires non-empty `textBody`; `EXTERNAL_LINK` requires a valid HTTPS URL. Asset-backed types require a compatible ready asset before publication.
-- Content may move only to a valid hierarchy target. Archived content cannot be newly placed or published.
+- [x] `TEXT` requires non-empty `textBody`; `EXTERNAL_LINK` requires a valid HTTPS URL.
+- Asset-backed types require a compatible ready asset before publication.
+- [x] Content may move only to a valid hierarchy target; archived content cannot be moved.
+- Archived content cannot be newly placed or published.
 
 ### APIs and tests
 
-- Add admin create, get, paginated list/filter, PATCH, move, reorder, archive, restore, and eligible-draft-delete endpoints.
-- Verify type-specific validation, exclusive placement enforcement, transactional ordering, draft/archived visibility, and role protection.
+- [x] Add admin create, get, paginated list/filter, PATCH, move, reorder, archive, restore, and eligible-draft-delete endpoints.
+- [x] Verify type-specific validation, exclusive placement enforcement, transactional ordering, and draft/archived visibility.
+- Verify role protection.
 
 ## Phase 3 — Manual Bunny Storage uploads
 

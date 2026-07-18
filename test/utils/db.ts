@@ -12,6 +12,8 @@ export async function cleanDatabase(
   await prisma.adminAuditLog.deleteMany();
   await prisma.authSession.deleteMany();
   await prisma.parentAccessSession.deleteMany();
+  await prisma.contentPlacement.deleteMany();
+  await prisma.contentItem.deleteMany();
   await prisma.section.deleteMany();
   await prisma.lesson.deleteMany();
   await prisma.chapter.deleteMany();
