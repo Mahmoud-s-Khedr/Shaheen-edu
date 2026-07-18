@@ -25,6 +25,12 @@ enum PartnerType {
   REFERRAL_PARTNER
 }
 
+enum ContentStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
 model User {
   id               String        @id @default(cuid())
   role             Role
@@ -40,6 +46,19 @@ model User {
   authSessions     AuthSession[]
   auditLogsActor   AdminAuditLog[]
 
+  academicGradesCreated AcademicGrade[] @relation("AcademicGradeCreatedBy")
+  academicGradesUpdated AcademicGrade[] @relation("AcademicGradeUpdatedBy")
+  subjectsCreated       Subject[]       @relation("SubjectCreatedBy")
+  subjectsUpdated       Subject[]       @relation("SubjectUpdatedBy")
+  coursesCreated        Course[]        @relation("CourseCreatedBy")
+  coursesUpdated        Course[]        @relation("CourseUpdatedBy")
+  chaptersCreated       Chapter[]       @relation("ChapterCreatedBy")
+  chaptersUpdated       Chapter[]       @relation("ChapterUpdatedBy")
+  lessonsCreated        Lesson[]        @relation("LessonCreatedBy")
+  lessonsUpdated        Lesson[]        @relation("LessonUpdatedBy")
+  sectionsCreated       Section[]       @relation("SectionCreatedBy")
+  sectionsUpdated       Section[]       @relation("SectionUpdatedBy")
+
   @@index([role])
   @@index([role, createdAt, id])
 }
@@ -53,7 +72,7 @@ model StudentProfile {
   nationalIdLast4       String
   nationalIdKeyVersion  Int      @default(1)
   academicGradeId       String?
-  gradeTransitional     String?
+  academicGrade         AcademicGrade? @relation(fields: [academicGradeId], references: [id], onDelete: Restrict)
   governorate           String
   center                String?
   parentPhoneNormalized String
@@ -62,6 +81,7 @@ model StudentProfile {
 
   @@index([parentPhoneNormalized])
   @@index([parentPhoneNormalized, createdAt, userId])
+  @@index([academicGradeId])
 }
 
 model PartnerProfile {
@@ -121,4 +141,174 @@ model AdminAuditLog {
 
   @@index([actorUserId])
   @@index([targetType, targetId])
+}
+
+model AcademicGrade {
+  id          String        @id @default(cuid())
+  title       String
+  slug        String
+  description String?
+  sortOrder   Int
+  status      ContentStatus @default(DRAFT)
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  publishedAt DateTime?
+  archivedAt  DateTime?
+  createdById String
+  updatedById String
+  version     Int       @default(1)
+
+  createdBy User @relation("AcademicGradeCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  updatedBy User @relation("AcademicGradeUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
+
+  subjects        Subject[]
+  studentProfiles StudentProfile[]
+
+  @@unique([slug])
+  @@unique([sortOrder])
+  @@index([status, sortOrder, id])
+}
+
+model Subject {
+  id              String        @id @default(cuid())
+  academicGradeId String
+  academicGrade   AcademicGrade @relation(fields: [academicGradeId], references: [id], onDelete: Restrict)
+
+  title       String
+  slug        String
+  description String?
+  sortOrder   Int
+  status      ContentStatus @default(DRAFT)
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  publishedAt DateTime?
+  archivedAt  DateTime?
+  createdById String
+  updatedById String
+  version     Int       @default(1)
+
+  createdBy User @relation("SubjectCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  updatedBy User @relation("SubjectUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
+
+  courses Course[]
+
+  @@unique([academicGradeId, slug])
+  @@unique([academicGradeId, sortOrder])
+  @@index([academicGradeId, status, sortOrder, id])
+}
+
+model Course {
+  id        String  @id @default(cuid())
+  subjectId String
+  subject   Subject @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+
+  title       String
+  slug        String
+  description String?
+  sortOrder   Int
+  status      ContentStatus @default(DRAFT)
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  publishedAt DateTime?
+  archivedAt  DateTime?
+  createdById String
+  updatedById String
+  version     Int       @default(1)
+
+  createdBy User @relation("CourseCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  updatedBy User @relation("CourseUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
+
+  chapters Chapter[]
+
+  @@unique([subjectId, slug])
+  @@unique([subjectId, sortOrder])
+  @@index([subjectId, status, sortOrder, id])
+}
+
+model Chapter {
+  id       String @id @default(cuid())
+  courseId String
+  course   Course @relation(fields: [courseId], references: [id], onDelete: Restrict)
+
+  title       String
+  slug        String
+  description String?
+  sortOrder   Int
+  status      ContentStatus @default(DRAFT)
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  publishedAt DateTime?
+  archivedAt  DateTime?
+  createdById String
+  updatedById String
+  version     Int       @default(1)
+
+  createdBy User @relation("ChapterCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  updatedBy User @relation("ChapterUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
+
+  lessons Lesson[]
+
+  @@unique([courseId, slug])
+  @@unique([courseId, sortOrder])
+  @@index([courseId, status, sortOrder, id])
+}
+
+model Lesson {
+  id        String  @id @default(cuid())
+  chapterId String
+  chapter   Chapter @relation(fields: [chapterId], references: [id], onDelete: Restrict)
+
+  title       String
+  slug        String
+  description String?
+  sortOrder   Int
+  status      ContentStatus @default(DRAFT)
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  publishedAt DateTime?
+  archivedAt  DateTime?
+  createdById String
+  updatedById String
+  version     Int       @default(1)
+
+  createdBy User @relation("LessonCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  updatedBy User @relation("LessonUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
+
+  sections Section[]
+
+  @@unique([chapterId, slug])
+  @@unique([chapterId, sortOrder])
+  @@index([chapterId, status, sortOrder, id])
+}
+
+model Section {
+  id       String @id @default(cuid())
+  lessonId String
+  lesson   Lesson @relation(fields: [lessonId], references: [id], onDelete: Restrict)
+
+  title       String
+  slug        String
+  description String?
+  sortOrder   Int
+  status      ContentStatus @default(DRAFT)
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  publishedAt DateTime?
+  archivedAt  DateTime?
+  createdById String
+  updatedById String
+  version     Int       @default(1)
+
+  createdBy User @relation("SectionCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  updatedBy User @relation("SectionUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
+
+  @@unique([lessonId, slug])
+  @@unique([lessonId, sortOrder])
+  @@index([lessonId, status, sortOrder, id])
 }

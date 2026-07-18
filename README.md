@@ -156,8 +156,8 @@ forbidNonWhitelisted:true})`) so a student can never smuggle in
   endpoint yet (only `ACTIVE`/`SUSPENDED` are reachable via the admin API).
 - Admin `PATCH /api/v1/admin/admins/:id` only updates `loginIdentifier`
   (email) — there's no other admin profile field in the schema yet.
-- `academicGradeId` and `gradeTransitional` are both nullable placeholder
-  columns on `StudentProfile`, pending a future Grade module.
+- `StudentProfile.academicGradeId` is the optional canonical relation to an
+  academic grade; the API accepts and exposes only that ID.
 
 ## Out of scope
 

@@ -1,5 +1,10 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { AccountStatus, PartnerType, Role } from '../types/roles.enum';
+import {
+  AccountStatus,
+  ContentStatus,
+  PartnerType,
+  Role,
+} from '../types/roles.enum';
 
 export class ApiErrorResponseDto {
   @ApiProperty({ example: 401 })
@@ -165,3 +170,113 @@ export class StudentProfileDto {
 }
 
 export class CurrentUserDto extends UserSummaryDto {}
+
+export class HierarchySummaryDto {
+  @ApiProperty()
+  id!: string;
+
+  @ApiProperty()
+  title!: string;
+
+  @ApiProperty()
+  slug!: string;
+
+  @ApiPropertyOptional({ nullable: true })
+  description!: string | null;
+
+  @ApiProperty()
+  sortOrder!: number;
+
+  @ApiProperty({ enum: ContentStatus })
+  status!: ContentStatus;
+
+  @ApiProperty({ type: String, format: 'date-time' })
+  createdAt!: Date;
+
+  @ApiProperty({ type: String, format: 'date-time' })
+  updatedAt!: Date;
+
+  @ApiPropertyOptional({ type: String, format: 'date-time', nullable: true })
+  publishedAt?: Date | null;
+
+  @ApiPropertyOptional({ type: String, format: 'date-time', nullable: true })
+  archivedAt?: Date | null;
+
+  @ApiProperty()
+  version!: number;
+}
+
+export class AcademicGradeSummaryDto extends HierarchySummaryDto {}
+
+export class SubjectSummaryDto extends HierarchySummaryDto {
+  @ApiProperty()
+  academicGradeId!: string;
+}
+
+export class CourseSummaryDto extends HierarchySummaryDto {
+  @ApiProperty()
+  subjectId!: string;
+}
+
+export class ChapterSummaryDto extends HierarchySummaryDto {
+  @ApiProperty()
+  courseId!: string;
+}
+
+export class LessonSummaryDto extends HierarchySummaryDto {
+  @ApiProperty()
+  chapterId!: string;
+}
+
+export class SectionSummaryDto extends HierarchySummaryDto {
+  @ApiProperty()
+  lessonId!: string;
+}
+
+export class PaginatedAcademicGradeResponseDto {
+  @ApiProperty({ type: [AcademicGradeSummaryDto] })
+  data!: AcademicGradeSummaryDto[];
+
+  @ApiProperty({ type: PaginationMetaDto })
+  meta!: PaginationMetaDto;
+}
+
+export class PaginatedSubjectResponseDto {
+  @ApiProperty({ type: [SubjectSummaryDto] })
+  data!: SubjectSummaryDto[];
+
+  @ApiProperty({ type: PaginationMetaDto })
+  meta!: PaginationMetaDto;
+}
+
+export class PaginatedCourseResponseDto {
+  @ApiProperty({ type: [CourseSummaryDto] })
+  data!: CourseSummaryDto[];
+
+  @ApiProperty({ type: PaginationMetaDto })
+  meta!: PaginationMetaDto;
+}
+
+export class PaginatedChapterResponseDto {
+  @ApiProperty({ type: [ChapterSummaryDto] })
+  data!: ChapterSummaryDto[];
+
+  @ApiProperty({ type: PaginationMetaDto })
+  meta!: PaginationMetaDto;
+}
+
+export class PaginatedLessonResponseDto {
+  @ApiProperty({ type: [LessonSummaryDto] })
+  data!: LessonSummaryDto[];
+
+  @ApiProperty({ type: PaginationMetaDto })
+  meta!: PaginationMetaDto;
+}
+
+export class PaginatedSectionResponseDto {
+  @ApiProperty({ type: [SectionSummaryDto] })
+  data!: SectionSummaryDto[];
+
+  @ApiProperty({ type: PaginationMetaDto })
+  meta!: PaginationMetaDto;
+}

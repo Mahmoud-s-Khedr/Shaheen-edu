@@ -15,6 +15,12 @@ import { PartnersModule } from './modules/partners/partners.module';
 import { StudentsModule } from './modules/students/students.module';
 import { ParentsModule } from './modules/parents/parents.module';
 import { AuditModule } from './modules/audit/audit.module';
+import { AcademicGradesModule } from './modules/academic-grades/academic-grades.module';
+import { SubjectsModule } from './modules/subjects/subjects.module';
+import { CoursesModule } from './modules/courses/courses.module';
+import { ChaptersModule } from './modules/chapters/chapters.module';
+import { LessonsModule } from './modules/lessons/lessons.module';
+import { SectionsModule } from './modules/sections/sections.module';
 import { UserAuthGuard } from './common/guards/user-auth.guard';
 import type { IncomingMessage } from 'http';
 
@@ -45,6 +51,12 @@ import type { IncomingMessage } from 'http';
     StudentsModule,
     ParentsModule,
     AuditModule,
+    AcademicGradesModule,
+    SubjectsModule,
+    CoursesModule,
+    ChaptersModule,
+    LessonsModule,
+    SectionsModule,
   ],
   providers: [
     // Global deny-by-default auth guard - @Public() opts a route out.
