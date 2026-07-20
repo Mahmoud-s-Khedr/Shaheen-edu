@@ -37,6 +37,16 @@ function testEnvironment(
     NATIONAL_ID_KEY_VERSION: '1',
     SUPER_ADMIN_EMAIL: 'superadmin@example.com',
     SUPER_ADMIN_PASSWORD: 'TestPassword123!',
+    BUNNY_STORAGE_S3_ENDPOINT: 'https://ny-s3.storage.bunnycdn.com',
+    BUNNY_STORAGE_BUCKET: 'test-assets',
+    BUNNY_STORAGE_ACCESS_KEY_ID: 'test',
+    BUNNY_STORAGE_SECRET_ACCESS_KEY: 'test-secret',
+    BUNNY_STORAGE_PULL_ZONE_URL: 'https://assets.example.test',
+    BUNNY_STORAGE_TOKEN_KEY: 'test-storage-token-key-0123456789',
+    BUNNY_STREAM_LIBRARY_ID: '123',
+    BUNNY_STREAM_API_KEY: 'test-stream-key',
+    BUNNY_STREAM_READ_ONLY_KEY: 'test-read-only-key',
+    BUNNY_STREAM_PLAYER_TOKEN_KEY: 'test-player-token-key',
   };
 }
 

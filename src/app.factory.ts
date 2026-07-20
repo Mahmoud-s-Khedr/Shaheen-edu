@@ -9,6 +9,8 @@ import { RequestMethod, ValidationPipe, VersioningType } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import fastifyCookie from '@fastify/cookie';
 import fastifyHelmet from '@fastify/helmet';
+import fastifyMultipart from '@fastify/multipart';
+import fastifyRawBody from 'fastify-raw-body';
 import { AppModule } from './app.module';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
 import type { AppConfig } from './config/configuration';
@@ -38,6 +40,8 @@ export async function createApp(
   });
   await app.register(fastifyCookie, { secret: cookieSecret });
   await app.register(fastifyHelmet);
+  await app.register(fastifyMultipart, { limits: { files: 1 } });
+  await app.register(fastifyRawBody, { field: 'rawBody', global: false, encoding: false, runFirst: true, routes: ['/api/v1/integrations/bunny-stream/webhook'] });
 
   app.setGlobalPrefix('api', {
     exclude: [{ path: 'health', method: RequestMethod.GET }],

@@ -26,6 +26,7 @@ import type { QueryContentItemDto } from './dto/query-content-item.dto';
 import type { MoveContentItemDto } from './dto/move-content-item.dto';
 import type { ReorderContentItemDto } from './dto/reorder-content-item.dto';
 import type { ContentPlacementTargetDto } from './dto/content-placement-target.dto';
+import { AssetsService } from '../assets/assets.service';
 
 type PlacementField = 'courseId' | 'chapterId' | 'lessonId' | 'sectionId';
 type PlacementTarget = { field: PlacementField; id: string };
@@ -35,6 +36,7 @@ export class ContentItemsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
+    private readonly assets: AssetsService,
   ) {}
 
   private assertActorRole(actor: RequestUser): void {
@@ -432,6 +434,11 @@ export class ContentItemsService {
     if (parent.status !== ContentStatus.PUBLISHED) {
       throw new ConflictException('Content can be published only under a published parent');
     }
+    if (item.type === ContentItemType.VIDEO || item.type === ContentItemType.PDF || item.type === ContentItemType.IMAGE || item.type === ContentItemType.DOCUMENT || item.type === ContentItemType.DOWNLOADABLE_FILE) {
+      if (!item.primaryAssetId) throw new ConflictException('Asset-backed content requires a primary asset before publication');
+      const asset = await this.assets.getReady(item.primaryAssetId);
+      this.assets.assertCompatible(asset, item.type);
+    }
     await this.prisma.contentItem.update({ where: { id }, data: { status: ContentStatus.PUBLISHED, publishedAt: new Date(), archivedAt: null, updatedById: actor.id } });
     await this.auditService.record({ actorUserId: actor.id, action: 'CONTENT_ITEM_PUBLISHED', targetType: 'ContentItem', targetId: id });
     return this.toSummary(await this.getOrThrow(id));
@@ -475,6 +482,38 @@ export class ContentItemsService {
     });
   }
 
+  async setPrimaryAsset(actor: RequestUser, id: string, assetId: string) {
+    this.assertActorRole(actor);
+    const item = await this.getOrThrow(id);
+    const asset = await this.assets.getReady(assetId);
+    this.assets.assertCompatible(asset, item.type);
+    await this.prisma.contentItem.update({ where: { id }, data: { primaryAssetId: assetId, updatedById: actor.id } });
+    await this.auditService.record({ actorUserId: actor.id, action: 'CONTENT_PRIMARY_ASSET_SET', targetType: 'ContentItem', targetId: id, metadata: { assetId } });
+    return this.toSummary(await this.getOrThrow(id));
+  }
+
+  async addAttachment(actor: RequestUser, id: string, assetId: string) {
+    this.assertActorRole(actor); await this.getOrThrow(id); await this.assets.getReady(assetId);
+    const max = await this.prisma.assetReference.aggregate({ where: { contentItemId: id }, _max: { sortOrder: true } });
+    await this.prisma.assetReference.create({ data: { contentItemId: id, assetId, sortOrder: (max._max.sortOrder ?? 0) + 1 } });
+    await this.auditService.record({ actorUserId: actor.id, action: 'CONTENT_ATTACHMENT_ADDED', targetType: 'ContentItem', targetId: id, metadata: { assetId } });
+    return this.toSummary(await this.getOrThrow(id));
+  }
+
+  async removeAttachment(actor: RequestUser, id: string, assetId: string) {
+    this.assertActorRole(actor); const ref = await this.prisma.assetReference.findUnique({ where: { contentItemId_assetId: { contentItemId: id, assetId } } }); if (!ref) throw new NotFoundException('Attachment not found');
+    await this.prisma.$transaction([this.prisma.assetReference.delete({ where: { id: ref.id } }), this.prisma.assetReference.updateMany({ where: { contentItemId: id, sortOrder: { gt: ref.sortOrder } }, data: { sortOrder: { decrement: 1 } } })]);
+    await this.auditService.record({ actorUserId: actor.id, action: 'CONTENT_ATTACHMENT_REMOVED', targetType: 'ContentItem', targetId: id, metadata: { assetId } });
+  }
+
+  async reorderAttachments(actor: RequestUser, id: string, assetIds: string[]) {
+    this.assertActorRole(actor);
+    const references = await this.prisma.assetReference.findMany({ where: { contentItemId: id }, select: { id: true, assetId: true } });
+    if (assetIds.length !== references.length || new Set(assetIds).size !== assetIds.length || references.some((reference) => !assetIds.includes(reference.assetId))) throw new BadRequestException('assetIds must contain every attachment exactly once');
+    await this.prisma.$transaction(async (tx) => { for (let index = 0; index < references.length; index++) await tx.assetReference.update({ where: { id: references[index].id }, data: { sortOrder: 1_000_000 + index } }); for (let index = 0; index < assetIds.length; index++) await tx.assetReference.update({ where: { contentItemId_assetId: { contentItemId: id, assetId: assetIds[index] } }, data: { sortOrder: index + 1 } }); });
+    await this.auditService.record({ actorUserId: actor.id, action: 'CONTENT_ATTACHMENTS_REORDERED', targetType: 'ContentItem', targetId: id, metadata: { assetIds } });
+  }
+
   private toSummary(
     item: Awaited<ReturnType<ContentItemsService['getOrThrow']>>,
   ) {
@@ -501,6 +540,7 @@ export class ContentItemsService {
       updatedAt: item.updatedAt,
       publishedAt: item.publishedAt,
       archivedAt: item.archivedAt,
+      primaryAssetId: item.primaryAssetId,
     };
   }
 }

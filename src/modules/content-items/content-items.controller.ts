@@ -131,4 +131,24 @@ export class ContentItemsController {
     @Param('id') id: string,  ) {
     return this.contentItemsService.delete(actor, id);
   }
+
+  @Post(':id/primary-asset')
+  setPrimaryAsset(@CurrentUser() actor: RequestUser, @Param('id') id: string, @Body('assetId') assetId: string) {
+    return this.contentItemsService.setPrimaryAsset(actor, id, assetId);
+  }
+
+  @Post(':id/attachments')
+  addAttachment(@CurrentUser() actor: RequestUser, @Param('id') id: string, @Body('assetId') assetId: string) {
+    return this.contentItemsService.addAttachment(actor, id, assetId);
+  }
+
+  @Post(':id/attachments/reorder')
+  reorderAttachments(@CurrentUser() actor: RequestUser, @Param('id') id: string, @Body('assetIds') assetIds: string[]) {
+    return this.contentItemsService.reorderAttachments(actor, id, assetIds);
+  }
+
+  @Delete(':id/attachments/:assetId')
+  removeAttachment(@CurrentUser() actor: RequestUser, @Param('id') id: string, @Param('assetId') assetId: string) {
+    return this.contentItemsService.removeAttachment(actor, id, assetId);
+  }
 }

@@ -333,6 +333,9 @@ export class ContentItemSummaryDto {
   @ApiProperty({ enum: ContentStatus })
   status!: ContentStatus;
 
+  @ApiPropertyOptional({ nullable: true })
+  primaryAssetId!: string | null;
+
   @ApiProperty({ type: ContentPlacementSummaryDto })
   placement!: ContentPlacementSummaryDto;
 

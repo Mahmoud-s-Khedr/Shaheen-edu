@@ -10,4 +10,9 @@ export {
   AccessType,
   EntitlementSource,
   EntitlementStatus,
+  AssetProvider,
+  AssetKind,
+  AssetStatus,
+  AssetReferenceType,
+  VideoProcessingStatus,
 } from '@prisma/client';

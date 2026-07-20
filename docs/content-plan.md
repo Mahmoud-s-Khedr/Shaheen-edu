@@ -58,9 +58,9 @@ Allow manual text and external-resource authoring at course, chapter, lesson, or
 
 - [x] Add `ContentItem` with `type` (`TEXT`, `EXTERNAL_LINK`, `VIDEO`, `PDF`, `IMAGE`, `DOCUMENT`, `DOWNLOADABLE_FILE`), title, description, `textBody`, `externalUrl`, `accessType`, estimated duration, lifecycle fields, and audit actors. Content items default to `INHERIT` and may explicitly use `PUBLIC`, `FREE`, or `PAID`.
 - [x] Add `ContentPlacement`, with exactly one non-null target among course, chapter, lesson, and section. Enforce this with a PostgreSQL `CHECK` constraint as well as DTO validation.
-- A content item has one optional primary asset. Ordered optional attachments use `AssetReference`, with a typed relationship and explicit foreign keys; do not use an unenforceable polymorphic target. Hierarchy cover images use dedicated relations, not `AssetReference`.
+- [x] A content item has one optional primary asset. Ordered optional attachments use `AssetReference`, with a typed relationship and explicit foreign keys; do not use an unenforceable polymorphic target. Hierarchy cover images use dedicated relations, not `AssetReference`.
 - [x] `TEXT` requires non-empty `textBody`; `EXTERNAL_LINK` requires a valid HTTPS URL.
-- Asset-backed types require a compatible ready asset before publication.
+- [x] Asset-backed types require a compatible ready asset before publication.
 - [x] Content may move only to a valid, different hierarchy target; archived content cannot be moved. Repositioning within the current target always uses reorder.
 - Archived content cannot be newly placed or published.
 
@@ -78,16 +78,16 @@ Support individual upload and protected delivery of covers, PDFs, images, docume
 
 ### Data model and provider interface
 
-- Add `Asset` with provider, kind, status (`PENDING_UPLOAD`, `UPLOADING`, `READY`, `FAILED`, `ARCHIVED`), original/sanitized filename, generated storage key, MIME type, size, checksum, safe metadata, uploader, ready/failed/archive timestamps, and lifecycle data.
-- Define `FileStorageProvider` with upload, delete, and protected-URL creation operations. Implement it as `BunnyStorageProvider`.
-- Store Bunny credentials only in validated server configuration. Never return credentials, storage keys, provider internals, or unrestricted origin URLs.
+- [x] Add `Asset` with provider, kind, status (`PENDING_UPLOAD`, `UPLOADING`, `READY`, `FAILED`, `ARCHIVED`), original/sanitized filename, generated storage key, MIME type, size, checksum, safe metadata, uploader, ready/failed/archive timestamps, and lifecycle data.
+- [x] Define `FileStorageProvider` with upload, delete, and protected-URL creation operations. Implement it as `BunnyStorageProvider`.
+- [x] Store Bunny credentials only in validated server configuration. Never return credentials, storage keys, provider internals, or unrestricted origin URLs.
 
 ### Upload and delivery rules
 
-- Use Fastify-compatible multipart streaming; do not use Nest's Multer integration or buffer large uploads in memory.
+- [x] Use Fastify-compatible multipart streaming; do not use Nest's Multer integration or buffer large uploads in memory.
 - Validate size limits by asset kind, extension, declared MIME type, magic-byte signature, empty payload, and sanitized display filename before accepting an upload.
-- The backend streams one validated file to Bunny Storage, records success/failure, and permits attachment only after the asset is `READY`.
-- A protected asset URL is a short-lived Bunny CDN token-authenticated URL. The API performs authorization first and never proxies file bytes.
+- [x] The backend streams one validated file to Bunny Storage, records success/failure, and permits attachment only after the asset is `READY`.
+- [x] A protected asset URL is a short-lived Bunny CDN token-authenticated URL. The API performs authorization first and never proxies file bytes.
 - Unused draft assets may be deleted. Referenced assets cannot be deleted. Replacing an asset creates a new asset and archives the old reference only after it is no longer needed by published content.
 
 ### Tests
@@ -102,15 +102,15 @@ Allow admins to add one video at a time without exposing Bunny secrets.
 
 ### Data model and flow
 
-- Add a one-to-one `VideoAsset` extension of `Asset` containing Bunny library/video IDs, duration, thumbnail URL, processing status/progress, webhook timestamp, and safe error metadata. `Asset` remains the single resource identity used by content and access control.
-- Admin creates a video asset; the backend creates the Bunny video object and returns short-lived direct-upload authorization; the browser uploads with Bunny's resumable flow; Bunny processing updates the backend through a verified webhook; the asset becomes ready only after processing completes.
-- Verify webhook signatures, persist an idempotency key/event record, accept repeated deliveries safely, and reject state regressions. A failed asset keeps failure metadata and can be retried explicitly.
-- A video cannot publish or issue playback authorization until its asset is ready.
+- [x] Add a one-to-one `VideoAsset` extension of `Asset` containing Bunny library/video IDs, duration, thumbnail URL, processing status/progress, webhook timestamp, and safe error metadata. `Asset` remains the single resource identity used by content and access control.
+- [x] Admin creates a video asset; the backend creates the Bunny video object and returns short-lived direct-upload authorization; the browser uploads with Bunny's resumable flow; Bunny processing updates the backend through a verified webhook; the asset becomes ready only after processing completes.
+- [x] Verify webhook signatures, persist an idempotency key/event record, accept repeated deliveries safely, and reject state regressions. A failed asset keeps failure metadata and can be retried explicitly.
+- [x] A video cannot publish or issue playback authorization until its asset is ready.
 
 ### APIs and tests
 
-- Add admin create/get/upload-authorization/retry/archive video operations and one public webhook endpoint exempt only from user authentication, not signature verification.
-- Add student playback-authorization through the central access policy in Phase 7.
+- [x] Add admin create/get/upload-authorization/retry/archive video operations and one public webhook endpoint exempt only from user authentication, not signature verification.
+- [x] Add student playback-authorization through the central access policy in Phase 7.
 - Test secret non-disclosure, invalid signatures, repeated webhooks, valid transitions, failure preservation, retry, and publication blocking while unready.
 
 ## Phase 5 — Publication and public catalog

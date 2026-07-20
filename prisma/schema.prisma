@@ -60,6 +60,41 @@ enum EntitlementStatus {
   REVOKED
 }
 
+enum AssetProvider {
+  BUNNY_STORAGE
+  BUNNY_STREAM
+}
+
+enum AssetKind {
+  COVER_IMAGE
+  IMAGE
+  PDF
+  DOCUMENT
+  DOWNLOADABLE_FILE
+  VIDEO
+}
+
+enum AssetStatus {
+  PENDING_UPLOAD
+  UPLOADING
+  READY
+  FAILED
+  ARCHIVED
+}
+
+enum AssetReferenceType {
+  CONTENT_ATTACHMENT
+}
+
+enum VideoProcessingStatus {
+  CREATED
+  UPLOADING
+  QUEUED
+  PROCESSING
+  READY
+  FAILED
+}
+
 model User {
   id               String        @id @default(cuid())
   role             Role
@@ -90,6 +125,7 @@ model User {
   contentItemsCreated   ContentItem[]   @relation("ContentItemCreatedBy")
   contentItemsUpdated   ContentItem[]   @relation("ContentItemUpdatedBy")
   entitlements         StudentEntitlement[]
+  assetsUploaded       Asset[] @relation("AssetUploadedBy")
 
   @@index([role])
   @@index([role, createdAt, id])
@@ -195,6 +231,8 @@ model AcademicGrade {
 
   subjects        Subject[]
   studentProfiles StudentProfile[]
+  coverAsset      Asset? @relation("AcademicGradeCover", fields: [coverAssetId], references: [id], onDelete: Restrict)
+  coverAssetId    String?
 
   @@unique([slug])
   @@unique([sortOrder])
@@ -223,6 +261,8 @@ model Subject {
   updatedBy User @relation("SubjectUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
 
   courses Course[]
+  coverAsset      Asset? @relation("SubjectCover", fields: [coverAssetId], references: [id], onDelete: Restrict)
+  coverAssetId    String?
 
   @@unique([academicGradeId, slug])
   @@unique([academicGradeId, sortOrder])
@@ -254,6 +294,8 @@ model Course {
   chapters Chapter[]
   entitlements StudentEntitlement[]
   contentPlacements ContentPlacement[] @relation("ContentPlacementCourse")
+  coverAsset      Asset? @relation("CourseCover", fields: [coverAssetId], references: [id], onDelete: Restrict)
+  coverAssetId    String?
 
   @@unique([subjectId, slug])
   @@unique([subjectId, sortOrder])
@@ -285,6 +327,8 @@ model Chapter {
   lessons Lesson[]
   entitlements StudentEntitlement[]
   contentPlacements ContentPlacement[] @relation("ContentPlacementChapter")
+  coverAsset      Asset? @relation("ChapterCover", fields: [coverAssetId], references: [id], onDelete: Restrict)
+  coverAssetId    String?
 
   @@unique([courseId, slug])
   @@unique([courseId, sortOrder])
@@ -315,6 +359,8 @@ model Lesson {
 
   sections Section[]
   contentPlacements ContentPlacement[] @relation("ContentPlacementLesson")
+  coverAsset      Asset? @relation("LessonCover", fields: [coverAssetId], references: [id], onDelete: Restrict)
+  coverAssetId    String?
 
   @@unique([chapterId, slug])
   @@unique([chapterId, sortOrder])
@@ -344,6 +390,8 @@ model Section {
   updatedBy User @relation("SectionUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
 
   contentPlacements ContentPlacement[] @relation("ContentPlacementSection")
+  coverAsset      Asset? @relation("SectionCover", fields: [coverAssetId], references: [id], onDelete: Restrict)
+  coverAssetId    String?
 
   @@unique([lessonId, slug])
   @@unique([lessonId, sortOrder])
@@ -371,8 +419,79 @@ model ContentItem {
   createdBy User @relation("ContentItemCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
   updatedBy User @relation("ContentItemUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
   placement ContentPlacement?
+  primaryAssetId String?
+  primaryAsset Asset? @relation("ContentPrimaryAsset", fields: [primaryAssetId], references: [id], onDelete: Restrict)
+  assetReferences AssetReference[]
 
   @@index([status, createdAt, id])
+}
+
+model Asset {
+  id                String @id @default(cuid())
+  provider          AssetProvider
+  kind              AssetKind
+  status            AssetStatus @default(PENDING_UPLOAD)
+  originalFilename  String
+  filename          String
+  storageKey        String? @unique
+  mimeType          String
+  sizeBytes         Int?
+  checksum          String?
+  metadata          Json?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  readyAt           DateTime?
+  failedAt          DateTime?
+  archivedAt        DateTime?
+  uploadedById      String
+  uploadedBy        User @relation("AssetUploadedBy", fields: [uploadedById], references: [id], onDelete: Restrict)
+  primaryFor        ContentItem[] @relation("ContentPrimaryAsset")
+  references        AssetReference[]
+  gradeCovers       AcademicGrade[] @relation("AcademicGradeCover")
+  subjectCovers     Subject[] @relation("SubjectCover")
+  courseCovers      Course[] @relation("CourseCover")
+  chapterCovers     Chapter[] @relation("ChapterCover")
+  lessonCovers      Lesson[] @relation("LessonCover")
+  sectionCovers     Section[] @relation("SectionCover")
+  video             VideoAsset?
+  @@index([status, kind, createdAt])
+}
+
+model AssetReference {
+  id            String @id @default(cuid())
+  contentItemId String
+  assetId       String
+  type          AssetReferenceType @default(CONTENT_ATTACHMENT)
+  sortOrder     Int
+  createdAt     DateTime @default(now())
+  contentItem   ContentItem @relation(fields: [contentItemId], references: [id], onDelete: Cascade)
+  asset         Asset @relation(fields: [assetId], references: [id], onDelete: Restrict)
+  @@unique([contentItemId, assetId])
+  @@unique([contentItemId, sortOrder])
+}
+
+model VideoAsset {
+  assetId           String @id
+  asset             Asset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  libraryId          String
+  bunnyVideoId       String @unique
+  processingStatus   VideoProcessingStatus @default(CREATED)
+  processingProgress Int @default(0)
+  durationSeconds    Int?
+  thumbnailUrl       String?
+  lastWebhookAt      DateTime?
+  failureMetadata    Json?
+  attempt            Int @default(1)
+  @@index([processingStatus])
+}
+
+model BunnyStreamWebhookEvent {
+  id          String @id @default(cuid())
+  eventKey    String @unique
+  bunnyVideoId String
+  status      Int
+  payload     Json
+  receivedAt  DateTime @default(now())
 }
 
 model ContentPlacement {

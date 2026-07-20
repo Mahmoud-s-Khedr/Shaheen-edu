@@ -26,4 +26,22 @@ export const envValidationSchema = Joi.object({
 
   SUPER_ADMIN_EMAIL: Joi.string().email().required(),
   SUPER_ADMIN_PASSWORD: Joi.string().min(12).required(),
+
+  BUNNY_STORAGE_S3_ENDPOINT: Joi.string().uri().required(),
+  BUNNY_STORAGE_BUCKET: Joi.string().required(),
+  BUNNY_STORAGE_ACCESS_KEY_ID: Joi.string().required(),
+  BUNNY_STORAGE_SECRET_ACCESS_KEY: Joi.string().required(),
+  BUNNY_STORAGE_PULL_ZONE_URL: Joi.string().uri().required(),
+  BUNNY_STORAGE_TOKEN_KEY: Joi.string().min(16).required(),
+  ASSET_URL_TTL_SECONDS: Joi.number().integer().min(30).default(300),
+  ASSET_IMAGE_MAX_BYTES: Joi.number().integer().positive().default(10485760),
+  ASSET_DOCUMENT_MAX_BYTES: Joi.number().integer().positive().default(26214400),
+  ASSET_DOWNLOAD_MAX_BYTES: Joi.number().integer().positive().default(104857600),
+
+  BUNNY_STREAM_LIBRARY_ID: Joi.string().required(),
+  BUNNY_STREAM_API_KEY: Joi.string().required(),
+  BUNNY_STREAM_READ_ONLY_KEY: Joi.string().required(),
+  BUNNY_STREAM_PLAYER_TOKEN_KEY: Joi.string().required(),
+  BUNNY_STREAM_UPLOAD_TTL_SECONDS: Joi.number().integer().min(60).default(10800),
+  BUNNY_STREAM_PLAYBACK_TTL_SECONDS: Joi.number().integer().min(30).default(300),
 });

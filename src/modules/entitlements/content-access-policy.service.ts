@@ -39,4 +39,12 @@ export class ContentAccessPolicyService {
     if (!entitlement) throw new ForbiddenException('A valid entitlement is required');
     return item;
   }
+
+  async assertAssetAttached(contentItemId: string, assetId: string): Promise<void> {
+    const item = await this.prisma.contentItem.findUnique({ where: { id: contentItemId }, select: { primaryAssetId: true } });
+    if (!item) throw new NotFoundException('Content item not found');
+    if (item.primaryAssetId === assetId) return;
+    const reference = await this.prisma.assetReference.findUnique({ where: { contentItemId_assetId: { contentItemId, assetId } }, select: { id: true } });
+    if (!reference) throw new ForbiddenException('Asset is not attached to content item');
+  }
 }
