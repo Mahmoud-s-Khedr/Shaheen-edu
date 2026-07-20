@@ -1,6 +1,5 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiPropertyOptional } from '@nestjs/swagger';
 import {
-  IsBoolean,
   IsEnum,
   IsInt,
   IsOptional,
@@ -10,10 +9,7 @@ import {
   Min,
   MinLength,
 } from 'class-validator';
-import {
-  ContentAccessLevel,
-  ContentItemType,
-} from '../../../common/types/roles.enum';
+import { AccessType, ContentItemType } from '../../../common/types/roles.enum';
 
 export class UpdateContentItemDto {
   @ApiPropertyOptional({ enum: ContentItemType })
@@ -45,15 +41,10 @@ export class UpdateContentItemDto {
   @IsUrl({ protocols: ['https'], require_protocol: true })
   externalUrl?: string | null;
 
-  @ApiPropertyOptional({ enum: ContentAccessLevel })
+  @ApiPropertyOptional({ enum: AccessType })
   @IsOptional()
-  @IsEnum(ContentAccessLevel)
-  accessLevel?: ContentAccessLevel;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsBoolean()
-  isPreview?: boolean;
+  @IsEnum(AccessType)
+  accessType?: AccessType;
 
   @ApiPropertyOptional({ minimum: 0, nullable: true })
   @IsOptional()
@@ -61,8 +52,4 @@ export class UpdateContentItemDto {
   @Min(0)
   estimatedDuration?: number | null;
 
-  @ApiProperty({ minimum: 1 })
-  @IsInt()
-  @Min(1)
-  version!: number;
 }

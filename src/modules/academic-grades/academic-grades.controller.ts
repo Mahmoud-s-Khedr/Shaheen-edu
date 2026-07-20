@@ -25,7 +25,6 @@ import { CreateAcademicGradeDto } from './dto/create-academic-grade.dto';
 import { UpdateAcademicGradeDto } from './dto/update-academic-grade.dto';
 import { QueryAcademicGradeDto } from './dto/query-academic-grade.dto';
 import { ReorderAcademicGradeDto } from './dto/reorder-academic-grade.dto';
-import { VersionOnlyDto } from '../../common/dto/version-only.dto';
 import type { RequestUser } from '../../common/types/request-with-user.types';
 import { ApiStandardErrors } from '../../common/decorators/api-standard-errors.decorator';
 import {
@@ -103,10 +102,8 @@ export class AcademicGradesController {
   @ApiStandardErrors(401, 403, 404, 409)
   publish(
     @CurrentUser() actor: RequestUser,
-    @Param('id') id: string,
-    @Body() dto: VersionOnlyDto,
-  ) {
-    return this.academicGradesService.publish(actor, id, dto);
+    @Param('id') id: string,  ) {
+    return this.academicGradesService.publish(actor, id);
   }
 
   @Post(':id/archive')
@@ -115,10 +112,8 @@ export class AcademicGradesController {
   @ApiStandardErrors(401, 403, 404, 409)
   archive(
     @CurrentUser() actor: RequestUser,
-    @Param('id') id: string,
-    @Body() dto: VersionOnlyDto,
-  ) {
-    return this.academicGradesService.archive(actor, id, dto);
+    @Param('id') id: string,  ) {
+    return this.academicGradesService.archive(actor, id);
   }
 
   @Post(':id/restore')
@@ -127,10 +122,8 @@ export class AcademicGradesController {
   @ApiStandardErrors(401, 403, 404, 409)
   restore(
     @CurrentUser() actor: RequestUser,
-    @Param('id') id: string,
-    @Body() dto: VersionOnlyDto,
-  ) {
-    return this.academicGradesService.restore(actor, id, dto);
+    @Param('id') id: string,  ) {
+    return this.academicGradesService.restore(actor, id);
   }
 
   @Delete(':id')
@@ -138,9 +131,7 @@ export class AcademicGradesController {
   @ApiStandardErrors(401, 403, 404, 409)
   delete(
     @CurrentUser() actor: RequestUser,
-    @Param('id') id: string,
-    @Body() dto: VersionOnlyDto,
-  ) {
-    return this.academicGradesService.delete(actor, id, dto);
+    @Param('id') id: string,  ) {
+    return this.academicGradesService.delete(actor, id);
   }
 }

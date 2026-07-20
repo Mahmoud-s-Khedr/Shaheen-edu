@@ -5,7 +5,7 @@ import {
   PartnerType,
   Role,
   ContentItemType,
-  ContentAccessLevel,
+  AccessType,
 } from '../types/roles.enum';
 
 export class ApiErrorResponseDto {
@@ -192,6 +192,9 @@ export class HierarchySummaryDto {
   @ApiProperty({ enum: ContentStatus })
   status!: ContentStatus;
 
+  @ApiPropertyOptional({ enum: AccessType })
+  accessType?: AccessType;
+
   @ApiProperty({ type: String, format: 'date-time' })
   createdAt!: Date;
 
@@ -204,8 +207,6 @@ export class HierarchySummaryDto {
   @ApiPropertyOptional({ type: String, format: 'date-time', nullable: true })
   archivedAt?: Date | null;
 
-  @ApiProperty()
-  version!: number;
 }
 
 export class AcademicGradeSummaryDto extends HierarchySummaryDto {}
@@ -302,10 +303,6 @@ export class ContentPlacementSummaryDto {
   @ApiProperty()
   sortOrder!: number;
 
-  @ApiProperty({
-    description: 'Placement version used for move and reorder operations.',
-  })
-  version!: number;
 }
 
 export class ContentItemSummaryDto {
@@ -327,11 +324,8 @@ export class ContentItemSummaryDto {
   @ApiPropertyOptional({ nullable: true })
   externalUrl!: string | null;
 
-  @ApiProperty({ enum: ContentAccessLevel })
-  accessLevel!: ContentAccessLevel;
-
-  @ApiProperty()
-  isPreview!: boolean;
+  @ApiProperty({ enum: AccessType })
+  accessType!: AccessType;
 
   @ApiPropertyOptional({ nullable: true })
   estimatedDuration!: number | null;
@@ -354,8 +348,6 @@ export class ContentItemSummaryDto {
   @ApiPropertyOptional({ type: String, format: 'date-time', nullable: true })
   archivedAt!: Date | null;
 
-  @ApiProperty()
-  version!: number;
 }
 
 export class PaginatedContentItemResponseDto {

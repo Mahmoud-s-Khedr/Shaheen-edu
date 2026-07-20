@@ -22,6 +22,7 @@ import { ChaptersModule } from './modules/chapters/chapters.module';
 import { LessonsModule } from './modules/lessons/lessons.module';
 import { SectionsModule } from './modules/sections/sections.module';
 import { ContentItemsModule } from './modules/content-items/content-items.module';
+import { EntitlementsModule } from './modules/entitlements/entitlements.module';
 import { UserAuthGuard } from './common/guards/user-auth.guard';
 import type { IncomingMessage } from 'http';
 
@@ -59,6 +60,7 @@ import type { IncomingMessage } from 'http';
     LessonsModule,
     SectionsModule,
     ContentItemsModule,
+    EntitlementsModule,
   ],
   providers: [
     // Global deny-by-default auth guard - @Public() opts a route out.

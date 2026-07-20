@@ -26,7 +26,7 @@ import { UpdateSectionDto } from './dto/update-section.dto';
 import { QuerySectionDto } from './dto/query-section.dto';
 import { ReorderSectionDto } from './dto/reorder-section.dto';
 import { MoveSectionDto } from './dto/move-section.dto';
-import { VersionOnlyDto } from '../../common/dto/version-only.dto';
+import { UpdateAccessTypeDto } from '../../common/dto/update-access-type.dto';
 import type { RequestUser } from '../../common/types/request-with-user.types';
 import { ApiStandardErrors } from '../../common/decorators/api-standard-errors.decorator';
 import {
@@ -82,6 +82,11 @@ export class SectionsController {
     return this.sectionsService.update(actor, id, dto);
   }
 
+  @Patch(':id/access')
+  updateAccess(@CurrentUser() actor: RequestUser, @Param('id') id: string, @Body() dto: UpdateAccessTypeDto) {
+    return this.sectionsService.updateAccess(actor, id, dto.accessType);
+  }
+
   @Post('reorder')
   @ApiOperation({ summary: 'Atomically reorder sections within a lesson' })
   @ApiStandardErrors(400, 401, 403, 404, 409)
@@ -107,10 +112,8 @@ export class SectionsController {
   @ApiStandardErrors(401, 403, 404, 409)
   publish(
     @CurrentUser() actor: RequestUser,
-    @Param('id') id: string,
-    @Body() dto: VersionOnlyDto,
-  ) {
-    return this.sectionsService.publish(actor, id, dto);
+    @Param('id') id: string,  ) {
+    return this.sectionsService.publish(actor, id);
   }
 
   @Post(':id/archive')
@@ -119,10 +122,8 @@ export class SectionsController {
   @ApiStandardErrors(401, 403, 404, 409)
   archive(
     @CurrentUser() actor: RequestUser,
-    @Param('id') id: string,
-    @Body() dto: VersionOnlyDto,
-  ) {
-    return this.sectionsService.archive(actor, id, dto);
+    @Param('id') id: string,  ) {
+    return this.sectionsService.archive(actor, id);
   }
 
   @Post(':id/restore')
@@ -131,10 +132,8 @@ export class SectionsController {
   @ApiStandardErrors(401, 403, 404, 409)
   restore(
     @CurrentUser() actor: RequestUser,
-    @Param('id') id: string,
-    @Body() dto: VersionOnlyDto,
-  ) {
-    return this.sectionsService.restore(actor, id, dto);
+    @Param('id') id: string,  ) {
+    return this.sectionsService.restore(actor, id);
   }
 
   @Delete(':id')
@@ -142,9 +141,7 @@ export class SectionsController {
   @ApiStandardErrors(401, 403, 404, 409)
   delete(
     @CurrentUser() actor: RequestUser,
-    @Param('id') id: string,
-    @Body() dto: VersionOnlyDto,
-  ) {
-    return this.sectionsService.delete(actor, id, dto);
+    @Param('id') id: string,  ) {
+    return this.sectionsService.delete(actor, id);
   }
 }

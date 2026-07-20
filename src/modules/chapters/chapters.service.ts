@@ -7,21 +7,19 @@ import {
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { AuditService } from '../audit/audit.service';
-import { ContentStatus, Role } from '../../common/types/roles.enum';
+import { AccessType, ContentStatus, Role } from '../../common/types/roles.enum';
 import type { RequestUser } from '../../common/types/request-with-user.types';
 import { toPaginationMeta } from '../../common/dto/pagination-query.dto';
 import {
   computeTwoPhaseRenumber,
   slugifyOrThrow,
   assertCompleteSequentialReorder,
-  versionConflict,
 } from '../../common/hierarchy/hierarchy.helper';
 import type { CreateChapterDto } from './dto/create-chapter.dto';
 import type { UpdateChapterDto } from './dto/update-chapter.dto';
 import type { QueryChapterDto } from './dto/query-chapter.dto';
 import type { ReorderChapterDto } from './dto/reorder-chapter.dto';
 import type { MoveChapterDto } from './dto/move-chapter.dto';
-import type { VersionOnlyDto } from '../../common/dto/version-only.dto';
 
 /**
  * NOTE: this level models only the DRAFT/PUBLISHED/ARCHIVED lifecycle and the
@@ -95,7 +93,6 @@ export class ChaptersService {
         status: ContentStatus.DRAFT,
         createdById: actor.id,
         updatedById: actor.id,
-        version: 1,
       },
     });
 
@@ -155,18 +152,15 @@ export class ChaptersService {
         slug = candidate;
       }
     }
-
-    const result = await this.prisma.chapter.updateMany({
-      where: { id, version: dto.version },
+    await this.prisma.chapter.updateMany({
+      where: { id },
       data: {
         title: dto.title,
         slug,
         description: dto.description,
         updatedById: actor.id,
-        version: { increment: 1 },
-      },
+        },
     });
-    if (result.count === 0) versionConflict();
 
     await this.auditService.record({
       actorUserId: actor.id,
@@ -176,6 +170,13 @@ export class ChaptersService {
       metadata: { slug },
     });
 
+    return this.toSummary(await this.getOrThrow(id));
+  }
+
+  async updateAccess(actor: RequestUser, id: string, accessType: AccessType) {
+    this.assertActorRole(actor); await this.getOrThrow(id);
+    await this.prisma.chapter.update({ where: { id }, data: { accessType, updatedById: actor.id } });
+    await this.auditService.record({ actorUserId: actor.id, action: 'CHAPTER_ACCESS_UPDATED', targetType: 'Chapter', targetId: id, metadata: { accessType } });
     return this.toSummary(await this.getOrThrow(id));
   }
 
@@ -194,18 +195,14 @@ export class ChaptersService {
     assertCompleteSequentialReorder(dto.items, siblings);
 
     const plan = computeTwoPhaseRenumber(dto.items);
-    const versionById = new Map(
-      dto.items.map((item) => [item.id, item.version]),
-    );
 
     try {
       await this.prisma.$transaction(async (tx) => {
         for (const phase1 of plan.phase1) {
-          const result = await tx.chapter.updateMany({
-            where: { id: phase1.id, version: versionById.get(phase1.id) },
-            data: { sortOrder: phase1.sortOrder, updatedById: actor.id, version: { increment: 1 } },
+    await tx.chapter.updateMany({
+            where: { id: phase1.id },
+            data: { sortOrder: phase1.sortOrder, updatedById: actor.id, },
           });
-          if (result.count === 0) versionConflict();
         }
         for (const phase2 of plan.phase2) {
           await tx.chapter.updateMany({
@@ -233,6 +230,7 @@ export class ChaptersService {
   async move(actor: RequestUser, id: string, dto: MoveChapterDto) {
     this.assertActorRole(actor);
     const record = await this.getOrThrow(id);
+    if (record.courseId === dto.newCourseId) throw new ConflictException('Use reorder to change position within the same parent');
 
     const newParent = await this.prisma.course.findUnique({
       where: { id: dto.newCourseId },
@@ -272,15 +270,14 @@ export class ChaptersService {
 
     try {
       await this.prisma.$transaction(async (tx) => {
-        const preMove = await tx.chapter.updateMany({
-          where: { id, version: dto.version },
-          data: { sortOrder: 1_000_000_000, updatedById: actor.id, version: { increment: 1 } },
+        await tx.chapter.updateMany({
+          where: { id },
+          data: { sortOrder: 1_000_000_000, updatedById: actor.id, },
         });
-        if (preMove.count === 0) versionConflict();
 
         await tx.chapter.updateMany({
           where: { courseId: oldCourseId, sortOrder: { gt: oldSortOrder } },
-          data: { sortOrder: { decrement: 1 }, updatedById: actor.id, version: { increment: 1 } },
+          data: { sortOrder: { decrement: 1 }, updatedById: actor.id, },
         });
 
         await tx.chapter.updateMany({
@@ -288,7 +285,7 @@ export class ChaptersService {
             courseId: dto.newCourseId,
             sortOrder: { gte: targetSortOrder },
           },
-          data: { sortOrder: { increment: 1 }, updatedById: actor.id, version: { increment: 1 } },
+          data: { sortOrder: { increment: 1 }, updatedById: actor.id, },
         });
 
         await tx.chapter.updateMany({
@@ -314,7 +311,7 @@ export class ChaptersService {
     return this.toSummary(await this.getOrThrow(id));
   }
 
-  async publish(actor: RequestUser, id: string, dto: VersionOnlyDto) {
+  async publish(actor: RequestUser, id: string) {
     this.assertActorRole(actor);
     const record = await this.getOrThrow(id);
 
@@ -324,20 +321,13 @@ export class ChaptersService {
     if (!parent || parent.status !== ContentStatus.PUBLISHED) {
       throw new ConflictException('Parent course must be published first');
     }
-
-    const result = await this.prisma.chapter.updateMany({
-      where: { id, version: dto.version, status: ContentStatus.DRAFT },
+    await this.prisma.chapter.updateMany({
+      where: { id, status: ContentStatus.DRAFT },
       data: {
         status: ContentStatus.PUBLISHED,
         publishedAt: new Date(),
-        version: { increment: 1 },
-      },
+        },
     });
-    if (result.count === 0) {
-      const current = await this.getOrThrow(id);
-      if (current.version !== dto.version) versionConflict();
-      throw new ConflictException('Only a draft chapter can be published');
-    }
 
     await this.auditService.record({
       actorUserId: actor.id,
@@ -349,28 +339,21 @@ export class ChaptersService {
     return this.toSummary(await this.getOrThrow(id));
   }
 
-  async archive(actor: RequestUser, id: string, dto: VersionOnlyDto) {
+  async archive(actor: RequestUser, id: string) {
     this.assertActorRole(actor);
 
     // TODO(phase-5): block archiving when published descendants exist, once
     // PublicationValidator owns that cascade check.
-    const result = await this.prisma.chapter.updateMany({
+    await this.prisma.chapter.updateMany({
       where: {
         id,
-        version: dto.version,
         status: { not: ContentStatus.ARCHIVED },
       },
       data: {
         status: ContentStatus.ARCHIVED,
         archivedAt: new Date(),
-        version: { increment: 1 },
-      },
+        },
     });
-    if (result.count === 0) {
-      const record = await this.getOrThrow(id);
-      if (record.version !== dto.version) versionConflict();
-      throw new ConflictException('Chapter is already archived');
-    }
 
     await this.auditService.record({
       actorUserId: actor.id,
@@ -382,23 +365,16 @@ export class ChaptersService {
     return this.toSummary(await this.getOrThrow(id));
   }
 
-  async restore(actor: RequestUser, id: string, dto: VersionOnlyDto) {
+  async restore(actor: RequestUser, id: string) {
     this.assertActorRole(actor);
-
-    const result = await this.prisma.chapter.updateMany({
-      where: { id, version: dto.version, status: ContentStatus.ARCHIVED },
+    await this.prisma.chapter.updateMany({
+      where: { id, status: ContentStatus.ARCHIVED },
       data: {
         status: ContentStatus.DRAFT,
         publishedAt: null,
         archivedAt: null,
-        version: { increment: 1 },
-      },
+        },
     });
-    if (result.count === 0) {
-      const record = await this.getOrThrow(id);
-      if (record.version !== dto.version) versionConflict();
-      throw new ConflictException('Only an archived chapter can be restored');
-    }
 
     await this.auditService.record({
       actorUserId: actor.id,
@@ -412,12 +388,10 @@ export class ChaptersService {
 
   async delete(
     actor: RequestUser,
-    id: string,
-    dto: VersionOnlyDto,
+    id: string
   ): Promise<void> {
     this.assertActorRole(actor);
     const record = await this.getOrThrow(id);
-    if (record.version !== dto.version) versionConflict();
     if (record.status !== ContentStatus.DRAFT) {
       throw new ConflictException('Only a draft chapter can be deleted');
     }
@@ -428,11 +402,9 @@ export class ChaptersService {
     if (childCount > 0) {
       throw new ConflictException('Cannot delete a chapter with lessons');
     }
-
-    const result = await this.prisma.chapter.deleteMany({
-      where: { id, version: dto.version, status: ContentStatus.DRAFT },
+    await this.prisma.chapter.deleteMany({
+      where: { id, status: ContentStatus.DRAFT },
     });
-    if (result.count === 0) versionConflict();
 
     await this.auditService.record({
       actorUserId: actor.id,
@@ -454,7 +426,7 @@ export class ChaptersService {
     updatedAt: Date;
     publishedAt: Date | null;
     archivedAt: Date | null;
-    version: number;
+    accessType: AccessType;
   }) {
     return {
       id: record.id,
@@ -464,11 +436,11 @@ export class ChaptersService {
       description: record.description,
       sortOrder: record.sortOrder,
       status: record.status,
+      accessType: record.accessType,
       createdAt: record.createdAt,
       updatedAt: record.updatedAt,
       publishedAt: record.publishedAt,
       archivedAt: record.archivedAt,
-      version: record.version,
     };
   }
 }

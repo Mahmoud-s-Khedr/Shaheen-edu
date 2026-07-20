@@ -14,8 +14,8 @@ The milestone must not add `ContentImport`, `ContentImportRow`, `QuestionImport`
 ## Shared conventions
 
 - Every lifecycle-managed record uses `DRAFT`, `PUBLISHED`, and `ARCHIVED` status unless a phase defines a stricter workflow.
-- Records include `createdAt`, `updatedAt`, `createdById`, `updatedById`, `publishedAt`, `archivedAt`, and an integer `version` where concurrent mutations are possible.
-- Mutation DTOs must not accept status, timestamps, audit actor IDs, storage keys, provider IDs, or `version` changes directly. PATCH, reorder, publish, archive, restore, and move requests require the caller's current `version`; a mismatch returns `409 Conflict`.
+- Records include `createdAt`, `updatedAt`, `createdById`, `updatedById`, `publishedAt`, and `archivedAt`. The backend does not use version-based optimistic concurrency.
+- Mutation DTOs must not accept status, timestamps, audit actor IDs, storage keys, or provider IDs. Updates, lifecycle actions, reorders, and moves execute without a client concurrency token.
 - Published or referenced records are archived rather than deleted. A draft record may be physically deleted only when it has no dependents or references.
 - List endpoints use the existing offset-pagination contract, deterministic ordering, and filters appropriate to their resource. Normal reads exclude archived records by default.
 - Every admin mutation writes an `AdminAuditLog` record with an action, target, actor, correlation ID, and safe metadata.
@@ -34,7 +34,7 @@ AcademicGrade → Subject → Course → Chapter → Lesson → Section
 
 ### Data model and rules
 
-- [x] Add `AcademicGrade`, `Subject`, `Course`, `Chapter`, `Lesson`, and `Section` with title, scoped slug, description, `sortOrder`, lifecycle fields, audit actors, and `version`.
+- [x] Add `AcademicGrade`, `Subject`, `Course`, `Chapter`, `Lesson`, and `Section` with title, scoped slug, description, `sortOrder`, lifecycle fields, and audit actors.
 - [x] Each child has one required parent foreign key. Define restrictive referential actions so a parent with children cannot be deleted.
 - [x] Convert `StudentProfile.academicGradeId` from its current nullable string placeholder into an optional relation to `AcademicGrade`; preserve existing nullable data in the migration.
 - [x] Slugs are unique within their parent scope. Sibling records have a unique ordering scope and are returned by `sortOrder` followed by ID.
@@ -44,7 +44,7 @@ AcademicGrade → Subject → Course → Chapter → Lesson → Section
 ### APIs and tests
 
 - [x] Add admin create, get, paginated list/filter, PATCH, reorder, archive, restore, and eligible-draft-delete operations for each level. (A minimal `publish` action per level was also added in this phase, ahead of Phase 5's full `PublicationValidator`.)
-- [x] Verify a complete hierarchy can be created; invalid parents, duplicate scoped slugs, stale versions, and unauthorized roles are rejected; reorder/move is atomic; and archived records are hidden from normal lists.
+- [x] Verify a complete hierarchy can be created; invalid parents, duplicate scoped slugs, and unauthorized roles are rejected; reorder/move is atomic; and archived records are hidden from normal lists.
 
 ## Phase 2 — Manual content items
 
@@ -56,12 +56,12 @@ Allow manual text and external-resource authoring at course, chapter, lesson, or
 
 > Phase note: asset, primary-asset, and `AssetReference` relations are deferred to Phase 3, when `Asset` and ready-asset upload semantics are introduced. Phase 2 retains asset-backed content types as draft-only placeholders. Content publication endpoints and full publication validation are deferred to Phase 5.
 
-- [x] Add `ContentItem` with `type` (`TEXT`, `EXTERNAL_LINK`, `VIDEO`, `PDF`, `IMAGE`, `DOCUMENT`, `DOWNLOADABLE_FILE`), title, description, `textBody`, `externalUrl`, `accessLevel` (`PUBLIC`, `AUTHENTICATED`, `ENTITLED`), `isPreview`, estimated duration, lifecycle fields, audit actors, and `version`.
+- [x] Add `ContentItem` with `type` (`TEXT`, `EXTERNAL_LINK`, `VIDEO`, `PDF`, `IMAGE`, `DOCUMENT`, `DOWNLOADABLE_FILE`), title, description, `textBody`, `externalUrl`, `accessType`, estimated duration, lifecycle fields, and audit actors. Content items default to `INHERIT` and may explicitly use `PUBLIC`, `FREE`, or `PAID`.
 - [x] Add `ContentPlacement`, with exactly one non-null target among course, chapter, lesson, and section. Enforce this with a PostgreSQL `CHECK` constraint as well as DTO validation.
 - A content item has one optional primary asset. Ordered optional attachments use `AssetReference`, with a typed relationship and explicit foreign keys; do not use an unenforceable polymorphic target. Hierarchy cover images use dedicated relations, not `AssetReference`.
 - [x] `TEXT` requires non-empty `textBody`; `EXTERNAL_LINK` requires a valid HTTPS URL.
 - Asset-backed types require a compatible ready asset before publication.
-- [x] Content may move only to a valid hierarchy target; archived content cannot be moved.
+- [x] Content may move only to a valid, different hierarchy target; archived content cannot be moved. Repositioning within the current target always uses reorder.
 - Archived content cannot be newly placed or published.
 
 ### APIs and tests
@@ -145,7 +145,7 @@ Store future purchase and publisher-resolution metadata without implementing fin
 ### Data model and rules
 
 - Add nullable `priceMinor`, `currency`, and `isPurchasable` to courses and chapters. Use integer minor units and initialize supported currency as `EGP`.
-- Add `PublisherAgreement` with a content-publisher partner, exactly one target (`courseId` or `chapterId`), revenue share in basis points, schedule, status, `isPrimary`, creator, timestamps, and version.
+- Add `PublisherAgreement` with a content-publisher partner, exactly one target (`courseId` or `chapterId`), revenue share in basis points, schedule, status, `isPrimary`, creator, and timestamps.
 - Enforce exactly one target with a database `CHECK`. Validate that the partner has `CONTENT_PUBLISHER` type, `revenueShareBps` is in range, and start/end dates are valid.
 - Active chapter agreements override active course agreements. If neither applies, there is no publisher revenue share.
 - Reject overlapping time windows for active primary agreements on the same target. Historical and ended agreements remain immutable records apart from permitted lifecycle fields.
@@ -163,14 +163,15 @@ Allow admins to grant access for testing before payments exist, and securely del
 
 ### Data model and access policy
 
-- Add `StudentEntitlement` with exactly one target (`courseId` or `chapterId`), source (`ADMIN`, `PROMOTION`, `MIGRATION`, reserved `PAYMENT`), status, start/expiry dates, grant actor, revoke timestamp, and audit fields. Enforce the exclusive target with a `CHECK` constraint.
+- [x] Add `StudentEntitlement` with exactly one target (`courseId` or `chapterId`), source (`ADMIN`, `PROMOTION`, `MIGRATION`, reserved `PAYMENT`), status, start/expiry dates, grant/revoke actors, revoke timestamp, and audit fields. Enforce the exclusive target with a `CHECK` constraint.
 - Overlapping grants are allowed: access is the union of all active grants. An entitlement is active only when its status permits it, it has started, it is not revoked, and it has not expired.
-- Implement one `ContentAccessPolicyService` for course, chapter, lesson, section, content, asset, and video playback checks. It evaluates publication, non-archived ancestry, access level, preview flag, active course/chapter grants, and the student's identity.
-- `PUBLIC` content is available without login; `AUTHENTICATED` requires an authenticated student; `ENTITLED` requires a valid relevant entitlement unless preview is explicitly enabled.
+- [x] Implement one `ContentAccessPolicyService` for delivered content. It evaluates publication, non-archived ancestry, the effective inherited access type, active course/chapter grants, and the student's identity. Asset and video playback integration remains part of Phases 3–4.
+- `PUBLIC` content is available without login; `FREE` requires an authenticated student; `PAID` requires a valid relevant entitlement.
+- [x] Configure access at course, chapter, lesson, section, and content-item levels. Courses always have an explicit `PUBLIC`, `FREE`, or `PAID` value; descendants use `INHERIT` by default and resolve the nearest explicit ancestor.
 
 ### APIs and tests
 
-- Add admin grant/revoke/list entitlement operations, student `me/courses` and hierarchy/content reads, plus protected asset-access and video-playback authorization endpoints.
+- [x] Add admin grant/revoke/list entitlement operations and public/student content delivery endpoints. Add student course/hierarchy reads and protected asset/video authorization when their respective resources are introduced.
 - Verify course versus chapter boundaries, preview behavior, expired/revoked grants, public catalog versus protected delivery, draft exclusion despite entitlement, IDOR resistance, URL expiry, and denial for partners/unrelated students.
 
 ## Phase 8 — Manual question-bank authoring
@@ -208,5 +209,5 @@ Allow admins to author and maintain single-choice questions without building qui
 
 ### Hardening checklist
 
-- Review audit events, pagination/filtering, indexes, transaction boundaries, optimistic concurrency, ownership/IDOR protection, archive behavior, orphaned asset cleanup, webhook idempotency, access URL expiration, query counts, migrations, Swagger, e2e coverage, and production build.
+- Review audit events, pagination/filtering, indexes, transaction boundaries, ownership/IDOR protection, archive behavior, orphaned asset cleanup, webhook idempotency, access URL expiration, query counts, migrations, Swagger, e2e coverage, and production build.
 - Each implementation phase is delivered in its own commit with its migration and focused unit/e2e tests.

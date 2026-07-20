@@ -14,13 +14,11 @@ import {
   computeTwoPhaseRenumber,
   slugifyOrThrow,
   assertCompleteSequentialReorder,
-  versionConflict,
 } from '../../common/hierarchy/hierarchy.helper';
 import type { CreateAcademicGradeDto } from './dto/create-academic-grade.dto';
 import type { UpdateAcademicGradeDto } from './dto/update-academic-grade.dto';
 import type { QueryAcademicGradeDto } from './dto/query-academic-grade.dto';
 import type { ReorderAcademicGradeDto } from './dto/reorder-academic-grade.dto';
-import type { VersionOnlyDto } from '../../common/dto/version-only.dto';
 import type { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
 
 /**
@@ -75,7 +73,6 @@ export class AcademicGradesService {
         status: ContentStatus.DRAFT,
         createdById: actor.id,
         updatedById: actor.id,
-        version: 1,
       },
     });
 
@@ -147,18 +144,15 @@ export class AcademicGradesService {
         slug = candidate;
       }
     }
-
-    const result = await this.prisma.academicGrade.updateMany({
-      where: { id, version: dto.version },
+    await this.prisma.academicGrade.updateMany({
+      where: { id },
       data: {
         title: dto.title,
         slug,
         description: dto.description,
         updatedById: actor.id,
-        version: { increment: 1 },
-      },
+        },
     });
-    if (result.count === 0) versionConflict();
 
     await this.auditService.record({
       actorUserId: actor.id,
@@ -179,22 +173,17 @@ export class AcademicGradesService {
     assertCompleteSequentialReorder(dto.items, siblings);
 
     const plan = computeTwoPhaseRenumber(dto.items);
-    const versionById = new Map(
-      dto.items.map((item) => [item.id, item.version]),
-    );
 
     try {
       await this.prisma.$transaction(async (tx) => {
         for (const phase1 of plan.phase1) {
-          const result = await tx.academicGrade.updateMany({
-            where: { id: phase1.id, version: versionById.get(phase1.id) },
+    await tx.academicGrade.updateMany({
+            where: { id: phase1.id },
             data: {
               sortOrder: phase1.sortOrder,
               updatedById: actor.id,
-              version: { increment: 1 },
-            },
+              },
           });
-          if (result.count === 0) versionConflict();
         }
         for (const phase2 of plan.phase2) {
           await tx.academicGrade.updateMany({
@@ -224,24 +213,15 @@ export class AcademicGradesService {
     });
   }
 
-  async publish(actor: RequestUser, id: string, dto: VersionOnlyDto) {
+  async publish(actor: RequestUser, id: string) {
     this.assertActorRole(actor);
-
-    const result = await this.prisma.academicGrade.updateMany({
-      where: { id, version: dto.version, status: ContentStatus.DRAFT },
+    await this.prisma.academicGrade.updateMany({
+      where: { id, status: ContentStatus.DRAFT },
       data: {
         status: ContentStatus.PUBLISHED,
         publishedAt: new Date(),
-        version: { increment: 1 },
-      },
+        },
     });
-    if (result.count === 0) {
-      const record = await this.getOrThrow(id);
-      if (record.version !== dto.version) versionConflict();
-      throw new ConflictException(
-        'Only a draft academic grade can be published',
-      );
-    }
 
     await this.auditService.record({
       actorUserId: actor.id,
@@ -253,28 +233,21 @@ export class AcademicGradesService {
     return this.toSummary(await this.getOrThrow(id));
   }
 
-  async archive(actor: RequestUser, id: string, dto: VersionOnlyDto) {
+  async archive(actor: RequestUser, id: string) {
     this.assertActorRole(actor);
 
     // TODO(phase-5): block archiving when published descendants exist, once
     // PublicationValidator owns that cascade check.
-    const result = await this.prisma.academicGrade.updateMany({
+    await this.prisma.academicGrade.updateMany({
       where: {
         id,
-        version: dto.version,
         status: { not: ContentStatus.ARCHIVED },
       },
       data: {
         status: ContentStatus.ARCHIVED,
         archivedAt: new Date(),
-        version: { increment: 1 },
-      },
+        },
     });
-    if (result.count === 0) {
-      const record = await this.getOrThrow(id);
-      if (record.version !== dto.version) versionConflict();
-      throw new ConflictException('Academic grade is already archived');
-    }
 
     await this.auditService.record({
       actorUserId: actor.id,
@@ -286,25 +259,16 @@ export class AcademicGradesService {
     return this.toSummary(await this.getOrThrow(id));
   }
 
-  async restore(actor: RequestUser, id: string, dto: VersionOnlyDto) {
+  async restore(actor: RequestUser, id: string) {
     this.assertActorRole(actor);
-
-    const result = await this.prisma.academicGrade.updateMany({
-      where: { id, version: dto.version, status: ContentStatus.ARCHIVED },
+    await this.prisma.academicGrade.updateMany({
+      where: { id, status: ContentStatus.ARCHIVED },
       data: {
         status: ContentStatus.DRAFT,
         publishedAt: null,
         archivedAt: null,
-        version: { increment: 1 },
-      },
+        },
     });
-    if (result.count === 0) {
-      const record = await this.getOrThrow(id);
-      if (record.version !== dto.version) versionConflict();
-      throw new ConflictException(
-        'Only an archived academic grade can be restored',
-      );
-    }
 
     await this.auditService.record({
       actorUserId: actor.id,
@@ -318,12 +282,10 @@ export class AcademicGradesService {
 
   async delete(
     actor: RequestUser,
-    id: string,
-    dto: VersionOnlyDto,
+    id: string
   ): Promise<void> {
     this.assertActorRole(actor);
     const record = await this.getOrThrow(id);
-    if (record.version !== dto.version) versionConflict();
     if (record.status !== ContentStatus.DRAFT) {
       throw new ConflictException('Only a draft academic grade can be deleted');
     }
@@ -336,11 +298,9 @@ export class AcademicGradesService {
         'Cannot delete an academic grade with subjects',
       );
     }
-
-    const result = await this.prisma.academicGrade.deleteMany({
-      where: { id, version: dto.version, status: ContentStatus.DRAFT },
+    await this.prisma.academicGrade.deleteMany({
+      where: { id, status: ContentStatus.DRAFT },
     });
-    if (result.count === 0) versionConflict();
 
     await this.auditService.record({
       actorUserId: actor.id,
@@ -361,7 +321,6 @@ export class AcademicGradesService {
     updatedAt: Date;
     publishedAt: Date | null;
     archivedAt: Date | null;
-    version: number;
   }) {
     return {
       id: record.id,
@@ -374,7 +333,6 @@ export class AcademicGradesService {
       updatedAt: record.updatedAt,
       publishedAt: record.publishedAt,
       archivedAt: record.archivedAt,
-      version: record.version,
     };
   }
 }

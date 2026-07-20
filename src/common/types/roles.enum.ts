@@ -7,5 +7,7 @@ export {
   PartnerType,
   ContentStatus,
   ContentItemType,
-  ContentAccessLevel,
+  AccessType,
+  EntitlementSource,
+  EntitlementStatus,
 } from '@prisma/client';

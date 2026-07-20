@@ -14,11 +14,4 @@ export class MoveCourseDto {
   @Min(1)
   sortOrder?: number;
 
-  @ApiProperty({
-    description: 'Current version for optimistic concurrency',
-    minimum: 1,
-  })
-  @IsInt()
-  @Min(1)
-  version!: number;
 }

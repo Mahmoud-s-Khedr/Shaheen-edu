@@ -1,7 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
-  IsBoolean,
   IsEnum,
   IsInt,
   IsOptional,
@@ -12,10 +11,7 @@ import {
   MinLength,
   ValidateNested,
 } from 'class-validator';
-import {
-  ContentAccessLevel,
-  ContentItemType,
-} from '../../../common/types/roles.enum';
+import { AccessType, ContentItemType } from '../../../common/types/roles.enum';
 import {
   ContentPlacementTargetDto,
   ExactlyOneContentPlacementTargetConstraint,
@@ -50,18 +46,10 @@ export class CreateContentItemDto {
   @IsUrl({ protocols: ['https'], require_protocol: true })
   externalUrl?: string;
 
-  @ApiPropertyOptional({
-    enum: ContentAccessLevel,
-    default: ContentAccessLevel.ENTITLED,
-  })
+  @ApiPropertyOptional({ enum: AccessType, default: AccessType.INHERIT })
   @IsOptional()
-  @IsEnum(ContentAccessLevel)
-  accessLevel?: ContentAccessLevel;
-
-  @ApiPropertyOptional({ default: false })
-  @IsOptional()
-  @IsBoolean()
-  isPreview?: boolean;
+  @IsEnum(AccessType)
+  accessType?: AccessType;
 
   @ApiPropertyOptional({
     description: 'Estimated duration in seconds',

@@ -26,7 +26,7 @@ import { UpdateChapterDto } from './dto/update-chapter.dto';
 import { QueryChapterDto } from './dto/query-chapter.dto';
 import { ReorderChapterDto } from './dto/reorder-chapter.dto';
 import { MoveChapterDto } from './dto/move-chapter.dto';
-import { VersionOnlyDto } from '../../common/dto/version-only.dto';
+import { UpdateAccessTypeDto } from '../../common/dto/update-access-type.dto';
 import type { RequestUser } from '../../common/types/request-with-user.types';
 import { ApiStandardErrors } from '../../common/decorators/api-standard-errors.decorator';
 import {
@@ -82,6 +82,11 @@ export class ChaptersController {
     return this.chaptersService.update(actor, id, dto);
   }
 
+  @Patch(':id/access')
+  updateAccess(@CurrentUser() actor: RequestUser, @Param('id') id: string, @Body() dto: UpdateAccessTypeDto) {
+    return this.chaptersService.updateAccess(actor, id, dto.accessType);
+  }
+
   @Post('reorder')
   @ApiOperation({ summary: 'Atomically reorder chapters within a course' })
   @ApiStandardErrors(400, 401, 403, 404, 409)
@@ -107,10 +112,8 @@ export class ChaptersController {
   @ApiStandardErrors(401, 403, 404, 409)
   publish(
     @CurrentUser() actor: RequestUser,
-    @Param('id') id: string,
-    @Body() dto: VersionOnlyDto,
-  ) {
-    return this.chaptersService.publish(actor, id, dto);
+    @Param('id') id: string,  ) {
+    return this.chaptersService.publish(actor, id);
   }
 
   @Post(':id/archive')
@@ -119,10 +122,8 @@ export class ChaptersController {
   @ApiStandardErrors(401, 403, 404, 409)
   archive(
     @CurrentUser() actor: RequestUser,
-    @Param('id') id: string,
-    @Body() dto: VersionOnlyDto,
-  ) {
-    return this.chaptersService.archive(actor, id, dto);
+    @Param('id') id: string,  ) {
+    return this.chaptersService.archive(actor, id);
   }
 
   @Post(':id/restore')
@@ -131,10 +132,8 @@ export class ChaptersController {
   @ApiStandardErrors(401, 403, 404, 409)
   restore(
     @CurrentUser() actor: RequestUser,
-    @Param('id') id: string,
-    @Body() dto: VersionOnlyDto,
-  ) {
-    return this.chaptersService.restore(actor, id, dto);
+    @Param('id') id: string,  ) {
+    return this.chaptersService.restore(actor, id);
   }
 
   @Delete(':id')
@@ -142,9 +141,7 @@ export class ChaptersController {
   @ApiStandardErrors(401, 403, 404, 409)
   delete(
     @CurrentUser() actor: RequestUser,
-    @Param('id') id: string,
-    @Body() dto: VersionOnlyDto,
-  ) {
-    return this.chaptersService.delete(actor, id, dto);
+    @Param('id') id: string,  ) {
+    return this.chaptersService.delete(actor, id);
   }
 }

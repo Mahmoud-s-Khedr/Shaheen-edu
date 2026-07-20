@@ -19,7 +19,6 @@ import {
 import { ApiStandardErrors } from '../../common/decorators/api-standard-errors.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
-import { VersionOnlyDto } from '../../common/dto/version-only.dto';
 import {
   ContentItemSummaryDto,
   PaginatedContentItemResponseDto,
@@ -31,6 +30,7 @@ import { CreateContentItemDto } from './dto/create-content-item.dto';
 import { MoveContentItemDto } from './dto/move-content-item.dto';
 import { QueryContentItemDto } from './dto/query-content-item.dto';
 import { ReorderContentItemDto } from './dto/reorder-content-item.dto';
+import { UpdateAccessTypeDto } from '../../common/dto/update-access-type.dto';
 import { UpdateContentItemDto } from './dto/update-content-item.dto';
 import { ContentItemsService } from './content-items.service';
 
@@ -75,6 +75,12 @@ export class ContentItemsController {
     return this.contentItemsService.update(actor, id, dto);
   }
 
+  @Patch(':id/access')
+  @ApiOperation({ summary: 'Set the content item access type' })
+  updateAccess(@CurrentUser() actor: RequestUser, @Param('id') id: string, @Body() dto: UpdateAccessTypeDto) {
+    return this.contentItemsService.updateAccess(actor, id, dto.accessType);
+  }
+
   @Post('reorder')
   @ApiOperation({ summary: 'Atomically reorder all content at one target' })
   @ApiStandardErrors(400, 401, 403, 404, 409)
@@ -96,33 +102,33 @@ export class ContentItemsController {
     return this.contentItemsService.move(actor, id, dto);
   }
 
+  @Post(':id/publish')
+  @ApiOperation({ summary: 'Publish a content item' })
+  publish(@CurrentUser() actor: RequestUser, @Param('id') id: string) {
+    return this.contentItemsService.publish(actor, id);
+  }
+
   @Post(':id/archive')
   @ApiOperation({ summary: 'Archive a content item' })
   archive(
     @CurrentUser() actor: RequestUser,
-    @Param('id') id: string,
-    @Body() dto: VersionOnlyDto,
-  ) {
-    return this.contentItemsService.archive(actor, id, dto);
+    @Param('id') id: string,  ) {
+    return this.contentItemsService.archive(actor, id);
   }
 
   @Post(':id/restore')
   @ApiOperation({ summary: 'Restore an archived content item as draft' })
   restore(
     @CurrentUser() actor: RequestUser,
-    @Param('id') id: string,
-    @Body() dto: VersionOnlyDto,
-  ) {
-    return this.contentItemsService.restore(actor, id, dto);
+    @Param('id') id: string,  ) {
+    return this.contentItemsService.restore(actor, id);
   }
 
   @Delete(':id')
   @ApiOperation({ summary: 'Delete an eligible draft content item' })
   delete(
     @CurrentUser() actor: RequestUser,
-    @Param('id') id: string,
-    @Body() dto: VersionOnlyDto,
-  ) {
-    return this.contentItemsService.delete(actor, id, dto);
+    @Param('id') id: string,  ) {
+    return this.contentItemsService.delete(actor, id);
   }
 }

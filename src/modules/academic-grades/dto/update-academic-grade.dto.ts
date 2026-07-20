@@ -1,11 +1,9 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiPropertyOptional } from '@nestjs/swagger';
 import {
-  IsInt,
   IsOptional,
   IsString,
   Matches,
   MaxLength,
-  Min,
   MinLength,
 } from 'class-validator';
 import { SLUG_PATTERN } from '../../../common/hierarchy/hierarchy.helper';
@@ -30,11 +28,4 @@ export class UpdateAcademicGradeDto {
   @MaxLength(2000)
   description?: string;
 
-  @ApiProperty({
-    description: 'Current version for optimistic concurrency',
-    minimum: 1,
-  })
-  @IsInt()
-  @Min(1)
-  version!: number;
 }

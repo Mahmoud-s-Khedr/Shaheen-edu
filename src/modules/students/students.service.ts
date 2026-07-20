@@ -1,4 +1,5 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { ContentStatus } from '../../common/types/roles.enum';
 import { PrismaService } from '../../database/prisma.service';
 import type { UpdateStudentDto } from './dto/update-student.dto';
 
@@ -33,11 +34,20 @@ export class StudentsService {
   }
 
   async updateOwnProfile(userId: string, dto: UpdateStudentDto) {
+    if (dto.academicGradeId !== undefined) {
+      const grade = await this.prisma.academicGrade.findFirst({
+        where: { id: dto.academicGradeId, status: ContentStatus.PUBLISHED },
+      });
+      if (!grade) {
+        throw new ConflictException('Academic grade must be published');
+      }
+    }
     await this.prisma.studentProfile.update({
       where: { userId },
       data: {
         fullName: dto.fullName,
         center: dto.center,
+        academicGradeId: dto.academicGradeId,
       },
     });
     return this.getOwnProfile(userId);

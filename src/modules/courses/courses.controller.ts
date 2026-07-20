@@ -26,7 +26,7 @@ import { UpdateCourseDto } from './dto/update-course.dto';
 import { QueryCourseDto } from './dto/query-course.dto';
 import { ReorderCourseDto } from './dto/reorder-course.dto';
 import { MoveCourseDto } from './dto/move-course.dto';
-import { VersionOnlyDto } from '../../common/dto/version-only.dto';
+import { UpdateAccessTypeDto } from '../../common/dto/update-access-type.dto';
 import type { RequestUser } from '../../common/types/request-with-user.types';
 import { ApiStandardErrors } from '../../common/decorators/api-standard-errors.decorator';
 import {
@@ -82,6 +82,12 @@ export class CoursesController {
     return this.coursesService.update(actor, id, dto);
   }
 
+  @Patch(':id/access')
+  @ApiOperation({ summary: 'Set the course access type' })
+  updateAccess(@CurrentUser() actor: RequestUser, @Param('id') id: string, @Body() dto: UpdateAccessTypeDto) {
+    return this.coursesService.updateAccess(actor, id, dto.accessType);
+  }
+
   @Post('reorder')
   @ApiOperation({ summary: 'Atomically reorder courses within a subject' })
   @ApiStandardErrors(400, 401, 403, 404, 409)
@@ -107,10 +113,8 @@ export class CoursesController {
   @ApiStandardErrors(401, 403, 404, 409)
   publish(
     @CurrentUser() actor: RequestUser,
-    @Param('id') id: string,
-    @Body() dto: VersionOnlyDto,
-  ) {
-    return this.coursesService.publish(actor, id, dto);
+    @Param('id') id: string,  ) {
+    return this.coursesService.publish(actor, id);
   }
 
   @Post(':id/archive')
@@ -119,10 +123,8 @@ export class CoursesController {
   @ApiStandardErrors(401, 403, 404, 409)
   archive(
     @CurrentUser() actor: RequestUser,
-    @Param('id') id: string,
-    @Body() dto: VersionOnlyDto,
-  ) {
-    return this.coursesService.archive(actor, id, dto);
+    @Param('id') id: string,  ) {
+    return this.coursesService.archive(actor, id);
   }
 
   @Post(':id/restore')
@@ -131,10 +133,8 @@ export class CoursesController {
   @ApiStandardErrors(401, 403, 404, 409)
   restore(
     @CurrentUser() actor: RequestUser,
-    @Param('id') id: string,
-    @Body() dto: VersionOnlyDto,
-  ) {
-    return this.coursesService.restore(actor, id, dto);
+    @Param('id') id: string,  ) {
+    return this.coursesService.restore(actor, id);
   }
 
   @Delete(':id')
@@ -142,9 +142,7 @@ export class CoursesController {
   @ApiStandardErrors(401, 403, 404, 409)
   delete(
     @CurrentUser() actor: RequestUser,
-    @Param('id') id: string,
-    @Body() dto: VersionOnlyDto,
-  ) {
-    return this.coursesService.delete(actor, id, dto);
+    @Param('id') id: string,  ) {
+    return this.coursesService.delete(actor, id);
   }
 }

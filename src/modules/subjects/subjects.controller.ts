@@ -26,7 +26,6 @@ import { UpdateSubjectDto } from './dto/update-subject.dto';
 import { QuerySubjectDto } from './dto/query-subject.dto';
 import { ReorderSubjectDto } from './dto/reorder-subject.dto';
 import { MoveSubjectDto } from './dto/move-subject.dto';
-import { VersionOnlyDto } from '../../common/dto/version-only.dto';
 import type { RequestUser } from '../../common/types/request-with-user.types';
 import { ApiStandardErrors } from '../../common/decorators/api-standard-errors.decorator';
 import {
@@ -109,10 +108,8 @@ export class SubjectsController {
   @ApiStandardErrors(401, 403, 404, 409)
   publish(
     @CurrentUser() actor: RequestUser,
-    @Param('id') id: string,
-    @Body() dto: VersionOnlyDto,
-  ) {
-    return this.subjectsService.publish(actor, id, dto);
+    @Param('id') id: string,  ) {
+    return this.subjectsService.publish(actor, id);
   }
 
   @Post(':id/archive')
@@ -121,10 +118,8 @@ export class SubjectsController {
   @ApiStandardErrors(401, 403, 404, 409)
   archive(
     @CurrentUser() actor: RequestUser,
-    @Param('id') id: string,
-    @Body() dto: VersionOnlyDto,
-  ) {
-    return this.subjectsService.archive(actor, id, dto);
+    @Param('id') id: string,  ) {
+    return this.subjectsService.archive(actor, id);
   }
 
   @Post(':id/restore')
@@ -133,10 +128,8 @@ export class SubjectsController {
   @ApiStandardErrors(401, 403, 404, 409)
   restore(
     @CurrentUser() actor: RequestUser,
-    @Param('id') id: string,
-    @Body() dto: VersionOnlyDto,
-  ) {
-    return this.subjectsService.restore(actor, id, dto);
+    @Param('id') id: string,  ) {
+    return this.subjectsService.restore(actor, id);
   }
 
   @Delete(':id')
@@ -144,9 +137,7 @@ export class SubjectsController {
   @ApiStandardErrors(401, 403, 404, 409)
   delete(
     @CurrentUser() actor: RequestUser,
-    @Param('id') id: string,
-    @Body() dto: VersionOnlyDto,
-  ) {
-    return this.subjectsService.delete(actor, id, dto);
+    @Param('id') id: string,  ) {
+    return this.subjectsService.delete(actor, id);
   }
 }

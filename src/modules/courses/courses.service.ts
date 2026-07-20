@@ -7,21 +7,19 @@ import {
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { AuditService } from '../audit/audit.service';
-import { ContentStatus, Role } from '../../common/types/roles.enum';
+import { AccessType, ContentStatus, Role } from '../../common/types/roles.enum';
 import type { RequestUser } from '../../common/types/request-with-user.types';
 import { toPaginationMeta } from '../../common/dto/pagination-query.dto';
 import {
   computeTwoPhaseRenumber,
   slugifyOrThrow,
   assertCompleteSequentialReorder,
-  versionConflict,
 } from '../../common/hierarchy/hierarchy.helper';
 import type { CreateCourseDto } from './dto/create-course.dto';
 import type { UpdateCourseDto } from './dto/update-course.dto';
 import type { QueryCourseDto } from './dto/query-course.dto';
 import type { ReorderCourseDto } from './dto/reorder-course.dto';
 import type { MoveCourseDto } from './dto/move-course.dto';
-import type { VersionOnlyDto } from '../../common/dto/version-only.dto';
 
 /**
  * NOTE: this level models only the DRAFT/PUBLISHED/ARCHIVED lifecycle and the
@@ -93,9 +91,9 @@ export class CoursesService {
         description: dto.description,
         sortOrder: (maxOrder._max.sortOrder ?? 0) + 1,
         status: ContentStatus.DRAFT,
+        accessType: dto.accessType,
         createdById: actor.id,
         updatedById: actor.id,
-        version: 1,
       },
     });
 
@@ -157,18 +155,15 @@ export class CoursesService {
         slug = candidate;
       }
     }
-
-    const result = await this.prisma.course.updateMany({
-      where: { id, version: dto.version },
+    await this.prisma.course.updateMany({
+      where: { id },
       data: {
         title: dto.title,
         slug,
         description: dto.description,
         updatedById: actor.id,
-        version: { increment: 1 },
-      },
+        },
     });
-    if (result.count === 0) versionConflict();
 
     await this.auditService.record({
       actorUserId: actor.id,
@@ -178,6 +173,17 @@ export class CoursesService {
       metadata: { slug },
     });
 
+    return this.toSummary(await this.getOrThrow(id));
+  }
+
+  async updateAccess(actor: RequestUser, id: string, accessType: AccessType) {
+    this.assertActorRole(actor);
+    if (accessType === AccessType.INHERIT) {
+      throw new ConflictException('A course must have an explicit access type');
+    }
+    await this.getOrThrow(id);
+    await this.prisma.course.update({ where: { id }, data: { accessType, updatedById: actor.id } });
+    await this.auditService.record({ actorUserId: actor.id, action: 'COURSE_ACCESS_UPDATED', targetType: 'Course', targetId: id, metadata: { accessType } });
     return this.toSummary(await this.getOrThrow(id));
   }
 
@@ -196,18 +202,14 @@ export class CoursesService {
     assertCompleteSequentialReorder(dto.items, siblings);
 
     const plan = computeTwoPhaseRenumber(dto.items);
-    const versionById = new Map(
-      dto.items.map((item) => [item.id, item.version]),
-    );
 
     try {
       await this.prisma.$transaction(async (tx) => {
         for (const phase1 of plan.phase1) {
-          const result = await tx.course.updateMany({
-            where: { id: phase1.id, version: versionById.get(phase1.id) },
-            data: { sortOrder: phase1.sortOrder, updatedById: actor.id, version: { increment: 1 } },
+    await tx.course.updateMany({
+            where: { id: phase1.id },
+            data: { sortOrder: phase1.sortOrder, updatedById: actor.id, },
           });
-          if (result.count === 0) versionConflict();
         }
         for (const phase2 of plan.phase2) {
           await tx.course.updateMany({
@@ -235,6 +237,7 @@ export class CoursesService {
   async move(actor: RequestUser, id: string, dto: MoveCourseDto) {
     this.assertActorRole(actor);
     const record = await this.getOrThrow(id);
+    if (record.subjectId === dto.newSubjectId) throw new ConflictException('Use reorder to change position within the same parent');
 
     const newParent = await this.prisma.subject.findUnique({
       where: { id: dto.newSubjectId },
@@ -274,15 +277,14 @@ export class CoursesService {
 
     try {
       await this.prisma.$transaction(async (tx) => {
-        const preMove = await tx.course.updateMany({
-          where: { id, version: dto.version },
-          data: { sortOrder: 1_000_000_000, updatedById: actor.id, version: { increment: 1 } },
+        await tx.course.updateMany({
+          where: { id },
+          data: { sortOrder: 1_000_000_000, updatedById: actor.id, },
         });
-        if (preMove.count === 0) versionConflict();
 
         await tx.course.updateMany({
           where: { subjectId: oldSubjectId, sortOrder: { gt: oldSortOrder } },
-          data: { sortOrder: { decrement: 1 }, updatedById: actor.id, version: { increment: 1 } },
+          data: { sortOrder: { decrement: 1 }, updatedById: actor.id, },
         });
 
         await tx.course.updateMany({
@@ -290,7 +292,7 @@ export class CoursesService {
             subjectId: dto.newSubjectId,
             sortOrder: { gte: targetSortOrder },
           },
-          data: { sortOrder: { increment: 1 }, updatedById: actor.id, version: { increment: 1 } },
+          data: { sortOrder: { increment: 1 }, updatedById: actor.id, },
         });
 
         await tx.course.updateMany({
@@ -316,7 +318,7 @@ export class CoursesService {
     return this.toSummary(await this.getOrThrow(id));
   }
 
-  async publish(actor: RequestUser, id: string, dto: VersionOnlyDto) {
+  async publish(actor: RequestUser, id: string) {
     this.assertActorRole(actor);
     const record = await this.getOrThrow(id);
 
@@ -326,20 +328,13 @@ export class CoursesService {
     if (!parent || parent.status !== ContentStatus.PUBLISHED) {
       throw new ConflictException('Parent subject must be published first');
     }
-
-    const result = await this.prisma.course.updateMany({
-      where: { id, version: dto.version, status: ContentStatus.DRAFT },
+    await this.prisma.course.updateMany({
+      where: { id, status: ContentStatus.DRAFT },
       data: {
         status: ContentStatus.PUBLISHED,
         publishedAt: new Date(),
-        version: { increment: 1 },
-      },
+        },
     });
-    if (result.count === 0) {
-      const current = await this.getOrThrow(id);
-      if (current.version !== dto.version) versionConflict();
-      throw new ConflictException('Only a draft course can be published');
-    }
 
     await this.auditService.record({
       actorUserId: actor.id,
@@ -351,28 +346,21 @@ export class CoursesService {
     return this.toSummary(await this.getOrThrow(id));
   }
 
-  async archive(actor: RequestUser, id: string, dto: VersionOnlyDto) {
+  async archive(actor: RequestUser, id: string) {
     this.assertActorRole(actor);
 
     // TODO(phase-5): block archiving when published descendants exist, once
     // PublicationValidator owns that cascade check.
-    const result = await this.prisma.course.updateMany({
+    await this.prisma.course.updateMany({
       where: {
         id,
-        version: dto.version,
         status: { not: ContentStatus.ARCHIVED },
       },
       data: {
         status: ContentStatus.ARCHIVED,
         archivedAt: new Date(),
-        version: { increment: 1 },
-      },
+        },
     });
-    if (result.count === 0) {
-      const record = await this.getOrThrow(id);
-      if (record.version !== dto.version) versionConflict();
-      throw new ConflictException('Course is already archived');
-    }
 
     await this.auditService.record({
       actorUserId: actor.id,
@@ -384,23 +372,16 @@ export class CoursesService {
     return this.toSummary(await this.getOrThrow(id));
   }
 
-  async restore(actor: RequestUser, id: string, dto: VersionOnlyDto) {
+  async restore(actor: RequestUser, id: string) {
     this.assertActorRole(actor);
-
-    const result = await this.prisma.course.updateMany({
-      where: { id, version: dto.version, status: ContentStatus.ARCHIVED },
+    await this.prisma.course.updateMany({
+      where: { id, status: ContentStatus.ARCHIVED },
       data: {
         status: ContentStatus.DRAFT,
         publishedAt: null,
         archivedAt: null,
-        version: { increment: 1 },
-      },
+        },
     });
-    if (result.count === 0) {
-      const record = await this.getOrThrow(id);
-      if (record.version !== dto.version) versionConflict();
-      throw new ConflictException('Only an archived course can be restored');
-    }
 
     await this.auditService.record({
       actorUserId: actor.id,
@@ -414,12 +395,10 @@ export class CoursesService {
 
   async delete(
     actor: RequestUser,
-    id: string,
-    dto: VersionOnlyDto,
+    id: string
   ): Promise<void> {
     this.assertActorRole(actor);
     const record = await this.getOrThrow(id);
-    if (record.version !== dto.version) versionConflict();
     if (record.status !== ContentStatus.DRAFT) {
       throw new ConflictException('Only a draft course can be deleted');
     }
@@ -430,11 +409,9 @@ export class CoursesService {
     if (childCount > 0) {
       throw new ConflictException('Cannot delete a course with chapters');
     }
-
-    const result = await this.prisma.course.deleteMany({
-      where: { id, version: dto.version, status: ContentStatus.DRAFT },
+    await this.prisma.course.deleteMany({
+      where: { id, status: ContentStatus.DRAFT },
     });
-    if (result.count === 0) versionConflict();
 
     await this.auditService.record({
       actorUserId: actor.id,
@@ -456,7 +433,7 @@ export class CoursesService {
     updatedAt: Date;
     publishedAt: Date | null;
     archivedAt: Date | null;
-    version: number;
+    accessType: AccessType;
   }) {
     return {
       id: record.id,
@@ -466,11 +443,11 @@ export class CoursesService {
       description: record.description,
       sortOrder: record.sortOrder,
       status: record.status,
+      accessType: record.accessType,
       createdAt: record.createdAt,
       updatedAt: record.updatedAt,
       publishedAt: record.publishedAt,
       archivedAt: record.archivedAt,
-      version: record.version,
     };
   }
 }

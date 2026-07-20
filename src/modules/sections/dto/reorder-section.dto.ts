@@ -18,10 +18,6 @@ export class ReorderSectionItemDto {
   @Min(1)
   sortOrder!: number;
 
-  @ApiProperty({ minimum: 1 })
-  @IsInt()
-  @Min(1)
-  version!: number;
 }
 
 export class ReorderSectionDto {

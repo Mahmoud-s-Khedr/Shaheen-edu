@@ -18,4 +18,9 @@ export class UpdateStudentDto {
   @IsOptional()
   @IsString()
   center?: string;
+
+  @ApiProperty({ required: false, description: 'Published academic grade ID' })
+  @IsOptional()
+  @IsString()
+  academicGradeId?: string;
 }

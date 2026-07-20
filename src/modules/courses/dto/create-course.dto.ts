@@ -7,6 +7,8 @@ import {
   MinLength,
 } from 'class-validator';
 import { SLUG_PATTERN } from '../../../common/hierarchy/hierarchy.helper';
+import { AccessType } from '../../../common/types/roles.enum';
+import { IsEnum } from 'class-validator';
 
 export class CreateCourseDto {
   @ApiProperty({ example: 'Algebra Fundamentals' })
@@ -33,4 +35,8 @@ export class CreateCourseDto {
   @ApiProperty()
   @IsString()
   subjectId!: string;
+
+  @ApiProperty({ enum: [AccessType.PUBLIC, AccessType.FREE, AccessType.PAID] })
+  @IsEnum([AccessType.PUBLIC, AccessType.FREE, AccessType.PAID])
+  accessType!: AccessType;
 }

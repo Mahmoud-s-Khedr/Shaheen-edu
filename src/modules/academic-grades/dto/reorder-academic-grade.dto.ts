@@ -18,10 +18,6 @@ export class ReorderAcademicGradeItemDto {
   @Min(1)
   sortOrder!: number;
 
-  @ApiProperty({ minimum: 1 })
-  @IsInt()
-  @Min(1)
-  version!: number;
 }
 
 export class ReorderAcademicGradeDto {

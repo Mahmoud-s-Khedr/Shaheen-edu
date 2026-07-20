@@ -23,10 +23,6 @@ export class ReorderContentItemEntryDto {
   @Min(1)
   sortOrder!: number;
 
-  @ApiProperty({ minimum: 1, description: 'Current placement version' })
-  @IsInt()
-  @Min(1)
-  version!: number;
 }
 
 export class ReorderContentItemDto {

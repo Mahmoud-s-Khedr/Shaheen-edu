@@ -86,11 +86,3 @@ export function assertCompleteSequentialReorder(
     );
   }
 }
-
-export function versionConflict(): never {
-  throw new AppException(
-    'This record was modified by someone else. Refetch and retry.',
-    HttpStatus.CONFLICT,
-    ErrorCode.CONFLICT,
-  );
-}

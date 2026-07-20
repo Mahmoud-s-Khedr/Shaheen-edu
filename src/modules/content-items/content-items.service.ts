@@ -11,10 +11,10 @@ import { PrismaService } from '../../database/prisma.service';
 import {
   assertCompleteSequentialReorder,
   computeTwoPhaseRenumber,
-  versionConflict,
 } from '../../common/hierarchy/hierarchy.helper';
 import { toPaginationMeta } from '../../common/dto/pagination-query.dto';
 import {
+  AccessType,
   ContentItemType,
   ContentStatus,
   Role,
@@ -26,7 +26,6 @@ import type { QueryContentItemDto } from './dto/query-content-item.dto';
 import type { MoveContentItemDto } from './dto/move-content-item.dto';
 import type { ReorderContentItemDto } from './dto/reorder-content-item.dto';
 import type { ContentPlacementTargetDto } from './dto/content-placement-target.dto';
-import type { VersionOnlyDto } from '../../common/dto/version-only.dto';
 
 type PlacementField = 'courseId' | 'chapterId' | 'lessonId' | 'sectionId';
 type PlacementTarget = { field: PlacementField; id: string };
@@ -76,7 +75,7 @@ export class ContentItemsService {
     return { [target.field]: target.id };
   }
 
-  private async assertValidTarget(target: PlacementTarget): Promise<void> {
+  private async assertValidTarget(target: PlacementTarget) {
     const record =
       target.field === 'courseId'
         ? await this.prisma.course.findUnique({ where: { id: target.id } })
@@ -91,6 +90,7 @@ export class ContentItemsService {
       throw new NotFoundException('Content placement target not found');
     if (record.status === ContentStatus.ARCHIVED)
       throw new ConflictException('Cannot place content in an archived target');
+    return record;
   }
 
   private async getOrThrow(id: string) {
@@ -155,8 +155,7 @@ export class ContentItemsService {
         description: dto.description,
         textBody: dto.textBody,
         externalUrl: dto.externalUrl,
-        accessLevel: dto.accessLevel,
-        isPreview: dto.isPreview,
+        accessType: dto.accessType,
         estimatedDuration: dto.estimatedDuration,
         createdById: actor.id,
         updatedById: actor.id,
@@ -217,7 +216,7 @@ export class ContentItemsService {
     const where: Prisma.ContentItemWhereInput = {
       status: query.status ?? { not: ContentStatus.ARCHIVED },
       type: query.type,
-      accessLevel: query.accessLevel,
+      accessType: query.accessType,
       placement: { is: placementWhere },
     };
     const [items, total] = await this.prisma.$transaction([
@@ -250,22 +249,19 @@ export class ContentItemsService {
     const externalUrl =
       dto.externalUrl === undefined ? item.externalUrl : dto.externalUrl;
     this.assertTypeFields(type, textBody, externalUrl);
-    const result = await this.prisma.contentItem.updateMany({
-      where: { id, version: dto.version },
+    await this.prisma.contentItem.updateMany({
+      where: { id },
       data: {
         type,
         title: dto.title,
         description: dto.description,
         textBody,
         externalUrl,
-        accessLevel: dto.accessLevel,
-        isPreview: dto.isPreview,
+        accessType: dto.accessType,
         estimatedDuration: dto.estimatedDuration,
         updatedById: actor.id,
-        version: { increment: 1 },
-      },
+        },
     });
-    if (!result.count) versionConflict();
     await this.auditService.record({
       actorUserId: actor.id,
       action: 'CONTENT_ITEM_UPDATED',
@@ -276,13 +272,21 @@ export class ContentItemsService {
     return this.toSummary(await this.getOrThrow(id));
   }
 
+  async updateAccess(actor: RequestUser, id: string, accessType: AccessType) {
+    this.assertActorRole(actor);
+    await this.getOrThrow(id);
+    await this.prisma.contentItem.update({ where: { id }, data: { accessType, updatedById: actor.id } });
+    await this.auditService.record({ actorUserId: actor.id, action: 'CONTENT_ITEM_ACCESS_UPDATED', targetType: 'ContentItem', targetId: id, metadata: { accessType } });
+    return this.toSummary(await this.getOrThrow(id));
+  }
+
   async reorder(actor: RequestUser, dto: ReorderContentItemDto): Promise<void> {
     this.assertActorRole(actor);
     const target = this.targetFromDto(dto.placement);
     await this.assertValidTarget(target);
     const siblings = await this.prisma.contentPlacement.findMany({
       where: this.scopeWhere(target),
-      select: { id: true, contentItemId: true, sortOrder: true, version: true },
+      select: { id: true, contentItemId: true, sortOrder: true },
     });
     assertCompleteSequentialReorder(
       dto.items,
@@ -295,17 +299,13 @@ export class ContentItemsService {
         sortOrder: item.sortOrder,
       })),
     );
-    const versions = new Map(
-      dto.items.map((item) => [byContentId.get(item.id)!.id, item.version]),
-    );
-    try {
+        try {
       await this.prisma.$transaction(async (tx) => {
         for (const step of plan.phase1) {
-          const result = await tx.contentPlacement.updateMany({
-            where: { id: step.id, version: versions.get(step.id) },
-            data: { sortOrder: step.sortOrder, version: { increment: 1 } },
+    await tx.contentPlacement.updateMany({
+            where: { id: step.id },
+            data: { sortOrder: step.sortOrder, },
           });
-          if (!result.count) versionConflict();
         }
         for (const step of plan.phase2)
           await tx.contentPlacement.updateMany({
@@ -339,12 +339,14 @@ export class ContentItemsService {
     const target = this.targetFromDto(dto.placement);
     await this.assertValidTarget(target);
     const oldTarget = this.targetFromPlacement(item.placement);
+    if (oldTarget.field === target.field && oldTarget.id === target.id) {
+      throw new ConflictException('Use reorder to change position within the same parent');
+    }
     const max = await this.prisma.contentPlacement.aggregate({
       where: this.scopeWhere(target),
       _max: { sortOrder: true },
     });
-    const sameTarget =
-      oldTarget.field === target.field && oldTarget.id === target.id;
+    const sameTarget = false;
     const targetSortOrder =
       dto.sortOrder ??
       (sameTarget ? (max._max.sortOrder ?? 1) : (max._max.sortOrder ?? 0) + 1);
@@ -355,24 +357,24 @@ export class ContentItemsService {
       );
     try {
       await this.prisma.$transaction(async (tx) => {
-        const preMove = await tx.contentPlacement.updateMany({
-          where: { id: item.placement.id, version: dto.version },
-          data: { sortOrder: 1_000_000_000, version: { increment: 1 } },
+        await tx.contentPlacement.updateMany({
+          where: { id: item.placement.id },
+          data: { sortOrder: 1_000_000_000, },
         });
-        if (!preMove.count) versionConflict();
+
         await tx.contentPlacement.updateMany({
           where: {
             ...this.scopeWhere(oldTarget),
             sortOrder: { gt: item.placement.sortOrder },
           },
-          data: { sortOrder: { decrement: 1 }, version: { increment: 1 } },
+          data: { sortOrder: { decrement: 1 }, },
         });
         await tx.contentPlacement.updateMany({
           where: {
             ...this.scopeWhere(target),
             sortOrder: { gte: targetSortOrder },
           },
-          data: { sortOrder: { increment: 1 }, version: { increment: 1 } },
+          data: { sortOrder: { increment: 1 }, },
         });
         await tx.contentPlacement.update({
           where: { id: item.placement.id },
@@ -401,25 +403,18 @@ export class ContentItemsService {
     return this.toSummary(await this.getOrThrow(id));
   }
 
-  async archive(actor: RequestUser, id: string, dto: VersionOnlyDto) {
+  async archive(actor: RequestUser, id: string) {
     this.assertActorRole(actor);
-    const result = await this.prisma.contentItem.updateMany({
+    await this.prisma.contentItem.updateMany({
       where: {
         id,
-        version: dto.version,
         status: { not: ContentStatus.ARCHIVED },
       },
       data: {
         status: ContentStatus.ARCHIVED,
         archivedAt: new Date(),
-        version: { increment: 1 },
-      },
+        },
     });
-    if (!result.count) {
-      const current = await this.getOrThrow(id);
-      if (current.version !== dto.version) versionConflict();
-      throw new ConflictException('Content item is already archived');
-    }
     await this.auditService.record({
       actorUserId: actor.id,
       action: 'CONTENT_ITEM_ARCHIVED',
@@ -429,24 +424,29 @@ export class ContentItemsService {
     return this.toSummary(await this.getOrThrow(id));
   }
 
-  async restore(actor: RequestUser, id: string, dto: VersionOnlyDto) {
+  async publish(actor: RequestUser, id: string) {
     this.assertActorRole(actor);
-    const result = await this.prisma.contentItem.updateMany({
-      where: { id, version: dto.version, status: ContentStatus.ARCHIVED },
+    const item = await this.getOrThrow(id);
+    const target = this.targetFromPlacement(item.placement);
+    const parent = await this.assertValidTarget(target);
+    if (parent.status !== ContentStatus.PUBLISHED) {
+      throw new ConflictException('Content can be published only under a published parent');
+    }
+    await this.prisma.contentItem.update({ where: { id }, data: { status: ContentStatus.PUBLISHED, publishedAt: new Date(), archivedAt: null, updatedById: actor.id } });
+    await this.auditService.record({ actorUserId: actor.id, action: 'CONTENT_ITEM_PUBLISHED', targetType: 'ContentItem', targetId: id });
+    return this.toSummary(await this.getOrThrow(id));
+  }
+
+  async restore(actor: RequestUser, id: string) {
+    this.assertActorRole(actor);
+    await this.prisma.contentItem.updateMany({
+      where: { id, status: ContentStatus.ARCHIVED },
       data: {
         status: ContentStatus.DRAFT,
         archivedAt: null,
         publishedAt: null,
-        version: { increment: 1 },
-      },
+        },
     });
-    if (!result.count) {
-      const current = await this.getOrThrow(id);
-      if (current.version !== dto.version) versionConflict();
-      throw new ConflictException(
-        'Only an archived content item can be restored',
-      );
-    }
     await this.auditService.record({
       actorUserId: actor.id,
       action: 'CONTENT_ITEM_RESTORED',
@@ -458,18 +458,15 @@ export class ContentItemsService {
 
   async delete(
     actor: RequestUser,
-    id: string,
-    dto: VersionOnlyDto,
+    id: string
   ): Promise<void> {
     this.assertActorRole(actor);
     const item = await this.getOrThrow(id);
-    if (item.version !== dto.version) versionConflict();
     if (item.status !== ContentStatus.DRAFT)
       throw new ConflictException('Only a draft content item can be deleted');
-    const result = await this.prisma.contentItem.deleteMany({
-      where: { id, version: dto.version, status: ContentStatus.DRAFT },
+    await this.prisma.contentItem.deleteMany({
+      where: { id, status: ContentStatus.DRAFT },
     });
-    if (!result.count) versionConflict();
     await this.auditService.record({
       actorUserId: actor.id,
       action: 'CONTENT_ITEM_DELETED',
@@ -489,8 +486,7 @@ export class ContentItemsService {
       description: item.description,
       textBody: item.textBody,
       externalUrl: item.externalUrl,
-      accessLevel: item.accessLevel,
-      isPreview: item.isPreview,
+      accessType: item.accessType,
       estimatedDuration: item.estimatedDuration,
       status: item.status,
       placement: {
@@ -500,13 +496,11 @@ export class ContentItemsService {
         lessonId: placement.lessonId,
         sectionId: placement.sectionId,
         sortOrder: placement.sortOrder,
-        version: placement.version,
       },
       createdAt: item.createdAt,
       updatedAt: item.updatedAt,
       publishedAt: item.publishedAt,
       archivedAt: item.archivedAt,
-      version: item.version,
     };
   }
 }

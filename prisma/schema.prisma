@@ -41,10 +41,23 @@ enum ContentItemType {
   DOWNLOADABLE_FILE
 }
 
-enum ContentAccessLevel {
+enum AccessType {
   PUBLIC
-  AUTHENTICATED
-  ENTITLED
+  FREE
+  PAID
+  INHERIT
+}
+
+enum EntitlementSource {
+  ADMIN
+  PROMOTION
+  MIGRATION
+  PAYMENT
+}
+
+enum EntitlementStatus {
+  ACTIVE
+  REVOKED
 }
 
 model User {
@@ -76,6 +89,7 @@ model User {
   sectionsUpdated       Section[]       @relation("SectionUpdatedBy")
   contentItemsCreated   ContentItem[]   @relation("ContentItemCreatedBy")
   contentItemsUpdated   ContentItem[]   @relation("ContentItemUpdatedBy")
+  entitlements         StudentEntitlement[]
 
   @@index([role])
   @@index([role, createdAt, id])
@@ -175,7 +189,6 @@ model AcademicGrade {
   archivedAt  DateTime?
   createdById String
   updatedById String
-  version     Int       @default(1)
 
   createdBy User @relation("AcademicGradeCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
   updatedBy User @relation("AcademicGradeUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
@@ -205,7 +218,6 @@ model Subject {
   archivedAt  DateTime?
   createdById String
   updatedById String
-  version     Int       @default(1)
 
   createdBy User @relation("SubjectCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
   updatedBy User @relation("SubjectUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
@@ -234,12 +246,13 @@ model Course {
   archivedAt  DateTime?
   createdById String
   updatedById String
-  version     Int       @default(1)
+  accessType  AccessType @default(PAID)
 
   createdBy User @relation("CourseCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
   updatedBy User @relation("CourseUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
 
   chapters Chapter[]
+  entitlements StudentEntitlement[]
   contentPlacements ContentPlacement[] @relation("ContentPlacementCourse")
 
   @@unique([subjectId, slug])
@@ -264,12 +277,13 @@ model Chapter {
   archivedAt  DateTime?
   createdById String
   updatedById String
-  version     Int       @default(1)
+  accessType  AccessType @default(INHERIT)
 
   createdBy User @relation("ChapterCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
   updatedBy User @relation("ChapterUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
 
   lessons Lesson[]
+  entitlements StudentEntitlement[]
   contentPlacements ContentPlacement[] @relation("ContentPlacementChapter")
 
   @@unique([courseId, slug])
@@ -294,7 +308,7 @@ model Lesson {
   archivedAt  DateTime?
   createdById String
   updatedById String
-  version     Int       @default(1)
+  accessType  AccessType @default(INHERIT)
 
   createdBy User @relation("LessonCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
   updatedBy User @relation("LessonUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
@@ -324,7 +338,7 @@ model Section {
   archivedAt  DateTime?
   createdById String
   updatedById String
-  version     Int       @default(1)
+  accessType  AccessType @default(INHERIT)
 
   createdBy User @relation("SectionCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
   updatedBy User @relation("SectionUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
@@ -343,8 +357,7 @@ model ContentItem {
   description       String?
   textBody          String?
   externalUrl       String?
-  accessLevel       ContentAccessLevel @default(ENTITLED)
-  isPreview         Boolean            @default(false)
+  accessType        AccessType         @default(INHERIT)
   estimatedDuration Int?
   status            ContentStatus      @default(DRAFT)
 
@@ -354,7 +367,6 @@ model ContentItem {
   archivedAt  DateTime?
   createdById String
   updatedById String
-  version     Int      @default(1)
 
   createdBy User @relation("ContentItemCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
   updatedBy User @relation("ContentItemUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
@@ -371,7 +383,6 @@ model ContentPlacement {
   lessonId      String?
   sectionId     String?
   sortOrder     Int
-  version       Int      @default(1)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
@@ -385,4 +396,27 @@ model ContentPlacement {
   @@index([chapterId, sortOrder, id])
   @@index([lessonId, sortOrder, id])
   @@index([sectionId, sortOrder, id])
+}
+
+model StudentEntitlement {
+  id            String            @id @default(cuid())
+  studentUserId String
+  student       User              @relation(fields: [studentUserId], references: [id], onDelete: Restrict)
+  courseId      String?
+  course        Course?           @relation(fields: [courseId], references: [id], onDelete: Restrict)
+  chapterId     String?
+  chapter       Chapter?          @relation(fields: [chapterId], references: [id], onDelete: Restrict)
+  source        EntitlementSource @default(ADMIN)
+  status        EntitlementStatus @default(ACTIVE)
+  startsAt      DateTime          @default(now())
+  expiresAt     DateTime?
+  revokedAt     DateTime?
+  grantedById   String
+  revokedById   String?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  @@index([studentUserId, status, startsAt, expiresAt])
+  @@index([courseId])
+  @@index([chapterId])
 }

@@ -1,12 +1,9 @@
-import { HttpStatus } from '@nestjs/common';
 import { AppException } from '../exceptions/app.exception';
-import { ErrorCode } from '../exceptions/error-codes';
 import {
   computeTwoPhaseRenumber,
   assertCompleteSequentialReorder,
   slugify,
   slugifyOrThrow,
-  versionConflict,
 } from './hierarchy.helper';
 
 describe('slugify', () => {
@@ -79,20 +76,5 @@ describe('computeTwoPhaseRenumber', () => {
     const plan = computeTwoPhaseRenumber([]);
     expect(plan.phase1).toEqual([]);
     expect(plan.phase2).toEqual([]);
-  });
-});
-
-describe('versionConflict', () => {
-  it('throws an AppException with 409 and ErrorCode.CONFLICT', () => {
-    expect(() => versionConflict()).toThrow(AppException);
-    try {
-      versionConflict();
-      fail('expected versionConflict to throw');
-    } catch (error) {
-      expect(error).toBeInstanceOf(AppException);
-      const appException = error as AppException;
-      expect(appException.getStatus()).toBe(HttpStatus.CONFLICT);
-      expect(appException.code).toBe(ErrorCode.CONFLICT);
-    }
   });
 });

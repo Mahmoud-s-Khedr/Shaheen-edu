@@ -2,7 +2,7 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsEnum, IsOptional, IsString } from 'class-validator';
 import { PaginationQueryDto } from '../../../common/dto/pagination-query.dto';
 import {
-  ContentAccessLevel,
+  AccessType,
   ContentItemType,
   ContentStatus,
 } from '../../../common/types/roles.enum';
@@ -18,10 +18,10 @@ export class QueryContentItemDto extends PaginationQueryDto {
   @IsEnum(ContentItemType)
   type?: ContentItemType;
 
-  @ApiPropertyOptional({ enum: ContentAccessLevel })
+  @ApiPropertyOptional({ enum: AccessType })
   @IsOptional()
-  @IsEnum(ContentAccessLevel)
-  accessLevel?: ContentAccessLevel;
+  @IsEnum(AccessType)
+  accessType?: AccessType;
 
   @ApiPropertyOptional()
   @IsOptional()
