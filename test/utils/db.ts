@@ -18,6 +18,9 @@ export async function cleanDatabase(
   await prisma.parentAccessSession.deleteMany();
   await prisma.contentPlacement.deleteMany();
   await prisma.contentItem.deleteMany();
+  // Entitlements hold restrictive FKs to Course and Chapter, so they must go
+  // before the hierarchy rows below.
+  await prisma.studentEntitlement.deleteMany();
   await prisma.section.deleteMany();
   await prisma.lesson.deleteMany();
   await prisma.chapter.deleteMany();
@@ -32,7 +35,6 @@ export async function cleanDatabase(
   await prisma.assetReference.deleteMany();
   await prisma.videoAsset.deleteMany();
   await prisma.bunnyStreamWebhookEvent.deleteMany();
-  await prisma.studentEntitlement.deleteMany();
   await prisma.asset.deleteMany();
   await prisma.partnerProfile.deleteMany();
   await prisma.user.deleteMany();

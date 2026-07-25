@@ -1,11 +1,17 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return */
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import { createTestApp } from './utils/create-test-app';
-import { cleanDatabase, flushTestRedis, seedSuperAdmin } from './utils/db';
+import {
+  cleanDatabase,
+  flushTestRedis,
+  seedPublishedAcademicGrade,
+  seedSuperAdmin,
+} from './utils/db';
 
 describe('Content items (e2e)', () => {
   let app: NestFastifyApplication;
   let token: string;
+  let studentToken: string;
   let courseId: string;
   let chapterId: string;
   let initialContent: { id: string };
@@ -57,6 +63,25 @@ describe('Content items (e2e)', () => {
       payload: { title: 'Content Chapter', courseId },
     });
     chapterId = json(chapter).id;
+
+    const studentGradeId = (
+      await seedPublishedAcademicGrade(app, 'content-student-grade')
+    ).id;
+    studentToken = json(
+      await app.inject({
+        method: 'POST',
+        url: '/api/v1/auth/students/register',
+        payload: {
+          fullName: 'Content Student',
+          nationalId: '29901010154321',
+          phone: '01099991111',
+          parentPhone: '01088881111',
+          governorate: 'Cairo',
+          password: 'StudentP@ss1!',
+          academicGradeId: studentGradeId,
+        },
+      }),
+    ).accessToken;
   });
 
   afterAll(async () => {
@@ -179,5 +204,96 @@ describe('Content items (e2e)', () => {
     expect(
       json(list).data.some((item: { id: string }) => item.id === secondBody.id),
     ).toBe(false);
+  });
+
+  it('refuses to publish an archived content item', async () => {
+    const created = await app.inject({
+      method: 'POST',
+      url: '/api/v1/admin/content-items',
+      headers: auth(),
+      payload: {
+        type: 'TEXT',
+        title: 'Retired',
+        textBody: 'Old body',
+        placement: { chapterId },
+      },
+    });
+    const id = json(created).id;
+    const archived = await app.inject({
+      method: 'POST',
+      url: `/api/v1/admin/content-items/${id}/archive`,
+      headers: auth(),
+    });
+    expect(archived.statusCode).toBe(201);
+
+    const published = await app.inject({
+      method: 'POST',
+      url: `/api/v1/admin/content-items/${id}/publish`,
+      headers: auth(),
+    });
+    expect(published.statusCode).toBe(409);
+    const after = await app.inject({
+      method: 'GET',
+      url: `/api/v1/admin/content-items/${id}`,
+      headers: auth(),
+    });
+    expect(json(after).status).toBe('ARCHIVED');
+  });
+
+  describe('role protection', () => {
+    const student = () => ({ authorization: `Bearer ${studentToken}` });
+
+    // Every admin content route, exercised as a student (403) and unauthenticated
+    // (401). Authorization must be decided before any DTO validation or lookup.
+    type Route = { method: 'GET' | 'POST' | 'PATCH' | 'DELETE'; url: string };
+    const routes = (): Route[] => {
+      const item = `/api/v1/admin/content-items/${initialContent.id}`;
+      return [
+        { method: 'GET', url: '/api/v1/admin/content-items' },
+        { method: 'GET', url: item },
+        { method: 'POST', url: '/api/v1/admin/content-items' },
+        { method: 'POST', url: '/api/v1/admin/content-items/reorder' },
+        { method: 'PATCH', url: item },
+        { method: 'PATCH', url: `${item}/access` },
+        { method: 'POST', url: `${item}/move` },
+        { method: 'POST', url: `${item}/publish` },
+        { method: 'POST', url: `${item}/archive` },
+        { method: 'POST', url: `${item}/restore` },
+        { method: 'POST', url: `${item}/primary-asset` },
+        { method: 'POST', url: `${item}/attachments` },
+        { method: 'POST', url: `${item}/attachments/reorder` },
+        { method: 'DELETE', url: `${item}/attachments/missing-asset` },
+        { method: 'DELETE', url: item },
+      ];
+    };
+
+    const call = (route: Route, headers: Record<string, string>) =>
+      app.inject(
+        route.method === 'GET' || route.method === 'DELETE'
+          ? { ...route, headers }
+          : { ...route, headers, payload: {} },
+      );
+
+    it('rejects every admin content route for a student (403)', async () => {
+      for (const route of routes()) {
+        const response = await call(route, student());
+        expect([route.method, route.url, response.statusCode]).toEqual([
+          route.method,
+          route.url,
+          403,
+        ]);
+      }
+    });
+
+    it('rejects every admin content route when unauthenticated (401)', async () => {
+      for (const route of routes()) {
+        const response = await call(route, {});
+        expect([route.method, route.url, response.statusCode]).toEqual([
+          route.method,
+          route.url,
+          401,
+        ]);
+      }
+    });
   });
 });

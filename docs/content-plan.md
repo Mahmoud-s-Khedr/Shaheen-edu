@@ -46,7 +46,7 @@ AcademicGrade → Subject → Course → Chapter → Lesson → Section
 - [x] Add admin create, get, paginated list/filter, PATCH, reorder, archive, restore, and eligible-draft-delete operations for each level. (A minimal `publish` action per level was also added in this phase, ahead of Phase 5's full `PublicationValidator`.)
 - [x] Verify a complete hierarchy can be created; invalid parents, duplicate scoped slugs, and unauthorized roles are rejected; reorder/move is atomic; and archived records are hidden from normal lists.
 
-## Phase 2 — Manual content items
+## Phase 2 — Manual content items ✅ Complete
 
 ### Goal
 
@@ -62,15 +62,15 @@ Allow manual text and external-resource authoring at course, chapter, lesson, or
 - [x] `TEXT` requires non-empty `textBody`; `EXTERNAL_LINK` requires a valid HTTPS URL.
 - [x] Asset-backed types require a compatible ready asset before publication.
 - [x] Content may move only to a valid, different hierarchy target; archived content cannot be moved. Repositioning within the current target always uses reorder.
-- Archived content cannot be newly placed or published.
+- [x] Archived content cannot be newly placed or published.
 
 ### APIs and tests
 
 - [x] Add admin create, get, paginated list/filter, PATCH, move, reorder, archive, restore, and eligible-draft-delete endpoints.
 - [x] Verify type-specific validation, exclusive placement enforcement, transactional ordering, and draft/archived visibility.
-- Verify role protection.
+- [x] Verify role protection.
 
-## Phase 3 — Manual Bunny Storage uploads
+## Phase 3 — Manual Bunny Storage uploads ✅ Complete
 
 ### Goal
 
@@ -85,16 +85,16 @@ Support individual upload and protected delivery of covers, PDFs, images, docume
 ### Upload and delivery rules
 
 - [x] Use Fastify-compatible multipart streaming; do not use Nest's Multer integration or buffer large uploads in memory.
-- Validate size limits by asset kind, extension, declared MIME type, magic-byte signature, empty payload, and sanitized display filename before accepting an upload.
+- [x] Validate size limits by asset kind, extension, declared MIME type, magic-byte signature, empty payload, and sanitized display filename before accepting an upload.
 - [x] The backend streams one validated file to Bunny Storage, records success/failure, and permits attachment only after the asset is `READY`.
 - [x] A protected asset URL is a short-lived Bunny CDN token-authenticated URL. The API performs authorization first and never proxies file bytes.
-- Unused draft assets may be deleted. Referenced assets cannot be deleted. Replacing an asset creates a new asset and archives the old reference only after it is no longer needed by published content.
+- [x] Unused draft assets may be deleted. Referenced assets cannot be deleted. Replacing an asset creates a new asset and archives the old reference only after it is no longer needed by published content.
 
 ### Tests
 
-- Cover supported types, oversize/unsupported/spoofed files, empty files, provider failure recording, no credential disclosure, reference protection, attachment flow, short-lived access URLs, and admin-only uploads.
+- [x] Cover supported types, oversize/unsupported/spoofed files, empty files, provider failure recording, no credential disclosure, reference protection, attachment flow, short-lived access URLs, and admin-only uploads.
 
-## Phase 4 — Manual Bunny Stream video uploads
+## Phase 4 — Manual Bunny Stream video uploads ✅ Complete
 
 ### Goal
 
@@ -111,7 +111,7 @@ Allow admins to add one video at a time without exposing Bunny secrets.
 
 - [x] Add admin create/get/upload-authorization/retry/archive video operations and one public webhook endpoint exempt only from user authentication, not signature verification.
 - [x] Add student playback-authorization through the central access policy in Phase 7.
-- Test secret non-disclosure, invalid signatures, repeated webhooks, valid transitions, failure preservation, retry, and publication blocking while unready.
+- [x] Test secret non-disclosure, invalid signatures, repeated webhooks, valid transitions, failure preservation, retry, and publication blocking while unready.
 
 ## Phase 5 — Publication and public catalog
 
@@ -164,15 +164,15 @@ Allow admins to grant access for testing before payments exist, and securely del
 ### Data model and access policy
 
 - [x] Add `StudentEntitlement` with exactly one target (`courseId` or `chapterId`), source (`ADMIN`, `PROMOTION`, `MIGRATION`, reserved `PAYMENT`), status, start/expiry dates, grant/revoke actors, revoke timestamp, and audit fields. Enforce the exclusive target with a `CHECK` constraint.
-- Overlapping grants are allowed: access is the union of all active grants. An entitlement is active only when its status permits it, it has started, it is not revoked, and it has not expired.
+- [x] Overlapping grants are allowed: access is the union of all active grants. An entitlement is active only when its status permits it, it has started, it is not revoked, and it has not expired.
 - [x] Implement one `ContentAccessPolicyService` for delivered content. It evaluates publication, non-archived ancestry, the effective inherited access type, active course/chapter grants, and the student's identity. Asset and video playback integration remains part of Phases 3–4.
-- `PUBLIC` content is available without login; `FREE` requires an authenticated student; `PAID` requires a valid relevant entitlement.
+- [x] `PUBLIC` content is available without login; `FREE` requires an authenticated student; `PAID` requires a valid relevant entitlement.
 - [x] Configure access at course, chapter, lesson, section, and content-item levels. Courses always have an explicit `PUBLIC`, `FREE`, or `PAID` value; descendants use `INHERIT` by default and resolve the nearest explicit ancestor.
 
 ### APIs and tests
 
 - [x] Add admin grant/revoke/list entitlement operations and public/student content delivery endpoints. Add student course/hierarchy reads and protected asset/video authorization when their respective resources are introduced.
-- Verify course versus chapter boundaries, preview behavior, expired/revoked grants, public catalog versus protected delivery, draft exclusion despite entitlement, IDOR resistance, URL expiry, and denial for partners/unrelated students.
+- [x] Verify course versus chapter boundaries, preview behavior, expired/revoked grants, public catalog versus protected delivery, draft exclusion despite entitlement, IDOR resistance, URL expiry, and denial for partners/unrelated students. (`test/entitlements.e2e-spec.ts`. Locked-outline preview behavior is verified with the Phase 5 catalog endpoints.)
 
 ## Phase 8 — Manual question-bank authoring
 

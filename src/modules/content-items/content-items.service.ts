@@ -429,6 +429,11 @@ export class ContentItemsService {
   async publish(actor: RequestUser, id: string) {
     this.assertActorRole(actor);
     const item = await this.getOrThrow(id);
+    if (item.status === ContentStatus.ARCHIVED) {
+      throw new ConflictException(
+        'Archived content cannot be published; restore it first',
+      );
+    }
     const target = this.targetFromPlacement(item.placement);
     const parent = await this.assertValidTarget(target);
     if (parent.status !== ContentStatus.PUBLISHED) {
