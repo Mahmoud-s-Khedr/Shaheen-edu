@@ -42,11 +42,16 @@ export class StudentsService {
         throw new ConflictException('Academic grade must be published');
       }
     }
+    const current = await this.prisma.studentProfile.findUniqueOrThrow({ where: { userId }, select: { governorateId: true } });
+    const center = dto.center === undefined ? undefined : dto.center?.trim()
+      ? await this.prisma.center.upsert({ where: { governorateId_name: { governorateId: current.governorateId, name: dto.center.trim() } }, create: { governorateId: current.governorateId, name: dto.center.trim() }, update: {} })
+      : null;
     await this.prisma.studentProfile.update({
       where: { userId },
       data: {
         fullName: dto.fullName,
         center: dto.center,
+        ...(dto.center === undefined ? {} : { centerId: center?.id ?? null }),
         academicGradeId: dto.academicGradeId,
       },
     });

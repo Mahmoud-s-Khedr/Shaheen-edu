@@ -10,6 +10,7 @@ export const questionBankAuthoringJourney: JourneyDefinition = {
   async run({ clients, context, factory, step }) {
     const admin = clients.admin;
     const chapterId = String(context.academic.chapterId);
+    const courseId = String(context.academic.courseId);
     const publisherUserId = String(context.partner.id);
     let sourceId = '';
     let bankId = '';
@@ -42,12 +43,12 @@ export const questionBankAuthoringJourney: JourneyDefinition = {
 
     await step('Creating a single-choice question and enforcing its option constraints', async () => {
       const question = await admin.request<any>('POST', '/admin/questions', {
-        bankId, sourceId, chapterId, body: 'Which synthetic option is correct?', explanation: 'This is a generated journey explanation.',
+        bankId, sourceId, courseId, placements: [{ chapterId }], body: 'Which synthetic option is correct?', explanation: 'This is a generated journey explanation.',
       });
       expectStatus(question, 201);
       questionId = question.body.id;
       context.created.questions.push(questionId);
-      assert(question.body.type === 'SINGLE_CHOICE' && question.body.scope.chapterId === chapterId, 'Question must be single-choice and inherit chapter scope');
+      assert(question.body.type === 'SINGLE_CHOICE' && question.body.scope.courseId === courseId && question.body.placements.some((placement: any) => placement.chapterId === chapterId), 'Question must be single-choice and retain its chapter placement');
 
       expectStatus(await admin.request<any>('POST', `/admin/questions/${questionId}/submit`), 409);
       const first = await admin.request<any>('POST', `/admin/questions/${questionId}/options`, { body: 'Correct option', isCorrect: true });
@@ -79,7 +80,7 @@ export const questionBankAuthoringJourney: JourneyDefinition = {
     await step('Protecting published dependencies and archiving the question', async () => {
       expectStatus(await admin.request<any>('POST', `/admin/question-banks/sources/${sourceId}/archive`), 409);
       expectStatus(await admin.request<any>('POST', `/admin/question-banks/${bankId}/archive`), 409);
-      const denied = await clients.partner.request<any>('POST', '/admin/questions', { bankId, sourceId, chapterId, body: 'Denied question', explanation: 'Denied.' });
+      const denied = await clients.partner.request<any>('POST', '/admin/questions', { bankId, sourceId, courseId, placements: [{ chapterId }], body: 'Denied question', explanation: 'Denied.' });
       expectStatus(denied, 403);
 
       const archived = await admin.request<any>('POST', `/admin/questions/${questionId}/archive`);

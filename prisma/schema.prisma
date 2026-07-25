@@ -119,6 +119,7 @@ enum QuestionStatus {
 
 enum QuestionType {
   SINGLE_CHOICE
+  MULTIPLE_CHOICE
 }
 
 model User {
@@ -135,6 +136,11 @@ model User {
   partnerProfile   PartnerProfile?
   authSessions     AuthSession[]
   auditLogsActor   AdminAuditLog[]
+  partnerProfilesCreated PartnerProfile[] @relation("PartnerProfileCreatedBy")
+  entitlementsGranted StudentEntitlement[] @relation("EntitlementGrantedBy")
+  entitlementsRevoked StudentEntitlement[] @relation("EntitlementRevokedBy")
+  publisherAgreementsCreated PublisherAgreement[] @relation("PublisherAgreementCreatedBy")
+  earningsStatementsCreated PublisherEarningsStatement[] @relation("EarningsStatementCreatedBy")
 
   academicGradesCreated AcademicGrade[] @relation("AcademicGradeCreatedBy")
   academicGradesUpdated AcademicGrade[] @relation("AcademicGradeUpdatedBy")
@@ -150,7 +156,6 @@ model User {
   sectionsUpdated       Section[]       @relation("SectionUpdatedBy")
   contentItemsCreated   ContentItem[]   @relation("ContentItemCreatedBy")
   contentItemsUpdated   ContentItem[]   @relation("ContentItemUpdatedBy")
-  entitlements         StudentEntitlement[]
   assetsUploaded       Asset[] @relation("AssetUploadedBy")
   questionSourcesCreated QuestionSource[] @relation("QuestionSourceCreatedBy")
   questionSourcesUpdated QuestionSource[] @relation("QuestionSourceUpdatedBy")
@@ -176,13 +181,22 @@ model StudentProfile {
   academicGrade         AcademicGrade? @relation(fields: [academicGradeId], references: [id], onDelete: Restrict)
   governorate           String
   center                String?
+  governorateId         String
+  centerId              String?
+  governorateRef        Governorate? @relation(fields: [governorateId], references: [id], onDelete: Restrict)
+  centerRef             Center?      @relation(fields: [centerId], references: [id], onDelete: Restrict)
   parentPhoneNormalized String
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
+  entitlements          StudentEntitlement[]
+  parentAccessSessions  ParentAccessSession[]
 
   @@index([parentPhoneNormalized])
   @@index([parentPhoneNormalized, createdAt, userId])
   @@index([academicGradeId])
+  @@unique([userId, parentPhoneNormalized])
+  @@index([governorateId])
+  @@index([centerId])
 }
 
 model PartnerProfile {
@@ -193,6 +207,7 @@ model PartnerProfile {
   legalName       String?
   phone           String?
   createdByAdminId String
+  createdByAdmin User @relation("PartnerProfileCreatedBy", fields: [createdByAdminId], references: [id], onDelete: Restrict)
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
   publisherAgreements PublisherAgreement[] @relation("AgreementPublisher")
@@ -207,7 +222,9 @@ model AuthSession {
   familyId             String
   revoked              Boolean   @default(false)
   revokedAt            DateTime?
-  replacedBySessionId  String?
+  replacedBySessionId  String? @unique
+  replacedBy           AuthSession? @relation("AuthSessionReplacement", fields: [replacedBySessionId], references: [id], onDelete: Restrict)
+  replaces             AuthSession? @relation("AuthSessionReplacement")
   ipAddress            String?
   userAgent            String?
   expiresAt            DateTime
@@ -221,6 +238,7 @@ model ParentAccessSession {
   id                     String    @id @default(cuid())
   parentPhoneNormalized  String
   activeStudentId        String?
+  activeStudent          StudentProfile? @relation(fields: [activeStudentId, parentPhoneNormalized], references: [userId, parentPhoneNormalized], onDelete: Restrict)
   revoked                Boolean   @default(false)
   revokedAt              DateTime?
   ipAddress              String?
@@ -330,6 +348,8 @@ model Course {
   updatedBy User @relation("CourseUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
 
   chapters Chapter[]
+  questions Question[]
+  questionPlacements QuestionPlacement[] @relation("QuestionPlacementCourse")
   entitlements StudentEntitlement[]
   publisherAgreements PublisherAgreement[] @relation("PublisherAgreementCourse")
   earningsStatements PublisherEarningsStatement[] @relation("EarningsCourse")
@@ -372,7 +392,7 @@ model Chapter {
   publisherAgreements PublisherAgreement[] @relation("PublisherAgreementChapter")
   earningsStatements PublisherEarningsStatement[] @relation("EarningsChapter")
   contentPlacements ContentPlacement[] @relation("ContentPlacementChapter")
-  questions Question[]
+  questionPlacements QuestionPlacement[] @relation("QuestionPlacementChapter")
   coverAsset      Asset? @relation("ChapterCover", fields: [coverAssetId], references: [id], onDelete: Restrict)
   coverAssetId    String?
 
@@ -412,6 +432,7 @@ model Lesson {
   contentPlacements ContentPlacement[] @relation("ContentPlacementLesson")
   coverAsset      Asset? @relation("LessonCover", fields: [coverAssetId], references: [id], onDelete: Restrict)
   coverAssetId    String?
+  questionPlacements QuestionPlacement[] @relation("QuestionPlacementLesson")
 
   @@unique([chapterId, slug])
   @@unique([chapterId, sortOrder])
@@ -443,6 +464,7 @@ model Section {
   contentPlacements ContentPlacement[] @relation("ContentPlacementSection")
   coverAsset      Asset? @relation("SectionCover", fields: [coverAssetId], references: [id], onDelete: Restrict)
   coverAssetId    String?
+  questionPlacements QuestionPlacement[] @relation("QuestionPlacementSection")
 
   @@unique([lessonId, slug])
   @@unique([lessonId, sortOrder])
@@ -506,7 +528,6 @@ model Asset {
   sectionCovers     Section[] @relation("SectionCover")
   video             VideoAsset?
   questionAssets    QuestionAsset[] @relation("QuestionAttachmentAsset")
-  questionVideoLinks QuestionVideoLink[] @relation("QuestionVideoAsset")
   @@index([status, kind, createdAt])
 }
 
@@ -535,6 +556,7 @@ model VideoAsset {
   lastWebhookAt      DateTime?
   failureMetadata    Json?
   attempt            Int @default(1)
+  questionVideoLinks QuestionVideoLink[]
   @@index([processingStatus])
 }
 
@@ -582,7 +604,7 @@ model Question {
   id           String         @id @default(cuid())
   bankId       String
   sourceId     String
-  chapterId    String
+  courseId     String
   type         QuestionType   @default(SINGLE_CHOICE)
   body         String
   explanation  String?
@@ -598,18 +620,19 @@ model Question {
   reviewedById String?
   bank         QuestionBank   @relation(fields: [bankId], references: [id], onDelete: Restrict)
   source       QuestionSource @relation(fields: [sourceId], references: [id], onDelete: Restrict)
-  chapter      Chapter        @relation(fields: [chapterId], references: [id], onDelete: Restrict)
+  course       Course         @relation(fields: [courseId], references: [id], onDelete: Restrict)
   createdBy    User           @relation("QuestionCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
   updatedBy    User           @relation("QuestionUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
   reviewedBy   User?          @relation("QuestionReviewedBy", fields: [reviewedById], references: [id], onDelete: Restrict)
   options      QuestionOption[]
   assets       QuestionAsset[]
   videoLink    QuestionVideoLink?
+  placements   QuestionPlacement[]
 
   @@index([status, createdAt, id])
   @@index([bankId, status])
   @@index([sourceId, status])
-  @@index([chapterId, status])
+  @@index([courseId, status])
 }
 
 model QuestionOption {
@@ -646,9 +669,30 @@ model QuestionVideoLink {
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
   question         Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
-  videoAsset       Asset    @relation("QuestionVideoAsset", fields: [videoAssetId], references: [id], onDelete: Restrict)
+  videoAsset       VideoAsset @relation(fields: [videoAssetId], references: [assetId], onDelete: Restrict)
 
   @@index([videoAssetId])
+}
+
+model QuestionPlacement {
+  id         String   @id @default(cuid())
+  questionId String
+  courseId   String?
+  chapterId  String?
+  lessonId   String?
+  sectionId  String?
+  createdAt  DateTime @default(now())
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  course     Course?  @relation("QuestionPlacementCourse", fields: [courseId], references: [id], onDelete: Restrict)
+  chapter    Chapter? @relation("QuestionPlacementChapter", fields: [chapterId], references: [id], onDelete: Restrict)
+  lesson     Lesson?  @relation("QuestionPlacementLesson", fields: [lessonId], references: [id], onDelete: Restrict)
+  section    Section? @relation("QuestionPlacementSection", fields: [sectionId], references: [id], onDelete: Restrict)
+
+  @@index([questionId])
+  @@index([courseId])
+  @@index([chapterId])
+  @@index([lessonId])
+  @@index([sectionId])
 }
 
 model BunnyStreamWebhookEvent {
@@ -686,7 +730,7 @@ model ContentPlacement {
 model StudentEntitlement {
   id            String            @id @default(cuid())
   studentUserId String
-  student       User              @relation(fields: [studentUserId], references: [id], onDelete: Restrict)
+  student       StudentProfile    @relation(fields: [studentUserId], references: [userId], onDelete: Restrict)
   courseId      String?
   course        Course?           @relation(fields: [courseId], references: [id], onDelete: Restrict)
   chapterId     String?
@@ -697,7 +741,9 @@ model StudentEntitlement {
   expiresAt     DateTime?
   revokedAt     DateTime?
   grantedById   String
+  grantedBy     User              @relation("EntitlementGrantedBy", fields: [grantedById], references: [id], onDelete: Restrict)
   revokedById   String?
+  revokedBy     User?             @relation("EntitlementRevokedBy", fields: [revokedById], references: [id], onDelete: Restrict)
   createdAt     DateTime          @default(now())
   updatedAt     DateTime          @updatedAt
 
@@ -722,6 +768,7 @@ model PublisherAgreement {
   status          PublisherAgreementStatus @default(DRAFT)
   isPrimary       Boolean                  @default(true)
   createdById     String
+  createdBy       User                     @relation("PublisherAgreementCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
   createdAt       DateTime                 @default(now())
   updatedAt       DateTime                 @updatedAt
 
@@ -750,10 +797,33 @@ model PublisherEarningsStatement {
   revenueShareBps       Int
   publisherEarningsMinor Int
   createdById           String
+  createdBy             User               @relation("EarningsStatementCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
   createdAt             DateTime           @default(now())
 
   @@index([agreementId, periodStartsAt, periodEndsAt])
   @@index([courseId, periodStartsAt])
   @@index([chapterId, periodStartsAt])
   @@index([lessonId, periodStartsAt])
+}
+
+model Governorate {
+  id       String @id @default(cuid())
+  name     String @unique
+  centers  Center[]
+  students StudentProfile[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Center {
+  id            String @id @default(cuid())
+  governorateId String
+  governorate   Governorate @relation(fields: [governorateId], references: [id], onDelete: Restrict)
+  name          String
+  students      StudentProfile[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([governorateId, name])
+  @@index([governorateId])
 }

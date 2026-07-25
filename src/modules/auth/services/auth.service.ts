@@ -206,6 +206,18 @@ export class AuthService {
           passwordHash,
         },
       });
+      const governorate = await tx.governorate.upsert({
+        where: { name: dto.governorate.trim() },
+        create: { name: dto.governorate.trim() },
+        update: {},
+      });
+      const center = dto.center?.trim()
+        ? await tx.center.upsert({
+            where: { governorateId_name: { governorateId: governorate.id, name: dto.center.trim() } },
+            create: { governorateId: governorate.id, name: dto.center.trim() },
+            update: {},
+          })
+        : null;
       await tx.studentProfile.create({
         data: {
           userId: created.id,
@@ -216,6 +228,8 @@ export class AuthService {
           academicGradeId: dto.academicGradeId,
           governorate: dto.governorate,
           center: dto.center,
+          governorateId: governorate.id,
+          centerId: center?.id,
           parentPhoneNormalized: normalizedParentPhone,
         },
       });

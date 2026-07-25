@@ -1,8 +1,8 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsBoolean, IsEnum, IsInt, IsOptional, IsString, MaxLength, Min, MinLength } from 'class-validator';
+import { ArrayMinSize, IsArray, IsBoolean, IsEnum, IsInt, IsOptional, IsString, MaxLength, Min, MinLength, ValidateNested } from 'class-validator';
 import { PaginationQueryDto } from '../../../common/dto/pagination-query.dto';
-import { ContentStatus, QuestionSourceType, QuestionStatus } from '../../../common/types/roles.enum';
+import { ContentStatus, QuestionSourceType, QuestionStatus, QuestionType } from '../../../common/types/roles.enum';
 
 export class CreateQuestionSourceDto {
   @ApiProperty({ enum: QuestionSourceType }) @IsEnum(QuestionSourceType) type!: QuestionSourceType;
@@ -18,13 +18,24 @@ export class UpdateQuestionSourceDto {
 }
 export class CreateQuestionBankDto { @ApiProperty() @IsString() @MinLength(1) @MaxLength(200) title!: string; @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(2000) description?: string; }
 export class UpdateQuestionBankDto { @ApiPropertyOptional() @IsOptional() @IsString() @MinLength(1) @MaxLength(200) title?: string; @ApiPropertyOptional({ nullable: true }) @IsOptional() @IsString() @MaxLength(2000) description?: string | null; }
+export class QuestionPlacementDto {
+  @ApiPropertyOptional() @IsOptional() @IsString() courseId?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() chapterId?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() lessonId?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() sectionId?: string;
+}
+
 export class CreateQuestionDto {
-  @ApiProperty() @IsString() bankId!: string; @ApiProperty() @IsString() sourceId!: string; @ApiProperty() @IsString() chapterId!: string;
+  @ApiProperty() @IsString() bankId!: string; @ApiProperty() @IsString() sourceId!: string; @ApiProperty() @IsString() courseId!: string;
+  @ApiPropertyOptional({ enum: QuestionType }) @IsOptional() @IsEnum(QuestionType) type?: QuestionType;
+  @ApiProperty({ type: [QuestionPlacementDto] }) @IsArray() @ArrayMinSize(1) @ValidateNested({ each: true }) @Type(() => QuestionPlacementDto) placements!: QuestionPlacementDto[];
   @ApiProperty() @IsString() @MinLength(1) @MaxLength(100000) body!: string;
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(100000) explanation?: string;
 }
 export class UpdateQuestionDto {
-  @ApiPropertyOptional() @IsOptional() @IsString() bankId?: string; @ApiPropertyOptional() @IsOptional() @IsString() sourceId?: string; @ApiPropertyOptional() @IsOptional() @IsString() chapterId?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() bankId?: string; @ApiPropertyOptional() @IsOptional() @IsString() sourceId?: string; @ApiPropertyOptional() @IsOptional() @IsString() courseId?: string;
+  @ApiPropertyOptional({ enum: QuestionType }) @IsOptional() @IsEnum(QuestionType) type?: QuestionType;
+  @ApiPropertyOptional({ type: [QuestionPlacementDto] }) @IsOptional() @IsArray() @ArrayMinSize(1) @ValidateNested({ each: true }) @Type(() => QuestionPlacementDto) placements?: QuestionPlacementDto[];
   @ApiPropertyOptional() @IsOptional() @IsString() @MinLength(1) @MaxLength(100000) body?: string;
   @ApiPropertyOptional({ nullable: true }) @IsOptional() @IsString() @MaxLength(100000) explanation?: string | null;
 }
@@ -36,7 +47,7 @@ export class SetQuestionVideoLinkDto { @ApiProperty() @IsString() videoAssetId!:
 export class RejectQuestionDto { @ApiProperty() @IsString() @MinLength(1) @MaxLength(2000) reviewNote!: string; }
 export class QueryQuestionDto extends PaginationQueryDto {
   @ApiPropertyOptional({ enum: QuestionStatus }) @IsOptional() @IsEnum(QuestionStatus) status?: QuestionStatus;
-  @ApiPropertyOptional() @IsOptional() @IsString() bankId?: string; @ApiPropertyOptional() @IsOptional() @IsString() sourceId?: string; @ApiPropertyOptional() @IsOptional() @IsString() chapterId?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() bankId?: string; @ApiPropertyOptional() @IsOptional() @IsString() sourceId?: string; @ApiPropertyOptional() @IsOptional() @IsString() chapterId?: string; @ApiPropertyOptional() @IsOptional() @IsString() lessonId?: string; @ApiPropertyOptional() @IsOptional() @IsString() sectionId?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() courseId?: string; @ApiPropertyOptional() @IsOptional() @IsString() subjectId?: string; @ApiPropertyOptional() @IsOptional() @IsString() academicGradeId?: string;
 }
 export class QueryQuestionSourceDto extends PaginationQueryDto { @ApiPropertyOptional({ enum: ContentStatus }) @IsOptional() @IsEnum(ContentStatus) status?: ContentStatus; @ApiPropertyOptional({ enum: QuestionSourceType }) @IsOptional() @IsEnum(QuestionSourceType) type?: QuestionSourceType; }
