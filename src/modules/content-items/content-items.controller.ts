@@ -133,21 +133,25 @@ export class ContentItemsController {
   }
 
   @Post(':id/primary-asset')
+  @ApiOperation({ summary: 'Set the content item primary asset' })
   setPrimaryAsset(@CurrentUser() actor: RequestUser, @Param('id') id: string, @Body('assetId') assetId: string) {
     return this.contentItemsService.setPrimaryAsset(actor, id, assetId);
   }
 
   @Post(':id/attachments')
+  @ApiOperation({ summary: 'Add an ordered attachment to a content item' })
   addAttachment(@CurrentUser() actor: RequestUser, @Param('id') id: string, @Body('assetId') assetId: string) {
     return this.contentItemsService.addAttachment(actor, id, assetId);
   }
 
   @Post(':id/attachments/reorder')
+  @ApiOperation({ summary: 'Reorder content item attachments' })
   reorderAttachments(@CurrentUser() actor: RequestUser, @Param('id') id: string, @Body('assetIds') assetIds: string[]) {
     return this.contentItemsService.reorderAttachments(actor, id, assetIds);
   }
 
   @Delete(':id/attachments/:assetId')
+  @ApiOperation({ summary: 'Remove an attachment from a content item' })
   removeAttachment(@CurrentUser() actor: RequestUser, @Param('id') id: string, @Param('assetId') assetId: string) {
     return this.contentItemsService.removeAttachment(actor, id, assetId);
   }

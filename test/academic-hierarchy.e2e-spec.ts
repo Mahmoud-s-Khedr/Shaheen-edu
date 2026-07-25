@@ -111,14 +111,13 @@ describe('Academic hierarchy (e2e)', () => {
 
   describe('full hierarchy creation', () => {
     let gradeId: string;
-    let gradeVersion: number;
     let subjectId: string;
     let courseId: string;
     let chapterId: string;
     let lessonId: string;
     let sectionId: string;
 
-    it('creates a grade in DRAFT with version 1', async () => {
+    it('creates a grade in DRAFT', async () => {
       const response = await app.inject({
         method: 'POST',
         url: '/api/v1/admin/academic-grades',
@@ -128,10 +127,8 @@ describe('Academic hierarchy (e2e)', () => {
       expect(response.statusCode).toBe(201);
       const body = await json(response);
       expect(body.status).toBe('DRAFT');
-      expect(body.version).toBe(1);
       expect(body.slug).toBe('grade-10');
       gradeId = body.id;
-      gradeVersion = body.version;
 
       const publicGrades = await app.inject({
         method: 'GET',
@@ -164,7 +161,11 @@ describe('Academic hierarchy (e2e)', () => {
         method: 'POST',
         url: '/api/v1/admin/courses',
         headers: authHeader(adminToken),
-        payload: { title: 'Algebra Fundamentals', subjectId },
+        payload: {
+          title: 'Algebra Fundamentals',
+          subjectId,
+          accessType: 'PUBLIC',
+        },
       });
       expect(response.statusCode).toBe(201);
       const body = await json(response);
@@ -225,7 +226,6 @@ describe('Academic hierarchy (e2e)', () => {
         method: 'POST',
         url: `/api/v1/admin/academic-grades/${gradeId}/publish`,
         headers: authHeader(adminToken),
-        payload: { version: gradeVersion },
       });
       expect(publishGrade.statusCode).toBe(201);
 
@@ -337,7 +337,7 @@ describe('Academic hierarchy (e2e)', () => {
       expect(sameSlugDifferentParent.statusCode).toBe(201);
     });
 
-    it('rejects a PATCH with a stale version (409)', async () => {
+    it('applies sequential PATCH updates without a concurrency token', async () => {
       const created = await app.inject({
         method: 'POST',
         url: '/api/v1/admin/subjects',
@@ -350,17 +350,19 @@ describe('Academic hierarchy (e2e)', () => {
         method: 'PATCH',
         url: `/api/v1/admin/subjects/${subjectId}`,
         headers: authHeader(adminToken),
-        payload: { title: 'Chemistry I', version: 1 },
+        payload: { title: 'Chemistry I' },
       });
       expect(firstPatch.statusCode).toBe(200);
 
-      const stalePatch = await app.inject({
+      // Versioning was removed: a second update against the same record still succeeds.
+      const secondPatch = await app.inject({
         method: 'PATCH',
         url: `/api/v1/admin/subjects/${subjectId}`,
         headers: authHeader(adminToken),
-        payload: { title: 'Chemistry II', version: 1 },
+        payload: { title: 'Chemistry II' },
       });
-      expect(stalePatch.statusCode).toBe(409);
+      expect(secondPatch.statusCode).toBe(200);
+      expect((await json(secondPatch)).title).toBe('Chemistry II');
     });
 
     it('rejects mutating requests from STUDENT and PARTNER roles (403), and unauthenticated requests (401)', async () => {
@@ -391,9 +393,9 @@ describe('Academic hierarchy (e2e)', () => {
 
   describe('atomic reorder and move', () => {
     let gradeId: string;
-    let subjectA: { id: string; version: number };
-    let subjectB: { id: string; version: number };
-    let subjectC: { id: string; version: number };
+    let subjectA: { id: string };
+    let subjectB: { id: string };
+    let subjectC: { id: string };
 
     beforeAll(async () => {
       const grade = await app.inject({
@@ -416,30 +418,28 @@ describe('Academic hierarchy (e2e)', () => {
           payload: { title, academicGradeId: gradeId },
         });
         const body = await json(created);
-        if (key === 'subjectA')
-          subjectA = { id: body.id, version: body.version };
-        if (key === 'subjectB')
-          subjectB = { id: body.id, version: body.version };
-        if (key === 'subjectC')
-          subjectC = { id: body.id, version: body.version };
+        if (key === 'subjectA') subjectA = { id: body.id };
+        if (key === 'subjectB') subjectB = { id: body.id };
+        if (key === 'subjectC') subjectC = { id: body.id };
       }
     });
 
-    it('rolls back the whole reorder when one item has a stale version', async () => {
+    it('rejects an invalid reorder and leaves sibling order unchanged', async () => {
       const response = await app.inject({
         method: 'POST',
         url: '/api/v1/admin/subjects/reorder',
         headers: authHeader(adminToken),
         payload: {
           academicGradeId: gradeId,
+          // Duplicate sortOrder (1 twice) is not a valid 1..N permutation.
           items: [
-            { id: subjectA.id, sortOrder: 3, version: subjectA.version },
-            { id: subjectB.id, sortOrder: 1, version: 999 }, // stale
-            { id: subjectC.id, sortOrder: 2, version: subjectC.version },
+            { id: subjectA.id, sortOrder: 3 },
+            { id: subjectB.id, sortOrder: 1 },
+            { id: subjectC.id, sortOrder: 1 },
           ],
         },
       });
-      expect(response.statusCode).toBe(409);
+      expect(response.statusCode).toBe(400);
 
       const list = await app.inject({
         method: 'GET',
@@ -458,7 +458,7 @@ describe('Academic hierarchy (e2e)', () => {
       ).toBe(3);
     });
 
-    it('atomically reorders when all versions are current', async () => {
+    it('atomically reorders all siblings', async () => {
       const response = await app.inject({
         method: 'POST',
         url: '/api/v1/admin/subjects/reorder',
@@ -466,9 +466,9 @@ describe('Academic hierarchy (e2e)', () => {
         payload: {
           academicGradeId: gradeId,
           items: [
-            { id: subjectA.id, sortOrder: 3, version: subjectA.version },
-            { id: subjectB.id, sortOrder: 1, version: subjectB.version },
-            { id: subjectC.id, sortOrder: 2, version: subjectC.version },
+            { id: subjectA.id, sortOrder: 3 },
+            { id: subjectB.id, sortOrder: 1 },
+            { id: subjectC.id, sortOrder: 2 },
           ],
         },
       });
@@ -501,16 +501,13 @@ describe('Academic hierarchy (e2e)', () => {
       const targetGradeId = (await json(targetGrade)).id;
 
       // subjectB currently sits at sortOrder 1 in gradeId; moving it should
-      // close the gap for subjectC (now at 2 -> should become 1). The prior
-      // successful reorder bumped every sibling's version by exactly 1, so
-      // subjectB.version (captured at creation) + 1 is its current version.
+      // close the gap for subjectC (now at 2 -> should become 1).
       const move = await app.inject({
         method: 'POST',
         url: `/api/v1/admin/subjects/${subjectB.id}/move`,
         headers: authHeader(adminToken),
         payload: {
           newAcademicGradeId: targetGradeId,
-          version: subjectB.version + 1,
         },
       });
       expect(move.statusCode).toBe(201);
@@ -617,7 +614,11 @@ describe('Academic hierarchy (e2e)', () => {
         method: 'POST',
         url: '/api/v1/admin/courses',
         headers: authHeader(adminToken),
-        payload: { title: 'Delete Test Course', subjectId },
+        payload: {
+          title: 'Delete Test Course',
+          subjectId,
+          accessType: 'PUBLIC',
+        },
       });
       const courseId = (await json(course)).id;
 

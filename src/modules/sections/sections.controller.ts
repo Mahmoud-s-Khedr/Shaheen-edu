@@ -83,6 +83,7 @@ export class SectionsController {
   }
 
   @Patch(':id/access')
+  @ApiOperation({ summary: 'Set the section access type' })
   updateAccess(@CurrentUser() actor: RequestUser, @Param('id') id: string, @Body() dto: UpdateAccessTypeDto) {
     return this.sectionsService.updateAccess(actor, id, dto.accessType);
   }

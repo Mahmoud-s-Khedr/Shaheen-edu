@@ -12,3 +12,4 @@ reports/journeys/
 .journey-debug/
 .claude/
 .pnpm-store/
+test-files

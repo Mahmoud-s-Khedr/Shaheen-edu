@@ -26,6 +26,14 @@ export async function cleanDatabase(
   // Must run before academicGrade.deleteMany() due to the FK.
   await prisma.studentProfile.deleteMany();
   await prisma.academicGrade.deleteMany();
+  // Assets and their references are gated behind restrictive FKs (uploadedById ->
+  // User, coverAssetId/primaryAssetId -> Asset), so they must be cleared after the
+  // hierarchy/content rows above and before User below.
+  await prisma.assetReference.deleteMany();
+  await prisma.videoAsset.deleteMany();
+  await prisma.bunnyStreamWebhookEvent.deleteMany();
+  await prisma.studentEntitlement.deleteMany();
+  await prisma.asset.deleteMany();
   await prisma.partnerProfile.deleteMany();
   await prisma.user.deleteMany();
 }

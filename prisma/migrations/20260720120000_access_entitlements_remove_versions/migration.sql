@@ -24,14 +24,17 @@ ALTER TABLE "Chapter" DROP COLUMN "version";
 ALTER TABLE "Lesson" DROP COLUMN "version";
 ALTER TABLE "Section" DROP COLUMN "version";
 
-ALTER TABLE "AcademicGrade" DROP CONSTRAINT "AcademicGrade_positive_values";
-ALTER TABLE "Subject" DROP CONSTRAINT "Subject_positive_values";
-ALTER TABLE "Course" DROP CONSTRAINT "Course_positive_values";
-ALTER TABLE "Chapter" DROP CONSTRAINT "Chapter_positive_values";
-ALTER TABLE "Lesson" DROP CONSTRAINT "Lesson_positive_values";
-ALTER TABLE "Section" DROP CONSTRAINT "Section_positive_values";
-ALTER TABLE "ContentItem" DROP CONSTRAINT "ContentItem_positive_values";
-ALTER TABLE "ContentPlacement" DROP CONSTRAINT "ContentPlacement_positive_values";
+-- Dropping the "version" columns above already cascades to the CHECK constraints
+-- that referenced them, so these drops must be idempotent (IF EXISTS) to avoid
+-- failing on a fresh database where the constraints are already gone.
+ALTER TABLE "AcademicGrade" DROP CONSTRAINT IF EXISTS "AcademicGrade_positive_values";
+ALTER TABLE "Subject" DROP CONSTRAINT IF EXISTS "Subject_positive_values";
+ALTER TABLE "Course" DROP CONSTRAINT IF EXISTS "Course_positive_values";
+ALTER TABLE "Chapter" DROP CONSTRAINT IF EXISTS "Chapter_positive_values";
+ALTER TABLE "Lesson" DROP CONSTRAINT IF EXISTS "Lesson_positive_values";
+ALTER TABLE "Section" DROP CONSTRAINT IF EXISTS "Section_positive_values";
+ALTER TABLE "ContentItem" DROP CONSTRAINT IF EXISTS "ContentItem_positive_values";
+ALTER TABLE "ContentPlacement" DROP CONSTRAINT IF EXISTS "ContentPlacement_positive_values";
 ALTER TABLE "AcademicGrade" ADD CONSTRAINT "AcademicGrade_positive_values" CHECK ("sortOrder" > 0);
 ALTER TABLE "Subject" ADD CONSTRAINT "Subject_positive_values" CHECK ("sortOrder" > 0);
 ALTER TABLE "Course" ADD CONSTRAINT "Course_positive_values" CHECK ("sortOrder" > 0);

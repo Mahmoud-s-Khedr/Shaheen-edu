@@ -83,6 +83,7 @@ export class ChaptersController {
   }
 
   @Patch(':id/access')
+  @ApiOperation({ summary: 'Set the chapter access type' })
   updateAccess(@CurrentUser() actor: RequestUser, @Param('id') id: string, @Body() dto: UpdateAccessTypeDto) {
     return this.chaptersService.updateAccess(actor, id, dto.accessType);
   }

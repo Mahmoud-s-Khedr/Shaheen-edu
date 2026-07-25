@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -15,7 +15,7 @@ import { EntitlementsService } from './entitlements.service';
 @Controller({ path: 'admin/entitlements', version: '1' })
 export class EntitlementsController {
   constructor(private readonly service: EntitlementsService) {}
-  @Post() grant(@CurrentUser() actor: RequestUser, @Body() dto: GrantEntitlementDto) { return this.service.grant(actor, dto); }
-  @Post(':id/revoke') revoke(@CurrentUser() actor: RequestUser, @Param('id') id: string) { return this.service.revoke(actor, id); }
-  @Get() list(@CurrentUser() actor: RequestUser, @Query('studentUserId') studentUserId?: string) { return this.service.list(actor, studentUserId); }
+  @Post() @ApiOperation({ summary: 'Grant a student entitlement' }) grant(@CurrentUser() actor: RequestUser, @Body() dto: GrantEntitlementDto) { return this.service.grant(actor, dto); }
+  @Post(':id/revoke') @ApiOperation({ summary: 'Revoke a student entitlement' }) revoke(@CurrentUser() actor: RequestUser, @Param('id') id: string) { return this.service.revoke(actor, id); }
+  @Get() @ApiOperation({ summary: 'List student entitlements' }) list(@CurrentUser() actor: RequestUser, @Query('studentUserId') studentUserId?: string) { return this.service.list(actor, studentUserId); }
 }

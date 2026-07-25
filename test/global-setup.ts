@@ -43,6 +43,10 @@ function testEnvironment(
     BUNNY_STORAGE_SECRET_ACCESS_KEY: 'test-secret',
     BUNNY_STORAGE_PULL_ZONE_URL: 'https://assets.example.test',
     BUNNY_STORAGE_TOKEN_KEY: 'test-storage-token-key-0123456789',
+    // Small limits keep the oversize-upload e2e cases cheap.
+    ASSET_IMAGE_MAX_BYTES: '2048',
+    ASSET_DOCUMENT_MAX_BYTES: '4096',
+    ASSET_DOWNLOAD_MAX_BYTES: '8192',
     BUNNY_STREAM_LIBRARY_ID: '123',
     BUNNY_STREAM_API_KEY: 'test-stream-key',
     BUNNY_STREAM_READ_ONLY_KEY: 'test-read-only-key',

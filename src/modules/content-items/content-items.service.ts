@@ -487,8 +487,10 @@ export class ContentItemsService {
     const item = await this.getOrThrow(id);
     const asset = await this.assets.getReady(assetId);
     this.assets.assertCompatible(asset, item.type);
+    const previousAssetId = item.primaryAssetId;
     await this.prisma.contentItem.update({ where: { id }, data: { primaryAssetId: assetId, updatedById: actor.id } });
     await this.auditService.record({ actorUserId: actor.id, action: 'CONTENT_PRIMARY_ASSET_SET', targetType: 'ContentItem', targetId: id, metadata: { assetId } });
+    if (previousAssetId && previousAssetId !== assetId) await this.assets.archiveIfUnreferenced(actor, previousAssetId);
     return this.toSummary(await this.getOrThrow(id));
   }
 

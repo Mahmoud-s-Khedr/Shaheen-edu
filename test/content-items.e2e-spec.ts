@@ -8,7 +8,7 @@ describe('Content items (e2e)', () => {
   let token: string;
   let courseId: string;
   let chapterId: string;
-  let initialContent: { id: string; placement: { version: number } };
+  let initialContent: { id: string };
 
   const json = (response: { body: string }) => JSON.parse(response.body);
   const auth = () => ({ authorization: `Bearer ${token}` });
@@ -43,7 +43,11 @@ describe('Content items (e2e)', () => {
       method: 'POST',
       url: '/api/v1/admin/courses',
       headers: auth(),
-      payload: { title: 'Content Course', subjectId: json(subject).id },
+      payload: {
+        title: 'Content Course',
+        subjectId: json(subject).id,
+        accessType: 'PUBLIC',
+      },
     });
     courseId = json(course).id;
     const chapter = await app.inject({
@@ -83,7 +87,7 @@ describe('Content items (e2e)', () => {
     expect(initialContent).toMatchObject({
       type: 'TEXT',
       status: 'DRAFT',
-      placement: { courseId, sortOrder: 1, version: 1 },
+      placement: { courseId, sortOrder: 1 },
     });
     const insecure = await app.inject({
       method: 'POST',
@@ -143,21 +147,9 @@ describe('Content items (e2e)', () => {
       payload: {
         placement: { courseId },
         items: [
-          {
-            id: initialContent.id,
-            sortOrder: 3,
-            version: initialContent.placement.version,
-          },
-          {
-            id: firstBody.id,
-            sortOrder: 2,
-            version: firstBody.placement.version,
-          },
-          {
-            id: secondBody.id,
-            sortOrder: 1,
-            version: secondBody.placement.version,
-          },
+          { id: initialContent.id, sortOrder: 3 },
+          { id: firstBody.id, sortOrder: 2 },
+          { id: secondBody.id, sortOrder: 1 },
         ],
       },
     });
@@ -168,7 +160,6 @@ describe('Content items (e2e)', () => {
       headers: auth(),
       payload: {
         placement: { chapterId },
-        version: firstBody.placement.version + 1,
       },
     });
     expect(moved.statusCode).toBe(201);

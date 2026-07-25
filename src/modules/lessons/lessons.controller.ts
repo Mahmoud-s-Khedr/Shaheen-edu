@@ -83,6 +83,7 @@ export class LessonsController {
   }
 
   @Patch(':id/access')
+  @ApiOperation({ summary: 'Set the lesson access type' })
   updateAccess(@CurrentUser() actor: RequestUser, @Param('id') id: string, @Body() dto: UpdateAccessTypeDto) {
     return this.lessonsService.updateAccess(actor, id, dto.accessType);
   }
