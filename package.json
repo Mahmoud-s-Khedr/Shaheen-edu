@@ -36,6 +36,7 @@
     "journey:auth:parent": "tsx scripts/run-journey.ts AUTH-005",
     "journey:content:hierarchy": "tsx scripts/run-journey.ts CONTENT-001",
     "journey:content:basic": "tsx scripts/run-journey.ts CONTENT-002",
+    "journey:content:delivery": "tsx scripts/run-journey.ts CONTENT-003",
     "journey:current": "tsx scripts/run-journey.ts current",
     "journey:test": "tsx --test scripts/journeys/lib/*.test.ts",
     "test:all": "pnpm test && pnpm test:e2e && pnpm build",

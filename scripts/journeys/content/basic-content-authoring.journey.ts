@@ -13,15 +13,16 @@ export const contentJourney: JourneyDefinition = {
     });
     await step('Reading, updating, and reordering placed content', async () => {
       const get = await admin.request<any>('GET', `/admin/content-items/${text.id}`); expectStatus(get, 200); assert(get.body.id === text.id, 'Read content must match');
-      const update = await admin.request<any>('PATCH', `/admin/content-items/${text.id}`, { title: factory.title('Updated text'), version: text.version }); expectStatus(update, 200); text = update.body;
-      const reorder = await admin.request<any>('POST', '/admin/content-items/reorder', { placement: { courseId }, items: [{ id: text.id, sortOrder: 2, version: text.placement.version }, { id: link.id, sortOrder: 1, version: link.placement.version }] }); expectStatus(reorder, 201);
+      const newTitle = factory.title('Updated text');
+      const update = await admin.request<any>('PATCH', `/admin/content-items/${text.id}`, { title: newTitle }); expectStatus(update, 200); text = update.body; assert(text.title === newTitle, 'Update must persist the new title');
+      const reorder = await admin.request<any>('POST', '/admin/content-items/reorder', { placement: { courseId }, items: [{ id: text.id, sortOrder: 2 }, { id: link.id, sortOrder: 1 }] }); expectStatus(reorder, 201);
     });
     await step('Moving, archiving, restoring, and deleting content', async () => {
-      const moved = await admin.request<any>('POST', `/admin/content-items/${text.id}/move`, { placement: { chapterId }, version: text.placement.version + 1 }); expectStatus(moved, 201); text = moved.body; assert(text.placement.chapterId === chapterId && text.placement.courseId === null, 'Move must replace placement target');
-      const archived = await admin.request<any>('POST', `/admin/content-items/${link.id}/archive`, { version: link.version }); expectStatus(archived, 201); assert(archived.body.status === 'ARCHIVED', 'Content must archive');
+      const moved = await admin.request<any>('POST', `/admin/content-items/${text.id}/move`, { placement: { chapterId } }); expectStatus(moved, 201); text = moved.body; assert(text.placement.chapterId === chapterId && text.placement.courseId === null, 'Move must replace placement target');
+      const archived = await admin.request<any>('POST', `/admin/content-items/${link.id}/archive`); expectStatus(archived, 201); assert(archived.body.status === 'ARCHIVED', 'Content must archive');
       const hidden = await admin.request<any>('GET', `/admin/content-items?courseId=${courseId}`); expectStatus(hidden, 200); assert(!hidden.body.data.some((entry: any) => entry.id === link.id), 'Archived content must be hidden by default');
-      const restored = await admin.request<any>('POST', `/admin/content-items/${link.id}/restore`, { version: archived.body.version }); expectStatus(restored, 201); assert(restored.body.status === 'DRAFT', 'Content must restore to draft');
-      const deleted = await admin.request<any>('DELETE', `/admin/content-items/${link.id}`, { version: restored.body.version }); expectStatus(deleted, 200);
+      const restored = await admin.request<any>('POST', `/admin/content-items/${link.id}/restore`); expectStatus(restored, 201); assert(restored.body.status === 'DRAFT', 'Content must restore to draft');
+      const deleted = await admin.request<any>('DELETE', `/admin/content-items/${link.id}`); expectStatus(deleted, 200);
     });
     await step('Rejecting content mutation by partner', async () => { const denied = await clients.partner.request<any>('POST', '/admin/content-items', { type: 'TEXT', title: factory.title('Denied'), textBody: 'x', placement: { courseId } }); expectStatus(denied, 403); });
   },
