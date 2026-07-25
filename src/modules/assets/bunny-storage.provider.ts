@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { DeleteObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { DeleteObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { Upload } from '@aws-sdk/lib-storage';
 import { createHmac } from 'node:crypto';
 import { Readable } from 'node:stream';
 import type { AppConfig } from '../../config/configuration';
@@ -17,7 +18,9 @@ export class BunnyStorageProvider implements FileStorageProvider {
   }
 
   async upload(key: string, body: Readable, mimeType: string): Promise<void> {
-    await this.client.send(new PutObjectCommand({ Bucket: this.config.bucket, Key: key, Body: body, ContentType: mimeType }));
+    // Bunny rejects a PutObject whose body length is unknown, so unbounded streams go through
+    // multipart upload, which sizes each part before signing it (and aborts the upload on failure).
+    await new Upload({ client: this.client, params: { Bucket: this.config.bucket, Key: key, Body: body, ContentType: mimeType } }).done();
   }
 
   async delete(key: string): Promise<void> {
