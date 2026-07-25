@@ -21,6 +21,8 @@ export async function cleanDatabase(
   // Entitlements hold restrictive FKs to Course and Chapter, so they must go
   // before the hierarchy rows below.
   await prisma.studentEntitlement.deleteMany();
+  await prisma.publisherEarningsStatement.deleteMany();
+  await prisma.publisherAgreement.deleteMany();
   await prisma.section.deleteMany();
   await prisma.lesson.deleteMany();
   await prisma.chapter.deleteMany();

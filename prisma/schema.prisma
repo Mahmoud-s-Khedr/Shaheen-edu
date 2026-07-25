@@ -60,6 +60,12 @@ enum EntitlementStatus {
   REVOKED
 }
 
+enum PublisherAgreementStatus {
+  DRAFT
+  ACTIVE
+  ENDED
+}
+
 enum AssetProvider {
   BUNNY_STORAGE
   BUNNY_STREAM
@@ -162,6 +168,7 @@ model PartnerProfile {
   createdByAdminId String
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
+  publisherAgreements PublisherAgreement[] @relation("AgreementPublisher")
 }
 
 model AuthSession {
@@ -287,12 +294,17 @@ model Course {
   createdById String
   updatedById String
   accessType  AccessType @default(PAID)
+  priceMinor     Int?
+  currency       String?
+  isPurchasable  Boolean @default(false)
 
   createdBy User @relation("CourseCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
   updatedBy User @relation("CourseUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
 
   chapters Chapter[]
   entitlements StudentEntitlement[]
+  publisherAgreements PublisherAgreement[] @relation("PublisherAgreementCourse")
+  earningsStatements PublisherEarningsStatement[] @relation("EarningsCourse")
   contentPlacements ContentPlacement[] @relation("ContentPlacementCourse")
   coverAsset      Asset? @relation("CourseCover", fields: [coverAssetId], references: [id], onDelete: Restrict)
   coverAssetId    String?
@@ -320,12 +332,17 @@ model Chapter {
   createdById String
   updatedById String
   accessType  AccessType @default(INHERIT)
+  priceMinor     Int?
+  currency       String?
+  isPurchasable  Boolean?
 
   createdBy User @relation("ChapterCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
   updatedBy User @relation("ChapterUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
 
   lessons Lesson[]
   entitlements StudentEntitlement[]
+  publisherAgreements PublisherAgreement[] @relation("PublisherAgreementChapter")
+  earningsStatements PublisherEarningsStatement[] @relation("EarningsChapter")
   contentPlacements ContentPlacement[] @relation("ContentPlacementChapter")
   coverAsset      Asset? @relation("ChapterCover", fields: [coverAssetId], references: [id], onDelete: Restrict)
   coverAssetId    String?
@@ -353,11 +370,16 @@ model Lesson {
   createdById String
   updatedById String
   accessType  AccessType @default(INHERIT)
+  priceMinor     Int?
+  currency       String?
+  isPurchasable  Boolean?
 
   createdBy User @relation("LessonCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
   updatedBy User @relation("LessonUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
 
   sections Section[]
+  publisherAgreements PublisherAgreement[] @relation("PublisherAgreementLesson")
+  earningsStatements PublisherEarningsStatement[] @relation("EarningsLesson")
   contentPlacements ContentPlacement[] @relation("ContentPlacementLesson")
   coverAsset      Asset? @relation("LessonCover", fields: [coverAssetId], references: [id], onDelete: Restrict)
   coverAssetId    String?
@@ -538,4 +560,56 @@ model StudentEntitlement {
   @@index([studentUserId, status, startsAt, expiresAt])
   @@index([courseId])
   @@index([chapterId])
+}
+
+model PublisherAgreement {
+  id              String                   @id @default(cuid())
+  publisherUserId String
+  publisher       PartnerProfile           @relation("AgreementPublisher", fields: [publisherUserId], references: [userId], onDelete: Restrict)
+  courseId        String?
+  course          Course?                  @relation("PublisherAgreementCourse", fields: [courseId], references: [id], onDelete: Restrict)
+  chapterId       String?
+  chapter         Chapter?                 @relation("PublisherAgreementChapter", fields: [chapterId], references: [id], onDelete: Restrict)
+  lessonId        String?
+  lesson          Lesson?                  @relation("PublisherAgreementLesson", fields: [lessonId], references: [id], onDelete: Restrict)
+  revenueShareBps Int
+  startsAt        DateTime
+  endsAt          DateTime?
+  status          PublisherAgreementStatus @default(DRAFT)
+  isPrimary       Boolean                  @default(true)
+  createdById     String
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime                 @updatedAt
+
+  earningsStatements PublisherEarningsStatement[]
+
+  @@index([courseId, status, isPrimary, startsAt, endsAt])
+  @@index([chapterId, status, isPrimary, startsAt, endsAt])
+  @@index([lessonId, status, isPrimary, startsAt, endsAt])
+  @@index([publisherUserId, startsAt])
+}
+
+model PublisherEarningsStatement {
+  id                    String             @id @default(cuid())
+  agreementId           String
+  agreement             PublisherAgreement @relation(fields: [agreementId], references: [id], onDelete: Restrict)
+  courseId              String?
+  course                Course?            @relation("EarningsCourse", fields: [courseId], references: [id], onDelete: Restrict)
+  chapterId             String?
+  chapter               Chapter?           @relation("EarningsChapter", fields: [chapterId], references: [id], onDelete: Restrict)
+  lessonId              String?
+  lesson                Lesson?            @relation("EarningsLesson", fields: [lessonId], references: [id], onDelete: Restrict)
+  periodStartsAt        DateTime
+  periodEndsAt          DateTime
+  grossRevenueMinor     Int
+  currency              String
+  revenueShareBps       Int
+  publisherEarningsMinor Int
+  createdById           String
+  createdAt             DateTime           @default(now())
+
+  @@index([agreementId, periodStartsAt, periodEndsAt])
+  @@index([courseId, periodStartsAt])
+  @@index([chapterId, periodStartsAt])
+  @@index([lessonId, periodStartsAt])
 }

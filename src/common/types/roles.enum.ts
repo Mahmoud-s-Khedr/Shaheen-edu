@@ -10,6 +10,7 @@ export {
   AccessType,
   EntitlementSource,
   EntitlementStatus,
+  PublisherAgreementStatus,
   AssetProvider,
   AssetKind,
   AssetStatus,

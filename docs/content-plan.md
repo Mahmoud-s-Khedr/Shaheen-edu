@@ -9,7 +9,7 @@ This milestone adds manually authored academic content and secure student delive
 - Students browse published catalog information and consume only content they are authorized to access.
 - `ADMIN` and `SUPER_ADMIN` perform all content mutations. Partners Ihave no content-management or protected student-content access in this milestone.
 
-The milestone must not add `ContentImport`, `ContentImportRow`, `QuestionImport`, import jobs, CSV/Excel/PDF parsers, AI generation or explanations, OpenRouter integration, prompts, bulk-create/bulk-update endpoints, BullMQ queues, payment processing, orders, commissions, payouts, refunds, or quiz-taking/submission.
+The milestone must not add `ContentImport`, `ContentImportRow`, `QuestionImport`, import jobs, CSV/Excel/PDF parsers, AI generation or explanations, OpenRouter integration, prompts, bulk-create/bulk-update endpoints, BullMQ queues, payment processing, orders, payout execution, refunds, or quiz-taking/submission. Phase 6 permits admin-entered gross-revenue statements and calculated publisher earnings only; it does not create payment, invoice, or payout workflows.
 
 ## Shared conventions
 
@@ -145,25 +145,24 @@ Separate editable draft records from student-visible published records.
 - [x] Verify the Phase 7 locked-outline preview behavior now that catalog endpoints exist.
 - [x] Add and run `CONTENT-004`, covering default and filtered catalog browsing, safe anonymous locked previews, and entitlement-based outline unlocks.
 
-## Phase 6 — Pricing and publisher agreements
+## Phase 6 — Pricing and publisher agreements ✅ Complete
 
 ### Goal
 
-Store future purchase and publisher-resolution metadata without implementing financial processing.
+Store inherited pricing, publisher-resolution metadata, and admin-entered earnings reporting without payment processing.
 
 ### Data model and rules
 
-- Add nullable `priceMinor`, `currency`, and `isPurchasable` to courses and chapters. Use integer minor units and initialize supported currency as `EGP`.
-- Add `PublisherAgreement` with a content-publisher partner, exactly one target (`courseId` or `chapterId`), revenue share in basis points, schedule, status, `isPrimary`, creator, and timestamps.
-- Enforce exactly one target with a database `CHECK`, following the `StudentEntitlement_exactly_one_target` precedent. Validate that the partner has `CONTENT_PUBLISHER` type, `revenueShareBps` is in range, and start/end dates are valid. The partner type lives on `PartnerProfile`; there is no separate `Partner` model.
-- Active chapter agreements override active course agreements. If neither applies, there is no publisher revenue share.
-- Reject overlapping time windows for active primary agreements on the same target. There is no exclusion-constraint precedent in this schema, so overlap rejection is transactional service logic. Historical and ended agreements remain immutable records apart from permitted lifecycle fields.
-- This phase does not depend on Phase 5 and may be built in parallel with it.
+- [x] Add pricing fields to courses, chapters, and lessons. Courses default to not purchasable; chapters and lessons inherit the complete pricing setting until explicitly overridden. Pricing uses integer minor units and supports `EGP` initially.
+- [x] Add `PublisherAgreement` with a content-publisher partner and exactly one target (`courseId`, `chapterId`, or `lessonId`), revenue share in basis points, half-open effective dates, primary flag, lifecycle, creator, and timestamps. Enforce the exclusive target with a database `CHECK`.
+- [x] Validate `CONTENT_PUBLISHER` partners, revenue shares from `0` to `10,000` basis points, and valid date windows. Agreements move from `DRAFT` to `ACTIVE` to `ENDED`; only drafts are editable, and corrections use end-and-replace.
+- [x] Resolve active primary agreements by lesson → chapter → course precedence. Reject overlapping primary agreements transactionally at activation; non-primary agreements are historical/reference records only.
+- [x] Add immutable `PublisherEarningsStatement` records. Admins enter EGP gross revenue for one target and a half-open period; the service resolves one applicable agreement, snapshots its terms, and calculates publisher earnings. Periods crossing an agreement boundary are rejected and must be split.
 
 ### APIs and tests
 
-- Add admin create/update/end/list/history/effective-resolution operations.
-- Test invalid targets/partners/ranges/dates, overlap rejection, schedule behavior, chapter override, historical retention, and absence of financial records.
+- [x] Add admin agreement create/update/activate/end/list/history/effective-resolution operations, pricing set/effective-resolution operations, and earnings-statement create/list operations.
+- [x] Add and run `CONTENT-005`, covering pricing inheritance and override, agreement precedence, primary-overlap rejection, agreement history, and calculated earnings.
 
 ## Phase 7 — Manual entitlements and student delivery ✅ Complete
 
@@ -230,4 +229,4 @@ The scenario runs as scripted journeys alongside `CONTENT-001`/`002`/`003`/`004`
 
 ## Remaining order of work
 
-Phases 1, 2, 3, 4, and 7 are complete. Phase 5 is the gate for the rest: Phase 8 needs its ancestry validation, Phase 9 needs its catalog and outline endpoints, and Phase 5 also owns the response-DTO work carried over from Phase 7. Phase 6 is independent and may run in parallel. Suggested split for Phase 5: first the validator, archive guard, and stale-publish conflict; then the catalog endpoints and delivery response DTOs.
+Phases 1, 2, 3, 4, 6, and 7 are complete. Phase 5 is the gate for the rest: Phase 8 needs its ancestry validation, Phase 9 needs its catalog and outline endpoints, and Phase 5 also owns the response-DTO work carried over from Phase 7. Suggested split for Phase 5: first the validator, archive guard, and stale-publish conflict; then the catalog endpoints and delivery response DTOs.
