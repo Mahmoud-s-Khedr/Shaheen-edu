@@ -57,6 +57,8 @@ describe('Entitlements and student delivery (e2e)', () => {
   let chapterAId: string;
   let pdfItemId: string;
   let pdfAssetId: string;
+  let catalogGradeId: string;
+  let catalogSubjectId: string;
 
   const json = (response: { body: string }) => JSON.parse(response.body);
   const bearer = (token: string) => ({ authorization: `Bearer ${token}` });
@@ -199,21 +201,25 @@ describe('Entitlements and student delivery (e2e)', () => {
     );
 
     // Published grade -> subject shared by all three courses.
-    const gradeId = json(
+    catalogGradeId = json(
       await post('/api/v1/admin/academic-grades', { title: 'Delivery Grade' }),
     ).id;
-    await publish('academic-grades', gradeId);
-    const subjectId = json(
+    await publish('academic-grades', catalogGradeId);
+    catalogSubjectId = json(
       await post('/api/v1/admin/subjects', {
         title: 'Delivery Subject',
-        academicGradeId: gradeId,
+        academicGradeId: catalogGradeId,
       }),
     ).id;
-    await publish('subjects', subjectId);
+    await publish('subjects', catalogSubjectId);
 
     const createCourse = async (title: string, accessType: string) => {
       const id = json(
-        await post('/api/v1/admin/courses', { title, subjectId, accessType }),
+        await post('/api/v1/admin/courses', {
+          title,
+          subjectId: catalogSubjectId,
+          accessType,
+        }),
       ).id;
       await publish('courses', id);
       return id as string;
@@ -328,6 +334,91 @@ describe('Entitlements and student delivery (e2e)', () => {
       expect(
         (await readAsStudent('entitled', paidChapterAItemId)).statusCode,
       ).toBe(200);
+    });
+  });
+
+  describe('published catalog outline', () => {
+    it('paginates and filters published catalog collections', async () => {
+      const defaultSubjects = await app.inject({
+        method: 'GET',
+        url: '/api/v1/catalog/subjects',
+      });
+      expect(defaultSubjects.statusCode).toBe(200);
+      expect(json(defaultSubjects)).toMatchObject({
+        data: [{ id: catalogSubjectId }],
+        meta: { page: 1, limit: 20, total: 1, totalPages: 1 },
+      });
+
+      const subjects = await app.inject({
+        method: 'GET',
+        url: `/api/v1/catalog/subjects?academicGradeId=${catalogGradeId}`,
+      });
+      expect(subjects.statusCode).toBe(200);
+      expect(json(subjects)).toMatchObject({
+        data: [{ id: catalogSubjectId }],
+        meta: { page: 1, limit: 20, total: 1, totalPages: 1 },
+      });
+
+      const courses = await app.inject({
+        method: 'GET',
+        url:
+          `/api/v1/catalog/courses?subjectId=${catalogSubjectId}` +
+          '&page=3&limit=1',
+      });
+      expect(courses.statusCode).toBe(200);
+      expect(json(courses)).toMatchObject({
+        data: [{ id: paidCourseId }],
+        meta: { page: 3, limit: 1, total: 3, totalPages: 3 },
+      });
+    });
+
+    it('rejects invalid catalog collection query parameters', async () => {
+      const invalidPage = await app.inject({
+        method: 'GET',
+        url: '/api/v1/catalog/subjects?page=0',
+      });
+      expect(invalidPage.statusCode).toBe(400);
+
+      const unexpectedParameter = await app.inject({
+        method: 'GET',
+        url: '/api/v1/catalog/courses?unexpected=value',
+      });
+      expect(unexpectedParameter.statusCode).toBe(400);
+    });
+
+    it('returns published metadata only and personalizes locks for a student', async () => {
+      const anonymous = await app.inject({
+        method: 'GET',
+        url: `/api/v1/catalog/courses/${paidCourseId}/outline`,
+      });
+      expect(anonymous.statusCode).toBe(200);
+      const anonymousBody = json(anonymous);
+      expect(anonymousBody.chapters).toHaveLength(2);
+      expect(anonymousBody.chapters[0].isLocked).toBe(true);
+      const item = anonymousBody.chapters[0].contentItems[0];
+      expect(item).toMatchObject({ id: paidChapterAItemId, isLocked: true });
+      expect(item.textBody).toBeUndefined();
+      expect(item.externalUrl).toBeUndefined();
+      expect(anonymous.body).not.toContain('storageKey');
+
+      const entitled = await app.inject({
+        method: 'GET',
+        url: `/api/v1/catalog/courses/${paidCourseId}/outline`,
+        headers: bearer(students.entitled.token),
+      });
+      expect(entitled.statusCode).toBe(200);
+      expect(json(entitled).chapters[0].isLocked).toBe(false);
+    });
+
+    it('uses a safe delivery DTO instead of raw Prisma ancestry', async () => {
+      const response = await readAsStudent('entitled', paidChapterAItemId);
+      expect(response.statusCode).toBe(200);
+      const body = json(response);
+      expect(body).toMatchObject({ id: paidChapterAItemId, title: 'Chapter A item' });
+      expect(body.status).toBeUndefined();
+      expect(body.createdById).toBeUndefined();
+      expect(body.placement.chapterId).toBe(chapterAId);
+      expect(body.placement.chapter).toBeUndefined();
     });
   });
 

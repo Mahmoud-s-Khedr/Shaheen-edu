@@ -10,6 +10,8 @@ export class ContentAccessPolicyService {
     const item = await this.prisma.contentItem.findUnique({
       where: { id: contentItemId },
       include: {
+        primaryAsset: { select: { id: true, kind: true, filename: true, mimeType: true, sizeBytes: true } },
+        assetReferences: { orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }], include: { asset: { select: { id: true, kind: true, filename: true, mimeType: true, sizeBytes: true } } } },
         placement: {
           include: {
             course: { include: { subject: { include: { academicGrade: true } } } },
@@ -38,6 +40,39 @@ export class ContentAccessPolicyService {
     const entitlement = await this.prisma.studentEntitlement.findFirst({ where: { studentUserId, status: EntitlementStatus.ACTIVE, revokedAt: null, startsAt: { lte: now }, AND: [{ OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] }, { OR: [{ courseId: course }, { chapterId: { in: chapterIds } }] }] } });
     if (!entitlement) throw new ForbiddenException('A valid entitlement is required');
     return item;
+  }
+
+  /** A catalog-safe predicate for callers that need a lock indicator instead of a 403. */
+  async canAccessContentItem(contentItemId: string, studentUserId?: string): Promise<boolean> {
+    try {
+      await this.assertContentItemAccess(contentItemId, studentUserId);
+      return true;
+    } catch (error) {
+      if (error instanceof ForbiddenException || error instanceof NotFoundException) return false;
+      throw error;
+    }
+  }
+
+  /** Explicit delivery shape: never expose a Prisma model or storage internals. */
+  toDeliveryDto(item: any) {
+    return {
+      id: item.id,
+      type: item.type,
+      title: item.title,
+      description: item.description,
+      textBody: item.textBody,
+      externalUrl: item.externalUrl,
+      estimatedDuration: item.estimatedDuration,
+      placement: {
+        courseId: item.placement.courseId,
+        chapterId: item.placement.chapterId,
+        lessonId: item.placement.lessonId,
+        sectionId: item.placement.sectionId,
+        sortOrder: item.placement.sortOrder,
+      },
+      primaryAsset: item.primaryAsset,
+      attachments: item.assetReferences.map((reference: any) => ({ ...reference.asset, sortOrder: reference.sortOrder })),
+    };
   }
 
   async assertAssetAttached(contentItemId: string, assetId: string): Promise<void> {

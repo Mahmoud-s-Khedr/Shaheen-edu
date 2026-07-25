@@ -20,6 +20,7 @@ import type { UpdateCourseDto } from './dto/update-course.dto';
 import type { QueryCourseDto } from './dto/query-course.dto';
 import type { ReorderCourseDto } from './dto/reorder-course.dto';
 import type { MoveCourseDto } from './dto/move-course.dto';
+import { PublicationService } from '../publication/publication.service';
 
 /**
  * NOTE: this level models only the DRAFT/PUBLISHED/ARCHIVED lifecycle and the
@@ -32,6 +33,7 @@ export class CoursesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
+    private readonly publicationService: PublicationService,
   ) {}
 
   private assertActorRole(actor: RequestUser): void {
@@ -320,21 +322,7 @@ export class CoursesService {
 
   async publish(actor: RequestUser, id: string) {
     this.assertActorRole(actor);
-    const record = await this.getOrThrow(id);
-
-    const parent = await this.prisma.subject.findUnique({
-      where: { id: record.subjectId },
-    });
-    if (!parent || parent.status !== ContentStatus.PUBLISHED) {
-      throw new ConflictException('Parent subject must be published first');
-    }
-    await this.prisma.course.updateMany({
-      where: { id, status: ContentStatus.DRAFT },
-      data: {
-        status: ContentStatus.PUBLISHED,
-        publishedAt: new Date(),
-        },
-    });
+    await this.publicationService.publish('course', id, actor.id);
 
     await this.auditService.record({
       actorUserId: actor.id,
@@ -349,8 +337,7 @@ export class CoursesService {
   async archive(actor: RequestUser, id: string) {
     this.assertActorRole(actor);
 
-    // TODO(phase-5): block archiving when published descendants exist, once
-    // PublicationValidator owns that cascade check.
+    await this.publicationService.assertCanArchive('course', id);
     await this.prisma.course.updateMany({
       where: {
         id,

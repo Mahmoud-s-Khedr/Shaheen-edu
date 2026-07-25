@@ -2,9 +2,10 @@ import { Module } from '@nestjs/common';
 import { LessonsController } from './lessons.controller';
 import { LessonsService } from './lessons.service';
 import { AuditModule } from '../audit/audit.module';
+import { PublicationModule } from '../publication/publication.module';
 
 @Module({
-  imports: [AuditModule],
+  imports: [AuditModule, PublicationModule],
   controllers: [LessonsController],
   providers: [LessonsService],
   exports: [LessonsService],

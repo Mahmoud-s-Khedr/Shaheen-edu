@@ -32,4 +32,8 @@ Purpose: manage the full academic tree. Depends on AUTH-002. Creates grade → s
 
 Purpose: author current supported basic content. Depends on CONTENT-001. Creates TEXT and HTTPS EXTERNAL_LINK items, validates exact placement/type rules, reads/updates/reorders/moves, archives/restores/deletes, and rejects partner mutation. Script: `scripts/journeys/content/basic-content-authoring.journey.ts`.
 
-Dependency graph: `INFRA-001 → AUTH-001 → AUTH-002 → { AUTH-003, CONTENT-001 → CONTENT-002 }`; `AUTH-001 → { AUTH-004, AUTH-005 }`.
+## CONTENT-004 — Public catalog browsing and personalized outline access
+
+Purpose: validate public catalog discovery and personalized paid-content previews. Depends on CONTENT-001 and AUTH-004. Verifies default and filtered catalog collections, course detail ancestry, anonymous locked outline previews without protected payloads, and entitlement-based unlocks for the registered student. Script: `scripts/journeys/content/public-catalog.journey.ts`.
+
+Dependency graph: `INFRA-001 → AUTH-001 → AUTH-002 → { AUTH-003, CONTENT-001 → { CONTENT-002, CONTENT-003, CONTENT-004 } }`; `AUTH-001 → { AUTH-004, AUTH-005 }`; CONTENT-004 also depends on AUTH-004.

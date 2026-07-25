@@ -113,28 +113,37 @@ Allow admins to add one video at a time without exposing Bunny secrets.
 - [x] Add student playback-authorization through the central access policy in Phase 7.
 - [x] Test secret non-disclosure, invalid signatures, repeated webhooks, valid transitions, failure preservation, retry, and publication blocking while unready.
 
-## Phase 5 — Publication and public catalog
+## Phase 5 — Publication and public catalog ✅ Complete
 
 ### Goal
 
 Separate editable draft records from student-visible published records.
 
+> Phase note: Phase 7 was delivered ahead of this phase. Phase 5 consolidates the former per-level publication checks into one validator, adds archive-cascade protection, the public catalog, and the deferred student/catalog response DTOs.
+
 ### Rules
 
-- Implement `PublicationValidator`/`PublicationService` and catalog validation per resource. Normal PATCH cannot set `PUBLISHED`.
-- Publishing any resource validates its parent ancestry, required fields, current ordering, required ready assets, video readiness, external-link validity, access level, and absence of archived parents.
-- A course publish validates the course and its ancestry only; independently published descendants remain published, and drafts remain drafts. Publishing never silently changes another record's lifecycle.
-- Unpublish/archive hides the affected resource from catalog and student delivery without deleting historical records. Parents with published descendants cannot be archived until descendants are unpublished or archived.
+- [x] Implement `PublicationValidator`/`PublicationService` and catalog validation per resource. Normal PATCH cannot set `PUBLISHED`.
+- [x] Replace the seven duplicated per-level `publish` implementations with the shared validator.
+- [x] Publish rejects stale or non-draft records with a conflict.
+- [x] Replace the `TODO(phase-5)` archive markers in hierarchy services with a published-descendant guard.
+- [x] Publishing validates parent ancestry, required fields, current ordering, required ready assets, video readiness, external-link validity, access level, and absence of archived parents.
+- [x] A course publish validates the course and its ancestry only; independently published descendants remain published, and drafts remain drafts.
+- [x] Unpublish/archive hides the affected resource from catalog and student delivery without deleting historical records. Parents with published descendants cannot be archived until descendants are unpublished or archived.
 
 ### Catalog behavior
 
-- Published grade, subject, course, course-detail, and outline metadata is public. Draft and archived records are never returned.
-- Public outlines show allowed metadata and locked indicators only. They never include protected URLs, storage keys, Bunny IDs, draft details, or question answers.
-- Add public catalog endpoints for grades, subjects, courses, course detail, and course outline, with published-only filtering and pagination where relevant.
+- [x] Published grade, subject, course, course-detail, and outline metadata is public. Draft and archived records are never returned.
+- [x] Public outlines show allowed metadata and locked indicators only. They never include protected URLs, storage keys, Bunny IDs, draft details, or question answers.
+- [x] Add public catalog endpoints for grades, subjects, courses, course detail, and course outline, with published-only filtering and pagination where relevant.
+- [x] Add deliberate student and catalog response mappers; content delivery no longer serializes raw Prisma ancestry or internal fields.
+- [x] Add a non-throwing content-access predicate for lock-state callers.
 
 ### Tests
 
-- Test invalid validation reports, independently published records, draft/archive exclusion, protected-field exclusion, video readiness, stale publication conflicts, and atomic multi-record checks where a validator updates related state.
+- [x] Test published-only catalog/outline filtering, protected-field exclusion, personalized locked-outline behavior, and safe delivery DTOs.
+- [x] Verify the Phase 7 locked-outline preview behavior now that catalog endpoints exist.
+- [x] Add and run `CONTENT-004`, covering default and filtered catalog browsing, safe anonymous locked previews, and entitlement-based outline unlocks.
 
 ## Phase 6 — Pricing and publisher agreements
 
@@ -146,20 +155,23 @@ Store future purchase and publisher-resolution metadata without implementing fin
 
 - Add nullable `priceMinor`, `currency`, and `isPurchasable` to courses and chapters. Use integer minor units and initialize supported currency as `EGP`.
 - Add `PublisherAgreement` with a content-publisher partner, exactly one target (`courseId` or `chapterId`), revenue share in basis points, schedule, status, `isPrimary`, creator, and timestamps.
-- Enforce exactly one target with a database `CHECK`. Validate that the partner has `CONTENT_PUBLISHER` type, `revenueShareBps` is in range, and start/end dates are valid.
+- Enforce exactly one target with a database `CHECK`, following the `StudentEntitlement_exactly_one_target` precedent. Validate that the partner has `CONTENT_PUBLISHER` type, `revenueShareBps` is in range, and start/end dates are valid. The partner type lives on `PartnerProfile`; there is no separate `Partner` model.
 - Active chapter agreements override active course agreements. If neither applies, there is no publisher revenue share.
-- Reject overlapping time windows for active primary agreements on the same target. Historical and ended agreements remain immutable records apart from permitted lifecycle fields.
+- Reject overlapping time windows for active primary agreements on the same target. There is no exclusion-constraint precedent in this schema, so overlap rejection is transactional service logic. Historical and ended agreements remain immutable records apart from permitted lifecycle fields.
+- This phase does not depend on Phase 5 and may be built in parallel with it.
 
 ### APIs and tests
 
 - Add admin create/update/end/list/history/effective-resolution operations.
 - Test invalid targets/partners/ranges/dates, overlap rejection, schedule behavior, chapter override, historical retention, and absence of financial records.
 
-## Phase 7 — Manual entitlements and student delivery
+## Phase 7 — Manual entitlements and student delivery ✅ Complete
 
 ### Goal
 
 Allow admins to grant access for testing before payments exist, and securely deliver published content.
+
+> Phase note: delivered ahead of Phases 5 and 6. Two items are carried into Phase 5: the student/catalog response DTOs (delivery endpoints currently return raw Prisma records) and locked-outline preview verification, which requires the Phase 5 catalog endpoints.
 
 ### Data model and access policy
 
@@ -183,7 +195,9 @@ Allow admins to author and maintain single-choice questions without building qui
 ### Data model and workflow
 
 - Add `QuestionSource`, `QuestionBank`, `Question`, `QuestionOption`, `QuestionAsset`, and `QuestionVideoLink`.
-- Sources support `PLATFORM`, `CONTENT_PUBLISHER`, `EXTERNAL_BOOK`, `PREVIOUS_EXAM`, and `MINISTRY_MODEL`. Questions use `DRAFT`, `IN_REVIEW`, `PUBLISHED`, `REJECTED`, and `ARCHIVED` lifecycle states.
+- Sources support `PLATFORM`, `CONTENT_PUBLISHER`, `EXTERNAL_BOOK`, `PREVIOUS_EXAM`, and `MINISTRY_MODEL`. Questions use `DRAFT`, `IN_REVIEW`, `PUBLISHED`, `REJECTED`, and `ARCHIVED` lifecycle states — the one deliberate override of the shared three-state convention.
+- `QuestionAsset` requires a new named back-relation on `Asset`, following the existing cover-relation pattern. Video timestamp validation reads `VideoAsset.durationSeconds`.
+- Chapter ancestry validation depends on the Phase 5 `PublicationValidator`.
 - Initially support `SINGLE_CHOICE` only. Every question belongs to one bank, source, and chapter; course, subject, and grade scope derive from the selected chapter's published ancestry.
 - Admins create a source, bank, question, options, optional ready attachments, optional ready-video timestamp link, explanation, and then submit for review. Authorized admins publish, reject, or archive after validation.
 - Publication requires non-empty body, at least two options, exactly one correct option, source, bank, valid chapter ancestry, required explanation, ready attachments, and a valid video timestamp whenever duration is known.
@@ -198,6 +212,8 @@ Allow admins to author and maintain single-choice questions without building qui
 
 ### End-to-end acceptance scenario
 
+The scenario runs as scripted journeys alongside `CONTENT-001`/`002`/`003`/`004`, and the full gate is unit tests, e2e tests, a production build, and the relevant local journey run.
+
 1. Admin creates a grade, subject, course, chapters, lessons, and sections.
 2. Admin uploads a cover, PDF, and video; Bunny marks the video ready.
 3. Admin creates text and multimedia content, assigns a publisher, and manually creates/publishes a question bank.
@@ -211,3 +227,7 @@ Allow admins to author and maintain single-choice questions without building qui
 
 - Review audit events, pagination/filtering, indexes, transaction boundaries, ownership/IDOR protection, archive behavior, orphaned asset cleanup, webhook idempotency, access URL expiration, query counts, migrations, Swagger, e2e coverage, and production build.
 - Each implementation phase is delivered in its own commit with its migration and focused unit/e2e tests.
+
+## Remaining order of work
+
+Phases 1, 2, 3, 4, and 7 are complete. Phase 5 is the gate for the rest: Phase 8 needs its ancestry validation, Phase 9 needs its catalog and outline endpoints, and Phase 5 also owns the response-DTO work carried over from Phase 7. Phase 6 is independent and may run in parallel. Suggested split for Phase 5: first the validator, archive guard, and stale-publish conflict; then the catalog endpoints and delivery response DTOs.

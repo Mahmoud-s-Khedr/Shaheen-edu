@@ -25,6 +25,7 @@ import { ContentItemsModule } from './modules/content-items/content-items.module
 import { EntitlementsModule } from './modules/entitlements/entitlements.module';
 import { AssetsModule } from './modules/assets/assets.module';
 import { VideosModule } from './modules/videos/videos.module';
+import { CatalogModule } from './modules/catalog/catalog.module';
 import { UserAuthGuard } from './common/guards/user-auth.guard';
 import type { IncomingMessage } from 'http';
 
@@ -65,6 +66,7 @@ import type { IncomingMessage } from 'http';
     EntitlementsModule,
     AssetsModule,
     VideosModule,
+    CatalogModule,
   ],
   providers: [
     // Global deny-by-default auth guard - @Public() opts a route out.

@@ -49,6 +49,26 @@ describe('Swagger (e2e)', () => {
       ]),
     );
 
+    const catalogSubjects = document.paths['/api/v1/catalog/subjects'].get;
+    expect(catalogSubjects.summary).toBe('List published catalog subjects');
+    expect(catalogSubjects.parameters).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: 'page', in: 'query' }),
+        expect.objectContaining({ name: 'limit', in: 'query' }),
+        expect.objectContaining({ name: 'academicGradeId', in: 'query' }),
+      ]),
+    );
+
+    const catalogCourses = document.paths['/api/v1/catalog/courses'].get;
+    expect(catalogCourses.summary).toBe('List published catalog courses');
+    expect(catalogCourses.parameters).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: 'page', in: 'query' }),
+        expect.objectContaining({ name: 'limit', in: 'query' }),
+        expect.objectContaining({ name: 'subjectId', in: 'query' }),
+      ]),
+    );
+
     const refresh = document.paths['/api/v1/auth/refresh'].post;
     expect(refresh.summary).toBe('Refresh user access token');
     expect(refresh.security).toEqual([{ refresh_token: [] }]);

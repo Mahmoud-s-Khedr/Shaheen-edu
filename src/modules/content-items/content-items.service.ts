@@ -27,6 +27,7 @@ import type { MoveContentItemDto } from './dto/move-content-item.dto';
 import type { ReorderContentItemDto } from './dto/reorder-content-item.dto';
 import type { ContentPlacementTargetDto } from './dto/content-placement-target.dto';
 import { AssetsService } from '../assets/assets.service';
+import { PublicationService } from '../publication/publication.service';
 
 type PlacementField = 'courseId' | 'chapterId' | 'lessonId' | 'sectionId';
 type PlacementTarget = { field: PlacementField; id: string };
@@ -37,6 +38,7 @@ export class ContentItemsService {
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
     private readonly assets: AssetsService,
+    private readonly publicationService: PublicationService,
   ) {}
 
   private assertActorRole(actor: RequestUser): void {
@@ -428,23 +430,7 @@ export class ContentItemsService {
 
   async publish(actor: RequestUser, id: string) {
     this.assertActorRole(actor);
-    const item = await this.getOrThrow(id);
-    if (item.status === ContentStatus.ARCHIVED) {
-      throw new ConflictException(
-        'Archived content cannot be published; restore it first',
-      );
-    }
-    const target = this.targetFromPlacement(item.placement);
-    const parent = await this.assertValidTarget(target);
-    if (parent.status !== ContentStatus.PUBLISHED) {
-      throw new ConflictException('Content can be published only under a published parent');
-    }
-    if (item.type === ContentItemType.VIDEO || item.type === ContentItemType.PDF || item.type === ContentItemType.IMAGE || item.type === ContentItemType.DOCUMENT || item.type === ContentItemType.DOWNLOADABLE_FILE) {
-      if (!item.primaryAssetId) throw new ConflictException('Asset-backed content requires a primary asset before publication');
-      const asset = await this.assets.getReady(item.primaryAssetId);
-      this.assets.assertCompatible(asset, item.type);
-    }
-    await this.prisma.contentItem.update({ where: { id }, data: { status: ContentStatus.PUBLISHED, publishedAt: new Date(), archivedAt: null, updatedById: actor.id } });
+    await this.publicationService.publish('contentItem', id, actor.id);
     await this.auditService.record({ actorUserId: actor.id, action: 'CONTENT_ITEM_PUBLISHED', targetType: 'ContentItem', targetId: id });
     return this.toSummary(await this.getOrThrow(id));
   }

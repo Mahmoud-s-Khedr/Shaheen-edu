@@ -20,6 +20,7 @@ import type { UpdateAcademicGradeDto } from './dto/update-academic-grade.dto';
 import type { QueryAcademicGradeDto } from './dto/query-academic-grade.dto';
 import type { ReorderAcademicGradeDto } from './dto/reorder-academic-grade.dto';
 import type { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
+import { PublicationService } from '../publication/publication.service';
 
 /**
  * NOTE: this level models only the DRAFT/PUBLISHED/ARCHIVED lifecycle and the
@@ -32,6 +33,7 @@ export class AcademicGradesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
+    private readonly publicationService: PublicationService,
   ) {}
 
   private assertActorRole(actor: RequestUser): void {
@@ -215,13 +217,7 @@ export class AcademicGradesService {
 
   async publish(actor: RequestUser, id: string) {
     this.assertActorRole(actor);
-    await this.prisma.academicGrade.updateMany({
-      where: { id, status: ContentStatus.DRAFT },
-      data: {
-        status: ContentStatus.PUBLISHED,
-        publishedAt: new Date(),
-        },
-    });
+    await this.publicationService.publish('academicGrade', id, actor.id);
 
     await this.auditService.record({
       actorUserId: actor.id,
@@ -236,8 +232,7 @@ export class AcademicGradesService {
   async archive(actor: RequestUser, id: string) {
     this.assertActorRole(actor);
 
-    // TODO(phase-5): block archiving when published descendants exist, once
-    // PublicationValidator owns that cascade check.
+    await this.publicationService.assertCanArchive('academicGrade', id);
     await this.prisma.academicGrade.updateMany({
       where: {
         id,
