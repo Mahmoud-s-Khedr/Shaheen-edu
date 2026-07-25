@@ -16,4 +16,7 @@ export {
   AssetStatus,
   AssetReferenceType,
   VideoProcessingStatus,
+  QuestionSourceType,
+  QuestionStatus,
+  QuestionType,
 } from '@prisma/client';

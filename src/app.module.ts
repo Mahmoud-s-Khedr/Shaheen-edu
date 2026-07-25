@@ -27,6 +27,7 @@ import { AssetsModule } from './modules/assets/assets.module';
 import { VideosModule } from './modules/videos/videos.module';
 import { CatalogModule } from './modules/catalog/catalog.module';
 import { PublisherAgreementsModule } from './modules/publisher-agreements/publisher-agreements.module';
+import { QuestionBanksModule } from './modules/question-banks/question-banks.module';
 import { UserAuthGuard } from './common/guards/user-auth.guard';
 import type { IncomingMessage } from 'http';
 
@@ -69,6 +70,7 @@ import type { IncomingMessage } from 'http';
     VideosModule,
     CatalogModule,
     PublisherAgreementsModule,
+    QuestionBanksModule,
   ],
   providers: [
     // Global deny-by-default auth guard - @Public() opts a route out.

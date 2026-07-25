@@ -48,6 +48,15 @@ export class PublicationService {
     }
   }
 
+  /** Reusable ancestry gate for resources scoped directly to a chapter. */
+  async assertPublishedChapterAncestry(chapterId: string, client: any = this.prisma): Promise<void> {
+    const chapter = await client.chapter.findUnique({ where: { id: chapterId }, include: { course: { include: { subject: { include: { academicGrade: true } } } } } });
+    if (!chapter) throw new NotFoundException('Chapter not found');
+    if ([chapter, chapter.course, chapter.course.subject, chapter.course.subject.academicGrade].some((node: any) => node.status !== ContentStatus.PUBLISHED)) {
+      throw new ConflictException('Every chapter ancestor must be published');
+    }
+  }
+
   private async assertContentItem(item: any, tx: any) {
     if (!item.placement) throw new ConflictException('Content item requires a placement');
     if (item.type === ContentItemType.TEXT && !item.textBody?.trim()) {

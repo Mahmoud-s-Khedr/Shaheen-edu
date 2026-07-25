@@ -37,3 +37,7 @@ Purpose: author current supported basic content. Depends on CONTENT-001. Creates
 Purpose: validate public catalog discovery and personalized paid-content previews. Depends on CONTENT-001 and AUTH-004. Verifies default and filtered catalog collections, course detail ancestry, anonymous locked outline previews without protected payloads, and entitlement-based unlocks for the registered student. Script: `scripts/journeys/content/public-catalog.journey.ts`.
 
 Dependency graph: `INFRA-001 → AUTH-001 → AUTH-002 → { AUTH-003, CONTENT-001 → { CONTENT-002, CONTENT-003, CONTENT-004 } }`; `AUTH-001 → { AUTH-004, AUTH-005 }`; CONTENT-004 also depends on AUTH-004.
+
+## CONTENT-006 — Manual question-bank authoring and review lifecycle
+
+Purpose: create a content-publisher source and question bank, publish both, author a single-choice question, validate option constraints, exercise review/rejection/revision/publishing, and verify archive and role protections. Depends on CONTENT-001 and AUTH-003. Script: `scripts/journeys/content/question-bank-authoring.journey.ts`.

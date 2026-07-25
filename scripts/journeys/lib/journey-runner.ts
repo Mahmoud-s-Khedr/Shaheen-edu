@@ -17,7 +17,7 @@ export class JourneyRunner {
   constructor(private readonly environment: JourneyEnvironment, definitions: JourneyDefinition[], private readonly options: { verbose: boolean; quiet: boolean }) {
     this.byId = new Map(definitions.map((journey) => [journey.id, journey]));
     this.factory = new DataFactory();
-    this.context = { runId: this.factory.runId, created: { admins: [], partners: [], students: [], grades: [], subjects: [], courses: [], chapters: [], lessons: [], sections: [], contentItems: [] }, superAdmin: {}, admin: {}, partner: {}, students: [], parent: {}, academic: {} };
+    this.context = { runId: this.factory.runId, created: { admins: [], partners: [], students: [], grades: [], subjects: [], courses: [], chapters: [], lessons: [], sections: [], contentItems: [], questionSources: [], questionBanks: [], questions: [] }, superAdmin: {}, admin: {}, partner: {}, students: [], parent: {}, academic: {} };
     const config = environment;
     this.clients = Object.fromEntries(['public', 'superAdmin', 'admin', 'partner', 'student', 'parent'].map((name) => [name, new ApiClient(config, name, (correlationId) => this.activeCorrelationIds?.push(correlationId))]));
   }

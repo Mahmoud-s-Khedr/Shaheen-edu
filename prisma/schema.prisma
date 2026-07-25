@@ -101,6 +101,26 @@ enum VideoProcessingStatus {
   FAILED
 }
 
+enum QuestionSourceType {
+  PLATFORM
+  CONTENT_PUBLISHER
+  EXTERNAL_BOOK
+  PREVIOUS_EXAM
+  MINISTRY_MODEL
+}
+
+enum QuestionStatus {
+  DRAFT
+  IN_REVIEW
+  PUBLISHED
+  REJECTED
+  ARCHIVED
+}
+
+enum QuestionType {
+  SINGLE_CHOICE
+}
+
 model User {
   id               String        @id @default(cuid())
   role             Role
@@ -132,6 +152,13 @@ model User {
   contentItemsUpdated   ContentItem[]   @relation("ContentItemUpdatedBy")
   entitlements         StudentEntitlement[]
   assetsUploaded       Asset[] @relation("AssetUploadedBy")
+  questionSourcesCreated QuestionSource[] @relation("QuestionSourceCreatedBy")
+  questionSourcesUpdated QuestionSource[] @relation("QuestionSourceUpdatedBy")
+  questionBanksCreated QuestionBank[] @relation("QuestionBankCreatedBy")
+  questionBanksUpdated QuestionBank[] @relation("QuestionBankUpdatedBy")
+  questionsCreated Question[] @relation("QuestionCreatedBy")
+  questionsUpdated Question[] @relation("QuestionUpdatedBy")
+  questionsReviewed Question[] @relation("QuestionReviewedBy")
 
   @@index([role])
   @@index([role, createdAt, id])
@@ -169,6 +196,7 @@ model PartnerProfile {
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
   publisherAgreements PublisherAgreement[] @relation("AgreementPublisher")
+  questionSources QuestionSource[] @relation("QuestionSourcePublisher")
 }
 
 model AuthSession {
@@ -344,6 +372,7 @@ model Chapter {
   publisherAgreements PublisherAgreement[] @relation("PublisherAgreementChapter")
   earningsStatements PublisherEarningsStatement[] @relation("EarningsChapter")
   contentPlacements ContentPlacement[] @relation("ContentPlacementChapter")
+  questions Question[]
   coverAsset      Asset? @relation("ChapterCover", fields: [coverAssetId], references: [id], onDelete: Restrict)
   coverAssetId    String?
 
@@ -476,6 +505,8 @@ model Asset {
   lessonCovers      Lesson[] @relation("LessonCover")
   sectionCovers     Section[] @relation("SectionCover")
   video             VideoAsset?
+  questionAssets    QuestionAsset[] @relation("QuestionAttachmentAsset")
+  questionVideoLinks QuestionVideoLink[] @relation("QuestionVideoAsset")
   @@index([status, kind, createdAt])
 }
 
@@ -505,6 +536,119 @@ model VideoAsset {
   failureMetadata    Json?
   attempt            Int @default(1)
   @@index([processingStatus])
+}
+
+model QuestionSource {
+  id              String             @id @default(cuid())
+  type            QuestionSourceType
+  title           String
+  note            String?
+  publisherUserId String?
+  publisher       PartnerProfile?    @relation("QuestionSourcePublisher", fields: [publisherUserId], references: [userId], onDelete: Restrict)
+  status          ContentStatus      @default(DRAFT)
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  publishedAt     DateTime?
+  archivedAt      DateTime?
+  createdById     String
+  updatedById     String
+  createdBy       User               @relation("QuestionSourceCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  updatedBy       User               @relation("QuestionSourceUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
+  questions       Question[]
+
+  @@index([status, type, createdAt, id])
+  @@index([publisherUserId])
+}
+
+model QuestionBank {
+  id          String        @id @default(cuid())
+  title       String
+  description String?
+  status      ContentStatus @default(DRAFT)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  publishedAt DateTime?
+  archivedAt  DateTime?
+  createdById String
+  updatedById String
+  createdBy   User          @relation("QuestionBankCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  updatedBy   User          @relation("QuestionBankUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
+  questions   Question[]
+
+  @@index([status, createdAt, id])
+}
+
+model Question {
+  id           String         @id @default(cuid())
+  bankId       String
+  sourceId     String
+  chapterId    String
+  type         QuestionType   @default(SINGLE_CHOICE)
+  body         String
+  explanation  String?
+  status       QuestionStatus @default(DRAFT)
+  reviewNote   String?
+  reviewedAt   DateTime?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  publishedAt  DateTime?
+  archivedAt   DateTime?
+  createdById  String
+  updatedById  String
+  reviewedById String?
+  bank         QuestionBank   @relation(fields: [bankId], references: [id], onDelete: Restrict)
+  source       QuestionSource @relation(fields: [sourceId], references: [id], onDelete: Restrict)
+  chapter      Chapter        @relation(fields: [chapterId], references: [id], onDelete: Restrict)
+  createdBy    User           @relation("QuestionCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  updatedBy    User           @relation("QuestionUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
+  reviewedBy   User?          @relation("QuestionReviewedBy", fields: [reviewedById], references: [id], onDelete: Restrict)
+  options      QuestionOption[]
+  assets       QuestionAsset[]
+  videoLink    QuestionVideoLink?
+
+  @@index([status, createdAt, id])
+  @@index([bankId, status])
+  @@index([sourceId, status])
+  @@index([chapterId, status])
+}
+
+model QuestionOption {
+  id         String   @id @default(cuid())
+  questionId String
+  body       String
+  isCorrect  Boolean  @default(false)
+  sortOrder  Int
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([questionId, sortOrder])
+}
+
+model QuestionAsset {
+  id         String   @id @default(cuid())
+  questionId String
+  assetId    String
+  sortOrder  Int
+  createdAt  DateTime @default(now())
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  asset      Asset    @relation("QuestionAttachmentAsset", fields: [assetId], references: [id], onDelete: Restrict)
+
+  @@unique([questionId, assetId])
+  @@unique([questionId, sortOrder])
+}
+
+model QuestionVideoLink {
+  id               String   @id @default(cuid())
+  questionId       String   @unique
+  videoAssetId     String
+  timestampSeconds Int
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  question         Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  videoAsset       Asset    @relation("QuestionVideoAsset", fields: [videoAssetId], references: [id], onDelete: Restrict)
+
+  @@index([videoAssetId])
 }
 
 model BunnyStreamWebhookEvent {

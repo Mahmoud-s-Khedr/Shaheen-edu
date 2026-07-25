@@ -39,6 +39,7 @@
     "journey:content:delivery": "tsx scripts/run-journey.ts CONTENT-003",
     "journey:content:catalog": "tsx scripts/run-journey.ts CONTENT-004",
     "journey:content:pricing": "tsx scripts/run-journey.ts CONTENT-005",
+    "journey:content:questions": "tsx scripts/run-journey.ts CONTENT-006",
     "journey:current": "tsx scripts/run-journey.ts current",
     "journey:test": "tsx --test scripts/journeys/lib/*.test.ts",
     "test:all": "pnpm test && pnpm test:e2e && pnpm build",

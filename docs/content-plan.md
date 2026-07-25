@@ -185,7 +185,7 @@ Allow admins to grant access for testing before payments exist, and securely del
 - [x] Add admin grant/revoke/list entitlement operations and public/student content delivery endpoints. Add student course/hierarchy reads and protected asset/video authorization when their respective resources are introduced.
 - [x] Verify course versus chapter boundaries, preview behavior, expired/revoked grants, public catalog versus protected delivery, draft exclusion despite entitlement, IDOR resistance, URL expiry, and denial for partners/unrelated students. (`test/entitlements.e2e-spec.ts`. Locked-outline preview behavior is verified with the Phase 5 catalog endpoints.)
 
-## Phase 8 — Manual question-bank authoring
+## Phase 8 — Manual question-bank authoring ✅ Complete
 
 ### Goal
 
