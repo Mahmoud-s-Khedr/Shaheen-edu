@@ -10,8 +10,9 @@ handing the APIs to the frontend. For dashboard setup and environment variables 
 | Layer | Bunny | What it proves | When to use |
 | --- | --- | --- | --- |
 | **1. Automated tests** (`jest`) | Mocked | Validation, delivery signing, webhook verification, idempotency, failure/retry, role protection — deterministic, no credentials. | Every change; CI. |
-| **2. End-to-end journey** (`CONTENT-003`) | **Real** | The full server-owned contract the frontend calls: upload → signed URL that actually resolves; video create → signed TUS authorization. | Before frontend integration; after config changes. |
-| **3. Manual test console** (`dev/manual-test-console.html`) | **Real** | The live browser flow incl. TUS byte-upload, encode, webhook, and playback in an `<iframe>`. | Final sign-off of the video pipeline. |
+| **2. End-to-end journey** (`CONTENT-003`) | **Real** | Storage upload → signed URL resolves; video create → signed TUS authorization. | Before frontend integration; after config changes. |
+| **3. Phase 9 acceptance** (`CONTENT-007`) | **Real** | Complete hierarchy, real TUS bytes, verified webhook readiness, protected PDF/playback delivery, and denial boundaries. | Required release gate. |
+| **4. Manual test console** (`dev/manual-test-console.html`) | **Real** | Interactive diagnosis of the live browser flow. | Troubleshooting and exploratory checks. |
 
 Start at layer 1 (fast, free), then 2, then 3.
 
@@ -101,7 +102,34 @@ pnpm journey:list                # list all journeys
 
 ---
 
-## Layer 3 — Manual test console (full live video flow)
+## Layer 3 — Phase 9 full live acceptance
+
+`CONTENT-007` is the required non-production release gate. It uses real Bunny
+Storage and Stream services, uploads a valid MP4 through TUS, waits for Bunny's
+signed webhook to mark it ready, and verifies protected PDF and playback access
+for an entitled student while rejecting a non-entitled student and a partner.
+
+The Stream Library webhook must point at the externally reachable API URL before
+running it. Use a dedicated Bunny library/storage zone because the journey creates
+real artifacts and intentionally retains published-course evidence for review.
+
+```bash
+JOURNEY_ALLOW_MUTATIONS=true \
+JOURNEY_BASE_URL=http://localhost:3000 \
+JOURNEY_SUPER_ADMIN_EMAIL="superadmin@example.com" \
+JOURNEY_SUPER_ADMIN_PASSWORD="ChangeThisPassword123!" \
+JOURNEY_VIDEO_FILE=/absolute/path/to/small-valid.mp4 \
+JOURNEY_BUNNY_WEBHOOK_URL=https://your-public-api.example/api/v1/integrations/bunny-stream/webhook \
+pnpm journey:content:integration
+```
+
+`JOURNEY_VIDEO_READY_TIMEOUT_MS` defaults to 10 minutes and
+`JOURNEY_VIDEO_POLL_INTERVAL_MS` to 5 seconds. The runner reports the configured
+webhook URL when readiness times out. Remove unreferenced failed/test video assets
+explicitly through `DELETE /admin/video-assets/:id`; it deletes the Bunny object
+and is blocked while any content or question reference remains.
+
+## Layer 4 — Manual test console (full live video flow)
 
 `dev/manual-test-console.html` is a dev-only page that logs in as an admin and drives every
 flow, including the real browser TUS upload and protected playback that the journey cannot
@@ -156,6 +184,7 @@ Open <http://localhost:5173/manual-test-console.html>, log in with an admin, the
 
 - [ ] `pnpm test` and `pnpm test:e2e` pass.
 - [ ] `pnpm journey:content:delivery` passes against real Bunny.
+- [ ] `pnpm journey:content:integration` passes against real Bunny with a real TUS upload and webhook.
 - [ ] Console: a small image/PDF uploads and reaches `READY`.
 - [ ] Console: a published asset returns a signed URL that works before expiry and is
       rejected after.

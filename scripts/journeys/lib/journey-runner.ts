@@ -3,7 +3,12 @@ import { resolve } from 'node:path';
 import { ApiClient } from './api-client.js';
 import { DataFactory } from './data-factory.js';
 import { redact } from './redaction.js';
-import type { JourneyContext, JourneyDefinition, JourneyResult, JourneyRuntime } from './types.js';
+import type {
+  JourneyContext,
+  JourneyDefinition,
+  JourneyResult,
+  JourneyRuntime,
+} from './types.js';
 import type { JourneyEnvironment } from './environment.js';
 
 export class JourneyRunner {
@@ -14,16 +19,56 @@ export class JourneyRunner {
   private readonly factory: DataFactory;
   private activeCorrelationIds: string[] | undefined;
 
-  constructor(private readonly environment: JourneyEnvironment, definitions: JourneyDefinition[], private readonly options: { verbose: boolean; quiet: boolean }) {
+  constructor(
+    private readonly environment: JourneyEnvironment,
+    definitions: JourneyDefinition[],
+    private readonly options: { verbose: boolean; quiet: boolean },
+  ) {
     this.byId = new Map(definitions.map((journey) => [journey.id, journey]));
     this.factory = new DataFactory();
-    this.context = { runId: this.factory.runId, created: { admins: [], partners: [], students: [], grades: [], subjects: [], courses: [], chapters: [], lessons: [], sections: [], contentItems: [], questionSources: [], questionBanks: [], questions: [] }, superAdmin: {}, admin: {}, partner: {}, students: [], parent: {}, academic: {} };
+    this.context = {
+      runId: this.factory.runId,
+      created: {
+        admins: [],
+        partners: [],
+        students: [],
+        grades: [],
+        subjects: [],
+        courses: [],
+        chapters: [],
+        lessons: [],
+        sections: [],
+        contentItems: [],
+        questionSources: [],
+        questionBanks: [],
+        questions: [],
+      },
+      superAdmin: {},
+      admin: {},
+      partner: {},
+      students: [],
+      parent: {},
+      academic: {},
+    };
     const config = environment;
-    this.clients = Object.fromEntries(['public', 'superAdmin', 'admin', 'partner', 'student', 'parent'].map((name) => [name, new ApiClient(config, name, (correlationId) => this.activeCorrelationIds?.push(correlationId))]));
+    this.clients = Object.fromEntries(
+      ['public', 'superAdmin', 'admin', 'partner', 'student', 'parent'].map(
+        (name) => [
+          name,
+          new ApiClient(config, name, (correlationId) =>
+            this.activeCorrelationIds?.push(correlationId),
+          ),
+        ],
+      ),
+    );
   }
 
-  list(): JourneyDefinition[] { return [...this.byId.values()]; }
-  getContext(): JourneyContext { return this.context; }
+  list(): JourneyDefinition[] {
+    return [...this.byId.values()];
+  }
+  getContext(): JourneyContext {
+    return this.context;
+  }
 
   async execute(selected: JourneyDefinition[]): Promise<JourneyResult[]> {
     for (const journey of selected) await this.executeOne(journey.id);
@@ -34,41 +79,84 @@ export class JourneyRunner {
     if (this.completed.has(id)) return;
     const journey = this.byId.get(id);
     if (!journey) throw new Error(`Unknown journey: ${id}`);
-    for (const dependency of journey.dependsOn ?? []) await this.executeOne(dependency);
-    const started = performance.now(); const correlationIds: string[] = []; let currentStep = '';
+    for (const dependency of journey.dependsOn ?? [])
+      await this.executeOne(dependency);
+    const started = performance.now();
+    const correlationIds: string[] = [];
+    let currentStep = '';
     this.activeCorrelationIds = correlationIds;
-    if (!this.options.quiet) console.log(`[${journey.id}] Starting ${journey.name}`);
+    if (!this.options.quiet)
+      console.log(`[${journey.id}] Starting ${journey.name}`);
     const runtime: JourneyRuntime = {
-      context: this.context, clients: this.clients, factory: this.factory, options: { verbose: this.options.verbose },
+      context: this.context,
+      clients: this.clients,
+      factory: this.factory,
+      options: { verbose: this.options.verbose },
+      environment: this.environment,
       step: async (label, action) => {
         currentStep = label;
-        try { await action(); if (!this.options.quiet) console.log(`[${journey.id}] ${label}... PASS`); }
-        catch (error) {
-          const response = (error as { response?: { correlationId?: string } }).response;
-          if (response?.correlationId) correlationIds.push(response.correlationId);
+        try {
+          await action();
+          if (!this.options.quiet)
+            console.log(`[${journey.id}] ${label}... PASS`);
+        } catch (error) {
+          const response = (error as { response?: { correlationId?: string } })
+            .response;
+          if (response?.correlationId)
+            correlationIds.push(response.correlationId);
           throw error;
         }
       },
     };
     try {
       await journey.run(runtime);
-      const result: JourneyResult = { id: journey.id, name: journey.name, status: 'passed', durationMs: performance.now() - started, correlationIds, created: structuredClone(this.context.created) };
+      const result: JourneyResult = {
+        id: journey.id,
+        name: journey.name,
+        status: 'passed',
+        durationMs: performance.now() - started,
+        correlationIds,
+        created: structuredClone(this.context.created),
+      };
       this.completed.set(id, result);
       this.activeCorrelationIds = undefined;
-      if (!this.options.quiet) console.log(`[${journey.id}] Completed in ${(result.durationMs / 1000).toFixed(2)}s`);
+      if (!this.options.quiet)
+        console.log(
+          `[${journey.id}] Completed in ${(result.durationMs / 1000).toFixed(2)}s`,
+        );
     } catch (error) {
-      const result: JourneyResult = { id: journey.id, name: journey.name, status: 'failed', durationMs: performance.now() - started, failedStep: currentStep, correlationIds, created: structuredClone(this.context.created), error: redact(error instanceof Error ? { name: error.name, message: error.message } : error) };
+      const result: JourneyResult = {
+        id: journey.id,
+        name: journey.name,
+        status: 'failed',
+        durationMs: performance.now() - started,
+        failedStep: currentStep,
+        correlationIds,
+        created: structuredClone(this.context.created),
+        error: redact(
+          error instanceof Error
+            ? { name: error.name, message: error.message }
+            : error,
+        ),
+      };
       this.completed.set(id, result);
       this.activeCorrelationIds = undefined;
-      console.error(`[${journey.id}] FAILED at ${currentStep}: ${JSON.stringify(result.error)}`);
+      console.error(
+        `[${journey.id}] FAILED at ${currentStep}: ${JSON.stringify(result.error)}`,
+      );
       throw error;
     }
   }
 
   async writeReport(results: JourneyResult[]): Promise<string> {
-    const directory = resolve(process.cwd(), 'reports', 'journeys'); await mkdir(directory, { recursive: true });
+    const directory = resolve(process.cwd(), 'reports', 'journeys');
+    await mkdir(directory, { recursive: true });
     const path = resolve(directory, `${this.context.runId}.json`);
-    await writeFile(path, `${JSON.stringify({ runId: this.context.runId, target: this.environment.baseUrl, results }, null, 2)}\n`, 'utf8');
+    await writeFile(
+      path,
+      `${JSON.stringify({ runId: this.context.runId, target: this.environment.baseUrl, results }, null, 2)}\n`,
+      'utf8',
+    );
     return path;
   }
 }

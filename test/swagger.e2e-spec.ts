@@ -80,14 +80,31 @@ describe('Swagger (e2e)', () => {
       429: expect.any(Object),
     });
 
-    for (const path of Object.values(document.paths) as Array<
-      Record<string, { summary?: string }>
+    const httpMethods = new Set([
+      'get',
+      'put',
+      'post',
+      'delete',
+      'options',
+      'head',
+      'patch',
+      'trace',
+    ]);
+    const undocumented: string[] = [];
+    for (const [pathName, path] of Object.entries(document.paths) as Array<
+      [string, Record<string, { summary?: string }>]
     >) {
-      for (const operation of Object.values(path)) {
-        if (typeof operation === 'object' && operation !== null) {
-          expect(operation.summary).toBeDefined();
+      for (const [method, operation] of Object.entries(path)) {
+        if (
+          httpMethods.has(method) &&
+          typeof operation === 'object' &&
+          operation !== null
+        ) {
+          if (!operation.summary)
+            undocumented.push(`${method.toUpperCase()} ${pathName}`);
         }
       }
     }
+    expect(undocumented).toEqual([]);
   });
 });

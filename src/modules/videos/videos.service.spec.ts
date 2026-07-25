@@ -28,7 +28,12 @@ function sign(raw: string): string {
 
 function buildService() {
   const prisma = {
-    asset: { create: jest.fn(), update: jest.fn(), findUnique: jest.fn() },
+    asset: {
+      create: jest.fn(),
+      update: jest.fn(),
+      findUnique: jest.fn(),
+      delete: jest.fn(),
+    },
     videoAsset: { update: jest.fn(), findUnique: jest.fn() },
     bunnyStreamWebhookEvent: { create: jest.fn().mockResolvedValue(undefined) },
     // Supports both the array form (webhook) and the callback form (retry).
@@ -40,13 +45,15 @@ function buildService() {
     }),
   };
   const audit = { record: jest.fn().mockResolvedValue(undefined) };
+  const assets = { isReferenced: jest.fn().mockResolvedValue(false) };
   const config = { get: () => streamConfig };
   const service = new VideosService(
     prisma as never,
     audit as never,
+    assets as never,
     config as never,
   );
-  return { service, prisma, audit };
+  return { service, prisma, audit, assets };
 }
 
 describe('VideosService', () => {
@@ -188,6 +195,48 @@ describe('VideosService', () => {
       await expect(
         service.webhook({ Status: 3 } as any, '{}'),
       ).rejects.toBeInstanceOf(BadRequestException);
+    });
+  });
+
+  describe('explicit deletion', () => {
+    it('deletes an unreferenced Bunny video and records a safe audit event', async () => {
+      const { service, prisma, audit, assets } = buildService();
+      prisma.asset.findUnique.mockResolvedValue({
+        id: 'asset-1',
+        video: { bunnyVideoId: 'bunny-1' },
+      });
+      jest
+        .spyOn(global, 'fetch')
+        .mockResolvedValue(new Response(null, { status: 204 }));
+      await expect(service.delete(admin, 'asset-1')).resolves.toEqual({
+        id: 'asset-1',
+        deleted: true,
+      });
+      expect(assets.isReferenced).toHaveBeenCalledWith('asset-1');
+      expect(prisma.asset.delete).toHaveBeenCalledWith({
+        where: { id: 'asset-1' },
+      });
+      expect(audit.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'VIDEO_ASSET_DELETED',
+          metadata: { bunnyVideoId: 'bunny-1' },
+        }),
+      );
+    });
+
+    it('refuses deletion before contacting Bunny when the video is referenced', async () => {
+      const { service, prisma, assets } = buildService();
+      prisma.asset.findUnique.mockResolvedValue({
+        id: 'asset-1',
+        video: { bunnyVideoId: 'bunny-1' },
+      });
+      assets.isReferenced.mockResolvedValue(true);
+      const fetchSpy = jest.spyOn(global, 'fetch');
+      await expect(service.delete(admin, 'asset-1')).rejects.toBeInstanceOf(
+        ConflictException,
+      );
+      expect(fetchSpy).not.toHaveBeenCalled();
+      expect(prisma.asset.delete).not.toHaveBeenCalled();
     });
   });
 

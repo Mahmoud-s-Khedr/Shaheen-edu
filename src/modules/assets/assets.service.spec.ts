@@ -54,6 +54,8 @@ function buildService() {
     chapter: { count: jest.fn() },
     lesson: { count: jest.fn() },
     section: { count: jest.fn() },
+    questionAsset: { count: jest.fn() },
+    questionVideoLink: { count: jest.fn() },
     $transaction: jest.fn(),
   };
   const audit = { record: jest.fn().mockResolvedValue(undefined) };
@@ -338,7 +340,7 @@ describe('AssetsService', () => {
     it('refuses to archive a referenced asset', async () => {
       const { service, prisma } = buildService();
       prisma.asset.findUnique.mockResolvedValue({ id: 'a1', storageKey: 'k' });
-      prisma.$transaction.mockResolvedValue([1, 0, 0, 0, 0, 0, 0, 0]);
+      prisma.$transaction.mockResolvedValue([1, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
       await expect(service.archive(admin, 'a1')).rejects.toBeInstanceOf(
         ConflictException,
       );
@@ -347,7 +349,7 @@ describe('AssetsService', () => {
     it('archives an unreferenced asset, deletes bytes, and audits', async () => {
       const { service, prisma, storage, audit } = buildService();
       prisma.asset.findUnique.mockResolvedValue({ id: 'a1', storageKey: 'k' });
-      prisma.$transaction.mockResolvedValue([0, 0, 0, 0, 0, 0, 0, 0]);
+      prisma.$transaction.mockResolvedValue([0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
       prisma.asset.update.mockResolvedValue({
         id: 'a1',
         status: AssetStatus.ARCHIVED,
@@ -368,7 +370,7 @@ describe('AssetsService', () => {
         storageKey: 'k',
         video: null,
       });
-      prisma.$transaction.mockResolvedValue([0, 0, 0, 0, 0, 0, 0, 0]);
+      prisma.$transaction.mockResolvedValue([0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
       prisma.asset.delete.mockResolvedValue({ id: 'a1' });
       await expect(service.delete(admin, 'a1')).resolves.toEqual({
         id: 'a1',
@@ -388,7 +390,7 @@ describe('AssetsService', () => {
         storageKey: 'k',
         video: null,
       });
-      prisma.$transaction.mockResolvedValue([1, 0, 0, 0, 0, 0, 0, 0]);
+      prisma.$transaction.mockResolvedValue([1, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
       await expect(service.delete(admin, 'a1')).rejects.toBeInstanceOf(
         ConflictException,
       );
@@ -417,7 +419,7 @@ describe('AssetsService', () => {
         status: AssetStatus.READY,
         storageKey: 'k',
       });
-      prisma.$transaction.mockResolvedValue([0, 0, 0, 0, 0, 0, 0, 0]);
+      prisma.$transaction.mockResolvedValue([0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
       prisma.asset.update.mockResolvedValue({
         id: 'a1',
         status: AssetStatus.ARCHIVED,
@@ -441,7 +443,7 @@ describe('AssetsService', () => {
         status: AssetStatus.READY,
         storageKey: 'k',
       });
-      prisma.$transaction.mockResolvedValue([1, 0, 0, 0, 0, 0, 0, 0]);
+      prisma.$transaction.mockResolvedValue([1, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
       await service.archiveIfUnreferenced(admin, 'a1');
       expect(storage.delete).not.toHaveBeenCalled();
       expect(prisma.asset.update).not.toHaveBeenCalled();

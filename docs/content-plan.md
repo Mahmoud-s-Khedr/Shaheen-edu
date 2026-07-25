@@ -193,21 +193,22 @@ Allow admins to author and maintain single-choice questions without building qui
 
 ### Data model and workflow
 
-- Add `QuestionSource`, `QuestionBank`, `Question`, `QuestionOption`, `QuestionAsset`, and `QuestionVideoLink`.
-- Sources support `PLATFORM`, `CONTENT_PUBLISHER`, `EXTERNAL_BOOK`, `PREVIOUS_EXAM`, and `MINISTRY_MODEL`. Questions use `DRAFT`, `IN_REVIEW`, `PUBLISHED`, `REJECTED`, and `ARCHIVED` lifecycle states — the one deliberate override of the shared three-state convention.
-- `QuestionAsset` requires a new named back-relation on `Asset`, following the existing cover-relation pattern. Video timestamp validation reads `VideoAsset.durationSeconds`.
-- Chapter ancestry validation depends on the Phase 5 `PublicationValidator`.
-- Initially support `SINGLE_CHOICE` only. Every question belongs to one bank, source, and chapter; course, subject, and grade scope derive from the selected chapter's published ancestry.
-- Admins create a source, bank, question, options, optional ready attachments, optional ready-video timestamp link, explanation, and then submit for review. Authorized admins publish, reject, or archive after validation.
-- Publication requires non-empty body, at least two options, exactly one correct option, source, bank, valid chapter ancestry, required explanation, ready attachments, and a valid video timestamp whenever duration is known.
+- [x] Add `QuestionSource`, `QuestionBank`, `Question`, `QuestionOption`, `QuestionAsset`, and `QuestionVideoLink`.
+- [x] Sources support `PLATFORM`, `CONTENT_PUBLISHER`, `EXTERNAL_BOOK`, `PREVIOUS_EXAM`, and `MINISTRY_MODEL`. Questions use `DRAFT`, `IN_REVIEW`, `PUBLISHED`, `REJECTED`, and `ARCHIVED` lifecycle states — the one deliberate override of the shared three-state convention.
+- [x] `QuestionAsset` has a named back-relation on `Asset`; video timestamp validation reads `VideoAsset.durationSeconds`.
+- [x] Chapter ancestry validation reuses the Phase 5 `PublicationService` validator.
+- [x] Initially support `SINGLE_CHOICE` only. Every question belongs to one bank, source, and chapter; course, subject, and grade scope derive from the selected chapter's published ancestry.
+- [x] Admins create a source, bank, question, options, optional ready attachments, optional ready-video timestamp link, explanation, and then submit for review. Authorized admins publish, reject, or archive after validation.
+- [x] Submission/publication validates non-empty body and explanation, at least two options, exactly one correct option, source, bank, published chapter ancestry, ready attachments, and a valid video timestamp whenever duration is known.
 
 ### Representation and tests
 
-- Define separate admin, review, and future student DTOs. Student representation excludes correctness, correct-option ID, explanation, review notes, and internal status.
-- Do not add quiz-taking or student question-delivery endpoints in this milestone.
-- Test valid manual creation, option constraints, source and hierarchy validation, linked-video timestamps, review transitions, archive behavior, role protection, and answer-field exclusion.
+- [x] Define deliberate admin/review responses and a future student-safe mapper. Student representation excludes correctness, correct-option ID, explanation, review notes, and internal status.
+- [x] Do not add quiz-taking or student question-delivery endpoints in this milestone.
+- [x] Add and run `CONTENT-006`, covering publisher-backed source validation, question creation, option constraints, review transitions, archive behavior, source/bank publication guards, and role protection.
+- [x] Unit-test answer-field exclusion in the future student representation.
 
-## Phase 9 — Integration and hardening
+## Phase 9 — Integration and hardening ✅ Complete
 
 ### End-to-end acceptance scenario
 
@@ -226,6 +227,12 @@ The scenario runs as scripted journeys alongside `CONTENT-001`/`002`/`003`/`004`
 
 - Review audit events, pagination/filtering, indexes, transaction boundaries, ownership/IDOR protection, archive behavior, orphaned asset cleanup, webhook idempotency, access URL expiration, query counts, migrations, Swagger, e2e coverage, and production build.
 - Each implementation phase is delivered in its own commit with its migration and focused unit/e2e tests.
+
+### Delivered
+
+- [x] Add `CONTENT-007`, the non-production live Bunny release journey: hierarchy, real Storage uploads, real TUS upload, verified webhook readiness, catalog lock state, entitlement delivery, question-bank publishing, and denial boundaries.
+- [x] Add explicit deletion of unreferenced Bunny Stream video assets; referenced video assets remain protected from deletion.
+- [x] Document live journey configuration, readiness timeout, webhook prerequisite, and explicit orphan cleanup.
 
 ## Remaining order of work
 

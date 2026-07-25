@@ -10,6 +10,7 @@ import { fullDeliveryJourney } from './content/full-content-delivery.journey.js'
 import { publicCatalogJourney } from './content/public-catalog.journey.js';
 import { pricingPublisherAgreementsJourney } from './content/pricing-publisher-agreements.journey.js';
 import { questionBankAuthoringJourney } from './content/question-bank-authoring.journey.js';
+import { phase9IntegrationJourney } from './content/phase9-integration.journey.js';
 import type { JourneyDefinition } from './lib/types.js';
 
-export const journeys: JourneyDefinition[] = [healthJourney, superAdminJourney, adminJourney, partnerJourney, studentJourney, parentJourney, hierarchyJourney, contentJourney, fullDeliveryJourney, publicCatalogJourney, pricingPublisherAgreementsJourney, questionBankAuthoringJourney];
+export const journeys: JourneyDefinition[] = [healthJourney, superAdminJourney, adminJourney, partnerJourney, studentJourney, parentJourney, hierarchyJourney, contentJourney, fullDeliveryJourney, publicCatalogJourney, pricingPublisherAgreementsJourney, questionBankAuthoringJourney, phase9IntegrationJourney];

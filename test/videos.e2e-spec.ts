@@ -347,4 +347,24 @@ describe('Video assets (e2e)', () => {
       expect(response.statusCode).toBe(409);
     });
   });
+
+  describe('explicit cleanup', () => {
+    it('deletes an unreferenced video asset', async () => {
+      const created = await app.inject({
+        method: 'POST',
+        url: '/api/v1/admin/video-assets',
+        headers: admin(),
+        payload: { title: 'Disposable video' },
+      });
+      expect(created.statusCode).toBe(201);
+      const id = json(created).id;
+      const deleted = await app.inject({
+        method: 'DELETE',
+        url: `/api/v1/admin/video-assets/${id}`,
+        headers: admin(),
+      });
+      expect(deleted.statusCode).toBe(200);
+      expect(json(deleted)).toEqual({ id, deleted: true });
+    });
+  });
 });
