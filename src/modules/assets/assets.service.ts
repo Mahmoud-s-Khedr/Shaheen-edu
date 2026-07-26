@@ -83,5 +83,16 @@ export class AssetsService {
     if (previousCoverId && previousCoverId !== assetId) await this.archiveIfUnreferenced(actor, previousCoverId);
     return this.get(actor, assetId);
   }
+  async removeCover(actor: RequestUser, resource: string, id: string) {
+    this.assertAdmin(actor);
+    const clients: Record<string, { findUnique: Function; update: Function }> = { grades: this.prisma.academicGrade, subjects: this.prisma.subject, courses: this.prisma.course, chapters: this.prisma.chapter, lessons: this.prisma.lesson, sections: this.prisma.section };
+    const client = clients[resource];
+    if (!client) throw new BadRequestException('Unsupported cover resource');
+    const record = await client.findUnique({ where: { id } });
+    if (!record) throw new NotFoundException('Hierarchy record not found');
+    await client.update({ where: { id }, data: { coverAssetId: null } });
+    await this.audit.record({ actorUserId: actor.id, action: 'HIERARCHY_COVER_REMOVED', targetType: resource, targetId: id });
+    return { id, coverAssetId: null };
+  }
   private summary(asset: any) { return { id: asset.id, provider: asset.provider, kind: asset.kind, status: asset.status, filename: asset.filename, mimeType: asset.mimeType, sizeBytes: asset.sizeBytes, checksum: asset.checksum, createdAt: asset.createdAt, readyAt: asset.readyAt, failedAt: asset.failedAt, archivedAt: asset.archivedAt }; }
 }

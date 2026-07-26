@@ -7,7 +7,7 @@ export const pricingPublisherAgreementsJourney: JourneyDefinition = {
   name: 'Pricing inheritance and publisher earnings agreements',
   category: 'content',
   dependsOn: ['CONTENT-001', 'AUTH-003'],
-  async run({ clients, context, factory, step }) {
+  async run({ clients, context, step }) {
     const admin = clients.admin;
     const courseId = String(context.academic.courseId);
     const chapterId = String(context.academic.chapterId);

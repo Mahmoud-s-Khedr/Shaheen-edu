@@ -1,4 +1,5 @@
 import { healthJourney } from './infrastructure/health.journey.js';
+import { geographyJourney } from './infrastructure/geography.journey.js';
 import { superAdminJourney } from './auth/super-admin-bootstrap.journey.js';
 import { adminJourney } from './auth/admin-lifecycle.journey.js';
 import { partnerJourney } from './auth/partner-lifecycle.journey.js';
@@ -11,6 +12,23 @@ import { publicCatalogJourney } from './content/public-catalog.journey.js';
 import { pricingPublisherAgreementsJourney } from './content/pricing-publisher-agreements.journey.js';
 import { questionBankAuthoringJourney } from './content/question-bank-authoring.journey.js';
 import { phase9IntegrationJourney } from './content/phase9-integration.journey.js';
+import { apiCoverageJourney } from './content/api-coverage.journey.js';
 import type { JourneyDefinition } from './lib/types.js';
 
-export const journeys: JourneyDefinition[] = [healthJourney, superAdminJourney, adminJourney, partnerJourney, studentJourney, parentJourney, hierarchyJourney, contentJourney, fullDeliveryJourney, publicCatalogJourney, pricingPublisherAgreementsJourney, questionBankAuthoringJourney, phase9IntegrationJourney];
+export const journeys: JourneyDefinition[] = [
+  healthJourney,
+  superAdminJourney,
+  geographyJourney,
+  adminJourney,
+  partnerJourney,
+  studentJourney,
+  parentJourney,
+  hierarchyJourney,
+  contentJourney,
+  fullDeliveryJourney,
+  publicCatalogJourney,
+  pricingPublisherAgreementsJourney,
+  questionBankAuthoringJourney,
+  phase9IntegrationJourney,
+  apiCoverageJourney,
+];

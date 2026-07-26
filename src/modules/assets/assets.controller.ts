@@ -18,4 +18,5 @@ export class AssetsController {
   @Post(':id/archive') @ApiOperation({ summary: 'Archive an asset' }) archive(@CurrentUser() actor: RequestUser, @Param('id') id: string) { return this.assets.archive(actor, id); }
   @Delete(':id') @ApiOperation({ summary: 'Delete an unused draft asset' }) delete(@CurrentUser() actor: RequestUser, @Param('id') id: string) { return this.assets.delete(actor, id); }
   @Post('covers/:resource/:id') @ApiOperation({ summary: 'Set a hierarchy record cover image' }) setCover(@CurrentUser() actor: RequestUser, @Param('resource') resource: string, @Param('id') id: string, @Body('assetId') assetId: string) { return this.assets.setCover(actor, resource, id, assetId); }
+  @Delete('covers/:resource/:id') @ApiOperation({ summary: 'Remove a hierarchy record cover image' }) removeCover(@CurrentUser() actor: RequestUser, @Param('resource') resource: string, @Param('id') id: string) { return this.assets.removeCover(actor, resource, id); }
 }

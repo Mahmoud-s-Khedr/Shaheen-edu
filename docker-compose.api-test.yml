@@ -1,0 +1,54 @@
+name: shaheen-edu-api-test
+
+# This stack is intentionally separate from docker-compose.yml. It owns no host
+# database/Redis ports and is always removed by `pnpm api:test:full`.
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: api_test
+      POSTGRES_PASSWORD: api_test_password
+      POSTGRES_DB: api_test
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U api_test -d api_test']
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  api:
+    build:
+      context: .
+      target: development
+    env_file:
+      - .env.api-tests.local
+    environment:
+      NODE_ENV: test
+      PORT: 3000
+      HOST: 0.0.0.0
+      DATABASE_URL: postgresql://api_test:api_test_password@postgres:5432/api_test?schema=public
+      REDIS_URL: redis://redis:6379/0
+      COOKIE_SECURE: 'false'
+      CORS_ORIGINS: http://localhost:3100
+    ports:
+      - '127.0.0.1:3100:3000'
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          node -e "fetch('http://127.0.0.1:3000/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
+      interval: 3s
+      timeout: 3s
+      retries: 30

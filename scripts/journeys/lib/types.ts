@@ -9,6 +9,17 @@ export interface ApiResponse<T = unknown> {
   path: string;
 }
 
+/** A redacted record of a real HTTP call made during an acceptance run. */
+export interface OperationRecord {
+  method: HttpMethod;
+  path: string;
+  status: number;
+  durationMs: number;
+  correlationId: string;
+  client: string;
+  body: unknown;
+}
+
 export interface UserSession {
   id?: string;
   accessToken?: string;

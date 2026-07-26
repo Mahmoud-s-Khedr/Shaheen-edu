@@ -48,12 +48,12 @@ function buildService() {
     },
     contentItem: { count: jest.fn() },
     assetReference: { count: jest.fn() },
-    academicGrade: { count: jest.fn() },
-    subject: { count: jest.fn() },
-    course: { count: jest.fn() },
-    chapter: { count: jest.fn() },
-    lesson: { count: jest.fn() },
-    section: { count: jest.fn() },
+    academicGrade: { count: jest.fn(), findUnique: jest.fn(), update: jest.fn() },
+    subject: { count: jest.fn(), findUnique: jest.fn(), update: jest.fn() },
+    course: { count: jest.fn(), findUnique: jest.fn(), update: jest.fn() },
+    chapter: { count: jest.fn(), findUnique: jest.fn(), update: jest.fn() },
+    lesson: { count: jest.fn(), findUnique: jest.fn(), update: jest.fn() },
+    section: { count: jest.fn(), findUnique: jest.fn(), update: jest.fn() },
     questionAsset: { count: jest.fn() },
     questionVideoLink: { count: jest.fn() },
     $transaction: jest.fn(),
@@ -447,6 +447,40 @@ describe('AssetsService', () => {
       await service.archiveIfUnreferenced(admin, 'a1');
       expect(storage.delete).not.toHaveBeenCalled();
       expect(prisma.asset.update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('removeCover', () => {
+    it('clears a hierarchy cover and records an audit entry', async () => {
+      const { service, prisma, audit } = buildService();
+      prisma.course.findUnique.mockResolvedValue({ id: 'course-1' });
+      prisma.course.update.mockResolvedValue({ id: 'course-1' });
+
+      await expect(service.removeCover(admin, 'courses', 'course-1')).resolves.toEqual({
+        id: 'course-1',
+        coverAssetId: null,
+      });
+      expect(prisma.course.update).toHaveBeenCalledWith({
+        where: { id: 'course-1' },
+        data: { coverAssetId: null },
+      });
+      expect(audit.record).toHaveBeenCalledWith(
+        expect.objectContaining({ action: 'HIERARCHY_COVER_REMOVED' }),
+      );
+    });
+
+    it('rejects unsupported hierarchy resources', async () => {
+      const { service } = buildService();
+      await expect(service.removeCover(admin, 'unknown', 'record-1')).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+    });
+
+    it('rejects non-admin actors', async () => {
+      const { service } = buildService();
+      await expect(service.removeCover(student, 'courses', 'course-1')).rejects.toBeInstanceOf(
+        ForbiddenException,
+      );
     });
   });
 

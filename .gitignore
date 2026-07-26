@@ -9,6 +9,8 @@ coverage/
 .DS_Store
 *.tsbuildinfo
 reports/journeys/
+reports/api-tests/
+.env.api-tests.local
 .journey-debug/
 .claude/
 .pnpm-store/

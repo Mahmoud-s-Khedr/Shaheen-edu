@@ -17,6 +17,7 @@ export class JourneyRunner {
   private readonly context: JourneyContext;
   private readonly clients: Record<string, ApiClient>;
   private readonly factory: DataFactory;
+  private readonly operations: import('./types.js').OperationRecord[] = [];
   private activeCorrelationIds: string[] | undefined;
 
   constructor(
@@ -55,8 +56,11 @@ export class JourneyRunner {
       ['public', 'superAdmin', 'admin', 'partner', 'student', 'parent'].map(
         (name) => [
           name,
-          new ApiClient(config, name, (correlationId) =>
-            this.activeCorrelationIds?.push(correlationId),
+          new ApiClient(
+            config,
+            name,
+            (correlationId) => this.activeCorrelationIds?.push(correlationId),
+            (operation) => this.operations.push(operation),
           ),
         ],
       ),
@@ -68,6 +72,14 @@ export class JourneyRunner {
   }
   getContext(): JourneyContext {
     return this.context;
+  }
+  getOperations(): readonly import('./types.js').OperationRecord[] {
+    return this.operations;
+  }
+  getClient(name: string): ApiClient {
+    const client = this.clients[name];
+    if (!client) throw new Error(`Unknown journey client: ${name}`);
+    return client;
   }
 
   async execute(selected: JourneyDefinition[]): Promise<JourneyResult[]> {

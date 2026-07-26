@@ -97,13 +97,13 @@ export class PartnerSummaryDto {
   @ApiProperty({ enum: PartnerType, nullable: true })
   partnerType!: PartnerType | null;
 
-  @ApiProperty({ nullable: true })
+  @ApiProperty({ type: String, nullable: true })
   displayName!: string | null;
 
   @ApiProperty({ nullable: true })
   legalName!: string | null;
 
-  @ApiProperty({ nullable: true })
+  @ApiProperty({ type: String, nullable: true })
   phone!: string | null;
 }
 
@@ -288,10 +288,10 @@ export class ContentPlacementSummaryDto {
   @ApiProperty()
   id!: string;
 
-  @ApiPropertyOptional({ nullable: true })
+  @ApiPropertyOptional({ type: String, nullable: true })
   courseId!: string | null;
 
-  @ApiPropertyOptional({ nullable: true })
+  @ApiPropertyOptional({ type: String, nullable: true })
   chapterId!: string | null;
 
   @ApiPropertyOptional({ nullable: true })
@@ -318,10 +318,10 @@ export class ContentItemSummaryDto {
   @ApiPropertyOptional({ nullable: true })
   description!: string | null;
 
-  @ApiPropertyOptional({ nullable: true })
+  @ApiPropertyOptional({ type: String, nullable: true })
   textBody!: string | null;
 
-  @ApiPropertyOptional({ nullable: true })
+  @ApiPropertyOptional({ type: String, nullable: true })
   externalUrl!: string | null;
 
   @ApiProperty({ enum: AccessType })

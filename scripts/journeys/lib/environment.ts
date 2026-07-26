@@ -9,6 +9,7 @@ export interface JourneyEnvironment {
   videoReadyTimeoutMs: number;
   videoPollIntervalMs: number;
   bunnyWebhookUrl?: string;
+  bunnyReadOnlyKey?: string;
 }
 
 function required(name: string): string {
@@ -81,5 +82,6 @@ export function loadEnvironment(): JourneyEnvironment {
     videoReadyTimeoutMs,
     videoPollIntervalMs,
     bunnyWebhookUrl: process.env.JOURNEY_BUNNY_WEBHOOK_URL?.trim() || undefined,
+    bunnyReadOnlyKey: process.env.JOURNEY_BUNNY_READ_ONLY_KEY?.trim() || undefined,
   };
 }

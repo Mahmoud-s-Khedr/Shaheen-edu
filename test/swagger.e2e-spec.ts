@@ -40,6 +40,30 @@ describe('Swagger (e2e)', () => {
     });
     expect(studentRegistrationSchema.required).toContain('academicGradeId');
 
+    const contentItemSchema = document.components.schemas.ContentItemSummaryDto;
+    expect(contentItemSchema.properties.textBody).toMatchObject({
+      type: 'string',
+      nullable: true,
+    });
+    expect(contentItemSchema.properties.externalUrl).toMatchObject({
+      type: 'string',
+      nullable: true,
+    });
+    expect(
+      document.components.schemas.ContentPlacementSummaryDto.properties.courseId,
+    ).toMatchObject({ type: 'string', nullable: true });
+    expect(
+      document.components.schemas.PartnerSummaryDto.properties.displayName,
+    ).toMatchObject({ type: 'string', nullable: true });
+    expect(document.components.schemas.PartnerSummaryDto.properties.phone).toMatchObject({
+      type: 'string',
+      nullable: true,
+    });
+    expect(
+      document.paths['/api/v1/admin/assets/covers/{resource}/{id}'].delete
+        .summary,
+    ).toBe('Remove a hierarchy record cover image');
+
     const publicGrades = document.paths['/api/v1/academic-grades'].get;
     expect(publicGrades.summary).toBe('List published academic grades');
     expect(publicGrades.parameters).toEqual(

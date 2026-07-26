@@ -28,9 +28,11 @@ describe('AcademicGradesService', () => {
       $transaction: jest.fn(),
     };
     const auditService = { record: jest.fn().mockResolvedValue(undefined) };
+    const publicationService = {};
     const service = new AcademicGradesService(
       prisma as never,
       auditService as never,
+      publicationService as never,
     );
     return { service, prisma, auditService };
   }

@@ -7,6 +7,7 @@ import { loadEnvironment } from './environment.js';
 import { JourneyRunner } from './journey-runner.js';
 import { redact } from './redaction.js';
 import { expectStatus, JourneyAssertionError } from './assertions.js';
+import { operationTemplateFor } from '../../api-testing/operation-path.js';
 import type { JourneyDefinition } from './types.js';
 
 const saved = { ...process.env };
@@ -31,12 +32,35 @@ test('redaction removes sensitive values and factories are unique', () => {
   const factory = new DataFactory(); assert.notEqual(factory.email('user'), factory.email('user')); assert.notEqual(factory.phone(), factory.phone()); assert.notEqual(factory.nationalId(), factory.nationalId());
 });
 
+test('operation template matching prefers static paths over parameters', () => {
+  const paths = {
+    '/api/v1/admin/content-items/{id}': {},
+    '/api/v1/admin/content-items/reorder': {},
+    '/api/v1/admin/questions/{id}/options/{optionId}': {},
+    '/api/v1/admin/questions/{id}/options/reorder': {},
+  };
+  assert.equal(
+    operationTemplateFor('/api/v1/admin/content-items/reorder', paths),
+    '/api/v1/admin/content-items/reorder',
+  );
+  assert.equal(
+    operationTemplateFor('/api/v1/admin/questions/q1/options/reorder', paths),
+    '/api/v1/admin/questions/{id}/options/reorder',
+  );
+  assert.equal(
+    operationTemplateFor('/api/v1/admin/content-items/item1', paths),
+    '/api/v1/admin/content-items/{id}',
+  );
+});
+
 test('API client sends isolated bearer token and assertion failures throw', async () => {
-  const originalFetch = globalThis.fetch; let authorization = '';
-  globalThis.fetch = (async (_input: RequestInfo | URL, init?: RequestInit) => { authorization = new Headers(init?.headers).get('authorization') ?? ''; return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'content-type': 'application/json' } }); }) as typeof fetch;
+  const originalFetch = globalThis.fetch; let authorization = ''; let signature = ''; const operations: string[] = [];
+  globalThis.fetch = (async (_input: RequestInfo | URL, init?: RequestInit) => { const headers = new Headers(init?.headers); authorization = headers.get('authorization') ?? ''; signature = headers.get('x-test-signature') ?? ''; return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'content-type': 'application/json' } }); }) as typeof fetch;
   try {
-    const client = new ApiClient({ baseUrl: 'http://localhost:3000', apiPrefix: '/api/v1', timeoutMs: 1000 }, 'test'); client.accessToken = 'actor-token';
+    const client = new ApiClient({ baseUrl: 'http://localhost:3000', apiPrefix: '/api/v1', timeoutMs: 1000 }, 'test', undefined, (record) => operations.push(record.path)); client.accessToken = 'actor-token';
     const response = await client.request('GET', '/auth/me'); assert.equal(authorization, 'Bearer actor-token'); assert.throws(() => expectStatus(response, 201), JourneyAssertionError);
+    await client.request('POST', '/webhook', undefined, { rawBody: '{}', headers: { 'x-test-signature': 'signed' }, track: false });
+    assert.equal(signature, 'signed'); assert.deepEqual(operations, ['/api/v1/auth/me']);
   } finally { globalThis.fetch = originalFetch; }
 });
 

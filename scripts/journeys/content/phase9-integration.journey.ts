@@ -56,7 +56,7 @@ async function uploadTus(
       'Upload-Offset': '0',
       'Content-Length': String(bytes.length),
     },
-    body: bytes,
+    body: new Uint8Array([...bytes]),
   });
   if (uploaded.status !== 204)
     throw new Error(`Bunny TUS upload failed with ${uploaded.status}`);
@@ -74,13 +74,14 @@ export const phase9IntegrationJourney: JourneyDefinition = {
     const chapterId = String(context.academic.chapterId);
     const gradeId = String(context.academic.gradeId);
     const entitledStudent = context.students[0];
-    if (!environment.videoFile)
+    const videoFile = environment.videoFile;
+    if (!videoFile)
       throw new Error(
         'CONTENT-007 requires JOURNEY_VIDEO_FILE pointing to a small valid MP4',
       );
     if (!entitledStudent?.id || !entitledStudent.accessToken)
       throw new Error('A registered student is required');
-    const videoBytes = await readFile(environment.videoFile);
+    const videoBytes = await readFile(videoFile);
     if (!videoBytes.length) throw new Error('JOURNEY_VIDEO_FILE is empty');
     let pdfAssetId = '';
     let videoAssetId = '';
@@ -146,7 +147,7 @@ export const phase9IntegrationJourney: JourneyDefinition = {
       async () => {
         const video = await admin.request<any>('POST', '/admin/video-assets', {
           title: factory.title('Phase 9 video'),
-          filename: basename(environment.videoFile),
+          filename: basename(videoFile),
         });
         expectStatus(video, 201);
         videoAssetId = video.body.id;
@@ -155,10 +156,12 @@ export const phase9IntegrationJourney: JourneyDefinition = {
           `/admin/video-assets/${videoAssetId}/upload-authorization`,
         );
         expectStatus(authorization, 201);
+        context.academic.coverageVideoAssetId = videoAssetId;
+        context.academic.coverageVideoBunnyId = authorization.body.videoId;
         await uploadTus(
           authorization.body,
           videoBytes,
-          basename(environment.videoFile),
+          basename(videoFile),
         );
         const deadline = Date.now() + environment.videoReadyTimeoutMs;
         while (Date.now() < deadline) {
@@ -217,7 +220,9 @@ export const phase9IntegrationJourney: JourneyDefinition = {
             publisherUserId: context.partner.id,
             revenueShareBps: 1500,
             startsAt: new Date().toISOString(),
-            isPrimary: true,
+            // CONTENT-005 already owns the course's primary agreement. This
+            // independent integration agreement only needs to be active.
+            isPrimary: false,
           },
         );
         expectStatus(agreement, 201);
@@ -259,7 +264,8 @@ export const phase9IntegrationJourney: JourneyDefinition = {
         const question = await admin.request<any>('POST', '/admin/questions', {
           bankId: bank.body.id,
           sourceId: source.body.id,
-          chapterId,
+          courseId,
+          placements: [{ chapterId }],
           body: 'Which option is correct?',
           explanation: 'The marked option is correct.',
         });
@@ -300,6 +306,14 @@ export const phase9IntegrationJourney: JourneyDefinition = {
     await step(
       'Showing a safe locked catalog outline before access is granted',
       async () => {
+        expectStatus(
+          await admin.request<any>(
+            'PATCH',
+            `/admin/courses/${courseId}/access`,
+            { accessType: 'PAID' },
+          ),
+          200,
+        );
         const outline = await clients.public.request<any>(
           'GET',
           `/catalog/courses/${courseId}/outline`,
