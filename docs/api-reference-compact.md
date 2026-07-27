@@ -5,13 +5,13 @@ Request cheat sheet for the implementation-backed API contract. Base URL is `/ap
 ## Health
 
 | Method & path | Summary | Authorization | Inputs |
-|---|---|---|---|---|
+|---|---|---|---|
 | `GET /health` | Check service health | Public | — |
 
 ## Authentication
 
 | Method & path | Summary | Authorization | Inputs |
-|---|---|---|---|---|
+|---|---|---|---|
 | `POST /api/v1/auth/students/register` | Register a student | Public | body: fullName, nationalId, phone, parentPhone, governorate, academicGradeId, center?, password |
 | `POST /api/v1/auth/students/login` | Log in as a student | Public | body: phone, password |
 | `POST /api/v1/auth/admins/login` | Log in as an administrator | Public | body: email, password |
@@ -29,7 +29,7 @@ Request cheat sheet for the implementation-backed API contract. Base URL is `/ap
 ## Identity
 
 | Method & path | Summary | Authorization | Inputs |
-|---|---|---|---|---|
+|---|---|---|---|
 | `POST /api/v1/admin/admins` | Create an administrator | Bearer token; role must be `SUPER_ADMIN` | body: email, password |
 | `GET /api/v1/admin/admins` | List administrators | Bearer token; role must be `SUPER_ADMIN` | query: page?<br>query: limit? |
 | `GET /api/v1/admin/admins/{id}` | Get an administrator by ID | Bearer token; role must be `SUPER_ADMIN` | path: id |
@@ -49,7 +49,7 @@ Request cheat sheet for the implementation-backed API contract. Base URL is `/ap
 ## Academic hierarchy
 
 | Method & path | Summary | Authorization | Inputs |
-|---|---|---|---|---|
+|---|---|---|---|
 | `POST /api/v1/admin/academic-grades` | Create an academic grade | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | body: title, slug?, description? |
 | `GET /api/v1/admin/academic-grades` | List academic grades | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | query: page?<br>query: limit?<br>query: status? |
 | `GET /api/v1/admin/academic-grades/{id}` | Get an academic grade by ID | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id |
@@ -118,7 +118,7 @@ Request cheat sheet for the implementation-backed API contract. Base URL is `/ap
 ## Content, assets, video, and entitlements
 
 | Method & path | Summary | Authorization | Inputs |
-|---|---|---|---|---|
+|---|---|---|---|
 | `POST /api/v1/admin/content-items` | Create a content item at one hierarchy target | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | body: type, title, description?, textBody?, externalUrl?, accessType?, estimatedDuration?, placement |
 | `GET /api/v1/admin/content-items` | List content items | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | query: page?<br>query: limit?<br>query: status?<br>query: type?<br>query: accessType?<br>query: courseId?<br>query: chapterId?<br>query: lessonId?<br>query: sectionId? |
 | `GET /api/v1/admin/content-items/{id}` | Get a content item by ID | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id |
@@ -159,7 +159,7 @@ Request cheat sheet for the implementation-backed API contract. Base URL is `/ap
 ## Catalog
 
 | Method & path | Summary | Authorization | Inputs |
-|---|---|---|---|---|
+|---|---|---|---|
 | `GET /api/v1/catalog/subjects` | List published catalog subjects | Public | query: page?<br>query: limit?<br>query: academicGradeId? |
 | `GET /api/v1/catalog/courses` | List published catalog courses | Public | query: page?<br>query: limit?<br>query: subjectId? |
 | `GET /api/v1/catalog/courses/{id}` | Get published catalog course details | Public | path: id |
@@ -168,7 +168,7 @@ Request cheat sheet for the implementation-backed API contract. Base URL is `/ap
 ## Publisher agreements and pricing
 
 | Method & path | Summary | Authorization | Inputs |
-|---|---|---|---|---|
+|---|---|---|---|
 | `POST /api/v1/admin/publisher-agreements` | Create a draft publisher agreement | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | body: body |
 | `GET /api/v1/admin/publisher-agreements` | List publisher agreements | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | query: history |
 | `PATCH /api/v1/admin/publisher-agreements/{id}` | Update a draft publisher agreement | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id<br>body: body |
@@ -185,7 +185,7 @@ Request cheat sheet for the implementation-backed API contract. Base URL is `/ap
 ## Question banks and questions
 
 | Method & path | Summary | Authorization | Inputs |
-|---|---|---|---|---|
+|---|---|---|---|
 | `POST /api/v1/admin/question-banks/sources` | Create a question source | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | body: type, title, note?, publisherUserId? |
 | `GET /api/v1/admin/question-banks/sources` | List question sources | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | query: page?<br>query: limit?<br>query: status?<br>query: type? |
 | `GET /api/v1/admin/question-banks/sources/{id}` | Get a question source | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id |
@@ -224,11 +224,10 @@ Request cheat sheet for the implementation-backed API contract. Base URL is `/ap
 ## Geography
 
 | Method & path | Summary | Authorization | Inputs |
-|---|---|---|---|---|
+|---|---|---|---|
 | `GET /api/v1/admin/geography/governorates` | List managed governorates and centers | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | — |
 | `POST /api/v1/admin/geography/governorates` | Create a governorate | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | body: name |
 | `POST /api/v1/admin/geography/governorates/{governorateId}/centers` | Create a center | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: governorateId<br>body: name |
 | `DELETE /api/v1/admin/geography/centers/{id}` | Delete an unreferenced center | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id |
 | `DELETE /api/v1/admin/geography/governorates/{id}` | Delete an unreferenced governorate | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id |
-
 
