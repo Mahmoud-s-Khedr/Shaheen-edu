@@ -1,6 +1,6 @@
 # Shaheen Edu API compact reference
 
-Request cheat sheet for the implementation-backed API contract. Base URL is `/api/v1`; `/health` is unversioned. Send user tokens as `Authorization: Bearer <accessToken>`. `?` marks an optional input. Refer to [the detailed API reference](api-reference-detailed.md) for response schemas, field types, validation, cookies, and error cases. Errors use `{ statusCode, message, error, correlationId }`.
+Request cheat sheet for the implementation-backed API contract. Base URL is `/api/v1`; `/health` is unversioned. Send user tokens as `Authorization: Bearer <accessToken>`. `?` marks an optional input. Refer to [the detailed API reference](api-reference-detailed.md) for response schemas, field types, validation, cookies, and error cases. Errors use `{ statusCode, code, message: { ar, en }, error: { ar, en }, details?, correlationId }`.
 
 ## Health
 
@@ -12,7 +12,7 @@ Request cheat sheet for the implementation-backed API contract. Base URL is `/ap
 
 | Method & path | Summary | Authorization | Inputs |
 |---|---|---|---|
-| `POST /api/v1/auth/students/register` | Register a student | Public | body: fullName, nationalId, phone, parentPhone, governorate, academicGradeId, center?, password |
+| `POST /api/v1/auth/students/register` | Register a student | Public | body: fullName, nationalId, phone, parentPhone, governorateId, academicGradeId, centerId?, password |
 | `POST /api/v1/auth/students/login` | Log in as a student | Public | body: phone, password |
 | `POST /api/v1/auth/admins/login` | Log in as an administrator | Public | body: email, password |
 | `POST /api/v1/auth/partners/login` | Log in as a partner | Public | body: email, password |
@@ -50,10 +50,10 @@ Request cheat sheet for the implementation-backed API contract. Base URL is `/ap
 
 | Method & path | Summary | Authorization | Inputs |
 |---|---|---|---|
-| `POST /api/v1/admin/academic-grades` | Create an academic grade | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | body: title, slug?, description? |
+| `POST /api/v1/admin/academic-grades` | Create an academic grade | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | body: title `{ ar, en }`, slug?, description? `{ ar, en }` |
 | `GET /api/v1/admin/academic-grades` | List academic grades | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | query: page?<br>query: limit?<br>query: status? |
 | `GET /api/v1/admin/academic-grades/{id}` | Get an academic grade by ID | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id |
-| `PATCH /api/v1/admin/academic-grades/{id}` | Update an academic grade | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id<br>body: title?, slug?, description? |
+| `PATCH /api/v1/admin/academic-grades/{id}` | Update an academic grade | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id<br>body: title? `{ ar, en }`, slug?, description? `{ ar, en }` |
 | `DELETE /api/v1/admin/academic-grades/{id}` | Delete an eligible draft academic grade | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id |
 | `POST /api/v1/admin/academic-grades/reorder` | Atomically reorder academic grades | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | body: items |
 | `POST /api/v1/admin/academic-grades/{id}/publish` | Publish an academic grade | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id |
@@ -186,10 +186,10 @@ Request cheat sheet for the implementation-backed API contract. Base URL is `/ap
 
 | Method & path | Summary | Authorization | Inputs |
 |---|---|---|---|
-| `POST /api/v1/admin/question-banks/sources` | Create a question source | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | body: type, title, note?, publisherUserId? |
+| `POST /api/v1/admin/question-banks/sources` | Create a question source | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | body: type, title `{ ar, en }`, note? `{ ar, en }`, publisherUserId? |
 | `GET /api/v1/admin/question-banks/sources` | List question sources | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | query: page?<br>query: limit?<br>query: status?<br>query: type? |
 | `GET /api/v1/admin/question-banks/sources/{id}` | Get a question source | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id |
-| `PATCH /api/v1/admin/question-banks/sources/{id}` | Update a question source | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id<br>body: type?, title?, note?, publisherUserId? |
+| `PATCH /api/v1/admin/question-banks/sources/{id}` | Update a question source | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id<br>body: type?, title? `{ ar, en }`, note? `{ ar, en }`, publisherUserId? |
 | `DELETE /api/v1/admin/question-banks/sources/{id}` | Delete an eligible draft question source | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id |
 | `POST /api/v1/admin/question-banks/sources/{id}/publish` | Publish a question source | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id |
 | `POST /api/v1/admin/question-banks/sources/{id}/archive` | Archive a question source | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id |
@@ -225,9 +225,9 @@ Request cheat sheet for the implementation-backed API contract. Base URL is `/ap
 
 | Method & path | Summary | Authorization | Inputs |
 |---|---|---|---|
+| `GET /api/v1/geography/governorates` | List bilingual geography for registration | Public | — |
 | `GET /api/v1/admin/geography/governorates` | List managed governorates and centers | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | — |
-| `POST /api/v1/admin/geography/governorates` | Create a governorate | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | body: name |
-| `POST /api/v1/admin/geography/governorates/{governorateId}/centers` | Create a center | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: governorateId<br>body: name |
+| `POST /api/v1/admin/geography/governorates` | Create a governorate | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | body: `{ ar, en }` |
+| `POST /api/v1/admin/geography/governorates/{governorateId}/centers` | Create a center | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: governorateId<br>body: `{ ar, en }` |
 | `DELETE /api/v1/admin/geography/centers/{id}` | Delete an unreferenced center | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id |
 | `DELETE /api/v1/admin/geography/governorates/{id}` | Delete an unreferenced governorate | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id |
-

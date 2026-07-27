@@ -12,14 +12,17 @@ export class ApiErrorResponseDto {
   @ApiProperty({ example: 401 })
   statusCode!: number;
 
-  @ApiProperty({
-    example: 'Unauthorized',
-    oneOf: [{ type: 'string' }, { type: 'array', items: { type: 'string' } }],
-  })
-  message!: string | string[];
+  @ApiProperty({ example: 'UNAUTHORIZED.INVALID_CREDENTIALS' })
+  code!: string;
 
-  @ApiProperty({ example: 'Unauthorized' })
-  error!: string;
+  @ApiProperty({ example: { ar: 'بيانات تسجيل الدخول غير صحيحة', en: 'Invalid credentials' } })
+  message!: { ar: string; en: string };
+
+  @ApiProperty({ example: { ar: 'غير مصرح', en: 'Unauthorized' } })
+  error!: { ar: string; en: string };
+
+  @ApiPropertyOptional({ type: 'array', example: [{ field: 'phone', code: 'VALIDATION.ISSTRING', message: { ar: 'يجب أن تكون القيمة نصاً', en: 'phone must be a string' } }] })
+  details?: Array<{ field: string; code: string; message: { ar: string; en: string } }>;
 
   @ApiProperty({ example: '3eb75610-8bc8-4fc2-b821-dc90d7f3f39a' })
   correlationId!: string;

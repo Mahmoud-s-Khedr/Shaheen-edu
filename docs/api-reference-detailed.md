@@ -1,6 +1,6 @@
 # Shaheen Edu API reference
 
-Implementation-backed API contract. Every endpoint below is self-contained: its authorization, parameter/body fields, and success response fields appear in the same section. Base URL is `/api/v1`; `/health` is unversioned. Unknown JSON fields are rejected. Errors use `{ statusCode, message, error, correlationId }`.
+Implementation-backed API contract. Every endpoint below is self-contained: its authorization, parameter/body fields, and success response fields appear in the same section. Base URL is `/api/v1`; `/health` is unversioned. Unknown JSON fields are rejected. Errors use `{ statusCode, code, message: { ar, en }, error: { ar, en }, details?, correlationId }`; `details` contains field-level bilingual validation feedback.
 
 ## Health
 

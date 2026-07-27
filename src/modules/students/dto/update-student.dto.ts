@@ -14,10 +14,10 @@ export class UpdateStudentDto {
   @MaxLength(200)
   fullName?: string;
 
-  @ApiProperty({ example: 'Nasr City Center', required: false })
+  @ApiProperty({ description: 'ID of a managed center in the student governorate', required: false, nullable: true })
   @IsOptional()
   @IsString()
-  center?: string;
+  centerId?: string | null;
 
   @ApiProperty({ required: false, description: 'Published academic grade ID' })
   @IsOptional()

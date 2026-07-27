@@ -3,18 +3,18 @@ import {
   IsOptional,
   IsString,
   Matches,
-  MaxLength,
-  MinLength,
 } from 'class-validator';
+import { Type } from 'class-transformer';
+import { ValidateNested } from 'class-validator';
 import { SLUG_PATTERN } from '../../../common/hierarchy/hierarchy.helper';
+import { LocalizedOptionalTextDto, LocalizedTextDto } from '../../../common/dto/localized-text.dto';
 
 export class UpdateAcademicGradeDto {
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ type: LocalizedTextDto })
   @IsOptional()
-  @IsString()
-  @MinLength(1)
-  @MaxLength(200)
-  title?: string;
+  @ValidateNested()
+  @Type(() => LocalizedTextDto)
+  title?: LocalizedTextDto;
 
   @ApiPropertyOptional()
   @IsOptional()
@@ -22,10 +22,10 @@ export class UpdateAcademicGradeDto {
   @Matches(SLUG_PATTERN)
   slug?: string;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ type: LocalizedOptionalTextDto, nullable: true })
   @IsOptional()
-  @IsString()
-  @MaxLength(2000)
-  description?: string;
+  @ValidateNested()
+  @Type(() => LocalizedOptionalTextDto)
+  description?: LocalizedOptionalTextDto | null;
 
 }

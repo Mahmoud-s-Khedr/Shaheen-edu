@@ -192,6 +192,15 @@ export class AuthService {
       }
     }
 
+    const governorate = await this.prisma.governorate.findUnique({
+      where: { id: dto.governorateId },
+    });
+    if (!governorate) throw new NotFoundException('Governorate not found');
+    const center = dto.centerId
+      ? await this.prisma.center.findFirst({ where: { id: dto.centerId, governorateId: governorate.id } })
+      : null;
+    if (dto.centerId && !center) throw new BadRequestException('Center must belong to the selected governorate');
+
     const passwordHash = await this.passwordService.hash(dto.password);
     const nationalIdEncrypted =
       this.nationalIdService.encrypt(normalizedNationalId);
@@ -206,18 +215,6 @@ export class AuthService {
           passwordHash,
         },
       });
-      const governorate = await tx.governorate.upsert({
-        where: { name: dto.governorate.trim() },
-        create: { name: dto.governorate.trim() },
-        update: {},
-      });
-      const center = dto.center?.trim()
-        ? await tx.center.upsert({
-            where: { governorateId_name: { governorateId: governorate.id, name: dto.center.trim() } },
-            create: { governorateId: governorate.id, name: dto.center.trim() },
-            update: {},
-          })
-        : null;
       await tx.studentProfile.create({
         data: {
           userId: created.id,
@@ -226,8 +223,8 @@ export class AuthService {
           nationalIdEncrypted,
           nationalIdLast4,
           academicGradeId: dto.academicGradeId,
-          governorate: dto.governorate,
-          center: dto.center,
+          governorate: governorate.nameAr,
+          center: center?.nameAr,
           governorateId: governorate.id,
           centerId: center?.id,
           parentPhoneNormalized: normalizedParentPhone,

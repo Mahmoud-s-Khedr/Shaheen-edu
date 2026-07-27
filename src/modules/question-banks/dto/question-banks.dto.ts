@@ -3,17 +3,18 @@ import { Type } from 'class-transformer';
 import { ArrayMinSize, IsArray, IsBoolean, IsEnum, IsInt, IsOptional, IsString, MaxLength, Min, MinLength, ValidateNested } from 'class-validator';
 import { PaginationQueryDto } from '../../../common/dto/pagination-query.dto';
 import { ContentStatus, QuestionSourceType, QuestionStatus, QuestionType } from '../../../common/types/roles.enum';
+import { LocalizedOptionalTextDto, LocalizedTextDto } from '../../../common/dto/localized-text.dto';
 
 export class CreateQuestionSourceDto {
   @ApiProperty({ enum: QuestionSourceType }) @IsEnum(QuestionSourceType) type!: QuestionSourceType;
-  @ApiProperty() @IsString() @MinLength(1) @MaxLength(200) title!: string;
-  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(2000) note?: string;
+  @ApiProperty({ type: LocalizedTextDto }) @ValidateNested() @Type(() => LocalizedTextDto) title!: LocalizedTextDto;
+  @ApiPropertyOptional({ type: LocalizedOptionalTextDto }) @IsOptional() @ValidateNested() @Type(() => LocalizedOptionalTextDto) note?: LocalizedOptionalTextDto;
   @ApiPropertyOptional({ description: 'Required only for CONTENT_PUBLISHER sources' }) @IsOptional() @IsString() publisherUserId?: string;
 }
 export class UpdateQuestionSourceDto {
   @ApiPropertyOptional({ enum: QuestionSourceType }) @IsOptional() @IsEnum(QuestionSourceType) type?: QuestionSourceType;
-  @ApiPropertyOptional() @IsOptional() @IsString() @MinLength(1) @MaxLength(200) title?: string;
-  @ApiPropertyOptional({ nullable: true }) @IsOptional() @IsString() @MaxLength(2000) note?: string | null;
+  @ApiPropertyOptional({ type: LocalizedTextDto }) @IsOptional() @ValidateNested() @Type(() => LocalizedTextDto) title?: LocalizedTextDto;
+  @ApiPropertyOptional({ type: LocalizedOptionalTextDto, nullable: true }) @IsOptional() @ValidateNested() @Type(() => LocalizedOptionalTextDto) note?: LocalizedOptionalTextDto | null;
   @ApiPropertyOptional({ nullable: true }) @IsOptional() @IsString() publisherUserId?: string | null;
 }
 export class CreateQuestionBankDto { @ApiProperty() @IsString() @MinLength(1) @MaxLength(200) title!: string; @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(2000) description?: string; }

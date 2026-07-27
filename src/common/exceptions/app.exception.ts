@@ -11,7 +11,7 @@ export class AppException extends HttpException {
   constructor(
     message: string,
     status: HttpStatus = HttpStatus.BAD_REQUEST,
-    public readonly code: ErrorCode = ErrorCode.VALIDATION_FAILED,
+    public readonly code: ErrorCode | string = ErrorCode.VALIDATION_FAILED,
   ) {
     super(message, status);
   }

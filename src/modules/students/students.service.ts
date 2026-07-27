@@ -21,6 +21,8 @@ export class StudentsService {
             fullName: true,
             governorate: true,
             center: true,
+            governorateRef: { select: { id: true, nameAr: true, nameEn: true } },
+            centerRef: { select: { id: true, nameAr: true, nameEn: true } },
             nationalIdLast4: true,
             academicGradeId: true,
           },
@@ -30,7 +32,7 @@ export class StudentsService {
     if (!student) {
       throw new NotFoundException('Student not found');
     }
-    return student;
+    return { ...student, studentProfile: student.studentProfile && { ...student.studentProfile, governorate: this.geographyDto(student.studentProfile.governorateRef), center: this.geographyDto(student.studentProfile.centerRef), governorateRef: undefined, centerRef: undefined } };
   }
 
   async updateOwnProfile(userId: string, dto: UpdateStudentDto) {
@@ -43,18 +45,18 @@ export class StudentsService {
       }
     }
     const current = await this.prisma.studentProfile.findUniqueOrThrow({ where: { userId }, select: { governorateId: true } });
-    const center = dto.center === undefined ? undefined : dto.center?.trim()
-      ? await this.prisma.center.upsert({ where: { governorateId_name: { governorateId: current.governorateId, name: dto.center.trim() } }, create: { governorateId: current.governorateId, name: dto.center.trim() }, update: {} })
-      : null;
+    const selectedCenter = dto.centerId == null ? null : dto.centerId === undefined ? undefined : await this.prisma.center.findFirst({ where: { id: dto.centerId, governorateId: current.governorateId } });
+    if (dto.centerId !== undefined && dto.centerId !== null && !selectedCenter) throw new ConflictException('Center must belong to the student governorate');
     await this.prisma.studentProfile.update({
       where: { userId },
       data: {
         fullName: dto.fullName,
-        center: dto.center,
-        ...(dto.center === undefined ? {} : { centerId: center?.id ?? null }),
+        ...(dto.centerId === undefined ? {} : { centerId: dto.centerId, center: selectedCenter?.nameAr ?? null }),
         academicGradeId: dto.academicGradeId,
       },
     });
     return this.getOwnProfile(userId);
   }
+
+  private geographyDto(record: { id: string; nameAr: string; nameEn: string | null } | null) { return record && { id: record.id, name: { ar: record.nameAr, en: record.nameEn } }; }
 }

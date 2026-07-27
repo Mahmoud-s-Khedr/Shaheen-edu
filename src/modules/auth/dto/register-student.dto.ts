@@ -35,10 +35,10 @@ export class RegisterStudentDto {
   @IsNotEmpty()
   parentPhone!: string;
 
-  @ApiProperty({ example: 'Cairo' })
+  @ApiProperty({ description: 'ID of a managed governorate' })
   @IsString()
   @IsNotEmpty()
-  governorate!: string;
+  governorateId!: string;
 
   @ApiProperty({
     description: 'ID of the academic grade the student is enrolled in',
@@ -47,10 +47,10 @@ export class RegisterStudentDto {
   @IsNotEmpty()
   academicGradeId!: string;
 
-  @ApiProperty({ example: 'Nasr City Center', required: false })
+  @ApiProperty({ description: 'ID of a managed center in the selected governorate', required: false })
   @IsOptional()
   @IsString()
-  center?: string;
+  centerId?: string;
 
   @ApiProperty({ example: 'StrongP@ssw0rd!', minLength: 8 })
   @IsString()

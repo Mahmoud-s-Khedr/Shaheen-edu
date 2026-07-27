@@ -55,7 +55,7 @@ export class AcademicGradesService {
   async create(actor: RequestUser, dto: CreateAcademicGradeDto) {
     this.assertActorRole(actor);
 
-    const slug = dto.slug ?? slugifyOrThrow(dto.title);
+    const slug = dto.slug ?? slugifyOrThrow(dto.title.en);
     const existing = await this.prisma.academicGrade.findUnique({
       where: { slug },
     });
@@ -68,9 +68,11 @@ export class AcademicGradesService {
     });
     const created = await this.prisma.academicGrade.create({
       data: {
-        title: dto.title,
+        titleAr: dto.title.ar,
+        titleEn: dto.title.en,
         slug,
-        description: dto.description,
+        descriptionAr: dto.description?.ar,
+        descriptionEn: dto.description?.en,
         sortOrder: (maxOrder._max.sortOrder ?? 0) + 1,
         status: ContentStatus.DRAFT,
         createdById: actor.id,
@@ -135,7 +137,7 @@ export class AcademicGradesService {
 
     let slug = record.slug;
     if (dto.slug !== undefined || dto.title !== undefined) {
-      const candidate = dto.slug ?? slugifyOrThrow(dto.title ?? record.title);
+      const candidate = dto.slug ?? slugifyOrThrow(dto.title?.en ?? record.titleEn ?? record.titleAr);
       if (candidate !== record.slug) {
         const collision = await this.prisma.academicGrade.findUnique({
           where: { slug: candidate },
@@ -149,9 +151,13 @@ export class AcademicGradesService {
     await this.prisma.academicGrade.updateMany({
       where: { id },
       data: {
-        title: dto.title,
+        titleAr: dto.title?.ar,
+        titleEn: dto.title?.en,
         slug,
-        description: dto.description,
+        ...(dto.description === undefined ? {} : {
+          descriptionAr: dto.description?.ar ?? null,
+          descriptionEn: dto.description?.en ?? null,
+        }),
         updatedById: actor.id,
         },
     });
@@ -307,9 +313,11 @@ export class AcademicGradesService {
 
   private toSummary(record: {
     id: string;
-    title: string;
+    titleAr: string;
+    titleEn: string | null;
     slug: string;
-    description: string | null;
+    descriptionAr: string | null;
+    descriptionEn: string | null;
     sortOrder: number;
     status: ContentStatus;
     createdAt: Date;
@@ -319,9 +327,9 @@ export class AcademicGradesService {
   }) {
     return {
       id: record.id,
-      title: record.title,
+      title: { ar: record.titleAr, en: record.titleEn },
       slug: record.slug,
-      description: record.description,
+      description: { ar: record.descriptionAr, en: record.descriptionEn },
       sortOrder: record.sortOrder,
       status: record.status,
       createdAt: record.createdAt,

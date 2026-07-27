@@ -9,11 +9,14 @@ import {
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { randomUUID } from 'crypto';
 import { RateLimitException } from '../exceptions/rate-limit.exception';
+import { errorCode, localizedError, localizedMessage, type LocalizedMessage, type ValidationDetail } from '../i18n/api-messages';
 
 interface ErrorResponseShape {
   statusCode: number;
-  message: string | string[];
-  error: string;
+  code: string;
+  message: LocalizedMessage;
+  error: LocalizedMessage;
+  details?: ValidationDetail[];
   correlationId: string;
 }
 
@@ -31,8 +34,9 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       randomUUID();
 
     let statusCode = HttpStatus.INTERNAL_SERVER_ERROR;
-    let message: string | string[] = 'Internal server error';
-    let error = 'Internal Server Error';
+    let message = 'Internal server error';
+    let explicitCode: string | undefined;
+    let details: ValidationDetail[] | undefined;
 
     if (exception instanceof HttpException) {
       statusCode = exception.getStatus();
@@ -41,12 +45,11 @@ export class GlobalExceptionFilter implements ExceptionFilter {
         message = body;
       } else if (typeof body === 'object' && body !== null) {
         const bodyObj = body as Record<string, unknown>;
-        message = (bodyObj.message as string | string[]) ?? exception.message;
-        error = (bodyObj.error as string) ?? exception.name;
+        const rawMessage = bodyObj.message ?? exception.message;
+        message = Array.isArray(rawMessage) ? rawMessage[0] ?? exception.message : String(rawMessage);
+        details = bodyObj.details as ValidationDetail[] | undefined;
       }
-      if (error === 'Internal Server Error') {
-        error = exception.name;
-      }
+      if ('code' in exception) explicitCode = String((exception as { code?: unknown }).code ?? '');
     } else if (exception instanceof Error) {
       this.logger.error(exception.message, exception.stack);
     }
@@ -58,8 +61,10 @@ export class GlobalExceptionFilter implements ExceptionFilter {
 
     const payload: ErrorResponseShape = {
       statusCode,
-      message,
-      error,
+      code: errorCode(message, statusCode, explicitCode),
+      message: localizedMessage(message, statusCode),
+      error: localizedError(statusCode),
+      ...(details?.length ? { details } : {}),
       correlationId,
     };
 

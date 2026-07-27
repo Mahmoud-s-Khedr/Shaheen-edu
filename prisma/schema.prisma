@@ -266,9 +266,11 @@ model AdminAuditLog {
 
 model AcademicGrade {
   id          String        @id @default(cuid())
-  title       String
+  titleAr     String
+  titleEn     String?
   slug        String
-  description String?
+  descriptionAr String?
+  descriptionEn String?
   sortOrder   Int
   status      ContentStatus @default(DRAFT)
 
@@ -563,8 +565,10 @@ model VideoAsset {
 model QuestionSource {
   id              String             @id @default(cuid())
   type            QuestionSourceType
-  title           String
-  note            String?
+  titleAr         String
+  titleEn         String?
+  noteAr          String?
+  noteEn          String?
   publisherUserId String?
   publisher       PartnerProfile?    @relation("QuestionSourcePublisher", fields: [publisherUserId], references: [userId], onDelete: Restrict)
   status          ContentStatus      @default(DRAFT)
@@ -808,7 +812,8 @@ model PublisherEarningsStatement {
 
 model Governorate {
   id       String @id @default(cuid())
-  name     String @unique
+  nameAr   String @unique
+  nameEn   String?
   centers  Center[]
   students StudentProfile[]
   createdAt DateTime @default(now())
@@ -819,11 +824,12 @@ model Center {
   id            String @id @default(cuid())
   governorateId String
   governorate   Governorate @relation(fields: [governorateId], references: [id], onDelete: Restrict)
-  name          String
+  nameAr        String
+  nameEn        String?
   students      StudentProfile[]
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  @@unique([governorateId, name])
+  @@unique([governorateId, nameAr])
   @@index([governorateId])
 }

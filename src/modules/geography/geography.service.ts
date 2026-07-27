@@ -1,19 +1,20 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
+import type { GeographyNameDto } from './geography.dto';
 
 @Injectable()
 export class GeographyService {
   constructor(private readonly prisma: PrismaService) {}
 
-  listGovernorates() { return this.prisma.governorate.findMany({ include: { centers: { orderBy: { name: 'asc' } } }, orderBy: { name: 'asc' } }); }
-  async createGovernorate(name: string) {
-    try { return await this.prisma.governorate.create({ data: { name: name.trim() } }); }
+  async listGovernorates() { const items = await this.prisma.governorate.findMany({ include: { centers: { orderBy: { nameAr: 'asc' } } }, orderBy: { nameAr: 'asc' } }); return items.map((item) => this.governorateDto(item)); }
+  async createGovernorate(name: GeographyNameDto) {
+    try { return this.governorateDto(await this.prisma.governorate.create({ data: { nameAr: name.ar.trim(), nameEn: name.en.trim() } })); }
     catch { throw new ConflictException('Governorate already exists'); }
   }
-  async createCenter(governorateId: string, name: string) {
+  async createCenter(governorateId: string, name: GeographyNameDto) {
     const governorate = await this.prisma.governorate.findUnique({ where: { id: governorateId } });
     if (!governorate) throw new NotFoundException('Governorate not found');
-    try { return await this.prisma.center.create({ data: { governorateId, name: name.trim() } }); }
+    try { return this.centerDto(await this.prisma.center.create({ data: { governorateId, nameAr: name.ar.trim(), nameEn: name.en.trim() } })); }
     catch { throw new ConflictException('Center already exists in this governorate'); }
   }
   async deleteCenter(id: string) {
@@ -24,4 +25,7 @@ export class GeographyService {
     try { await this.prisma.governorate.delete({ where: { id } }); return { id, deleted: true }; }
     catch { throw new ConflictException('Governorate cannot be deleted while referenced'); }
   }
+
+  private centerDto(center: any) { const { nameAr, nameEn, ...rest } = center; return { ...rest, name: { ar: nameAr, en: nameEn } }; }
+  private governorateDto(governorate: any) { const { nameAr, nameEn, centers, ...rest } = governorate; return { ...rest, name: { ar: nameAr, en: nameEn }, centers: centers?.map((center: any) => this.centerDto(center)) ?? [] }; }
 }

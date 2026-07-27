@@ -5,13 +5,15 @@ import {
 } from '@nestjs/platform-fastify';
 import { ConfigService } from '@nestjs/config';
 import { Logger as PinoLogger } from 'nestjs-pino';
-import { RequestMethod, ValidationPipe, VersioningType } from '@nestjs/common';
+import { BadRequestException, RequestMethod, ValidationPipe, VersioningType } from '@nestjs/common';
+import type { ValidationError } from 'class-validator';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import fastifyCookie from '@fastify/cookie';
 import fastifyHelmet from '@fastify/helmet';
 import fastifyMultipart from '@fastify/multipart';
 import { AppModule } from './app.module';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
+import { validationDetail, type ValidationDetail } from './common/i18n/api-messages';
 import type { AppConfig } from './config/configuration';
 
 export interface CreateAppOptions {
@@ -55,6 +57,10 @@ export async function createApp(
       forbidNonWhitelisted: true,
       transform: true,
       transformOptions: { enableImplicitConversion: true },
+      exceptionFactory: (errors: ValidationError[]) => new BadRequestException({
+        message: 'Validation failed',
+        details: flattenValidationErrors(errors),
+      }),
     }),
   );
   app.useGlobalFilters(new GlobalExceptionFilter());
@@ -85,4 +91,12 @@ export async function createApp(
   }
 
   return app;
+}
+
+function flattenValidationErrors(errors: ValidationError[], parent = ''): ValidationDetail[] {
+  return errors.flatMap((error) => {
+    const field = parent ? `${parent}.${error.property}` : error.property;
+    const own = Object.entries(error.constraints ?? {}).map(([constraint, message]) => validationDetail(field, constraint, message));
+    return [...own, ...flattenValidationErrors(error.children ?? [], field)];
+  });
 }
