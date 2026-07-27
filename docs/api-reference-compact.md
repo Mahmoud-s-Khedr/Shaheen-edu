@@ -1,0 +1,234 @@
+# Shaheen Edu API compact reference
+
+Request cheat sheet for the implementation-backed API contract. Base URL is `/api/v1`; `/health` is unversioned. Send user tokens as `Authorization: Bearer <accessToken>`. `?` marks an optional input. Refer to [the detailed API reference](api-reference-detailed.md) for response schemas, field types, validation, cookies, and error cases. Errors use `{ statusCode, message, error, correlationId }`.
+
+## Health
+
+| Method & path | Summary | Authorization | Inputs |
+|---|---|---|---|---|
+| `GET /health` | Check service health | Public | — |
+
+## Authentication
+
+| Method & path | Summary | Authorization | Inputs |
+|---|---|---|---|---|
+| `POST /api/v1/auth/students/register` | Register a student | Public | body: fullName, nationalId, phone, parentPhone, governorate, academicGradeId, center?, password |
+| `POST /api/v1/auth/students/login` | Log in as a student | Public | body: phone, password |
+| `POST /api/v1/auth/admins/login` | Log in as an administrator | Public | body: email, password |
+| `POST /api/v1/auth/partners/login` | Log in as a partner | Public | body: email, password |
+| `POST /api/v1/auth/parents/login` | Log in as a parent | Public | body: nationalId, parentPhone |
+| `GET /api/v1/auth/parents/children` | List children linked to the authenticated parent | Parent bearer token | query: page?<br>query: limit? |
+| `POST /api/v1/auth/parents/select-child` | Select the active child for a parent session | Parent bearer token | body: studentUserId |
+| `GET /api/v1/auth/parents/selected-child` | Get the selected child for a parent session | Parent selected-child bearer token | — |
+| `POST /api/v1/auth/refresh` | Refresh user access token | Public | — |
+| `POST /api/v1/auth/logout` | Log out of the current browser session | Bearer token | — |
+| `POST /api/v1/auth/logout-all` | Log out of all user sessions | Bearer token | — |
+| `GET /api/v1/auth/me` | Get the authenticated user | Bearer token | — |
+| `POST /api/v1/auth/change-password` | Change the authenticated user password | Bearer token | body: oldPassword, newPassword |
+
+## Identity
+
+| Method & path | Summary | Authorization | Inputs |
+|---|---|---|---|---|
+| `POST /api/v1/admin/admins` | Create an administrator | Bearer token; role must be `SUPER_ADMIN` | body: email, password |
+| `GET /api/v1/admin/admins` | List administrators | Bearer token; role must be `SUPER_ADMIN` | query: page?<br>query: limit? |
+| `GET /api/v1/admin/admins/{id}` | Get an administrator by ID | Bearer token; role must be `SUPER_ADMIN` | path: id |
+| `PATCH /api/v1/admin/admins/{id}` | Update an administrator email | Bearer token; role must be `SUPER_ADMIN` | path: id<br>body: email |
+| `POST /api/v1/admin/admins/{id}/suspend` | Suspend an administrator and revoke sessions | Bearer token; role must be `SUPER_ADMIN` | path: id |
+| `POST /api/v1/admin/admins/{id}/reactivate` | Reactivate an administrator | Bearer token; role must be `SUPER_ADMIN` | path: id |
+| `POST /api/v1/admin/partners` | Create a partner account | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | body: email, password, partnerType, displayName, legalName?, phone? |
+| `GET /api/v1/admin/partners` | List partner accounts | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | query: page?<br>query: limit? |
+| `GET /api/v1/admin/partners/{id}` | Get a partner by ID | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id |
+| `PATCH /api/v1/admin/partners/{id}` | Update a partner profile | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id<br>body: displayName?, legalName?, phone? |
+| `POST /api/v1/admin/partners/{id}/suspend` | Suspend a partner and revoke sessions | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id |
+| `POST /api/v1/admin/partners/{id}/reactivate` | Reactivate a partner | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id |
+| `GET /api/v1/partners/me` | Get the authenticated partner profile | Bearer token; role must be `PARTNER` | — |
+| `GET /api/v1/students/me` | Get the authenticated student profile | Bearer token; role must be `STUDENT` | — |
+| `PATCH /api/v1/students/me` | Update the authenticated student profile | Bearer token; role must be `STUDENT` | body: fullName?, center?, academicGradeId? |
+
+## Academic hierarchy
+
+| Method & path | Summary | Authorization | Inputs |
+|---|---|---|---|---|
+| `POST /api/v1/admin/academic-grades` | Create an academic grade | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | body: title, slug?, description? |
+| `GET /api/v1/admin/academic-grades` | List academic grades | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | query: page?<br>query: limit?<br>query: status? |
+| `GET /api/v1/admin/academic-grades/{id}` | Get an academic grade by ID | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id |
+| `PATCH /api/v1/admin/academic-grades/{id}` | Update an academic grade | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id<br>body: title?, slug?, description? |
+| `DELETE /api/v1/admin/academic-grades/{id}` | Delete an eligible draft academic grade | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id |
+| `POST /api/v1/admin/academic-grades/reorder` | Atomically reorder academic grades | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | body: items |
+| `POST /api/v1/admin/academic-grades/{id}/publish` | Publish an academic grade | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id |
+| `POST /api/v1/admin/academic-grades/{id}/archive` | Archive an academic grade | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id |
+| `POST /api/v1/admin/academic-grades/{id}/restore` | Restore an archived academic grade | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id |
+| `GET /api/v1/academic-grades` | List published academic grades | Public | query: page?<br>query: limit? |
+| `POST /api/v1/admin/subjects` | Create a subject | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | body: title, slug?, description?, academicGradeId |
+| `GET /api/v1/admin/subjects` | List subjects | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | query: page?<br>query: limit?<br>query: academicGradeId?<br>query: status? |
+| `GET /api/v1/admin/subjects/{id}` | Get a subject by ID | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id |
+| `PATCH /api/v1/admin/subjects/{id}` | Update a subject | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id<br>body: title?, slug?, description? |
+| `DELETE /api/v1/admin/subjects/{id}` | Delete an eligible draft subject | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id |
+| `POST /api/v1/admin/subjects/reorder` | Atomically reorder subjects within an academic grade | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | body: academicGradeId, items |
+| `POST /api/v1/admin/subjects/{id}/move` | Move a subject to a different academic grade | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id<br>body: newAcademicGradeId, sortOrder? |
+| `POST /api/v1/admin/subjects/{id}/publish` | Publish a subject | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id |
+| `POST /api/v1/admin/subjects/{id}/archive` | Archive a subject | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id |
+| `POST /api/v1/admin/subjects/{id}/restore` | Restore an archived subject | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id |
+| `POST /api/v1/admin/courses` | Create a course | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | body: title, slug?, description?, subjectId, accessType |
+| `GET /api/v1/admin/courses` | List courses | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | query: page?<br>query: limit?<br>query: subjectId?<br>query: status? |
+| `GET /api/v1/admin/courses/{id}` | Get a course by ID | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id |
+| `PATCH /api/v1/admin/courses/{id}` | Update a course | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id<br>body: title?, slug?, description? |
+| `DELETE /api/v1/admin/courses/{id}` | Delete an eligible draft course | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id |
+| `PATCH /api/v1/admin/courses/{id}/access` | Set the course access type | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id<br>body: accessType |
+| `POST /api/v1/admin/courses/reorder` | Atomically reorder courses within a subject | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | body: subjectId, items |
+| `POST /api/v1/admin/courses/{id}/move` | Move a course to a different subject | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id<br>body: newSubjectId, sortOrder? |
+| `POST /api/v1/admin/courses/{id}/publish` | Publish a course | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id |
+| `POST /api/v1/admin/courses/{id}/archive` | Archive a course | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id |
+| `POST /api/v1/admin/courses/{id}/restore` | Restore an archived course | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id |
+| `POST /api/v1/admin/chapters` | Create a chapter | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | body: title, slug?, description?, courseId |
+| `GET /api/v1/admin/chapters` | List chapters | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | query: page?<br>query: limit?<br>query: courseId?<br>query: status? |
+| `GET /api/v1/admin/chapters/{id}` | Get a chapter by ID | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id |
+| `PATCH /api/v1/admin/chapters/{id}` | Update a chapter | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id<br>body: title?, slug?, description? |
+| `DELETE /api/v1/admin/chapters/{id}` | Delete an eligible draft chapter | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id |
+| `PATCH /api/v1/admin/chapters/{id}/access` | Set the chapter access type | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id<br>body: accessType |
+| `POST /api/v1/admin/chapters/reorder` | Atomically reorder chapters within a course | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | body: courseId, items |
+| `POST /api/v1/admin/chapters/{id}/move` | Move a chapter to a different course | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id<br>body: newCourseId, sortOrder? |
+| `POST /api/v1/admin/chapters/{id}/publish` | Publish a chapter | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id |
+| `POST /api/v1/admin/chapters/{id}/archive` | Archive a chapter | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id |
+| `POST /api/v1/admin/chapters/{id}/restore` | Restore an archived chapter | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id |
+| `POST /api/v1/admin/lessons` | Create a lesson | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | body: title, slug?, description?, chapterId |
+| `GET /api/v1/admin/lessons` | List lessons | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | query: page?<br>query: limit?<br>query: chapterId?<br>query: status? |
+| `GET /api/v1/admin/lessons/{id}` | Get a lesson by ID | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id |
+| `PATCH /api/v1/admin/lessons/{id}` | Update a lesson | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id<br>body: title?, slug?, description? |
+| `DELETE /api/v1/admin/lessons/{id}` | Delete an eligible draft lesson | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id |
+| `PATCH /api/v1/admin/lessons/{id}/access` | Set the lesson access type | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id<br>body: accessType |
+| `POST /api/v1/admin/lessons/reorder` | Atomically reorder lessons within a chapter | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | body: chapterId, items |
+| `POST /api/v1/admin/lessons/{id}/move` | Move a lesson to a different chapter | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id<br>body: newChapterId, sortOrder? |
+| `POST /api/v1/admin/lessons/{id}/publish` | Publish a lesson | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id |
+| `POST /api/v1/admin/lessons/{id}/archive` | Archive a lesson | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id |
+| `POST /api/v1/admin/lessons/{id}/restore` | Restore an archived lesson | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id |
+| `POST /api/v1/admin/sections` | Create a section | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | body: title, slug?, description?, lessonId |
+| `GET /api/v1/admin/sections` | List sections | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | query: page?<br>query: limit?<br>query: lessonId?<br>query: status? |
+| `GET /api/v1/admin/sections/{id}` | Get a section by ID | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id |
+| `PATCH /api/v1/admin/sections/{id}` | Update a section | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id<br>body: title?, slug?, description? |
+| `DELETE /api/v1/admin/sections/{id}` | Delete an eligible draft section | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id |
+| `PATCH /api/v1/admin/sections/{id}/access` | Set the section access type | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id<br>body: accessType |
+| `POST /api/v1/admin/sections/reorder` | Atomically reorder sections within a lesson | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | body: lessonId, items |
+| `POST /api/v1/admin/sections/{id}/move` | Move a section to a different lesson | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id<br>body: newLessonId, sortOrder? |
+| `POST /api/v1/admin/sections/{id}/publish` | Publish a section | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id |
+| `POST /api/v1/admin/sections/{id}/archive` | Archive a section | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id |
+| `POST /api/v1/admin/sections/{id}/restore` | Restore an archived section | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id |
+
+## Content, assets, video, and entitlements
+
+| Method & path | Summary | Authorization | Inputs |
+|---|---|---|---|---|
+| `POST /api/v1/admin/content-items` | Create a content item at one hierarchy target | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | body: type, title, description?, textBody?, externalUrl?, accessType?, estimatedDuration?, placement |
+| `GET /api/v1/admin/content-items` | List content items | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | query: page?<br>query: limit?<br>query: status?<br>query: type?<br>query: accessType?<br>query: courseId?<br>query: chapterId?<br>query: lessonId?<br>query: sectionId? |
+| `GET /api/v1/admin/content-items/{id}` | Get a content item by ID | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id |
+| `PATCH /api/v1/admin/content-items/{id}` | Update a content item | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id<br>body: type?, title?, description?, textBody?, externalUrl?, accessType?, estimatedDuration? |
+| `DELETE /api/v1/admin/content-items/{id}` | Delete an eligible draft content item | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id |
+| `PATCH /api/v1/admin/content-items/{id}/access` | Set the content item access type | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id<br>body: accessType |
+| `POST /api/v1/admin/content-items/reorder` | Atomically reorder all content at one target | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | body: placement, items |
+| `POST /api/v1/admin/content-items/{id}/move` | Move a content item to a hierarchy target | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id<br>body: placement, sortOrder? |
+| `POST /api/v1/admin/content-items/{id}/publish` | Publish a content item | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id |
+| `POST /api/v1/admin/content-items/{id}/archive` | Archive a content item | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id |
+| `POST /api/v1/admin/content-items/{id}/restore` | Restore an archived content item as draft | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id |
+| `POST /api/v1/admin/content-items/{id}/primary-asset` | Set the content item primary asset | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id |
+| `POST /api/v1/admin/content-items/{id}/attachments` | Add an ordered attachment to a content item | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id |
+| `POST /api/v1/admin/content-items/{id}/attachments/reorder` | Reorder content item attachments | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id |
+| `DELETE /api/v1/admin/content-items/{id}/attachments/{assetId}` | Remove an attachment from a content item | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id<br>path: assetId |
+| `POST /api/v1/admin/assets/upload` | Upload a file asset | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | query: kind |
+| `GET /api/v1/admin/assets` | List assets | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | — |
+| `GET /api/v1/admin/assets/{id}` | Get an asset by ID | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id |
+| `DELETE /api/v1/admin/assets/{id}` | Delete an unused draft asset | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id |
+| `POST /api/v1/admin/assets/{id}/archive` | Archive an asset | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id |
+| `POST /api/v1/admin/assets/covers/{resource}/{id}` | Set a hierarchy record cover image | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: resource<br>path: id |
+| `DELETE /api/v1/admin/assets/covers/{resource}/{id}` | Remove a hierarchy record cover image | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: resource<br>path: id |
+| `POST /api/v1/admin/entitlements` | Grant a student entitlement | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | body: studentUserId, courseId?, chapterId?, source?, startsAt?, expiresAt? |
+| `GET /api/v1/admin/entitlements` | List student entitlements | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | query: studentUserId |
+| `POST /api/v1/admin/entitlements/{id}/revoke` | Revoke a student entitlement | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id |
+| `GET /api/v1/student/content-items/{id}` | Get a content item the student can access | Bearer token; role must be `STUDENT` | path: id |
+| `GET /api/v1/catalog/content-items/{id}` | Get a published content item | Public | path: id |
+| `GET /api/v1/catalog/content-items/{contentItemId}/assets/{assetId}/access` | Get a protected asset access URL for public content | Public | path: contentItemId<br>path: assetId |
+| `GET /api/v1/student/content-items/{contentItemId}/assets/{assetId}/access` | Get a protected asset access URL for an entitled student | Bearer token; role must be `STUDENT` | path: contentItemId<br>path: assetId |
+| `POST /api/v1/admin/video-assets` | Create a video asset | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | — |
+| `GET /api/v1/admin/video-assets/{id}` | Get a video asset by ID | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id |
+| `DELETE /api/v1/admin/video-assets/{id}` | Delete an unreferenced Bunny video asset | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id |
+| `POST /api/v1/admin/video-assets/{id}/upload-authorization` | Create a short-lived direct-upload authorization | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id |
+| `POST /api/v1/admin/video-assets/{id}/retry` | Retry a failed video asset | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id |
+| `POST /api/v1/admin/video-assets/{id}/archive` | Archive a video asset | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id |
+| `POST /api/v1/integrations/bunny-stream/webhook` | Receive a Bunny Stream processing webhook | Signed Bunny webhook (not bearer authentication) | header: x-bunnystream-signature<br>header: x-bunnystream-signature-version<br>header: x-bunnystream-signature-algorithm |
+
+## Catalog
+
+| Method & path | Summary | Authorization | Inputs |
+|---|---|---|---|---|
+| `GET /api/v1/catalog/subjects` | List published catalog subjects | Public | query: page?<br>query: limit?<br>query: academicGradeId? |
+| `GET /api/v1/catalog/courses` | List published catalog courses | Public | query: page?<br>query: limit?<br>query: subjectId? |
+| `GET /api/v1/catalog/courses/{id}` | Get published catalog course details | Public | path: id |
+| `GET /api/v1/catalog/courses/{id}/outline` | Get a published course outline with access locks | Public | path: id |
+
+## Publisher agreements and pricing
+
+| Method & path | Summary | Authorization | Inputs |
+|---|---|---|---|---|
+| `POST /api/v1/admin/publisher-agreements` | Create a draft publisher agreement | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | body: body |
+| `GET /api/v1/admin/publisher-agreements` | List publisher agreements | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | query: history |
+| `PATCH /api/v1/admin/publisher-agreements/{id}` | Update a draft publisher agreement | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id<br>body: body |
+| `POST /api/v1/admin/publisher-agreements/{id}/activate` | Activate a publisher agreement | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id |
+| `POST /api/v1/admin/publisher-agreements/{id}/end` | End a publisher agreement | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id<br>body: body |
+| `GET /api/v1/admin/publisher-agreements/effective` | Resolve the effective publisher agreement | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | query: at |
+| `POST /api/v1/admin/publisher-agreements/earnings-statements` | Create a publisher earnings statement | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | body: body |
+| `GET /api/v1/admin/publisher-agreements/earnings-statements` | List publisher earnings statements | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | — |
+| `POST /api/v1/admin/pricing/course/{id}` | Set course pricing | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id<br>body: body |
+| `POST /api/v1/admin/pricing/chapter/{id}` | Set chapter pricing | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id<br>body: body |
+| `POST /api/v1/admin/pricing/lesson/{id}` | Set lesson pricing | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id<br>body: body |
+| `GET /api/v1/admin/pricing/effective` | Resolve effective pricing | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | — |
+
+## Question banks and questions
+
+| Method & path | Summary | Authorization | Inputs |
+|---|---|---|---|---|
+| `POST /api/v1/admin/question-banks/sources` | Create a question source | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | body: type, title, note?, publisherUserId? |
+| `GET /api/v1/admin/question-banks/sources` | List question sources | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | query: page?<br>query: limit?<br>query: status?<br>query: type? |
+| `GET /api/v1/admin/question-banks/sources/{id}` | Get a question source | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id |
+| `PATCH /api/v1/admin/question-banks/sources/{id}` | Update a question source | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id<br>body: type?, title?, note?, publisherUserId? |
+| `DELETE /api/v1/admin/question-banks/sources/{id}` | Delete an eligible draft question source | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id |
+| `POST /api/v1/admin/question-banks/sources/{id}/publish` | Publish a question source | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id |
+| `POST /api/v1/admin/question-banks/sources/{id}/archive` | Archive a question source | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id |
+| `POST /api/v1/admin/question-banks/sources/{id}/restore` | Restore a question source | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id |
+| `POST /api/v1/admin/question-banks` | Create a question bank | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | body: title, description? |
+| `GET /api/v1/admin/question-banks` | List question banks | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | query: page?<br>query: limit?<br>query: status? |
+| `GET /api/v1/admin/question-banks/{id}` | Get a question bank | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id |
+| `PATCH /api/v1/admin/question-banks/{id}` | Update a question bank | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id<br>body: title?, description? |
+| `DELETE /api/v1/admin/question-banks/{id}` | Delete an eligible draft question bank | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id |
+| `POST /api/v1/admin/question-banks/{id}/publish` | Publish a question bank | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id |
+| `POST /api/v1/admin/question-banks/{id}/archive` | Archive a question bank | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id |
+| `POST /api/v1/admin/question-banks/{id}/restore` | Restore a question bank | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id |
+| `POST /api/v1/admin/questions` | Create a question | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | body: bankId, sourceId, courseId, type?, placements, body, explanation? |
+| `GET /api/v1/admin/questions` | List questions | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | query: page?<br>query: limit?<br>query: status?<br>query: bankId?<br>query: sourceId?<br>query: chapterId?<br>query: lessonId?<br>query: sectionId?<br>query: courseId?<br>query: subjectId?<br>query: academicGradeId? |
+| `GET /api/v1/admin/questions/{id}` | Get a question | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id |
+| `PATCH /api/v1/admin/questions/{id}` | Update a question | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id<br>body: bankId?, sourceId?, courseId?, type?, placements?, body?, explanation? |
+| `DELETE /api/v1/admin/questions/{id}` | Delete an eligible draft question | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id |
+| `POST /api/v1/admin/questions/{id}/submit` | Submit a question for review | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id |
+| `POST /api/v1/admin/questions/{id}/publish` | Publish a reviewed question | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id |
+| `POST /api/v1/admin/questions/{id}/reject` | Reject a question in review | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id<br>body: reviewNote |
+| `POST /api/v1/admin/questions/{id}/archive` | Archive a question | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id |
+| `POST /api/v1/admin/questions/{id}/options` | Add a question option | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id<br>body: body, isCorrect? |
+| `PATCH /api/v1/admin/questions/{id}/options/{optionId}` | Update a question option | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id<br>path: optionId<br>body: body?, isCorrect? |
+| `DELETE /api/v1/admin/questions/{id}/options/{optionId}` | Delete a question option | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id<br>path: optionId |
+| `POST /api/v1/admin/questions/{id}/options/reorder` | Reorder question options | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id<br>body: optionIds |
+| `POST /api/v1/admin/questions/{id}/assets` | Attach an asset to a question | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id |
+| `DELETE /api/v1/admin/questions/{id}/assets/{assetId}` | Remove a question asset | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id<br>path: assetId |
+| `POST /api/v1/admin/questions/{id}/assets/reorder` | Reorder question assets | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id<br>body: assetIds |
+| `POST /api/v1/admin/questions/{id}/video-link` | Set a question video link | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id<br>body: videoAssetId, timestampSeconds |
+| `DELETE /api/v1/admin/questions/{id}/video-link` | Remove a question video link | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id |
+
+## Geography
+
+| Method & path | Summary | Authorization | Inputs |
+|---|---|---|---|---|
+| `GET /api/v1/admin/geography/governorates` | List managed governorates and centers | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | — |
+| `POST /api/v1/admin/geography/governorates` | Create a governorate | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | body: name |
+| `POST /api/v1/admin/geography/governorates/{governorateId}/centers` | Create a center | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: governorateId<br>body: name |
+| `DELETE /api/v1/admin/geography/centers/{id}` | Delete an unreferenced center | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id |
+| `DELETE /api/v1/admin/geography/governorates/{id}` | Delete an unreferenced governorate | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id |
+
+
