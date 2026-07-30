@@ -50,7 +50,7 @@ export const fullDeliveryJourney: JourneyDefinition = {
 
     await step('Phase 3/7: an authenticated student receives a signed URL for the same content', async () => {
       const phone = factory.phone(); const password = factory.password('Student');
-      const reg = await clients.public.request<any>('POST', '/auth/students/register', { fullName: factory.title('Delivery Student'), nationalId: factory.nationalId(), phone: `+20${phone.slice(1)}`, parentPhone: factory.phone(), governorate: 'Cairo', academicGradeId: gradeId, password });
+      const reg = await clients.public.request<any>('POST', '/auth/students/register', { fullName: factory.title('Delivery Student'), nationalId: factory.nationalId(), phone: `+20${phone.slice(1)}`, parentPhone: factory.phone(), governorateId: String(context.academic.governorateId), academicGradeId: gradeId, password });
       expectStatus(reg, 201); studentToken = reg.body.accessToken; context.created.students.push(reg.body.user.id);
       const access = await clients.public.request<any>('GET', `/student/content-items/${pdfContentId}/assets/${assetId}/access`, undefined, { accessToken: studentToken }); expectStatus(access, 200); expectString(access.body.url, 'student signed url');
     });

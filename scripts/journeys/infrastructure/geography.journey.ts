@@ -17,14 +17,20 @@ export const geographyJourney: JourneyDefinition = {
         const governorate = await admin.request<any>(
           'POST',
           '/admin/geography/governorates',
-          { name: factory.title('Governorate') },
+          {
+            ar: factory.title('Governorate'),
+            en: factory.title('Governorate'),
+          },
         );
         expectStatus(governorate, 201);
         governorateId = governorate.body.id;
         const center = await admin.request<any>(
           'POST',
           `/admin/geography/governorates/${governorateId}/centers`,
-          { name: factory.title('Center') },
+          {
+            ar: factory.title('Center'),
+            en: factory.title('Center'),
+          },
         );
         expectStatus(center, 201);
         centerId = center.body.id;
@@ -40,6 +46,19 @@ export const geographyJourney: JourneyDefinition = {
               item.centers.some((child: any) => child.id === centerId),
           ),
           'Created geography must be listed with its center',
+        );
+        const publicList = await clients.public.request<any>(
+          'GET',
+          '/geography/governorates',
+        );
+        expectStatus(publicList, 200);
+        assert(
+          publicList.body.some(
+            (item: any) =>
+              item.id === governorateId &&
+              item.centers.some((child: any) => child.id === centerId),
+          ),
+          'Public geography must list the created governorate and center',
         );
       },
     );

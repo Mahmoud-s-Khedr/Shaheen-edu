@@ -4,6 +4,7 @@ import { resolve } from 'node:path';
 
 const root = resolve(import.meta.dirname, '..');
 const envPath = resolve(root, '.env.api-tests.local');
+const apiTestPort = process.env.API_TEST_PORT ?? '3101';
 const compose = [
   'compose',
   '-f',
@@ -84,7 +85,7 @@ if (!existsSync(envPath)) {
       env: {
         ...process.env,
         JOURNEY_ALLOW_MUTATIONS: 'true',
-        JOURNEY_BASE_URL: 'http://127.0.0.1:3100',
+        JOURNEY_BASE_URL: `http://127.0.0.1:${apiTestPort}`,
         JOURNEY_API_PREFIX: '/api/v1',
         JOURNEY_SUPER_ADMIN_EMAIL: testEnv.SUPER_ADMIN_EMAIL,
         JOURNEY_SUPER_ADMIN_PASSWORD: testEnv.SUPER_ADMIN_PASSWORD,

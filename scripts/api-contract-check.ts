@@ -41,7 +41,7 @@ async function main(): Promise<void> {
     await readFile(resolve(root, 'docs-json.json'), 'utf8'),
   ) as OpenApiDocument;
   const markdown = await readFile(
-    resolve(root, 'docs/api-reference.md'),
+    resolve(root, 'docs/api-reference-detailed.md'),
     'utf8',
   );
   const operations = operationKeys(spec);
@@ -51,7 +51,7 @@ async function main(): Promise<void> {
   );
   if (comparison.missing.length || comparison.extra.length) {
     throw new Error(
-      `API documentation inventory differs from docs-json.json. Missing: ${comparison.missing.join(', ') || 'none'}; extra: ${comparison.extra.join(', ') || 'none'}`,
+      `Detailed API documentation inventory differs from docs-json.json. Missing: ${comparison.missing.join(', ') || 'none'}; extra: ${comparison.extra.join(', ') || 'none'}`,
     );
   }
   console.log(

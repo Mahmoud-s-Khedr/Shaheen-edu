@@ -36,7 +36,11 @@ Purpose: author current supported basic content. Depends on CONTENT-001. Creates
 
 Purpose: validate public catalog discovery and personalized paid-content previews. Depends on CONTENT-001 and AUTH-004. Verifies default and filtered catalog collections, course detail ancestry, anonymous locked outline previews without protected payloads, and entitlement-based unlocks for the registered student. Script: `scripts/journeys/content/public-catalog.journey.ts`.
 
-Dependency graph: `INFRA-001 → AUTH-001 → AUTH-002 → { AUTH-003, CONTENT-001 → { CONTENT-002, CONTENT-003, CONTENT-004 } }`; `AUTH-001 → { AUTH-004, AUTH-005 }`; CONTENT-004 also depends on AUTH-004.
+## CONTENT-009 — Student catalogue, access state, and library ownership
+
+Purpose: validate the authenticated, grade-scoped catalogue. Depends on CONTENT-001 and AUTH-004. Creates an isolated paid hierarchy and student, verifies current-grade discovery, pricing inheritance/override, foreign-grade non-disclosure, chapter-only entitlement access, self-scoped paginated entitlements, and library retention after a grade change. Script: `scripts/journeys/content/student-catalog.journey.ts`.
+
+Dependency graph: `INFRA-001 → AUTH-001 → AUTH-002 → { AUTH-003, CONTENT-001 → { CONTENT-002, CONTENT-003, CONTENT-004, CONTENT-009 } }`; `AUTH-001 → { AUTH-004, AUTH-005 }`; CONTENT-004 and CONTENT-009 also depend on AUTH-004.
 
 ## CONTENT-006 — Manual question-bank authoring and review lifecycle
 

@@ -38,6 +38,7 @@
     "journey:content:basic": "tsx scripts/run-journey.ts CONTENT-002",
     "journey:content:delivery": "tsx scripts/run-journey.ts CONTENT-003",
     "journey:content:catalog": "tsx scripts/run-journey.ts CONTENT-004",
+    "journey:content:student-catalog": "tsx scripts/run-journey.ts CONTENT-009",
     "journey:content:pricing": "tsx scripts/run-journey.ts CONTENT-005",
     "journey:content:questions": "tsx scripts/run-journey.ts CONTENT-006",
     "journey:content:integration": "tsx scripts/run-journey.ts CONTENT-007",

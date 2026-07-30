@@ -51,7 +51,11 @@ export const apiCoverageJourney: JourneyDefinition = {
       ]) {
         expectStatus(await admin.request('GET', `/admin/${path}`), 200);
         expectStatus(await admin.request('GET', `/admin/${path}/${id}`), 200);
-        expectStatus(await admin.request('PATCH', `/admin/${path}/${id}`, { title: factory.title(`Covered ${path}`) }), 200);
+        expectStatus(await admin.request('PATCH', `/admin/${path}/${id}`, {
+          title: path === 'academic-grades'
+            ? factory.localizedTitle(`Covered ${path}`)
+            : factory.title(`Covered ${path}`),
+        }), 200);
       }
       const reorder = async (path: string, parent?: Record<string, string>) => {
         const query = parent ? `?${new URLSearchParams({ ...parent, limit: '100' })}` : '?limit=100';
@@ -90,8 +94,8 @@ export const apiCoverageJourney: JourneyDefinition = {
     });
 
     await step('Exercising hierarchy access, move, archive, restore, and delete variants', async () => {
-      const g = await create('/admin/academic-grades', { title: factory.title('Coverage grade'), slug: factory.slug('coverage-grade') });
-      const targetG = await create('/admin/academic-grades', { title: factory.title('Coverage grade target'), slug: factory.slug('coverage-grade-target') });
+      const g = await create('/admin/academic-grades', { title: factory.localizedTitle('Coverage grade'), slug: factory.slug('coverage-grade') });
+      const targetG = await create('/admin/academic-grades', { title: factory.localizedTitle('Coverage grade target'), slug: factory.slug('coverage-grade-target') });
       const s = await create('/admin/subjects', { title: factory.title('Coverage subject'), slug: factory.slug('coverage-subject'), academicGradeId: g.id });
       const targetS = await create('/admin/subjects', { title: factory.title('Coverage subject target'), slug: factory.slug('coverage-subject-target'), academicGradeId: targetG.id });
       const c = await create('/admin/courses', { title: factory.title('Coverage course'), slug: factory.slug('coverage-course'), subjectId: s.id, accessType: 'PUBLIC' });
@@ -114,7 +118,7 @@ export const apiCoverageJourney: JourneyDefinition = {
         expectStatus(await admin.request('POST', `/admin/${path}/${id}/restore`), 201);
       }
       // Delete a separate, leaf-first draft hierarchy so the move targets stay valid above.
-      const dg = await create('/admin/academic-grades', { title: factory.title('Delete grade'), slug: factory.slug('delete-grade') });
+      const dg = await create('/admin/academic-grades', { title: factory.localizedTitle('Delete grade'), slug: factory.slug('delete-grade') });
       const ds = await create('/admin/subjects', { title: factory.title('Delete subject'), slug: factory.slug('delete-subject'), academicGradeId: dg.id });
       const dc = await create('/admin/courses', { title: factory.title('Delete course'), slug: factory.slug('delete-course'), subjectId: ds.id, accessType: 'PUBLIC' });
       const dch = await create('/admin/chapters', { title: factory.title('Delete chapter'), slug: factory.slug('delete-chapter'), courseId: dc.id });
@@ -125,11 +129,11 @@ export const apiCoverageJourney: JourneyDefinition = {
     });
 
     await step('Covering question-bank source, bank, question, option, asset, and video-link endpoints', async () => {
-      const source = await create('/admin/question-banks/sources', { type: 'PLATFORM', title: factory.title('Coverage source') });
+      const source = await create('/admin/question-banks/sources', { type: 'PLATFORM', title: factory.localizedTitle('Coverage source') });
       const bank = await create('/admin/question-banks', { title: factory.title('Coverage bank') });
       expectStatus(await admin.request('GET', '/admin/question-banks/sources'), 200);
       expectStatus(await admin.request('GET', `/admin/question-banks/sources/${source.id}`), 200);
-      expectStatus(await admin.request('PATCH', `/admin/question-banks/sources/${source.id}`, { title: factory.title('Updated coverage source') }), 200);
+      expectStatus(await admin.request('PATCH', `/admin/question-banks/sources/${source.id}`, { title: factory.localizedTitle('Updated coverage source') }), 200);
       expectStatus(await admin.request('GET', '/admin/question-banks'), 200);
       expectStatus(await admin.request('GET', `/admin/question-banks/${bank.id}`), 200);
       expectStatus(await admin.request('PATCH', `/admin/question-banks/${bank.id}`, { description: 'covered' }), 200);
@@ -159,7 +163,7 @@ export const apiCoverageJourney: JourneyDefinition = {
       for (const option of remainingOptions)
         expectStatus(await admin.request('DELETE', `/admin/questions/${question.id}/options/${option.id}`), 200);
       expectStatus(await admin.request('DELETE', `/admin/questions/${question.id}`), 200);
-      const deleteSource = await create('/admin/question-banks/sources', { type: 'PLATFORM', title: factory.title('Delete source') });
+      const deleteSource = await create('/admin/question-banks/sources', { type: 'PLATFORM', title: factory.localizedTitle('Delete source') });
       const deleteBank = await create('/admin/question-banks', { title: factory.title('Delete bank') });
       expectStatus(await admin.request('DELETE', `/admin/question-banks/sources/${deleteSource.id}`), 200);
       expectStatus(await admin.request('DELETE', `/admin/question-banks/${deleteBank.id}`), 200);

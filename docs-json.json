@@ -8331,6 +8331,244 @@
                 ]
             }
         },
+        "/api/v1/student/catalog": {
+            "get": {
+                "operationId": "StudentCatalogController_catalogSummary_v1",
+                "parameters": [],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    }
+                ],
+                "summary": "Get the authenticated student catalogue summary",
+                "tags": [
+                    "student/catalog"
+                ]
+            }
+        },
+        "/api/v1/student/catalog/subjects": {
+            "get": {
+                "operationId": "StudentCatalogController_subjects_v1",
+                "parameters": [
+                    {
+                        "name": "page",
+                        "required": false,
+                        "in": "query",
+                        "description": "One-based page number.",
+                        "schema": {
+                            "minimum": 1,
+                            "default": 1,
+                            "type": "number"
+                        }
+                    },
+                    {
+                        "name": "limit",
+                        "required": false,
+                        "in": "query",
+                        "description": "Maximum records to return per page.",
+                        "schema": {
+                            "minimum": 1,
+                            "maximum": 100,
+                            "default": 20,
+                            "type": "number"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    }
+                ],
+                "summary": "List published subjects in the student grade",
+                "tags": [
+                    "student/catalog"
+                ]
+            }
+        },
+        "/api/v1/student/catalog/subjects/{subjectId}/courses": {
+            "get": {
+                "operationId": "StudentCatalogController_courses_v1",
+                "parameters": [
+                    {
+                        "name": "subjectId",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "required": false,
+                        "in": "query",
+                        "description": "One-based page number.",
+                        "schema": {
+                            "minimum": 1,
+                            "default": 1,
+                            "type": "number"
+                        }
+                    },
+                    {
+                        "name": "limit",
+                        "required": false,
+                        "in": "query",
+                        "description": "Maximum records to return per page.",
+                        "schema": {
+                            "minimum": 1,
+                            "maximum": 100,
+                            "default": 20,
+                            "type": "number"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    }
+                ],
+                "summary": "List grade-scoped courses for a subject",
+                "tags": [
+                    "student/catalog"
+                ]
+            }
+        },
+        "/api/v1/student/catalog/courses/{courseId}": {
+            "get": {
+                "operationId": "StudentCatalogController_course_v1",
+                "parameters": [
+                    {
+                        "name": "courseId",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    }
+                ],
+                "summary": "Get a grade-scoped course and published chapters",
+                "tags": [
+                    "student/catalog"
+                ]
+            }
+        },
+        "/api/v1/student/catalog/chapters/{chapterId}": {
+            "get": {
+                "operationId": "StudentCatalogController_chapter_v1",
+                "parameters": [
+                    {
+                        "name": "chapterId",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    }
+                ],
+                "summary": "Get a grade-scoped chapter and its published outline",
+                "tags": [
+                    "student/catalog"
+                ]
+            }
+        },
+        "/api/v1/student/library": {
+            "get": {
+                "operationId": "StudentCatalogController_library_v1",
+                "parameters": [],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    }
+                ],
+                "summary": "List the student active library across grades",
+                "tags": [
+                    "student/catalog"
+                ]
+            }
+        },
+        "/api/v1/student/entitlements": {
+            "get": {
+                "operationId": "StudentCatalogController_entitlements_v1",
+                "parameters": [
+                    {
+                        "name": "page",
+                        "required": false,
+                        "in": "query",
+                        "description": "One-based page number.",
+                        "schema": {
+                            "minimum": 1,
+                            "default": 1,
+                            "type": "number"
+                        }
+                    },
+                    {
+                        "name": "limit",
+                        "required": false,
+                        "in": "query",
+                        "description": "Maximum records to return per page.",
+                        "schema": {
+                            "minimum": 1,
+                            "maximum": 100,
+                            "default": 20,
+                            "type": "number"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    }
+                ],
+                "summary": "List the authenticated student active entitlements",
+                "tags": [
+                    "student/catalog"
+                ]
+            }
+        },
         "/api/v1/admin/publisher-agreements": {
             "post": {
                 "operationId": "PublisherAgreementsController_create_v1",
@@ -9982,7 +10220,7 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "$ref": "#/components/schemas/CreateGeographyNameDto"
+                                "$ref": "#/components/schemas/GeographyNameDto"
                             }
                         }
                     }
@@ -10021,7 +10259,7 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "$ref": "#/components/schemas/CreateGeographyNameDto"
+                                "$ref": "#/components/schemas/GeographyNameDto"
                             }
                         }
                     }
@@ -10099,6 +10337,21 @@
                     "admin/geography"
                 ]
             }
+        },
+        "/api/v1/geography/governorates": {
+            "get": {
+                "operationId": "PublicGeographyController_list_v1",
+                "parameters": [],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "summary": "List governorates and centers for student registration",
+                "tags": [
+                    "geography"
+                ]
+            }
         }
     },
     "info": {
@@ -10143,17 +10396,17 @@
                         "example": "01098765432",
                         "description": "Parent's phone number"
                     },
-                    "governorate": {
+                    "governorateId": {
                         "type": "string",
-                        "example": "Cairo"
+                        "description": "ID of a managed governorate"
                     },
                     "academicGradeId": {
                         "type": "string",
                         "description": "ID of the academic grade the student is enrolled in"
                     },
-                    "center": {
+                    "centerId": {
                         "type": "string",
-                        "example": "Nasr City Center"
+                        "description": "ID of a managed center in the selected governorate"
                     },
                     "password": {
                         "type": "string",
@@ -10166,7 +10419,7 @@
                     "nationalId",
                     "phone",
                     "parentPhone",
-                    "governorate",
+                    "governorateId",
                     "academicGradeId",
                     "password"
                 ]
@@ -10219,23 +10472,36 @@
                         "type": "number",
                         "example": 401
                     },
+                    "code": {
+                        "type": "string",
+                        "example": "UNAUTHORIZED.INVALID_CREDENTIALS"
+                    },
                     "message": {
-                        "example": "Unauthorized",
-                        "oneOf": [
+                        "type": "object",
+                        "example": {
+                            "ar": "بيانات تسجيل الدخول غير صحيحة",
+                            "en": "Invalid credentials"
+                        }
+                    },
+                    "error": {
+                        "type": "object",
+                        "example": {
+                            "ar": "غير مصرح",
+                            "en": "Unauthorized"
+                        }
+                    },
+                    "details": {
+                        "type": "array",
+                        "example": [
                             {
-                                "type": "string"
-                            },
-                            {
-                                "type": "array",
-                                "items": {
-                                    "type": "string"
+                                "field": "phone",
+                                "code": "VALIDATION.ISSTRING",
+                                "message": {
+                                    "ar": "يجب أن تكون القيمة نصاً",
+                                    "en": "phone must be a string"
                                 }
                             }
                         ]
-                    },
-                    "error": {
-                        "type": "string",
-                        "example": "Unauthorized"
                     },
                     "correlationId": {
                         "type": "string",
@@ -10244,6 +10510,7 @@
                 },
                 "required": [
                     "statusCode",
+                    "code",
                     "message",
                     "error",
                     "correlationId"
@@ -10765,9 +11032,10 @@
                         "type": "string",
                         "example": "Ahmed Mohamed Ali"
                     },
-                    "center": {
-                        "type": "string",
-                        "example": "Nasr City Center"
+                    "centerId": {
+                        "type": "object",
+                        "description": "ID of a managed center in the student governorate",
+                        "nullable": true
                     },
                     "academicGradeId": {
                         "type": "string",
@@ -10775,12 +11043,41 @@
                     }
                 }
             },
+            "LocalizedTextDto": {
+                "type": "object",
+                "properties": {
+                    "ar": {
+                        "type": "string",
+                        "example": "الصف الأول الثانوي"
+                    },
+                    "en": {
+                        "type": "string",
+                        "example": "First Secondary Grade"
+                    }
+                },
+                "required": [
+                    "ar",
+                    "en"
+                ]
+            },
+            "LocalizedOptionalTextDto": {
+                "type": "object",
+                "properties": {
+                    "ar": {
+                        "type": "string",
+                        "example": "وصف اختياري"
+                    },
+                    "en": {
+                        "type": "string",
+                        "example": "Optional description"
+                    }
+                }
+            },
             "CreateAcademicGradeDto": {
                 "type": "object",
                 "properties": {
                     "title": {
-                        "type": "string",
-                        "example": "Grade 10"
+                        "$ref": "#/components/schemas/LocalizedTextDto"
                     },
                     "slug": {
                         "type": "string",
@@ -10788,7 +11085,7 @@
                         "example": "grade-10"
                     },
                     "description": {
-                        "type": "string"
+                        "$ref": "#/components/schemas/LocalizedOptionalTextDto"
                     }
                 },
                 "required": [
@@ -10882,13 +11179,19 @@
                 "type": "object",
                 "properties": {
                     "title": {
-                        "type": "string"
+                        "$ref": "#/components/schemas/LocalizedTextDto"
                     },
                     "slug": {
                         "type": "string"
                     },
                     "description": {
-                        "type": "string"
+                        "nullable": true,
+                        "type": "object",
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/LocalizedOptionalTextDto"
+                            }
+                        ]
                     }
                 }
             },
@@ -12202,10 +12505,10 @@
                         ]
                     },
                     "title": {
-                        "type": "string"
+                        "$ref": "#/components/schemas/LocalizedTextDto"
                     },
                     "note": {
-                        "type": "string"
+                        "$ref": "#/components/schemas/LocalizedOptionalTextDto"
                     },
                     "publisherUserId": {
                         "type": "string",
@@ -12231,11 +12534,16 @@
                         ]
                     },
                     "title": {
-                        "type": "string"
+                        "$ref": "#/components/schemas/LocalizedTextDto"
                     },
                     "note": {
+                        "nullable": true,
                         "type": "object",
-                        "nullable": true
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/LocalizedOptionalTextDto"
+                            }
+                        ]
                     },
                     "publisherUserId": {
                         "type": "object",
@@ -12439,15 +12747,21 @@
                     "timestampSeconds"
                 ]
             },
-            "CreateGeographyNameDto": {
+            "GeographyNameDto": {
                 "type": "object",
                 "properties": {
-                    "name": {
-                        "type": "string"
+                    "ar": {
+                        "type": "string",
+                        "example": "القاهرة"
+                    },
+                    "en": {
+                        "type": "string",
+                        "example": "Cairo"
                     }
                 },
                 "required": [
-                    "name"
+                    "ar",
+                    "en"
                 ]
             }
         }

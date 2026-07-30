@@ -30,7 +30,7 @@ credential.
 
 The command starts `docker-compose.api-test.yml` as the
 `shaheen-edu-api-test` Compose project, exposing only its API on
-`127.0.0.1:3100`. It creates a fresh database and Redis instance, runs the
+`127.0.0.1:3101`. It creates a fresh database and Redis instance, runs the
 real HTTP journeys, checks runtime OpenAPI against both documentation files,
 writes a redacted per-operation report to `reports/api-tests/`, attempts to
 delete created Bunny-backed resources, and removes only that test project and

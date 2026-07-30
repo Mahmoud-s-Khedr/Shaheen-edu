@@ -3662,6 +3662,163 @@ No path, query, or header input.
 }
 ```
 
+### `GET /api/v1/student/catalog`
+
+**Authorization:** Bearer token; role must be `STUDENT`
+
+**Request**
+
+No path, query, or header input.
+
+**Success response — HTTP 200**
+
+```json
+{
+  "academicGrade": {
+    "id": "string",
+    "title": { "ar": "string", "en": "string | null" },
+    "slug": "string",
+    "description": { "ar": "string | null", "en": "string | null" },
+    "sortOrder": "number"
+  },
+  "summary": { "subjects": "number", "courses": "number", "chapters": "number" }
+}
+```
+
+### `GET /api/v1/student/catalog/subjects`
+
+**Authorization:** Bearer token; role must be `STUDENT`
+
+**Request**
+
+- query `page` (optional; one-based, default `1`)
+- query `limit` (optional; `1..100`, default `20`)
+
+**Success response — HTTP 200**
+
+```json
+{
+  "data": [{ "id": "string", "title": "string", "slug": "string", "description": "string | null", "sortOrder": "number" }],
+  "meta": { "page": "number", "limit": "number", "total": "number", "totalPages": "number" }
+}
+```
+
+### `GET /api/v1/student/catalog/subjects/{subjectId}/courses`
+
+**Authorization:** Bearer token; role must be `STUDENT`
+
+**Request**
+
+- path `subjectId` (required)
+- query `page` (optional; one-based, default `1`)
+- query `limit` (optional; `1..100`, default `20`)
+
+**Success response — HTTP 200**
+
+```json
+{
+  "data": [{
+    "id": "string",
+    "title": "string",
+    "slug": "string",
+    "description": "string | null",
+    "sortOrder": "number",
+    "access": {
+      "state": "ENTITLED | FREE | PUBLIC | PURCHASABLE | LOCKED",
+      "entitlementId?": "string",
+      "expiresAt?": "ISO-8601 date-time | null",
+      "price?": { "amountMinor": "number", "currency": "EGP" }
+    },
+    "isLocked": "boolean"
+  }],
+  "meta": { "page": "number", "limit": "number", "total": "number", "totalPages": "number" }
+}
+```
+
+### `GET /api/v1/student/catalog/courses/{courseId}`
+
+**Authorization:** Bearer token; role must be `STUDENT`
+
+**Request**
+
+- path `courseId` (required)
+
+**Success response — HTTP 200**
+
+Returns the grade-scoped course, its subject, and published chapters. The course
+and every chapter use the `access` and `isLocked` fields shown in the preceding
+course-list response.
+
+### `GET /api/v1/student/catalog/chapters/{chapterId}`
+
+**Authorization:** Bearer token; role must be `STUDENT`
+
+**Request**
+
+- path `chapterId` (required)
+
+**Success response — HTTP 200**
+
+Returns the grade-scoped chapter, course, published lessons/sections, and
+content preview metadata. Every hierarchy node and content item includes its
+effective `access` object and `isLocked` flag. Content previews include `id`,
+`type`, `title`, `description`, `estimatedDuration`, and `sortOrder`; they do
+not expose protected item bodies or asset URLs.
+
+### `GET /api/v1/student/library`
+
+**Authorization:** Bearer token; role must be `STUDENT`
+
+**Request**
+
+No path, query, or header input.
+
+**Success response — HTTP 200**
+
+```json
+{
+  "data": [{
+    "entitlementId": "string",
+    "targetType": "COURSE | CHAPTER",
+    "target": { "id": "string", "title": "string", "slug": "string", "description": "string | null", "sortOrder": "number" },
+    "course": { "id": "string", "title": "string", "slug": "string", "description": "string | null", "sortOrder": "number" },
+    "subject": { "id": "string", "title": "string", "slug": "string", "description": "string | null", "sortOrder": "number" },
+    "academicGrade": { "id": "string", "title": { "ar": "string", "en": "string | null" }, "slug": "string", "description": { "ar": "string | null", "en": "string | null" }, "sortOrder": "number" },
+    "startsAt": "ISO-8601 date-time",
+    "expiresAt": "ISO-8601 date-time | null"
+  }]
+}
+```
+
+### `GET /api/v1/student/entitlements`
+
+**Authorization:** Bearer token; role must be `STUDENT`
+
+**Request**
+
+- query `page` (optional; one-based, default `1`)
+- query `limit` (optional; `1..100`, default `20`)
+
+**Success response — HTTP 200**
+
+```json
+{
+  "data": [{
+    "id": "string",
+    "courseId": "string | null",
+    "chapterId": "string | null",
+    "targetType": "COURSE | CHAPTER",
+    "targetId": "string",
+    "source": "ADMIN | PROMOTION | MIGRATION | PAYMENT",
+    "status": "ACTIVE",
+    "startsAt": "ISO-8601 date-time",
+    "expiresAt": "ISO-8601 date-time | null",
+    "createdAt": "ISO-8601 date-time"
+  }],
+  "meta": { "page": "number", "limit": "number", "total": "number", "totalPages": "number" }
+}
+```
+
 ## Publisher agreements and pricing
 
 ### `POST /api/v1/admin/publisher-agreements`
@@ -5019,6 +5176,19 @@ No path, query, or header input.
 ```
 
 ## Geography
+
+### `GET /api/v1/geography/governorates`
+
+**Authorization:** Public
+
+**Request**
+
+No path, query, or header input.
+
+**Success response — HTTP 200**
+
+Returns the governorates and centers available for student registration, using
+the localized `name` shape (`{ "ar": "string", "en": "string | null" }`).
 
 ### `GET /api/v1/admin/geography/governorates`
 

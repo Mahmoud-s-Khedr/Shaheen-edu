@@ -9,6 +9,7 @@ import { hierarchyJourney } from './content/academic-hierarchy.journey.js';
 import { contentJourney } from './content/basic-content-authoring.journey.js';
 import { fullDeliveryJourney } from './content/full-content-delivery.journey.js';
 import { publicCatalogJourney } from './content/public-catalog.journey.js';
+import { studentCatalogJourney } from './content/student-catalog.journey.js';
 import { pricingPublisherAgreementsJourney } from './content/pricing-publisher-agreements.journey.js';
 import { questionBankAuthoringJourney } from './content/question-bank-authoring.journey.js';
 import { phase9IntegrationJourney } from './content/phase9-integration.journey.js';
@@ -27,6 +28,7 @@ export const journeys: JourneyDefinition[] = [
   contentJourney,
   fullDeliveryJourney,
   publicCatalogJourney,
+  studentCatalogJourney,
   pricingPublisherAgreementsJourney,
   questionBankAuthoringJourney,
   phase9IntegrationJourney,

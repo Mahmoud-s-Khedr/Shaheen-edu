@@ -13,7 +13,7 @@ export const partnerJourney: JourneyDefinition = {
       const login = await clients.partner.request<any>('POST', '/auth/partners/login', { email, password }); expectStatus(login, 201); assert(login.body.user.role === 'PARTNER', 'Partner login role must be PARTNER'); clients.partner.accessToken = login.body.accessToken; context.partner.accessToken = login.body.accessToken;
       const me = await clients.partner.request<any>('GET', '/partners/me'); expectStatus(me, 200); assert(me.body.id === context.partner.id, 'Partner profile must be structurally owned');
     });
-    await step('Rejecting partner access to admin operations', async () => { const r = await clients.partner.request<any>('POST', '/admin/academic-grades', { title: factory.title('Forbidden') }); expectStatus(r, 403); });
+    await step('Rejecting partner access to admin operations', async () => { const r = await clients.partner.request<any>('POST', '/admin/academic-grades', { title: factory.localizedTitle('Forbidden') }); expectStatus(r, 403); });
     await step('Suspending and reactivating partner', async () => {
       const suspend = await clients.admin.request<any>('POST', `/admin/partners/${context.partner.id}/suspend`); expectStatus(suspend, 201); assert(suspend.body.status === 'SUSPENDED', 'Partner must be suspended');
       const rejected = await clients.partner.request<any>('POST', '/auth/partners/login', { email, password }); expectStatus(rejected, 401);

@@ -18,12 +18,12 @@ export const questionBankAuthoringJourney: JourneyDefinition = {
 
     await step('Creating a publisher-backed source and a question bank', async () => {
       const invalid = await admin.request<any>('POST', '/admin/question-banks/sources', {
-        type: 'CONTENT_PUBLISHER', title: factory.title('Invalid publisher source'),
+        type: 'CONTENT_PUBLISHER', title: factory.localizedTitle('Invalid publisher source'),
       });
       expectStatus(invalid, 400);
 
       const source = await admin.request<any>('POST', '/admin/question-banks/sources', {
-        type: 'CONTENT_PUBLISHER', title: factory.title('Publisher source'), note: 'Synthetic journey provenance', publisherUserId,
+        type: 'CONTENT_PUBLISHER', title: factory.localizedTitle('Publisher source'), note: factory.localizedTitle('Synthetic journey provenance'), publisherUserId,
       });
       expectStatus(source, 201);
       sourceId = source.body.id;

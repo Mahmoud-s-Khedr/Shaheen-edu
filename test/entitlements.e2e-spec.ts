@@ -422,6 +422,137 @@ describe('Entitlements and student delivery (e2e)', () => {
     });
   });
 
+  describe('student catalogue', () => {
+    it('scopes discovery to the profile grade and resolves chapter access and inherited pricing', async () => {
+      const registration = await app.inject({
+        method: 'POST',
+        url: '/api/v1/auth/students/register',
+        payload: {
+          fullName: 'Catalogue Student',
+          nationalId: '29903030342345',
+          phone: '01099990004',
+          parentPhone: '01088880004',
+          governorate: 'Cairo',
+          password: 'StudentP@ss1!',
+          academicGradeId: catalogGradeId,
+        },
+      });
+      expect(registration.statusCode).toBe(201);
+      const student = json(registration);
+      const headers = bearer(student.accessToken);
+
+      const otherGradeSubjectId = json(
+        await post('/api/v1/admin/subjects', {
+          title: 'Other grade subject',
+          academicGradeId: registrationGradeId,
+        }),
+      ).id;
+      expect((await publish('subjects', otherGradeSubjectId)).statusCode).toBe(
+        201,
+      );
+
+      expect(
+        (
+          await post(`/api/v1/admin/pricing/course/${paidCourseId}`, {
+            isPurchasable: true,
+            priceMinor: 20_000,
+            currency: 'EGP',
+          })
+        ).statusCode,
+      ).toBe(201);
+
+      const summary = await app.inject({
+        method: 'GET',
+        url: '/api/v1/student/catalog',
+        headers,
+      });
+      expect(summary.statusCode).toBe(200);
+      expect(json(summary)).toMatchObject({
+        academicGrade: { id: catalogGradeId },
+        summary: { subjects: 1, courses: 3, chapters: 2 },
+      });
+
+      const courses = await app.inject({
+        method: 'GET',
+        url: `/api/v1/student/catalog/subjects/${catalogSubjectId}/courses`,
+        headers,
+      });
+      expect(courses.statusCode).toBe(200);
+      const coursesBody = JSON.parse(courses.body) as {
+        data: Array<{ id: string; access: unknown }>;
+      };
+      const paidCourse = coursesBody.data.find(
+        (course: { id: string }) => course.id === paidCourseId,
+      );
+      expect(paidCourse).toMatchObject({
+        access: {
+          state: 'PURCHASABLE',
+          price: { amountMinor: 20_000, currency: 'EGP' },
+        },
+        isLocked: true,
+      });
+
+      const otherGradeCourses = await app.inject({
+        method: 'GET',
+        url: `/api/v1/student/catalog/subjects/${otherGradeSubjectId}/courses`,
+        headers,
+      });
+      expect(otherGradeCourses.statusCode).toBe(404);
+
+      expect(
+        (await grant({ studentUserId: student.user.id, chapterId: chapterAId }))
+          .statusCode,
+      ).toBe(201);
+      const chapter = await app.inject({
+        method: 'GET',
+        url: `/api/v1/student/catalog/chapters/${chapterAId}`,
+        headers,
+      });
+      expect(chapter.statusCode).toBe(200);
+      expect(json(chapter)).toMatchObject({
+        id: chapterAId,
+        access: { state: 'ENTITLED' },
+        isLocked: false,
+      });
+      expect(json(chapter).contentItems[0]).toMatchObject({
+        id: paidChapterAItemId,
+        access: { state: 'ENTITLED' },
+        isLocked: false,
+      });
+
+      const library = await app.inject({
+        method: 'GET',
+        url: '/api/v1/student/library',
+        headers,
+      });
+      expect(library.statusCode).toBe(200);
+      expect(json(library).data).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            targetType: 'CHAPTER',
+            target: expect.objectContaining({ id: chapterAId }),
+          }),
+        ]),
+      );
+
+      const ownEntitlements = await app.inject({
+        method: 'GET',
+        url: '/api/v1/student/entitlements',
+        headers,
+      });
+      expect(ownEntitlements.statusCode).toBe(200);
+      expect(json(ownEntitlements)).toMatchObject({
+        data: [
+          expect.objectContaining({
+            targetType: 'CHAPTER',
+            targetId: chapterAId,
+          }),
+        ],
+        meta: { page: 1, limit: 20, total: 1, totalPages: 1 },
+      });
+    });
+  });
+
   describe('grant boundaries', () => {
     it('confines a chapter grant to that chapter', async () => {
       expect(

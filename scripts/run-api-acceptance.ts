@@ -296,7 +296,7 @@ async function main(): Promise<void> {
     await readFile(resolve(root, 'docs-json.json'), 'utf8'),
   ) as OpenApiDocument;
   const markdown = await readFile(
-    resolve(root, 'docs/api-reference.md'),
+    resolve(root, 'docs/api-reference-detailed.md'),
     'utf8',
   );
   const snapshotKeys = operationKeys(snapshot);
@@ -306,7 +306,7 @@ async function main(): Promise<void> {
   );
   if (markdownDiff.missing.length || markdownDiff.extra.length)
     throw new Error(
-      'docs/api-reference.md does not match docs-json.json; run `pnpm api:contract:check` for details.',
+      'docs/api-reference-detailed.md does not match docs-json.json; run `pnpm api:contract:check` for details.',
     );
 
   const environment = loadEnvironment();

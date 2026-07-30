@@ -9,5 +9,9 @@ export class DataFactory {
   phone(): string { return `010${String(randomBytes(4).readUInt32BE() % 100_000_000).padStart(8, '0')}`; }
   nationalId(): string { return `2990101${String(randomBytes(4).readUInt32BE() % 10_000_000).padStart(7, '0')}`; }
   title(kind: string): string { return `${kind} ${this.next()}`; }
+  localizedTitle(kind: string): { ar: string; en: string } {
+    const title = this.title(kind);
+    return { ar: title, en: title };
+  }
   slug(kind: string): string { return `${kind}-${this.next().toLowerCase().replace(/[^a-z0-9]+/g, '-')}`; }
 }

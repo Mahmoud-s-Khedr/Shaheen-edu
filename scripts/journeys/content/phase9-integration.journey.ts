@@ -238,7 +238,7 @@ export const phase9IntegrationJourney: JourneyDefinition = {
           '/admin/question-banks/sources',
           {
             type: 'CONTENT_PUBLISHER',
-            title: factory.title('Phase 9 source'),
+            title: factory.localizedTitle('Phase 9 source'),
             publisherUserId: context.partner.id,
           },
         );
@@ -380,7 +380,7 @@ export const phase9IntegrationJourney: JourneyDefinition = {
             nationalId: factory.nationalId(),
             phone: `+20${factory.phone().slice(1)}`,
             parentPhone: factory.phone(),
-            governorate: 'Cairo',
+            governorateId: String(context.academic.governorateId),
             academicGradeId: gradeId,
             password: factory.password('Denied'),
           },
