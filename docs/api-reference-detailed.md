@@ -4,6 +4,18 @@ Implementation-backed API contract. Every endpoint below is self-contained: its 
 
 ## Health
 
+## Student learning
+
+### `GET /api/v1/parent/selected-child/performance`
+### `POST /api/v1/student/content-items/{id}/complete`
+### `GET /api/v1/student/library/{targetType}/{targetId}/progress`
+### `GET /api/v1/student/performance`
+### `GET /api/v1/student/practice/questions`
+### `GET /api/v1/student/practice/questions/{questionId}/assets/{assetId}/access`
+### `GET /api/v1/student/practice/questions/{questionId}/attempts`
+### `POST /api/v1/student/practice/questions/{questionId}/attempts`
+### `GET /api/v1/student/progress`
+
 ### `GET /health`
 
 **Authorization:** Public

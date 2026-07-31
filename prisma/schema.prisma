@@ -214,6 +214,8 @@ model StudentProfile {
   cart                  Cart?
   orders                Order[]
   parentAccessSessions  ParentAccessSession[]
+  contentProgress       StudentContentProgress[]
+  questionAttempts      StudentQuestionAttempt[]
 
   @@index([parentPhoneNormalized])
   @@index([parentPhoneNormalized, createdAt, userId])
@@ -525,6 +527,7 @@ model ContentItem {
   primaryAssetId String?
   primaryAsset Asset? @relation("ContentPrimaryAsset", fields: [primaryAssetId], references: [id], onDelete: Restrict)
   assetReferences AssetReference[]
+  studentProgress StudentContentProgress[]
 
   @@index([status, createdAt, id])
 }
@@ -661,6 +664,7 @@ model Question {
   assets       QuestionAsset[]
   videoLink    QuestionVideoLink?
   placements   QuestionPlacement[]
+  studentAttempts StudentQuestionAttempt[]
 
   @@index([status, createdAt, id])
   @@index([bankId, status])
@@ -677,6 +681,7 @@ model QuestionOption {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
   question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  attemptAnswers StudentQuestionAttemptAnswer[]
 
   @@unique([questionId, sortOrder])
 }
@@ -758,6 +763,51 @@ model ContentPlacement {
   @@index([chapterId, sortOrder, id])
   @@index([lessonId, sortOrder, id])
   @@index([sectionId, sortOrder, id])
+}
+
+/// The only persisted content-completion state. Progress above an item is
+/// intentionally derived from these rows, rather than stored redundantly.
+model StudentContentProgress {
+  id            String       @id @default(cuid())
+  studentUserId String
+  contentItemId String
+  completedAt   DateTime
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  student       StudentProfile @relation(fields: [studentUserId], references: [userId], onDelete: Cascade)
+  contentItem   ContentItem    @relation(fields: [contentItemId], references: [id], onDelete: Cascade)
+
+  @@unique([studentUserId, contentItemId])
+  @@index([studentUserId, completedAt])
+  @@index([contentItemId])
+}
+
+/// Every submission is retained, including wrong answers and retries.
+model StudentQuestionAttempt {
+  id            String       @id @default(cuid())
+  studentUserId String
+  questionId    String
+  attemptNumber Int
+  isCorrect     Boolean
+  submittedAt   DateTime     @default(now())
+  student       StudentProfile @relation(fields: [studentUserId], references: [userId], onDelete: Cascade)
+  question      Question       @relation(fields: [questionId], references: [id], onDelete: Restrict)
+  answers       StudentQuestionAttemptAnswer[]
+
+  @@unique([studentUserId, questionId, attemptNumber])
+  @@index([studentUserId, submittedAt])
+  @@index([questionId, submittedAt])
+}
+
+model StudentQuestionAttemptAnswer {
+  id        String                 @id @default(cuid())
+  attemptId String
+  optionId  String
+  attempt   StudentQuestionAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  option    QuestionOption         @relation(fields: [optionId], references: [id], onDelete: Restrict)
+
+  @@unique([attemptId, optionId])
+  @@index([optionId])
 }
 
 model StudentEntitlement {

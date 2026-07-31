@@ -360,10 +360,10 @@ export class ContentPlacementSummaryDto {
   @ApiPropertyOptional({ type: String, nullable: true })
   chapterId!: string | null;
 
-  @ApiPropertyOptional({ nullable: true })
+  @ApiPropertyOptional({ type: String, nullable: true })
   lessonId!: string | null;
 
-  @ApiPropertyOptional({ nullable: true })
+  @ApiPropertyOptional({ type: String, nullable: true })
   sectionId!: string | null;
 
   @ApiProperty()

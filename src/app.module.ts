@@ -30,6 +30,7 @@ import { PublisherAgreementsModule } from './modules/publisher-agreements/publis
 import { QuestionBanksModule } from './modules/question-banks/question-banks.module';
 import { GeographyModule } from './modules/geography/geography.module';
 import { CommerceModule } from './modules/commerce/commerce.module';
+import { LearningModule } from './modules/learning/learning.module';
 import { UserAuthGuard } from './common/guards/user-auth.guard';
 import type { IncomingMessage } from 'http';
 
@@ -75,6 +76,7 @@ import type { IncomingMessage } from 'http';
     QuestionBanksModule,
     GeographyModule,
     CommerceModule,
+    LearningModule,
   ],
   providers: [
     // Global deny-by-default auth guard - @Public() opts a route out.

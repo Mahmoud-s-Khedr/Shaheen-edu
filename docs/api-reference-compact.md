@@ -168,6 +168,15 @@ Request cheat sheet for the implementation-backed API contract. Base URL is `/ap
 | `GET /api/v1/admin/entitlements` | List student entitlements | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | query: studentUserId |
 | `POST /api/v1/admin/entitlements/{id}/revoke` | Revoke a student entitlement | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id |
 | `GET /api/v1/student/content-items/{id}` | Get a content item the student can access | Bearer token; role must be `STUDENT` | path: id |
+| `POST /api/v1/student/content-items/{id}/complete` | Idempotently mark an accessible content item complete | Bearer token; role must be `STUDENT` | path: id |
+| `GET /api/v1/student/progress` | Get current-grade completion totals | Bearer token; role must be `STUDENT` | — |
+| `GET /api/v1/student/library/{targetType}/{targetId}/progress` | Get course/chapter library progress | Bearer token; role must be `STUDENT` | path: targetType (`COURSE`/`CHAPTER`)<br>path: targetId |
+| `GET /api/v1/student/practice/questions` | List eligible direct-practice questions | Bearer token; role must be `STUDENT` | exactly one query: courseId, chapterId, lessonId, sectionId<br>query: page?, limit? |
+| `POST /api/v1/student/practice/questions/{questionId}/attempts` | Submit an immutable question attempt | Bearer token; role must be `STUDENT` | path: questionId<br>body: optionIds |
+| `GET /api/v1/student/practice/questions/{questionId}/assets/{assetId}/access` | Get protected practice-question asset access | Bearer token; role must be `STUDENT` | path: questionId<br>path: assetId |
+| `GET /api/v1/student/practice/questions/{questionId}/attempts` | List personal question attempts | Bearer token; role must be `STUDENT` | path: questionId<br>query: page?, limit? |
+| `GET /api/v1/student/performance` | Get current-grade practice performance | Bearer token; role must be `STUDENT` | — |
+| `GET /api/v1/parent/selected-child/performance` | Get selected child's summary performance | Parent selected-child bearer token | — |
 | `GET /api/v1/catalog/content-items/{id}` | Get a published content item | Public | path: id |
 | `GET /api/v1/catalog/content-items/{contentItemId}/assets/{assetId}/access` | Get a protected asset access URL for public content | Public | path: contentItemId<br>path: assetId |
 | `GET /api/v1/student/content-items/{contentItemId}/assets/{assetId}/access` | Get a protected asset access URL for an entitled student | Bearer token; role must be `STUDENT` | path: contentItemId<br>path: assetId |

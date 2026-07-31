@@ -1,6 +1,14 @@
 {
     "openapi": "3.0.0",
     "paths": {
+        "/api/v1/parent/selected-child/performance": { "get": {} },
+        "/api/v1/student/content-items/{id}/complete": { "post": {} },
+        "/api/v1/student/library/{targetType}/{targetId}/progress": { "get": {} },
+        "/api/v1/student/performance": { "get": {} },
+        "/api/v1/student/practice/questions": { "get": {} },
+        "/api/v1/student/practice/questions/{questionId}/assets/{assetId}/access": { "get": {} },
+        "/api/v1/student/practice/questions/{questionId}/attempts": { "get": {}, "post": {} },
+        "/api/v1/student/progress": { "get": {} },
         "/api/v1/admin/manual-payment-methods": { "get": {}, "post": {} },
         "/api/v1/admin/manual-payment-methods/{id}": { "patch": {} },
         "/api/v1/admin/manual-payment-methods/reorder": { "post": {} },
@@ -12233,11 +12241,11 @@
                         "nullable": true
                     },
                     "lessonId": {
-                        "type": "object",
+                        "type": "string",
                         "nullable": true
                     },
                     "sectionId": {
-                        "type": "object",
+                        "type": "string",
                         "nullable": true
                     },
                     "sortOrder": {

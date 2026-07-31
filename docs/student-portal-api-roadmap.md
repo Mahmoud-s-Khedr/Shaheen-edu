@@ -214,26 +214,25 @@ payment and must grant no access until approved.
 
 | Proposed endpoint | Purpose |
 | --- | --- |
-| `GET /api/v1/student/content-items/:contentItemId` | Extend the existing protected delivery response with navigation and the student's saved progress. |
-| `PUT /api/v1/student/content-items/:contentItemId/progress` | Idempotently save read/watch position, elapsed seconds, and client completion signal. |
-| `POST /api/v1/student/content-items/:contentItemId/complete` | Mark eligible non-media content complete. |
-| `GET /api/v1/student/progress` | Course/chapter/lesson completion totals for the current grade. |
-| `GET /api/v1/student/library/:targetType/:targetId/progress` | Detailed course or chapter progress for an owned target. |
-| `GET /api/v1/student/home` | Continue-learning item, owned-course count, completed-course/chapter count, and latest generated practice result. |
+| `GET /api/v1/student/content-items/:contentItemId` | [x] Protected delivery with the student's item completion state. |
+| `POST /api/v1/student/content-items/:contentItemId/complete` | [x] Idempotently mark one accessible published item complete. |
+| `GET /api/v1/student/progress` | [x] Current-grade course/chapter/lesson/section completion totals. |
+| `GET /api/v1/student/library/:targetType/:targetId/progress` | [x] Detailed course or chapter progress for accessible library content. |
+| `GET /api/v1/student/practice/questions` | [x] Learner-safe published direct-practice questions for one hierarchy scope and descendants. |
+| `POST /api/v1/student/practice/questions/:questionId/attempts` | [x] Store an immutable selected-answer attempt and return immediate feedback. |
+| `GET /api/v1/student/practice/questions/:questionId/attempts` | [x] Paginated personal retry history. |
+| `GET /api/v1/student/performance` | [x] Current-grade question totals, accuracy, solved count, and first-try correctness. |
+| `GET /api/v1/parent/selected-child/performance` | [x] Selected-child summary-only progress and question performance. |
 
-All progress APIs above remain [ ]. `GET /api/v1/student/content-items/:contentItemId`
-is implemented for access-controlled delivery, but does not yet return
-navigation or saved progress.
-
-Add `StudentContentProgress` keyed by `(studentUserId, contentItemId)`, with
-position, elapsed time, completion status, and last-accessed timestamp. Derive
-course/chapter/lesson completion from accessible published content and these
-records; do not store competing totals unless they are deliberate cached
-aggregates.
+Completion records are keyed by `(studentUserId, contentItemId)` and store the
+completion timestamp. The client marks only an item complete; all hierarchy
+completion is derived from accessible published content and these records.
 
 ## AI-generated quizzes and exams from the existing question bank
 
-There is no assessment domain today. The student creates a quiz/exam request;
+There is no generated assessment domain today. Direct practice is implemented:
+students receive eligible published questions and every answer submission is
+retained as an immutable attempt. The student creates a quiz/exam request;
 AI may help choose a balanced set of **existing reviewed, published questions**.
 AI must not create unreviewed live questions or change correct answers.
 
