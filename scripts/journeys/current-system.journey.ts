@@ -14,6 +14,7 @@ import { pricingPublisherAgreementsJourney } from './content/pricing-publisher-a
 import { questionBankAuthoringJourney } from './content/question-bank-authoring.journey.js';
 import { phase9IntegrationJourney } from './content/phase9-integration.journey.js';
 import { apiCoverageJourney } from './content/api-coverage.journey.js';
+import { manualCommerceJourney } from './content/manual-commerce.journey.js';
 import type { JourneyDefinition } from './lib/types.js';
 
 export const journeys: JourneyDefinition[] = [
@@ -33,4 +34,5 @@ export const journeys: JourneyDefinition[] = [
   questionBankAuthoringJourney,
   phase9IntegrationJourney,
   apiCoverageJourney,
+  manualCommerceJourney,
 ];

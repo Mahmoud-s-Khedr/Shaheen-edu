@@ -1,15 +1,12 @@
 import { readFile } from 'node:fs/promises';
-import { basename } from 'node:path';
+import { resolve } from 'node:path';
 import { assert, expectStatus, expectString } from '../lib/assertions.js';
 import type { JourneyDefinition } from '../lib/types.js';
 
-const PDF_BYTES = Buffer.from(
-  '%PDF-1.7\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n',
-);
-const PNG_BYTES = Buffer.from(
-  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScL4WQAAAABJRU5ErkJggg==',
-  'base64',
-);
+const testFiles = resolve(process.cwd(), 'test-files');
+const testCover = resolve(testFiles, 'G5LDVlJWQAANOhJ.jpg');
+const testPdf = resolve(testFiles, '1-84628-843-6.pdf');
+const testVideo = resolve(testFiles, 'Screencast From 2026-07-24 16-51-21.mp4');
 
 function pause(ms: number) {
   return new Promise<void>((resolve) => setTimeout(resolve, ms));
@@ -74,15 +71,12 @@ export const phase9IntegrationJourney: JourneyDefinition = {
     const chapterId = String(context.academic.chapterId);
     const gradeId = String(context.academic.gradeId);
     const entitledStudent = context.students[0];
-    const videoFile = environment.videoFile;
-    if (!videoFile)
-      throw new Error(
-        'CONTENT-007 requires JOURNEY_VIDEO_FILE pointing to a small valid MP4',
-      );
+    const videoFile = testVideo;
     if (!entitledStudent?.id || !entitledStudent.accessToken)
       throw new Error('A registered student is required');
-    const videoBytes = await readFile(videoFile);
+    const [videoBytes, coverBytes, pdfBytes] = await Promise.all([readFile(videoFile), readFile(testCover), readFile(testPdf)]);
     if (!videoBytes.length) throw new Error('JOURNEY_VIDEO_FILE is empty');
+    const filePrefix = `phase9-${factory.runId}`;
     let pdfAssetId = '';
     let videoAssetId = '';
     let pdfContentId = '';
@@ -93,9 +87,9 @@ export const phase9IntegrationJourney: JourneyDefinition = {
       const cover = await admin.upload<any>(
         '/admin/assets/upload?kind=COVER_IMAGE',
         {
-          buffer: PNG_BYTES,
-          filename: 'phase9-cover.png',
-          contentType: 'image/png',
+          buffer: coverBytes,
+          filename: `${filePrefix}-cover.jpg`,
+          contentType: 'image/jpeg',
         },
       );
       expectStatus(cover, 201);
@@ -109,8 +103,8 @@ export const phase9IntegrationJourney: JourneyDefinition = {
         201,
       );
       const pdf = await admin.upload<any>('/admin/assets/upload?kind=PDF', {
-        buffer: PDF_BYTES,
-        filename: 'phase9-resource.pdf',
+        buffer: pdfBytes,
+        filename: `${filePrefix}-resource.pdf`,
         contentType: 'application/pdf',
       });
       expectStatus(pdf, 201);
@@ -147,7 +141,7 @@ export const phase9IntegrationJourney: JourneyDefinition = {
       async () => {
         const video = await admin.request<any>('POST', '/admin/video-assets', {
           title: factory.title('Phase 9 video'),
-          filename: basename(videoFile),
+          filename: `${filePrefix}-video.mp4`,
         });
         expectStatus(video, 201);
         videoAssetId = video.body.id;
@@ -161,7 +155,7 @@ export const phase9IntegrationJourney: JourneyDefinition = {
         await uploadTus(
           authorization.body,
           videoBytes,
-          basename(videoFile),
+          `${filePrefix}-video.mp4`,
         );
         const deadline = Date.now() + environment.videoReadyTimeoutMs;
         while (Date.now() < deadline) {

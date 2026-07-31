@@ -60,6 +60,25 @@ enum EntitlementStatus {
   REVOKED
 }
 
+enum CommerceTargetType {
+  COURSE
+  CHAPTER
+}
+
+enum OrderStatus {
+  AWAITING_PAYMENT
+  SUBMITTED
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum ManualPaymentSubmissionStatus {
+  SUBMITTED
+  APPROVED
+  REJECTED
+}
+
 enum PublisherAgreementStatus {
   DRAFT
   ACTIVE
@@ -74,6 +93,7 @@ enum AssetProvider {
 enum AssetKind {
   COVER_IMAGE
   IMAGE
+  PAYMENT_PROOF
   PDF
   DOCUMENT
   DOWNLOADABLE_FILE
@@ -139,6 +159,8 @@ model User {
   partnerProfilesCreated PartnerProfile[] @relation("PartnerProfileCreatedBy")
   entitlementsGranted StudentEntitlement[] @relation("EntitlementGrantedBy")
   entitlementsRevoked StudentEntitlement[] @relation("EntitlementRevokedBy")
+  manualPaymentMethodsCreated ManualPaymentMethod[] @relation("ManualPaymentMethodCreatedBy")
+  manualPaymentSubmissionsReviewed ManualPaymentSubmission[] @relation("ManualPaymentSubmissionReviewedBy")
   publisherAgreementsCreated PublisherAgreement[] @relation("PublisherAgreementCreatedBy")
   earningsStatementsCreated PublisherEarningsStatement[] @relation("EarningsStatementCreatedBy")
 
@@ -189,6 +211,8 @@ model StudentProfile {
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
   entitlements          StudentEntitlement[]
+  cart                  Cart?
+  orders                Order[]
   parentAccessSessions  ParentAccessSession[]
 
   @@index([parentPhoneNormalized])
@@ -353,6 +377,8 @@ model Course {
   questions Question[]
   questionPlacements QuestionPlacement[] @relation("QuestionPlacementCourse")
   entitlements StudentEntitlement[]
+  cartItems CartItem[] @relation("CartItemCourse")
+  orderItems OrderItem[] @relation("OrderItemCourse")
   publisherAgreements PublisherAgreement[] @relation("PublisherAgreementCourse")
   earningsStatements PublisherEarningsStatement[] @relation("EarningsCourse")
   contentPlacements ContentPlacement[] @relation("ContentPlacementCourse")
@@ -391,6 +417,8 @@ model Chapter {
 
   lessons Lesson[]
   entitlements StudentEntitlement[]
+  cartItems CartItem[] @relation("CartItemChapter")
+  orderItems OrderItem[] @relation("OrderItemChapter")
   publisherAgreements PublisherAgreement[] @relation("PublisherAgreementChapter")
   earningsStatements PublisherEarningsStatement[] @relation("EarningsChapter")
   contentPlacements ContentPlacement[] @relation("ContentPlacementChapter")
@@ -530,6 +558,7 @@ model Asset {
   sectionCovers     Section[] @relation("SectionCover")
   video             VideoAsset?
   questionAssets    QuestionAsset[] @relation("QuestionAttachmentAsset")
+  paymentProofFor    ManualPaymentSubmission[] @relation("ManualPaymentProof")
   @@index([status, kind, createdAt])
 }
 
@@ -739,6 +768,8 @@ model StudentEntitlement {
   course        Course?           @relation(fields: [courseId], references: [id], onDelete: Restrict)
   chapterId     String?
   chapter       Chapter?          @relation(fields: [chapterId], references: [id], onDelete: Restrict)
+  orderItemId   String?           @unique
+  orderItem     OrderItem?        @relation(fields: [orderItemId], references: [id], onDelete: Restrict)
   source        EntitlementSource @default(ADMIN)
   status        EntitlementStatus @default(ACTIVE)
   startsAt      DateTime          @default(now())
@@ -754,6 +785,120 @@ model StudentEntitlement {
   @@index([studentUserId, status, startsAt, expiresAt])
   @@index([courseId])
   @@index([chapterId])
+}
+
+model Cart {
+  id            String          @id @default(cuid())
+  studentUserId String          @unique
+  student       StudentProfile  @relation(fields: [studentUserId], references: [userId], onDelete: Cascade)
+  items         CartItem[]
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+}
+
+model CartItem {
+  id         String             @id @default(cuid())
+  cartId     String
+  cart       Cart               @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  targetType CommerceTargetType
+  courseId   String?
+  course     Course?            @relation("CartItemCourse", fields: [courseId], references: [id], onDelete: Restrict)
+  chapterId  String?
+  chapter    Chapter?           @relation("CartItemChapter", fields: [chapterId], references: [id], onDelete: Restrict)
+  createdAt  DateTime           @default(now())
+
+  @@unique([cartId, courseId])
+  @@unique([cartId, chapterId])
+  @@index([cartId, createdAt])
+}
+
+model ManualPaymentMethod {
+  id              String   @id @default(cuid())
+  titleAr         String
+  instructionsAr  String
+  titleEn         String?
+  instructionsEn  String?
+  isActive        Boolean  @default(true)
+  sortOrder       Int
+  createdById     String
+  createdBy       User     @relation("ManualPaymentMethodCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  orders          Order[]
+
+  @@unique([sortOrder])
+  @@index([isActive, sortOrder, id])
+}
+
+model Order {
+  id                      String      @id @default(cuid())
+  studentUserId           String
+  student                 StudentProfile @relation(fields: [studentUserId], references: [userId], onDelete: Restrict)
+  manualPaymentMethodId   String
+  manualPaymentMethod     ManualPaymentMethod @relation(fields: [manualPaymentMethodId], references: [id], onDelete: Restrict)
+  paymentMethodSnapshot   Json
+  totalMinor              Int
+  currency                String
+  status                  OrderStatus @default(AWAITING_PAYMENT)
+  items                   OrderItem[]
+  submissions             ManualPaymentSubmission[]
+  createdAt               DateTime    @default(now())
+  updatedAt               DateTime    @updatedAt
+  approvedAt              DateTime?
+  cancelledAt             DateTime?
+
+  @@index([studentUserId, createdAt, id])
+  @@index([status, createdAt, id])
+}
+
+model OrderItem {
+  id              String             @id @default(cuid())
+  orderId         String
+  order           Order              @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  targetType      CommerceTargetType
+  courseId        String?
+  course          Course?            @relation("OrderItemCourse", fields: [courseId], references: [id], onDelete: Restrict)
+  chapterId       String?
+  chapter         Chapter?           @relation("OrderItemChapter", fields: [chapterId], references: [id], onDelete: Restrict)
+  titleSnapshot   String
+  priceMinor      Int
+  currency        String
+  entitlement     StudentEntitlement?
+  createdAt       DateTime           @default(now())
+
+  @@index([orderId])
+}
+
+model ManualPaymentSubmission {
+  id                   String                        @id @default(cuid())
+  orderId              String
+  order                Order                         @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  proofAssetId         String
+  proofAsset           Asset                         @relation("ManualPaymentProof", fields: [proofAssetId], references: [id], onDelete: Restrict)
+  transactionReference String
+  note                 String?
+  status               ManualPaymentSubmissionStatus @default(SUBMITTED)
+  reviewedById         String?
+  reviewedBy           User?                         @relation("ManualPaymentSubmissionReviewedBy", fields: [reviewedById], references: [id], onDelete: Restrict)
+  reviewedAt           DateTime?
+  rejectionReason      String?
+  createdAt            DateTime                      @default(now())
+  updatedAt            DateTime                      @updatedAt
+
+  @@index([orderId, createdAt])
+  @@index([status, createdAt, id])
+  @@index([transactionReference])
+}
+
+model CommerceIdempotencyKey {
+  id            String   @id @default(cuid())
+  studentUserId String
+  operation     String
+  key           String
+  resourceId    String
+  createdAt     DateTime @default(now())
+
+  @@unique([studentUserId, operation, key])
 }
 
 model PublisherAgreement {

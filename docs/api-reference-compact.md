@@ -46,6 +46,28 @@ Request cheat sheet for the implementation-backed API contract. Base URL is `/ap
 | `GET /api/v1/students/me` | Get the authenticated student profile | Bearer token; role must be `STUDENT` | — |
 | `PATCH /api/v1/students/me` | Update the authenticated student profile | Bearer token; role must be `STUDENT` | body: fullName?, center?, academicGradeId? |
 
+## Manual commerce
+
+| Method & path | Summary | Authorization | Inputs |
+|---|---|---|---|
+| `GET /api/v1/student/manual-payment-methods` | List active transfer instructions | Student bearer token | — |
+| `GET /api/v1/student/cart` | Read the student's cart and server-calculated EGP total | Student bearer token | — |
+| `POST /api/v1/student/cart/items` | Add a purchasable course or chapter | Student bearer token | body: targetType, targetId |
+| `DELETE /api/v1/student/cart/items/{id}` | Remove a cart item | Student bearer token | path: id |
+| `POST /api/v1/student/checkout` | Create an immutable manual-payment order | Student bearer token | header: Idempotency-Key<br>body: manualPaymentMethodId |
+| `GET /api/v1/student/orders` | List the student's orders | Student bearer token | query: page?, limit? |
+| `GET /api/v1/student/orders/{id}` | Read one owned order and safe review state | Student bearer token | path: id |
+| `POST /api/v1/student/orders/{id}/cancel` | Cancel an awaiting/rejected order | Student bearer token | path: id |
+| `POST /api/v1/student/orders/{id}/payment-proof` | Upload receipt proof and reference | Student bearer token | header: Idempotency-Key<br>multipart: file, transactionReference, note? |
+| `GET /api/v1/admin/manual-payment-methods` | List payment methods including inactive entries | Admin bearer token | — |
+| `POST /api/v1/admin/manual-payment-methods` | Create a payment method | Admin bearer token | body: titleAr, instructionsAr, titleEn?, instructionsEn? |
+| `PATCH /api/v1/admin/manual-payment-methods/{id}` | Update/activate/deactivate a payment method | Admin bearer token | path: id<br>body: titleAr?, instructionsAr?, titleEn?, instructionsEn?, isActive? |
+| `POST /api/v1/admin/manual-payment-methods/reorder` | Reorder all payment methods | Admin bearer token | body: methodIds |
+| `GET /api/v1/admin/payment-submissions` | List the manual payment review queue | Admin bearer token | query: page?, limit?, status?, studentUserId? |
+| `GET /api/v1/admin/payment-submissions/{id}` | Read a payment submission and temporary proof URL | Admin bearer token | path: id |
+| `POST /api/v1/admin/payment-submissions/{id}/approve` | Approve the full order and grant entitlements once | Admin bearer token | path: id |
+| `POST /api/v1/admin/payment-submissions/{id}/reject` | Reject proof with a student-visible reason | Admin bearer token | path: id<br>body: rejectionReason |
+
 ## Academic hierarchy
 
 | Method & path | Summary | Authorization | Inputs |

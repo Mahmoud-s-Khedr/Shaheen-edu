@@ -108,7 +108,7 @@ export class ApiClient {
   async upload<T>(
     path: string,
     file: { buffer: Buffer; filename: string; contentType: string },
-    options: { expected?: number | number[]; accessToken?: string } = {},
+    options: { expected?: number | number[]; accessToken?: string; fields?: Record<string, string>; headers?: Record<string, string> } = {},
   ): Promise<ApiResponse<T>> {
     const correlationId = randomUUID();
     const headers = new Headers({
@@ -121,11 +121,13 @@ export class ApiClient {
     if (token) headers.set('authorization', `Bearer ${token}`);
     // Let fetch set the multipart boundary; do not set content-type manually.
     const form = new FormData();
+    for (const [name, value] of Object.entries(options.fields ?? {})) form.append(name, value);
     form.append(
       'file',
       new Blob([new Uint8Array(file.buffer)], { type: file.contentType }),
       file.filename,
     );
+    for (const [name, value] of Object.entries(options.headers ?? {})) headers.set(name, value);
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), this.config.timeoutMs);
     const absolutePath = `${this.config.apiPrefix}${path}`;

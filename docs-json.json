@@ -1,6 +1,22 @@
 {
     "openapi": "3.0.0",
     "paths": {
+        "/api/v1/admin/manual-payment-methods": { "get": {}, "post": {} },
+        "/api/v1/admin/manual-payment-methods/{id}": { "patch": {} },
+        "/api/v1/admin/manual-payment-methods/reorder": { "post": {} },
+        "/api/v1/admin/payment-submissions": { "get": {} },
+        "/api/v1/admin/payment-submissions/{id}": { "get": {} },
+        "/api/v1/admin/payment-submissions/{id}/approve": { "post": {} },
+        "/api/v1/admin/payment-submissions/{id}/reject": { "post": {} },
+        "/api/v1/student/manual-payment-methods": { "get": {} },
+        "/api/v1/student/cart": { "get": {} },
+        "/api/v1/student/cart/items": { "post": {} },
+        "/api/v1/student/cart/items/{id}": { "delete": {} },
+        "/api/v1/student/checkout": { "post": {} },
+        "/api/v1/student/orders": { "get": {} },
+        "/api/v1/student/orders/{id}": { "get": {} },
+        "/api/v1/student/orders/{id}/cancel": { "post": {} },
+        "/api/v1/student/orders/{id}/payment-proof": { "post": {} },
         "/health": {
             "get": {
                 "operationId": "HealthController_check",

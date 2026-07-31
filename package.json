@@ -42,6 +42,7 @@
     "journey:content:pricing": "tsx scripts/run-journey.ts CONTENT-005",
     "journey:content:questions": "tsx scripts/run-journey.ts CONTENT-006",
     "journey:content:integration": "tsx scripts/run-journey.ts CONTENT-007",
+    "journey:content:manual-commerce": "tsx scripts/run-journey.ts CONTENT-012",
     "journey:current": "tsx scripts/run-journey.ts current",
     "journey:test": "tsx --test scripts/journeys/lib/*.test.ts",
     "api:contract:check": "tsx scripts/api-contract-check.ts",

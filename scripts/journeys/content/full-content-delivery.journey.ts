@@ -1,8 +1,9 @@
+import { readFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
 import { assert, expectStatus, expectString } from '../lib/assertions.js';
 import type { JourneyDefinition } from '../lib/types.js';
 
-// A minimal but well-formed PDF (magic bytes %PDF-) accepted by the asset validator.
-const PDF_BYTES = Buffer.from('%PDF-1.7\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n');
+const testPdf = resolve(process.cwd(), 'test-files', '0-387-28132-0.pdf');
 
 /**
  * CONTENT-003 — End-to-end content delivery across Phases 1-4.
@@ -19,14 +20,15 @@ export const fullDeliveryJourney: JourneyDefinition = {
   id: 'CONTENT-003', name: 'End-to-end content delivery (Phases 1-4)', category: 'content', dependsOn: ['CONTENT-001', 'AUTH-003'],
   async run({ clients, context, factory, step }) {
     const admin = clients.admin; const courseId = String(context.academic.courseId); const gradeId = String(context.academic.gradeId);
+    const pdfBytes = await readFile(testPdf); const filePrefix = `delivery-${factory.runId}`;
     let assetId = ''; let replacementAssetId = ''; let pdfContentId = ''; let videoAssetId = ''; let studentToken = '';
 
     await step('Phase 3: uploading a file asset to Bunny Storage', async () => {
-      const r = await admin.upload<any>('/admin/assets/upload?kind=PDF', { buffer: PDF_BYTES, filename: 'journey-lesson.pdf', contentType: 'application/pdf' });
+      const r = await admin.upload<any>('/admin/assets/upload?kind=PDF', { buffer: pdfBytes, filename: `${filePrefix}-lesson.pdf`, contentType: 'application/pdf' });
       expectStatus(r, 201); assert(r.body.status === 'READY', 'Uploaded asset must reach READY');
       assert(!('storageKey' in r.body) && !JSON.stringify(r.body).includes('assets/pdf/'), 'Storage internals must never be returned');
       assetId = r.body.id;
-      const bad = await admin.upload<any>('/admin/assets/upload?kind=PDF', { buffer: PDF_BYTES, filename: 'wrong-extension.txt', contentType: 'application/pdf' });
+      const bad = await admin.upload<any>('/admin/assets/upload?kind=PDF', { buffer: pdfBytes, filename: `${filePrefix}-wrong-extension.txt`, contentType: 'application/pdf' });
       expectStatus(bad, 400);
     });
 
@@ -56,7 +58,7 @@ export const fullDeliveryJourney: JourneyDefinition = {
     });
 
     await step('Phase 3: replacing the primary asset archives the displaced asset', async () => {
-      const upload = await admin.upload<any>('/admin/assets/upload?kind=PDF', { buffer: PDF_BYTES, filename: 'journey-lesson-v2.pdf', contentType: 'application/pdf' }); expectStatus(upload, 201); replacementAssetId = upload.body.id;
+      const upload = await admin.upload<any>('/admin/assets/upload?kind=PDF', { buffer: pdfBytes, filename: `${filePrefix}-lesson-v2.pdf`, contentType: 'application/pdf' }); expectStatus(upload, 201); replacementAssetId = upload.body.id;
       const replace = await admin.request<any>('POST', `/admin/content-items/${pdfContentId}/primary-asset`, { assetId: replacementAssetId }); expectStatus(replace, 201);
       const displaced = await admin.request<any>('GET', `/admin/assets/${assetId}`); expectStatus(displaced, 200); assert(displaced.body.status === 'ARCHIVED', 'Displaced asset must be archived once unreferenced');
     });
@@ -76,7 +78,7 @@ export const fullDeliveryJourney: JourneyDefinition = {
     });
 
     await step('Access control: partners and anonymous callers are denied protected operations', async () => {
-      const partnerUpload = await clients.partner.upload<any>('/admin/assets/upload?kind=PDF', { buffer: PDF_BYTES, filename: 'denied.pdf', contentType: 'application/pdf' }); expectStatus(partnerUpload, 403);
+      const partnerUpload = await clients.partner.upload<any>('/admin/assets/upload?kind=PDF', { buffer: pdfBytes, filename: `${filePrefix}-denied.pdf`, contentType: 'application/pdf' }); expectStatus(partnerUpload, 403);
       const partnerVideo = await clients.partner.request<any>('POST', '/admin/video-assets', { title: factory.title('Denied video') }); expectStatus(partnerVideo, 403);
       const anonAsset = await clients.public.request<any>('GET', `/admin/assets/${replacementAssetId}`); expectStatus(anonAsset, 401);
     });

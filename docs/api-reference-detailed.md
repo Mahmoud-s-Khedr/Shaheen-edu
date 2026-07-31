@@ -21,6 +21,26 @@ No path, query, or header input.
 }
 ```
 
+## Manual commerce
+
+### `GET /api/v1/admin/manual-payment-methods`
+### `POST /api/v1/admin/manual-payment-methods`
+### `PATCH /api/v1/admin/manual-payment-methods/{id}`
+### `POST /api/v1/admin/manual-payment-methods/reorder`
+### `GET /api/v1/admin/payment-submissions`
+### `GET /api/v1/admin/payment-submissions/{id}`
+### `POST /api/v1/admin/payment-submissions/{id}/approve`
+### `POST /api/v1/admin/payment-submissions/{id}/reject`
+### `GET /api/v1/student/manual-payment-methods`
+### `GET /api/v1/student/cart`
+### `POST /api/v1/student/cart/items`
+### `DELETE /api/v1/student/cart/items/{id}`
+### `POST /api/v1/student/checkout`
+### `GET /api/v1/student/orders`
+### `GET /api/v1/student/orders/{id}`
+### `POST /api/v1/student/orders/{id}/cancel`
+### `POST /api/v1/student/orders/{id}/payment-proof`
+
 ## Authentication
 
 ### `POST /api/v1/auth/students/register`

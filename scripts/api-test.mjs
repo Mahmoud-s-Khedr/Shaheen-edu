@@ -41,7 +41,6 @@ function requireSafeProviderConfig(env) {
     'BUNNY_STREAM_API_KEY',
     'BUNNY_STREAM_READ_ONLY_KEY',
     'BUNNY_STREAM_PLAYER_TOKEN_KEY',
-    'API_TEST_VIDEO_FILE',
     'API_TEST_BUNNY_WEBHOOK_URL',
   ];
   const missing = required.filter(
@@ -89,7 +88,6 @@ if (!existsSync(envPath)) {
         JOURNEY_API_PREFIX: '/api/v1',
         JOURNEY_SUPER_ADMIN_EMAIL: testEnv.SUPER_ADMIN_EMAIL,
         JOURNEY_SUPER_ADMIN_PASSWORD: testEnv.SUPER_ADMIN_PASSWORD,
-        JOURNEY_VIDEO_FILE: testEnv.API_TEST_VIDEO_FILE,
         JOURNEY_BUNNY_WEBHOOK_URL: testEnv.API_TEST_BUNNY_WEBHOOK_URL,
         JOURNEY_BUNNY_READ_ONLY_KEY: testEnv.BUNNY_STREAM_READ_ONLY_KEY,
       },

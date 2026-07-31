@@ -8,6 +8,48 @@ import {
   AccessType,
 } from '../types/roles.enum';
 
+/** Localized values returned by persisted resources; migrated records may not have English yet. */
+export class LocalizedResponseTextDto {
+  @ApiProperty()
+  ar!: string;
+
+  @ApiProperty({ type: String, nullable: true })
+  en!: string | null;
+}
+
+export class LocalizedNullableResponseTextDto {
+  @ApiProperty({ type: String, nullable: true })
+  ar!: string | null;
+
+  @ApiProperty({ type: String, nullable: true })
+  en!: string | null;
+}
+
+export class ManagedGeographyReferenceDto {
+  @ApiProperty()
+  id!: string;
+
+  @ApiProperty({ type: LocalizedResponseTextDto })
+  name!: LocalizedResponseTextDto;
+}
+
+export class StudentProfileDetailsDto {
+  @ApiProperty()
+  fullName!: string;
+
+  @ApiProperty({ type: ManagedGeographyReferenceDto, nullable: true })
+  governorate!: ManagedGeographyReferenceDto | null;
+
+  @ApiProperty({ type: ManagedGeographyReferenceDto, nullable: true })
+  center!: ManagedGeographyReferenceDto | null;
+
+  @ApiProperty()
+  nationalIdLast4!: string;
+
+  @ApiProperty({ type: String, nullable: true })
+  academicGradeId!: string | null;
+}
+
 export class ApiErrorResponseDto {
   @ApiProperty({ example: 401 })
   statusCode!: number;
@@ -161,17 +203,8 @@ export class StudentProfileDto {
   @ApiProperty({ type: String, format: 'date-time' })
   createdAt!: Date;
 
-  @ApiProperty({
-    nullable: true,
-    properties: {
-      fullName: { type: 'string' },
-      governorate: { type: 'string' },
-      center: { type: 'string', nullable: true },
-      nationalIdLast4: { type: 'string' },
-      academicGradeId: { type: 'string', nullable: true },
-    },
-  })
-  studentProfile!: object | null;
+  @ApiProperty({ type: StudentProfileDetailsDto, nullable: true })
+  studentProfile!: StudentProfileDetailsDto | null;
 }
 
 export class CurrentUserDto extends UserSummaryDto {}
@@ -212,7 +245,37 @@ export class HierarchySummaryDto {
 
 }
 
-export class AcademicGradeSummaryDto extends HierarchySummaryDto {}
+export class AcademicGradeSummaryDto {
+  @ApiProperty()
+  id!: string;
+
+  @ApiProperty({ type: LocalizedResponseTextDto })
+  title!: LocalizedResponseTextDto;
+
+  @ApiProperty()
+  slug!: string;
+
+  @ApiProperty({ type: LocalizedNullableResponseTextDto })
+  description!: LocalizedNullableResponseTextDto;
+
+  @ApiProperty()
+  sortOrder!: number;
+
+  @ApiProperty({ enum: ContentStatus })
+  status!: ContentStatus;
+
+  @ApiProperty({ type: String, format: 'date-time' })
+  createdAt!: Date;
+
+  @ApiProperty({ type: String, format: 'date-time' })
+  updatedAt!: Date;
+
+  @ApiPropertyOptional({ type: String, format: 'date-time', nullable: true })
+  publishedAt?: Date | null;
+
+  @ApiPropertyOptional({ type: String, format: 'date-time', nullable: true })
+  archivedAt?: Date | null;
+}
 
 export class SubjectSummaryDto extends HierarchySummaryDto {
   @ApiProperty()
