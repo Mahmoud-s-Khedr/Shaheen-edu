@@ -59,6 +59,7 @@ Request cheat sheet for the implementation-backed API contract. Base URL is `/ap
 | `GET /api/v1/student/orders/{id}` | Read one owned order and safe review state | Student bearer token | path: id |
 | `POST /api/v1/student/orders/{id}/cancel` | Cancel an awaiting/rejected order | Student bearer token | path: id |
 | `POST /api/v1/student/orders/{id}/payment-proof` | Upload receipt proof and reference | Student bearer token | header: Idempotency-Key<br>multipart: file, transactionReference, note? |
+| `POST /api/v1/student/orders/{orderId}/payment-submissions/{submissionId}/resubmit` | Replace a rejected receipt proof | Student bearer token | header: Idempotency-Key<br>multipart: file, transactionReference, note? |
 | `GET /api/v1/admin/manual-payment-methods` | List payment methods including inactive entries | Admin bearer token | — |
 | `POST /api/v1/admin/manual-payment-methods` | Create a payment method | Admin bearer token | body: titleAr, instructionsAr, titleEn?, instructionsEn? |
 | `PATCH /api/v1/admin/manual-payment-methods/{id}` | Update/activate/deactivate a payment method | Admin bearer token | path: id<br>body: titleAr?, instructionsAr?, titleEn?, instructionsEn?, isActive? |

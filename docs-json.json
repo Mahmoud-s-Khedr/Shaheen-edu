@@ -17,6 +17,7 @@
         "/api/v1/student/orders/{id}": { "get": {} },
         "/api/v1/student/orders/{id}/cancel": { "post": {} },
         "/api/v1/student/orders/{id}/payment-proof": { "post": {} },
+        "/api/v1/student/orders/{orderId}/payment-submissions/{submissionId}/resubmit": { "post": {} },
         "/health": {
             "get": {
                 "operationId": "HealthController_check",

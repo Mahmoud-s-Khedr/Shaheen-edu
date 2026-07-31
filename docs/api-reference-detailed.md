@@ -40,6 +40,7 @@ No path, query, or header input.
 ### `GET /api/v1/student/orders/{id}`
 ### `POST /api/v1/student/orders/{id}/cancel`
 ### `POST /api/v1/student/orders/{id}/payment-proof`
+### `POST /api/v1/student/orders/{orderId}/payment-submissions/{submissionId}/resubmit`
 
 ## Authentication
 

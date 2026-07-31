@@ -26,6 +26,11 @@ export class CommerceController {
     const part = await req.file(); if (!part) throw new BadRequestException('A file is required');
     return this.commerce.submitProof(user.id, id, key, { transactionReference: String(part.fields?.transactionReference?.value ?? ''), note: part.fields?.note?.value ? String(part.fields.note.value) : undefined, part });
   }
+  @Post('orders/:orderId/payment-submissions/:submissionId/resubmit') @ApiConsumes('multipart/form-data') @ApiOperation({ summary: 'Submit replacement receipt proof for a rejected payment submission' })
+  async resubmit(@CurrentUser() user: RequestUser, @Param('orderId') orderId: string, @Param('submissionId') submissionId: string, @Headers('idempotency-key') key: string, @Req() req: any) {
+    const part = await req.file(); if (!part) throw new BadRequestException('A file is required');
+    return this.commerce.resubmitProof(user.id, orderId, submissionId, key, { transactionReference: String(part.fields?.transactionReference?.value ?? ''), note: part.fields?.note?.value ? String(part.fields.note.value) : undefined, part });
+  }
 }
 
 @ApiTags('admin/manual-payments') @ApiBearerAuth() @UseGuards(RolesGuard) @Roles(Role.ADMIN, Role.SUPER_ADMIN)

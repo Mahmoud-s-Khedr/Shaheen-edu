@@ -5,7 +5,7 @@
 > Implemented endpoints remain documented in
 > [api-reference-compact.md](api-reference-compact.md).
 
-## Implementation status (reviewed 2026-07-30)
+## Implementation status (reviewed 2026-07-31)
 
 - [x] Student registration and profile updates persist a published
   `academicGradeId`.
@@ -14,8 +14,10 @@
   entitlement-aware lock indicators.
 - [x] Course/chapter pricing and course/chapter `StudentEntitlement` records
   exist; entitled students can retrieve published content and protected assets.
-- [ ] Commerce, progress, assessments, and analytics APIs in this roadmap are
-  not implemented.
+- [x] Manual commerce supports carts, immutable EGP orders, receipt-proof
+  submission, staff review, and payment-backed course/chapter entitlements.
+- [ ] Progress, assessments, and analytics APIs in this roadmap are not
+  implemented.
 
 `[x]` means the implementation exists. `[ ]` means the item remains planned;
 an existing endpoint with a narrower or different response is called out in
@@ -47,7 +49,7 @@ to a subject, and a chapter belongs to a course.
 | --- | --- | --- | --- |
 | Grade selection | [x] | Registration accepts `academicGradeId`; `PATCH /api/v1/students/me` can change it. | — |
 | Public hierarchy | [x] Foundation | `GET /api/v1/academic-grades`, `GET /api/v1/catalog/subjects`, `GET /api/v1/catalog/courses`, and `GET /api/v1/catalog/courses/:id/outline` exist. | No public chapter/lesson hierarchy APIs; list APIs require callers to know parent IDs. |
-| Paid access | [x] Foundation | Course and chapter have price/purchasable fields; `StudentEntitlement` supports course or chapter; student library and entitlement views exist. | No order, payment, or checkout. |
+| Paid access | [x] | Course/chapter pricing, `StudentEntitlement`, carts, manual-payment orders, proof review, and payment-backed grants exist. | No refunds, payment expiry, or PSP integration. |
 | Questions | [x] Authoring only | Questions are linked to a course and may be placed at course/chapter/lesson/section level. | No learner-safe question delivery, generated quiz, attempt, answer, result, or history model. |
 | Content delivery | [x] Foundation | An entitled student can fetch a content item and its protected assets. | No progress, resume, next-item navigation, or completion view. |
 
@@ -141,31 +143,30 @@ payment instruction shown by the frontend, uploads a proof image, and an
 administrator approves or rejects the submission. There is no PSP redirect,
 card capture, provider callback, or payment webhook in this model.
 
-| Model | Essential responsibility |
-| --- | --- |
-| `Cart` / `CartItem` | One active cart per student; item targets exactly one course or chapter. |
-| `ManualPaymentMethod` | Admin-managed, active payment instructions shown to students (for example, transfer account/wallet details, title, and display order). The order snapshots the selected method text so later edits do not change an existing payment request. |
-| `Order` | Immutable purchase snapshot: student, total EGP amount, selected manual-payment instruction snapshot, lifecycle status, timestamps. |
-| `OrderItem` | Immutable price and target snapshot for each purchased course/chapter. |
-| `ManualPaymentSubmission` | A student's submitted transfer reference, optional note, receipt-proof asset, review status, reviewer, rejection reason, and timestamps. Keep the submission history so a rejected order can be corrected and resubmitted. |
-| `Refund` | Refund/cancellation history and corresponding entitlement action, when refunds become part of the operating process. |
+| Status | Model | Essential responsibility |
+| --- | --- | --- |
+| [x] | `Cart` / `CartItem` | One active cart per student; item targets exactly one course or chapter. |
+| [x] | `ManualPaymentMethod` | Admin-managed, active payment instructions shown to students (for example, transfer account/wallet details, title, and display order). The order snapshots the selected method text so later edits do not change an existing payment request. |
+| [x] | `Order` | Immutable purchase snapshot: student, total EGP amount, selected manual-payment instruction snapshot, lifecycle status, timestamps. |
+| [x] | `OrderItem` | Immutable price and target snapshot for each purchased course/chapter. |
+| [x] | `ManualPaymentSubmission` | A student's submitted transfer reference, optional note, receipt-proof asset, review status, reviewer, rejection reason, and timestamps. Rejected orders preserve submission history and accept replacement proof. |
+| [ ] | `Refund` | Refund/cancellation history and corresponding entitlement action, when refunds become part of the operating process. |
 
-All schema additions above remain [ ]. The existing `StudentEntitlement` model
-already supports exactly one course or chapter target and is the implemented
-foundation for the proposed fulfilment flow.
+All listed commerce schema additions except `Refund` are implemented. The
+existing `StudentEntitlement` model supports exactly one course or chapter
+target and is the implemented foundation for the fulfilment flow.
 
 `StudentEntitlement` remains the authoritative access record. An **approved**
 manual-payment submission creates exactly one entitlement per order item with
-`source = PAYMENT`. Add an optional `orderItemId` reference (or equivalent
-immutable source reference) to make the grant traceable and prevent
-duplication.
+`source = PAYMENT`. The implemented optional `orderItemId` reference makes the
+grant traceable and prevents duplication.
 
 Recommended lifecycle:
 
 ```text
-DRAFT_CART → AWAITING_PAYMENT → SUBMITTED → UNDER_REVIEW → APPROVED
-                                        └──→ REJECTED → SUBMITTED (replacement proof)
-AWAITING_PAYMENT / REJECTED → CANCELLED or EXPIRED
+DRAFT_CART → AWAITING_PAYMENT → SUBMITTED → APPROVED
+                                    └──→ REJECTED → SUBMITTED (replacement proof)
+AWAITING_PAYMENT / REJECTED → CANCELLED
 ```
 
 Only an administrator may transition a submission to `APPROVED` or `REJECTED`.
@@ -177,30 +178,35 @@ existing admin-only general asset upload endpoint.
 
 ### Proposed commerce APIs
 
-| Proposed endpoint | Purpose |
-| --- | --- |
-| `POST /api/v1/student/cart/items` | Add an eligible course or chapter. The server validates grade, publication, purchasability, price, and existing access. |
-| `GET /api/v1/student/cart` | Cart lines with server-calculated current totals and EGP prices. |
-| `DELETE /api/v1/student/cart/items/:itemId` | Remove a line. |
-| `GET /api/v1/student/manual-payment-methods` | Active payment instructions the frontend can present before the student creates an order. |
-| `POST /api/v1/student/checkout` | Atomically create an `AWAITING_PAYMENT` order and immutable order items, snapshotting the selected payment method and server-calculated EGP total. |
-| `GET /api/v1/student/orders` | Student purchase history. |
-| `GET /api/v1/student/orders/:orderId` | One order, selected instruction snapshot, submission/review state, any safe rejection reason, purchased targets, and fulfilment state. |
-| `POST /api/v1/student/orders/:orderId/payment-proof` | Upload one receipt image and transfer reference for an eligible order, creating a `SUBMITTED` manual-payment submission. |
-| `POST /api/v1/student/orders/:orderId/payment-submissions/:submissionId/resubmit` | Submit replacement proof after a rejection; preserve the rejected submission as audit history. |
-| `GET /api/v1/admin/manual-payment-methods` | List configured payment instructions, including inactive methods. |
-| `POST /api/v1/admin/manual-payment-methods` | Create a payment instruction. |
-| `PATCH /api/v1/admin/manual-payment-methods/:id` | Update, reorder, activate, or deactivate a payment instruction. |
-| `GET /api/v1/admin/payment-submissions` | Queue of submitted/reviewable payments, filterable by status, student, and date. |
-| `GET /api/v1/admin/payment-submissions/:id` | Full review view, including the private proof asset and immutable order snapshot. |
-| `POST /api/v1/admin/payment-submissions/:id/approve` | Atomically approve the submission and grant its order's entitlements once. |
-| `POST /api/v1/admin/payment-submissions/:id/reject` | Reject with a staff-visible and student-safe reason; the student may resubmit if the order remains eligible. |
+| Status | Proposed endpoint | Purpose |
+| --- | --- | --- |
+| [x] | `POST /api/v1/student/cart/items` | Add an eligible course or chapter. The server validates grade, publication, purchasability, price, and existing access. |
+| [x] | `GET /api/v1/student/cart` | Cart lines with server-calculated current totals and EGP prices. |
+| [x] | `DELETE /api/v1/student/cart/items/:itemId` | Remove a line. |
+| [x] | `GET /api/v1/student/manual-payment-methods` | Active payment instructions the frontend can present before the student creates an order. |
+| [x] | `POST /api/v1/student/checkout` | Atomically create an `AWAITING_PAYMENT` order and immutable order items, snapshotting the selected payment method and server-calculated EGP total. |
+| [x] | `GET /api/v1/student/orders` | Student purchase history. |
+| [x] | `GET /api/v1/student/orders/:orderId` | One order, selected instruction snapshot, submission/review state, any safe rejection reason, purchased targets, and fulfilment state. |
+| [x] | `POST /api/v1/student/orders/:orderId/payment-proof` | Upload one receipt image and transfer reference for an eligible order, creating a `SUBMITTED` manual-payment submission. |
+| [x] | `POST /api/v1/student/orders/:orderId/payment-submissions/:submissionId/resubmit` | Submit replacement proof after a rejection; preserve the rejected submission as audit history. |
+| [x] | `GET /api/v1/admin/manual-payment-methods` | List configured payment instructions, including inactive methods. |
+| [x] | `POST /api/v1/admin/manual-payment-methods` | Create a payment instruction. |
+| [x] | `PATCH /api/v1/admin/manual-payment-methods/:id` | Update, reorder, activate, or deactivate a payment instruction. |
+| [x] | `GET /api/v1/admin/payment-submissions` | Queue of submitted/reviewable payments, filterable by status, student, and date. |
+| [x] | `GET /api/v1/admin/payment-submissions/:id` | Full review view, including the private proof asset and immutable order snapshot. |
+| [x] | `POST /api/v1/admin/payment-submissions/:id/approve` | Atomically approve the submission and grant its order's entitlements once. |
+| [x] | `POST /api/v1/admin/payment-submissions/:id/reject` | Reject with a staff-visible and student-safe reason; the student may resubmit if the order remains eligible. |
 
-All commerce APIs above remain [ ].
+`POST /api/v1/student/orders/:orderId/payment-proof` accepts an initial proof
+only; rejected orders must use the dedicated resubmission route. `POST
+/api/v1/student/orders/:orderId/cancel` is also implemented for awaiting-payment
+or rejected orders.
 
 The API server—not the client—is authoritative for price, total, eligibility,
-payment state, review decisions, and entitlement fulfilment. Checkout, proof
-submission, and approval require idempotency. The displayed payment
+payment state, review decisions, and entitlement fulfilment. Checkout and proof
+submission require idempotency keys; repeating approval is safe because an
+already approved submission is returned without creating a second entitlement.
+The displayed payment
 instruction is guidance only; an uploaded proof is not itself a verified
 payment and must grant no access until approved.
 
@@ -319,9 +325,10 @@ answer keys, or staff-only question-quality data.
   return published hierarchy/content records.
 - [x] `Course` ownership covers its chapters; a chapter entitlement covers that
   chapter and descendants only.
-- Use idempotency keys for checkout, manual-payment proof submission, payment
-  approval, answer autosave, and assessment submission.
-- [x] Entitlement grants and revocations are audited; payment, grade-change,
-  and generated-assessment audits remain [ ].
+- [x] Checkout and manual-payment proof submission require idempotency keys;
+  approval is safe to retry and cannot grant a second entitlement.
+- [ ] Answer autosave and assessment submission idempotency remain planned.
+- [x] Entitlement grants/revocations and implemented commerce events are
+  audited; grade-change and generated-assessment audits remain [ ].
 - [x] Existing APIs use the current error envelope, bearer authentication,
   correlation IDs, and pagination conventions.
