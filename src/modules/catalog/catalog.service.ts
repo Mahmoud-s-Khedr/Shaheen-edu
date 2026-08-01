@@ -7,7 +7,7 @@ import { CatalogSubjectsQueryDto } from './dto/catalog-subjects-query.dto';
 
 const published = ContentStatus.PUBLISHED;
 const order = [{ sortOrder: 'asc' as const }, { id: 'asc' as const }];
-const publicNode = (record: any, isLocked?: boolean) => ({ id: record.id, title: record.title, slug: record.slug, description: record.description, sortOrder: record.sortOrder, ...(record.accessType ? { accessType: record.accessType } : {}), ...(isLocked === undefined ? {} : { isLocked }) });
+const publicNode = (record: any, isLocked?: boolean) => ({ id: record.id, title: record.title, slug: record.slug, description: record.description, sortOrder: record.sortOrder, coverAssetId: record.coverAssetId ?? null, ...(record.accessType ? { accessType: record.accessType } : {}), ...(isLocked === undefined ? {} : { isLocked }) });
 const publicItem = (placement: any, isLocked: boolean) => ({ id: placement.contentItem.id, type: placement.contentItem.type, title: placement.contentItem.title, description: placement.contentItem.description, estimatedDuration: placement.contentItem.estimatedDuration, accessType: placement.contentItem.accessType, isLocked, sortOrder: placement.sortOrder });
 const placements = { where: { contentItem: { status: published } }, include: { contentItem: true }, orderBy: order };
 

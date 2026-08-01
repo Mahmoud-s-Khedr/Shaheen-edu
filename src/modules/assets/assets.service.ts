@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { createHash, randomUUID } from 'node:crypto';
 import { PassThrough, Transform, type Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
-import { AssetKind, AssetStatus, ContentItemType, Role } from '../../common/types/roles.enum';
+import { AssetKind, AssetStatus, ContentItemType, ContentStatus, Role } from '../../common/types/roles.enum';
 import type { RequestUser } from '../../common/types/request-with-user.types';
 import type { AppConfig } from '../../config/configuration';
 import { PrismaService } from '../../database/prisma.service';
@@ -84,6 +84,39 @@ export class AssetsService {
   assertCompatible(asset: { kind: AssetKind }, type: ContentItemType) { const expected: Record<ContentItemType, AssetKind | undefined> = { TEXT: undefined, EXTERNAL_LINK: undefined, VIDEO: AssetKind.VIDEO, PDF: AssetKind.PDF, IMAGE: AssetKind.IMAGE, DOCUMENT: AssetKind.DOCUMENT, DOWNLOADABLE_FILE: AssetKind.DOWNLOADABLE_FILE }; if (expected[type] && asset.kind !== expected[type]) throw new BadRequestException('Asset kind is incompatible with content type'); }
   protectedUrl(asset: { storageKey: string | null }) { if (!asset.storageKey) throw new ConflictException('Asset has no file delivery URL'); return this.storage.createProtectedUrl(asset.storageKey, new Date(Date.now() + this.config.urlTtlSeconds * 1000)); }
   protectedAccess(asset: { storageKey: string | null }) { const expiresAt = new Date(Date.now() + this.config.urlTtlSeconds * 1000); if (!asset.storageKey) throw new ConflictException('Asset has no file delivery URL'); return { url: this.storage.createProtectedUrl(asset.storageKey, expiresAt), expiresAt }; }
+  async adminAccess(actor: RequestUser, id: string) {
+    this.assertAdmin(actor);
+    const asset = await this.getReady(id);
+    if (asset.kind === AssetKind.PAYMENT_PROOF || asset.kind === AssetKind.VIDEO) throw new NotFoundException('Asset preview is not available');
+    return this.protectedAccess(asset);
+  }
+
+  /** Public only for fully published hierarchy covers; archived paths require a retained student snapshot. */
+  async coverAccess(resource: string, id: string, studentUserId?: string) {
+    const target = await this.coverTarget(resource, id);
+    if (!target.coverAssetId) throw new NotFoundException('Cover image not found');
+    const asset = await this.getReady(target.coverAssetId);
+    if (asset.kind !== AssetKind.COVER_IMAGE && asset.kind !== AssetKind.IMAGE) throw new NotFoundException('Cover image not found');
+    const draft = target.nodes.find((node: any) => node.status === ContentStatus.DRAFT);
+    if (draft) throw new NotFoundException('Cover image not found');
+    const archived = target.nodes.find((node: any) => node.status === ContentStatus.ARCHIVED);
+    if (archived) {
+      if (!studentUserId) throw new ForbiddenException('Student authentication is required');
+      const retained = await (this.prisma as any).archivedAccessSnapshot.findFirst({ where: { studentUserId, resourceType: archived.type, resourceId: archived.id, revokedAt: null }, select: { id: true } });
+      if (!retained) throw new ForbiddenException('Archived access is required');
+    }
+    return this.protectedAccess(asset);
+  }
+
+  private async coverTarget(resource: string, id: string): Promise<{ coverAssetId: string | null; nodes: any[] }> {
+    if (resource === 'grades') { const x = await this.prisma.academicGrade.findUnique({ where: { id } }); if (!x) throw new NotFoundException('Hierarchy record not found'); return { coverAssetId: x.coverAssetId, nodes: [{ ...x, type: 'ACADEMIC_GRADE' }] }; }
+    if (resource === 'subjects') { const x = await this.prisma.subject.findUnique({ where: { id }, include: { academicGrade: true } }); if (!x) throw new NotFoundException('Hierarchy record not found'); return { coverAssetId: x.coverAssetId, nodes: [{ ...x, type: 'SUBJECT' }, { ...x.academicGrade, type: 'ACADEMIC_GRADE' }] }; }
+    if (resource === 'courses') { const x = await this.prisma.course.findUnique({ where: { id }, include: { subject: { include: { academicGrade: true } } } }); if (!x) throw new NotFoundException('Hierarchy record not found'); return { coverAssetId: x.coverAssetId, nodes: [{ ...x, type: 'COURSE' }, { ...x.subject, type: 'SUBJECT' }, { ...x.subject.academicGrade, type: 'ACADEMIC_GRADE' }] }; }
+    if (resource === 'chapters') { const x = await this.prisma.chapter.findUnique({ where: { id }, include: { course: { include: { subject: { include: { academicGrade: true } } } } } }); if (!x) throw new NotFoundException('Hierarchy record not found'); return { coverAssetId: x.coverAssetId, nodes: [{ ...x, type: 'CHAPTER' }, { ...x.course, type: 'COURSE' }, { ...x.course.subject, type: 'SUBJECT' }, { ...x.course.subject.academicGrade, type: 'ACADEMIC_GRADE' }] }; }
+    if (resource === 'lessons') { const x = await this.prisma.lesson.findUnique({ where: { id }, include: { chapter: { include: { course: { include: { subject: { include: { academicGrade: true } } } } } } } }); if (!x) throw new NotFoundException('Hierarchy record not found'); return { coverAssetId: x.coverAssetId, nodes: [{ ...x, type: 'LESSON' }, { ...x.chapter, type: 'CHAPTER' }, { ...x.chapter.course, type: 'COURSE' }, { ...x.chapter.course.subject, type: 'SUBJECT' }, { ...x.chapter.course.subject.academicGrade, type: 'ACADEMIC_GRADE' }] }; }
+    if (resource === 'sections') { const x = await this.prisma.section.findUnique({ where: { id }, include: { lesson: { include: { chapter: { include: { course: { include: { subject: { include: { academicGrade: true } } } } } } } } } }); if (!x) throw new NotFoundException('Hierarchy record not found'); return { coverAssetId: x.coverAssetId, nodes: [{ ...x, type: 'SECTION' }, { ...x.lesson, type: 'LESSON' }, { ...x.lesson.chapter, type: 'CHAPTER' }, { ...x.lesson.chapter.course, type: 'COURSE' }, { ...x.lesson.chapter.course.subject, type: 'SUBJECT' }, { ...x.lesson.chapter.course.subject.academicGrade, type: 'ACADEMIC_GRADE' }] }; }
+    throw new BadRequestException('Unsupported cover resource');
+  }
   async setCover(actor: RequestUser, resource: string, id: string, assetId: string) {
     this.assertAdmin(actor); const asset = await this.getReady(assetId); if (asset.kind !== AssetKind.COVER_IMAGE && asset.kind !== AssetKind.IMAGE) throw new BadRequestException('A cover must be an image asset');
     const clients: Record<string, { findUnique: Function; update: Function }> = { grades: this.prisma.academicGrade, subjects: this.prisma.subject, courses: this.prisma.course, chapters: this.prisma.chapter, lessons: this.prisma.lesson, sections: this.prisma.section };

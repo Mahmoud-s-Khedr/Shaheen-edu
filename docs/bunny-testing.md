@@ -10,8 +10,8 @@ handing the APIs to the frontend. For dashboard setup and environment variables 
 | Layer | Bunny | What it proves | When to use |
 | --- | --- | --- | --- |
 | **1. Automated tests** (`jest`) | Mocked | Validation, delivery signing, webhook verification, idempotency, failure/retry, role protection — deterministic, no credentials. | Every change; CI. |
-| **2. End-to-end journey** (`CONTENT-003`) | **Real** | Storage upload → signed URL resolves; video create → signed TUS authorization. | Before frontend integration; after config changes. |
-| **3. Phase 9 acceptance** (`CONTENT-007`) | **Real** | Complete hierarchy, real TUS bytes, verified webhook readiness, protected PDF/playback delivery, and denial boundaries. | Required release gate. |
+| **2. End-to-end journey** (`CONTENT-003`) | **Real** | Storage upload → public and student signed URLs resolve and download. | Before frontend integration; after config changes. |
+| **3. Phase 9 acceptance** (`CONTENT-007`) | **Real** | Complete hierarchy, real TUS bytes, verified webhook readiness, admin asset preview, public cover, protected PDF/question/playback delivery, and denial boundaries. | Required release gate. |
 | **4. Manual test console** (`dev/manual-test-console.html`) | **Real** | Interactive diagnosis of the live browser flow. | Troubleshooting and exploratory checks. |
 
 Start at layer 1 (fast, free), then 2, then 3.

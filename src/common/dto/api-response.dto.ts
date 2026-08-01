@@ -231,6 +231,9 @@ export class HierarchySummaryDto {
   @ApiPropertyOptional({ enum: AccessType })
   accessType?: AccessType;
 
+  @ApiPropertyOptional({ type: String, nullable: true })
+  coverAssetId?: string | null;
+
   @ApiProperty({ type: String, format: 'date-time' })
   createdAt!: Date;
 
@@ -263,6 +266,9 @@ export class AcademicGradeSummaryDto {
 
   @ApiProperty({ enum: ContentStatus })
   status!: ContentStatus;
+
+  @ApiPropertyOptional({ type: String, nullable: true })
+  coverAssetId?: string | null;
 
   @ApiProperty({ type: String, format: 'date-time' })
   createdAt!: Date;

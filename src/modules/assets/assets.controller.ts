@@ -15,6 +15,7 @@ export class AssetsController {
   async upload(@CurrentUser() actor: RequestUser, @Req() req: any, @Query('kind') kind: AssetKind) { if (!Object.values(AssetKind).includes(kind)) throw new BadRequestException('Unsupported asset kind'); const part = await req.file(); if (!part) throw new BadRequestException('A file is required'); return this.assets.upload(actor, kind, part); }
   @Get() @ApiOperation({ summary: 'List assets' }) list(@CurrentUser() actor: RequestUser) { return this.assets.list(actor); }
   @Get(':id') @ApiOperation({ summary: 'Get an asset by ID' }) get(@CurrentUser() actor: RequestUser, @Param('id') id: string) { return this.assets.get(actor, id); }
+  @Get(':id/access') @ApiOperation({ summary: 'Get a short-lived preview URL for an admin asset' }) access(@CurrentUser() actor: RequestUser, @Param('id') id: string) { return this.assets.adminAccess(actor, id); }
   @Post(':id/archive') @ApiOperation({ summary: 'Archive an asset' }) archive(@CurrentUser() actor: RequestUser, @Param('id') id: string) { return this.assets.archive(actor, id); }
   @Delete(':id') @ApiOperation({ summary: 'Delete an unused draft asset' }) delete(@CurrentUser() actor: RequestUser, @Param('id') id: string) { return this.assets.delete(actor, id); }
   @Post('covers/:resource/:id') @ApiOperation({ summary: 'Set a hierarchy record cover image' }) setCover(@CurrentUser() actor: RequestUser, @Param('resource') resource: string, @Param('id') id: string, @Body('assetId') assetId: string) { return this.assets.setCover(actor, resource, id, assetId); }

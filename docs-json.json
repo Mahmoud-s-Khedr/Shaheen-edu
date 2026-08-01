@@ -7709,6 +7709,16 @@
                 ]
             }
         },
+        "/api/v1/admin/assets/{id}/access": {
+            "get": {
+                "operationId": "AssetsController_access_v1",
+                "parameters": [{ "name": "id", "required": true, "in": "path", "schema": { "type": "string" } }],
+                "responses": { "200": { "description": "" } },
+                "security": [{ "bearer": [] }],
+                "summary": "Get a short-lived preview URL for an admin asset",
+                "tags": ["admin/assets"]
+            }
+        },
         "/api/v1/admin/assets/covers/{resource}/{id}": {
             "post": {
                 "operationId": "AssetsController_setCover_v1",
@@ -7865,6 +7875,16 @@
                 "tags": [
                     "admin/entitlements"
                 ]
+            }
+        },
+        "/api/v1/admin/entitlements/archived-access/{id}/revoke": {
+            "post": {
+                "operationId": "EntitlementsController_revokeArchivedAccess_v1",
+                "parameters": [{ "name": "id", "required": true, "in": "path", "schema": { "type": "string" } }],
+                "responses": { "201": { "description": "" } },
+                "security": [{ "bearer": [] }],
+                "summary": "Revoke retained archived access for a student",
+                "tags": ["admin/entitlements"]
             }
         },
         "/api/v1/student/content-items/{id}": {
@@ -8190,6 +8210,19 @@
                 "tags": [
                     "integrations/bunny-stream"
                 ]
+            }
+        },
+        "/api/v1/catalog/{resource}/{id}/cover/access": {
+            "get": {
+                "operationId": "CoverAccessController_access_v1",
+                "parameters": [
+                    { "name": "resource", "required": true, "in": "path", "schema": { "type": "string" } },
+                    { "name": "id", "required": true, "in": "path", "schema": { "type": "string" } }
+                ],
+                "responses": { "200": { "description": "" } },
+                "security": [{ "bearer": [] }],
+                "summary": "Get a protected URL for a visible hierarchy cover image",
+                "tags": ["catalog/covers"]
             }
         },
         "/api/v1/catalog/subjects": {

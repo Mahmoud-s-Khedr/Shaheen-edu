@@ -16,6 +16,7 @@ import { phase9IntegrationJourney } from './content/phase9-integration.journey.j
 import { apiCoverageJourney } from './content/api-coverage.journey.js';
 import { manualCommerceJourney } from './content/manual-commerce.journey.js';
 import { studentLearningJourney } from './content/student-learning.journey.js';
+import { assetAccessJourney } from './content/asset-access.journey.js';
 import type { JourneyDefinition } from './lib/types.js';
 
 export const journeys: JourneyDefinition[] = [
@@ -37,4 +38,5 @@ export const journeys: JourneyDefinition[] = [
   apiCoverageJourney,
   manualCommerceJourney,
   studentLearningJourney,
+  assetAccessJourney,
 ];

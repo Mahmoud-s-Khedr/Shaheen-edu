@@ -486,7 +486,7 @@ export class ContentItemsService {
   }
 
   async addAttachment(actor: RequestUser, id: string, assetId: string) {
-    this.assertActorRole(actor); await this.getOrThrow(id); await this.assets.getReady(assetId);
+    this.assertActorRole(actor); await this.getOrThrow(id); const asset = await this.assets.getReady(assetId); if (asset.kind === 'PAYMENT_PROOF') throw new BadRequestException('Payment proofs cannot be content attachments');
     const max = await this.prisma.assetReference.aggregate({ where: { contentItemId: id }, _max: { sortOrder: true } });
     await this.prisma.assetReference.create({ data: { contentItemId: id, assetId, sortOrder: (max._max.sortOrder ?? 0) + 1 } });
     await this.auditService.record({ actorUserId: actor.id, action: 'CONTENT_ATTACHMENT_ADDED', targetType: 'ContentItem', targetId: id, metadata: { assetId } });

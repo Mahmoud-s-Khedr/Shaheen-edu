@@ -17,5 +17,6 @@ export class EntitlementsController {
   constructor(private readonly service: EntitlementsService) {}
   @Post() @ApiOperation({ summary: 'Grant a student entitlement' }) grant(@CurrentUser() actor: RequestUser, @Body() dto: GrantEntitlementDto) { return this.service.grant(actor, dto); }
   @Post(':id/revoke') @ApiOperation({ summary: 'Revoke a student entitlement' }) revoke(@CurrentUser() actor: RequestUser, @Param('id') id: string) { return this.service.revoke(actor, id); }
+  @Post('archived-access/:id/revoke') @ApiOperation({ summary: 'Revoke retained archived access for a student' }) revokeArchivedAccess(@CurrentUser() actor: RequestUser, @Param('id') id: string) { return this.service.revokeArchivedAccess(actor, id); }
   @Get() @ApiOperation({ summary: 'List student entitlements' }) list(@CurrentUser() actor: RequestUser, @Query('studentUserId') studentUserId?: string) { return this.service.list(actor, studentUserId); }
 }

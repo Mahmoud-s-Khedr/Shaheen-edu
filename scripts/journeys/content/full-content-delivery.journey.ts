@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { assert, expectStatus, expectString } from '../lib/assertions.js';
+import { fetchDeliveryUrl } from '../lib/delivery.js';
 import type { JourneyDefinition } from '../lib/types.js';
 
 const testPdf = resolve(process.cwd(), 'test-files', '0-387-28132-0.pdf');
@@ -47,14 +48,14 @@ export const fullDeliveryJourney: JourneyDefinition = {
     await step('Phase 3: public delivery returns a short-lived signed Bunny URL that resolves', async () => {
       const access = await clients.public.request<any>('GET', `/catalog/content-items/${pdfContentId}/assets/${assetId}/access`); expectStatus(access, 200);
       expectString(access.body.url, 'signed url'); assert(/token=.+expires=\d+/.test(access.body.url), 'Delivery URL must be token-authenticated and time-limited'); assert(Boolean(access.body.expiresAt), 'Delivery URL must expose an expiry');
-      const fetched = await fetch(access.body.url); assert(fetched.status >= 200 && fetched.status < 300, `Signed Bunny URL must resolve (received ${fetched.status})`);
+      await fetchDeliveryUrl(access.body.url, 'Public PDF delivery');
     });
 
     await step('Phase 3/7: an authenticated student receives a signed URL for the same content', async () => {
       const phone = factory.phone(); const password = factory.password('Student');
       const reg = await clients.public.request<any>('POST', '/auth/students/register', { fullName: factory.title('Delivery Student'), nationalId: factory.nationalId(), phone: `+20${phone.slice(1)}`, parentPhone: factory.phone(), governorateId: String(context.academic.governorateId), academicGradeId: gradeId, password });
       expectStatus(reg, 201); studentToken = reg.body.accessToken; context.created.students.push(reg.body.user.id);
-      const access = await clients.public.request<any>('GET', `/student/content-items/${pdfContentId}/assets/${assetId}/access`, undefined, { accessToken: studentToken }); expectStatus(access, 200); expectString(access.body.url, 'student signed url');
+      const access = await clients.public.request<any>('GET', `/student/content-items/${pdfContentId}/assets/${assetId}/access`, undefined, { accessToken: studentToken }); expectStatus(access, 200); expectString(access.body.url, 'student signed url'); await fetchDeliveryUrl(access.body.url, 'Student PDF delivery');
     });
 
     await step('Phase 3: replacing the primary asset archives the displaced asset', async () => {

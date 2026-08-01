@@ -313,7 +313,38 @@ export class StudentCatalogService {
         },
       ];
     });
-    return { data };
+    return { data: [...data, ...(await this.archivedLibrary(studentUserId))] };
+  }
+
+  private async archivedLibrary(studentUserId: string) {
+    const snapshots = await (this.prisma as any).archivedAccessSnapshot.findMany({ where: { studentUserId, revokedAt: null }, orderBy: [{ archivedAt: 'desc' }, { id: 'desc' }] });
+    const rows: any[] = [];
+    for (const snapshot of snapshots) {
+      const record = await this.archivedRecord(snapshot.resourceType, snapshot.resourceId);
+      if (!record) continue;
+      const path = this.archivedPath(snapshot.resourceType, record);
+      rows.push({ archivedAccessSnapshotId: snapshot.id, targetType: snapshot.resourceType, target: this.node(record), course: path.course ? this.node(path.course) : null, subject: path.subject ? this.node(path.subject) : null, academicGrade: path.grade ? this.gradeDto(path.grade) : null, retainedAccess: true, archivedAt: snapshot.archivedAt });
+    }
+    return rows;
+  }
+
+  private async archivedRecord(type: string, id: string): Promise<any> {
+    if (type === 'ACADEMIC_GRADE') return this.prisma.academicGrade.findUnique({ where: { id } });
+    if (type === 'SUBJECT') return this.prisma.subject.findUnique({ where: { id }, include: { academicGrade: true } });
+    if (type === 'COURSE') return this.prisma.course.findUnique({ where: { id }, include: { subject: { include: { academicGrade: true } } } });
+    if (type === 'CHAPTER') return this.prisma.chapter.findUnique({ where: { id }, include: { course: { include: { subject: { include: { academicGrade: true } } } } } });
+    if (type === 'LESSON') return this.prisma.lesson.findUnique({ where: { id }, include: { chapter: { include: { course: { include: { subject: { include: { academicGrade: true } } } } } } } });
+    if (type === 'SECTION') return this.prisma.section.findUnique({ where: { id }, include: { lesson: { include: { chapter: { include: { course: { include: { subject: { include: { academicGrade: true } } } } } } } } } });
+    return null;
+  }
+
+  private archivedPath(type: string, record: any) {
+    if (type === 'ACADEMIC_GRADE') return { grade: record, subject: null, course: null };
+    if (type === 'SUBJECT') return { grade: record.academicGrade, subject: record, course: null };
+    if (type === 'COURSE') return { grade: record.subject.academicGrade, subject: record.subject, course: record };
+    if (type === 'CHAPTER') return { grade: record.course.subject.academicGrade, subject: record.course.subject, course: record.course };
+    if (type === 'LESSON') return { grade: record.chapter.course.subject.academicGrade, subject: record.chapter.course.subject, course: record.chapter.course };
+    return { grade: record.lesson.chapter.course.subject.academicGrade, subject: record.lesson.chapter.course.subject, course: record.lesson.chapter.course };
   }
 
   async entitlements(studentUserId: string, query: PaginationQueryDto) {
@@ -445,6 +476,7 @@ export class StudentCatalogService {
       slug: record.slug,
       description: record.description,
       sortOrder: record.sortOrder,
+      coverAssetId: record.coverAssetId ?? null,
     };
   }
   private gradeDto(grade: any) {
@@ -454,6 +486,7 @@ export class StudentCatalogService {
       slug: grade.slug,
       description: { ar: grade.descriptionAr, en: grade.descriptionEn },
       sortOrder: grade.sortOrder,
+      coverAssetId: grade.coverAssetId ?? null,
     };
   }
   private contentItem(item: any, sortOrder: number) {

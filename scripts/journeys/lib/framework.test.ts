@@ -7,6 +7,7 @@ import { loadEnvironment } from './environment.js';
 import { JourneyRunner } from './journey-runner.js';
 import { redact } from './redaction.js';
 import { expectStatus, JourneyAssertionError } from './assertions.js';
+import { fetchDeliveryUrl, getDeliveryFetches, resetDeliveryFetches } from './delivery.js';
 import { operationTemplateFor } from '../../api-testing/operation-path.js';
 import type { JourneyDefinition } from './types.js';
 
@@ -61,6 +62,27 @@ test('API client sends isolated bearer token and assertion failures throw', asyn
     const response = await client.request('GET', '/auth/me'); assert.equal(authorization, 'Bearer actor-token'); assert.throws(() => expectStatus(response, 201), JourneyAssertionError);
     await client.request('POST', '/webhook', undefined, { rawBody: '{}', headers: { 'x-test-signature': 'signed' }, track: false });
     assert.equal(signature, 'signed'); assert.deepEqual(operations, ['/api/v1/auth/me']);
+  } finally { globalThis.fetch = originalFetch; }
+});
+
+test('delivery URL fetch consumes a successful non-empty response', async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async () => new Response('asset-bytes', { status: 200 })) as typeof fetch;
+  try {
+    resetDeliveryFetches();
+    await fetchDeliveryUrl('https://cdn.example.test/asset.pdf', 'PDF delivery');
+    assert.deepEqual(getDeliveryFetches(), [{ label: 'PDF delivery', url: 'https://cdn.example.test/asset.pdf', status: 200, fileSize: 11 }]);
+  }
+  finally { globalThis.fetch = originalFetch; }
+});
+
+test('delivery URL fetch rejects failed and empty responses', async () => {
+  const originalFetch = globalThis.fetch;
+  try {
+    globalThis.fetch = (async () => new Response('', { status: 403 })) as typeof fetch;
+    await assert.rejects(() => fetchDeliveryUrl('https://cdn.example.test/asset.pdf', 'Denied delivery'), /resolve/);
+    globalThis.fetch = (async () => new Response('', { status: 200 })) as typeof fetch;
+    await assert.rejects(() => fetchDeliveryUrl('https://cdn.example.test/asset.pdf', 'Empty delivery'), /non-empty/);
   } finally { globalThis.fetch = originalFetch; }
 });
 

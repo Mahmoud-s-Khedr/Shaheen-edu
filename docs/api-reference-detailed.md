@@ -3129,6 +3129,23 @@ No path, query, or header input.
 }
 ```
 
+### `GET /api/v1/admin/assets/{id}/access`
+
+**Authorization:** Bearer token; role must be `ADMIN` or `SUPER_ADMIN`
+
+**Request**
+
+- path `id` (required)
+
+**Success response — HTTP 200**
+
+```json
+{
+  "url": "string",
+  "expiresAt": "ISO-8601 date-time"
+}
+```
+
 ### `POST /api/v1/admin/assets/{id}/archive`
 
 **Authorization:** Bearer token; role must be `ADMIN` or `SUPER_ADMIN`
@@ -3276,6 +3293,23 @@ No path, query, or header input.
 }
 ```
 
+### `POST /api/v1/admin/entitlements/archived-access/{id}/revoke`
+
+**Authorization:** Bearer token; role must be `ADMIN` or `SUPER_ADMIN`
+
+**Request**
+
+- path `id` (required; retained archived-access snapshot ID)
+
+**Success response — HTTP 201**
+
+```json
+{
+  "id": "string",
+  "revokedAt": "ISO-8601 date-time"
+}
+```
+
 ### `GET /api/v1/student/content-items/{id}`
 
 **Authorization:** Bearer token; role must be `STUDENT`
@@ -3380,6 +3414,24 @@ No path, query, or header input.
 
 - path `contentItemId` (required)
 - path `assetId` (required)
+
+**Success response — HTTP 200**
+
+```json
+{
+  "url": "string",
+  "expiresAt": "ISO-8601 date-time"
+}
+```
+
+### `GET /api/v1/catalog/{resource}/{id}/cover/access`
+
+**Authorization:** Public; an archived cover requires an authenticated student with retained archived access.
+
+**Request**
+
+- path `resource` (required; `grades | subjects | courses | chapters | lessons | sections`)
+- path `id` (required)
 
 **Success response — HTTP 200**
 

@@ -35,6 +35,15 @@ export class EntitlementsService {
     return updated;
   }
 
+  async revokeArchivedAccess(actor: RequestUser, id: string) {
+    this.assertAdmin(actor);
+    const snapshot = await (this.prisma as any).archivedAccessSnapshot.findUnique({ where: { id } });
+    if (!snapshot) throw new NotFoundException('Archived access snapshot not found');
+    const updated = await (this.prisma as any).archivedAccessSnapshot.update({ where: { id }, data: { revokedAt: new Date(), revokedById: actor.id } });
+    await this.audit.record({ actorUserId: actor.id, action: 'ARCHIVED_ACCESS_REVOKED', targetType: 'ArchivedAccessSnapshot', targetId: id });
+    return updated;
+  }
+
   async list(actor: RequestUser, studentUserId?: string) {
     this.assertAdmin(actor);
     return this.prisma.studentEntitlement.findMany({ where: { studentUserId }, orderBy: { createdAt: 'desc' } });

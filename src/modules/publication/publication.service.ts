@@ -46,6 +46,41 @@ export class PublicationService {
     if (hasPublishedDescendant) {
       throw new ConflictException('Cannot archive a record with published descendants');
     }
+    await this.snapshotActiveEntitlements(resource, id);
+  }
+
+  /** Preserve the students who were entitled at the instant a hierarchy node is archived. */
+  private async snapshotActiveEntitlements(resource: Exclude<PublishableResource, 'contentItem'>, id: string): Promise<void> {
+    const target = await this.archiveTarget(resource, id);
+    const now = new Date();
+    const grants = await this.prisma.studentEntitlement.findMany({
+      where: {
+        status: 'ACTIVE', revokedAt: null, startsAt: { lte: now },
+        AND: [
+          { OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] },
+          { OR: [{ courseId: { in: target.courseIds } }, ...(target.chapterIds.length ? [{ chapterId: { in: target.chapterIds } }] : [])] },
+        ],
+      },
+      select: { id: true, studentUserId: true },
+      orderBy: { createdAt: 'asc' },
+    });
+    const firstGrantByStudent = new Map<string, string>();
+    for (const grant of grants) if (!firstGrantByStudent.has(grant.studentUserId)) firstGrantByStudent.set(grant.studentUserId, grant.id);
+    if (!firstGrantByStudent.size) return;
+    await this.prisma.archivedAccessSnapshot.createMany({
+      data: [...firstGrantByStudent].map(([studentUserId, sourceEntitlementId]) => ({ studentUserId, sourceEntitlementId, resourceType: target.type, resourceId: id, archivedAt: now })),
+      skipDuplicates: true,
+    });
+  }
+
+  private async archiveTarget(resource: Exclude<PublishableResource, 'contentItem'>, id: string): Promise<{ type: any; courseIds: string[]; chapterIds: string[] }> {
+    if (resource === 'course') { const chapters = await this.prisma.chapter.findMany({ where: { courseId: id }, select: { id: true } }); return { type: 'COURSE', courseIds: [id], chapterIds: chapters.map((x) => x.id) }; }
+    if (resource === 'chapter') { const x = await this.prisma.chapter.findUnique({ where: { id } }); if (!x) throw new NotFoundException('chapter not found'); return { type: 'CHAPTER', courseIds: [x.courseId], chapterIds: [id] }; }
+    if (resource === 'lesson') { const x = await this.prisma.lesson.findUnique({ where: { id }, include: { chapter: true } }); if (!x) throw new NotFoundException('lesson not found'); return { type: 'LESSON', courseIds: [x.chapter.courseId], chapterIds: [x.chapterId] }; }
+    if (resource === 'section') { const x = await this.prisma.section.findUnique({ where: { id }, include: { lesson: { include: { chapter: true } } } }); if (!x) throw new NotFoundException('section not found'); return { type: 'SECTION', courseIds: [x.lesson.chapter.courseId], chapterIds: [x.lesson.chapterId] }; }
+    if (resource === 'subject') { const courses = await this.prisma.course.findMany({ where: { subjectId: id }, include: { chapters: { select: { id: true } } } }); return { type: 'SUBJECT', courseIds: courses.map((x) => x.id), chapterIds: courses.flatMap((x) => x.chapters.map((c) => c.id)) }; }
+    const courses = await this.prisma.course.findMany({ where: { subject: { academicGradeId: id } }, include: { chapters: { select: { id: true } } } });
+    return { type: 'ACADEMIC_GRADE', courseIds: courses.map((x) => x.id), chapterIds: courses.flatMap((x) => x.chapters.map((c) => c.id)) };
   }
 
   /** Reusable ancestry gate for resources scoped directly to a chapter. */

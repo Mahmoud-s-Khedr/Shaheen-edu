@@ -25,11 +25,20 @@ export class ContentAccessPolicyService {
     if (!item?.placement) throw new NotFoundException('Content item not found');
     const placement: any = item.placement;
     const nodes: any[] = [item];
-    if (placement.section) nodes.push(placement.section, placement.section.lesson, placement.section.lesson.chapter, placement.section.lesson.chapter.course, placement.section.lesson.chapter.course.subject, placement.section.lesson.chapter.course.subject.academicGrade);
-    else if (placement.lesson) nodes.push(placement.lesson, placement.lesson.chapter, placement.lesson.chapter.course, placement.lesson.chapter.course.subject, placement.lesson.chapter.course.subject.academicGrade);
-    else if (placement.chapter) nodes.push(placement.chapter, placement.chapter.course, placement.chapter.course.subject, placement.chapter.course.subject.academicGrade);
-    else if (placement.course) nodes.push(placement.course, placement.course.subject, placement.course.subject.academicGrade);
-    if (nodes.some((node) => node?.status !== ContentStatus.PUBLISHED)) throw new ForbiddenException('Content is not published');
+    const hierarchyNodes: any[] = [];
+    if (placement.section) { nodes.push(placement.section, placement.section.lesson, placement.section.lesson.chapter, placement.section.lesson.chapter.course, placement.section.lesson.chapter.course.subject, placement.section.lesson.chapter.course.subject.academicGrade); hierarchyNodes.push({ ...placement.section, type: 'SECTION' }, { ...placement.section.lesson, type: 'LESSON' }, { ...placement.section.lesson.chapter, type: 'CHAPTER' }, { ...placement.section.lesson.chapter.course, type: 'COURSE' }, { ...placement.section.lesson.chapter.course.subject, type: 'SUBJECT' }, { ...placement.section.lesson.chapter.course.subject.academicGrade, type: 'ACADEMIC_GRADE' }); }
+    else if (placement.lesson) { nodes.push(placement.lesson, placement.lesson.chapter, placement.lesson.chapter.course, placement.lesson.chapter.course.subject, placement.lesson.chapter.course.subject.academicGrade); hierarchyNodes.push({ ...placement.lesson, type: 'LESSON' }, { ...placement.lesson.chapter, type: 'CHAPTER' }, { ...placement.lesson.chapter.course, type: 'COURSE' }, { ...placement.lesson.chapter.course.subject, type: 'SUBJECT' }, { ...placement.lesson.chapter.course.subject.academicGrade, type: 'ACADEMIC_GRADE' }); }
+    else if (placement.chapter) { nodes.push(placement.chapter, placement.chapter.course, placement.chapter.course.subject, placement.chapter.course.subject.academicGrade); hierarchyNodes.push({ ...placement.chapter, type: 'CHAPTER' }, { ...placement.chapter.course, type: 'COURSE' }, { ...placement.chapter.course.subject, type: 'SUBJECT' }, { ...placement.chapter.course.subject.academicGrade, type: 'ACADEMIC_GRADE' }); }
+    else if (placement.course) { nodes.push(placement.course, placement.course.subject, placement.course.subject.academicGrade); hierarchyNodes.push({ ...placement.course, type: 'COURSE' }, { ...placement.course.subject, type: 'SUBJECT' }, { ...placement.course.subject.academicGrade, type: 'ACADEMIC_GRADE' }); }
+    if (nodes.some((node) => node?.status === ContentStatus.DRAFT)) throw new ForbiddenException('Content is not published');
+    const archived = hierarchyNodes.find((node) => node.status === ContentStatus.ARCHIVED);
+    if (archived) {
+      if (!studentUserId) throw new ForbiddenException('Student authentication is required');
+      const snapshot = await (this.prisma as any).archivedAccessSnapshot.findFirst({ where: { studentUserId, resourceType: archived.type, resourceId: archived.id, revokedAt: null }, select: { id: true } });
+      if (!snapshot) throw new ForbiddenException('Archived access is required');
+      return item;
+    }
+    if (item.status !== ContentStatus.PUBLISHED) throw new ForbiddenException('Content is not published');
     const effective = nodes.find((node) => node.accessType && node.accessType !== AccessType.INHERIT)?.accessType as AccessType;
     if (effective === AccessType.PUBLIC) return item;
     if (!studentUserId) throw new ForbiddenException('Student authentication is required');

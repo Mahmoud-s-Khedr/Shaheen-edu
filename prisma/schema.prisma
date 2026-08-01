@@ -112,6 +112,15 @@ enum AssetReferenceType {
   CONTENT_ATTACHMENT
 }
 
+enum ArchivedAccessResourceType {
+  ACADEMIC_GRADE
+  SUBJECT
+  COURSE
+  CHAPTER
+  LESSON
+  SECTION
+}
+
 enum VideoProcessingStatus {
   CREATED
   UPLOADING
@@ -179,6 +188,7 @@ model User {
   contentItemsCreated   ContentItem[]   @relation("ContentItemCreatedBy")
   contentItemsUpdated   ContentItem[]   @relation("ContentItemUpdatedBy")
   assetsUploaded       Asset[] @relation("AssetUploadedBy")
+  archivedAccessRevocations ArchivedAccessSnapshot[] @relation("ArchivedAccessRevokedBy")
   questionSourcesCreated QuestionSource[] @relation("QuestionSourceCreatedBy")
   questionSourcesUpdated QuestionSource[] @relation("QuestionSourceUpdatedBy")
   questionBanksCreated QuestionBank[] @relation("QuestionBankCreatedBy")
@@ -194,6 +204,7 @@ model User {
 model StudentProfile {
   userId               String   @id
   user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  archivedAccessSnapshots ArchivedAccessSnapshot[]
   fullName             String
   nationalIdHash        String   @unique
   nationalIdEncrypted   String?
@@ -829,12 +840,34 @@ model StudentEntitlement {
   grantedBy     User              @relation("EntitlementGrantedBy", fields: [grantedById], references: [id], onDelete: Restrict)
   revokedById   String?
   revokedBy     User?             @relation("EntitlementRevokedBy", fields: [revokedById], references: [id], onDelete: Restrict)
+  archivedAccessSnapshots ArchivedAccessSnapshot[]
   createdAt     DateTime          @default(now())
   updatedAt     DateTime          @updatedAt
 
   @@index([studentUserId, status, startsAt, expiresAt])
   @@index([courseId])
   @@index([chapterId])
+}
+
+/// A durable record that a student held an effective entitlement when a hierarchy
+/// node was archived. It intentionally survives expiry/revocation of its source.
+model ArchivedAccessSnapshot {
+  id                  String                       @id @default(cuid())
+  studentUserId       String
+  student             StudentProfile               @relation(fields: [studentUserId], references: [userId], onDelete: Restrict)
+  resourceType        ArchivedAccessResourceType
+  resourceId          String
+  sourceEntitlementId String
+  sourceEntitlement   StudentEntitlement           @relation(fields: [sourceEntitlementId], references: [id], onDelete: Restrict)
+  archivedAt          DateTime
+  revokedAt           DateTime?
+  revokedById         String?
+  revokedBy           User?                        @relation("ArchivedAccessRevokedBy", fields: [revokedById], references: [id], onDelete: Restrict)
+  createdAt           DateTime                     @default(now())
+
+  @@unique([studentUserId, resourceType, resourceId])
+  @@index([studentUserId, revokedAt])
+  @@index([resourceType, resourceId])
 }
 
 model Cart {

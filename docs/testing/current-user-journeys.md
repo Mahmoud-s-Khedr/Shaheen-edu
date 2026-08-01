@@ -45,3 +45,9 @@ Dependency graph: `INFRA-001 → AUTH-001 → AUTH-002 → { AUTH-003, CONTENT-0
 ## CONTENT-006 — Manual question-bank authoring and review lifecycle
 
 Purpose: create a content-publisher source and question bank, publish both, author a single-choice question, validate option constraints, exercise review/rejection/revision/publishing, and verify archive and role protections. Depends on CONTENT-001 and AUTH-003. Script: `scripts/journeys/content/question-bank-authoring.journey.ts`.
+
+## CONTENT-014 — Asset preview, cover visibility, and archived student retention
+
+Purpose: use a real Bunny cover upload to verify that every returned admin-preview, public-cover, and retained-student-cover delivery URL is fetched successfully. It also proves that anonymous archived access is denied and explicit snapshot revocation blocks the retained student. Depends on CONTENT-007. Script: `scripts/journeys/content/asset-access.journey.ts`.
+
+All journey delivery APIs returning a browser URL (`url` or `embedUrl`) fetch that URL and consume its body; an issued URL alone is not treated as successful delivery.

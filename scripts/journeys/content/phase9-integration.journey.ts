@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { assert, expectStatus, expectString } from '../lib/assertions.js';
+import { fetchDeliveryUrl } from '../lib/delivery.js';
 import type { JourneyDefinition } from '../lib/types.js';
 
 const testFiles = resolve(process.cwd(), 'test-files');
@@ -70,10 +71,7 @@ export const phase9IntegrationJourney: JourneyDefinition = {
     const courseId = String(context.academic.courseId);
     const chapterId = String(context.academic.chapterId);
     const gradeId = String(context.academic.gradeId);
-    const entitledStudent = context.students[0];
     const videoFile = testVideo;
-    if (!entitledStudent?.id || !entitledStudent.accessToken)
-      throw new Error('A registered student is required');
     const [videoBytes, coverBytes, pdfBytes] = await Promise.all([readFile(videoFile), readFile(testCover), readFile(testPdf)]);
     if (!videoBytes.length) throw new Error('JOURNEY_VIDEO_FILE is empty');
     const filePrefix = `phase9-${factory.runId}`;
@@ -81,7 +79,10 @@ export const phase9IntegrationJourney: JourneyDefinition = {
     let videoAssetId = '';
     let pdfContentId = '';
     let videoContentId = '';
+    let questionId = '';
     let unentitledToken = '';
+    let deliveryStudentId = '';
+    let deliveryStudentToken = '';
 
     await step('Uploading a real cover and PDF to Bunny Storage', async () => {
       const cover = await admin.upload<any>(
@@ -102,6 +103,15 @@ export const phase9IntegrationJourney: JourneyDefinition = {
         ),
         201,
       );
+      const adminCover = await admin.request<any>('GET', `/admin/assets/${cover.body.id}/access`);
+      expectStatus(adminCover, 200);
+      await fetchDeliveryUrl(adminCover.body.url, 'Admin cover preview');
+      const courseRead = await admin.request<any>('GET', `/admin/courses/${courseId}`);
+      expectStatus(courseRead, 200);
+      assert(courseRead.body.coverAssetId === cover.body.id, 'Course read must expose its linked cover asset ID');
+      const publicCover = await clients.public.request<any>('GET', `/catalog/courses/${courseId}/cover/access`);
+      expectStatus(publicCover, 200);
+      await fetchDeliveryUrl(publicCover.body.url, 'Public course cover');
       const pdf = await admin.upload<any>('/admin/assets/upload?kind=PDF', {
         buffer: pdfBytes,
         filename: `${filePrefix}-resource.pdf`,
@@ -109,6 +119,9 @@ export const phase9IntegrationJourney: JourneyDefinition = {
       });
       expectStatus(pdf, 201);
       pdfAssetId = pdf.body.id;
+      const adminPdf = await admin.request<any>('GET', `/admin/assets/${pdfAssetId}/access`);
+      expectStatus(adminPdf, 200);
+      await fetchDeliveryUrl(adminPdf.body.url, 'Admin PDF preview');
     });
 
     await step('Authoring and publishing protected PDF content', async () => {
@@ -264,10 +277,12 @@ export const phase9IntegrationJourney: JourneyDefinition = {
           explanation: 'The marked option is correct.',
         });
         expectStatus(question, 201);
+        questionId = question.body.id;
+        expectStatus(await admin.request<any>('POST', `/admin/questions/${questionId}/assets`, { assetId: pdfAssetId }), 201);
         expectStatus(
           await admin.request<any>(
             'POST',
-            `/admin/questions/${question.body.id}/options`,
+          `/admin/questions/${questionId}/options`,
             { body: 'Correct', isCorrect: true },
           ),
           201,
@@ -275,7 +290,7 @@ export const phase9IntegrationJourney: JourneyDefinition = {
         expectStatus(
           await admin.request<any>(
             'POST',
-            `/admin/questions/${question.body.id}/options`,
+          `/admin/questions/${questionId}/options`,
             { body: 'Incorrect', isCorrect: false },
           ),
           201,
@@ -283,14 +298,14 @@ export const phase9IntegrationJourney: JourneyDefinition = {
         expectStatus(
           await admin.request<any>(
             'POST',
-            `/admin/questions/${question.body.id}/submit`,
+          `/admin/questions/${questionId}/submit`,
           ),
           201,
         );
         expectStatus(
           await admin.request<any>(
             'POST',
-            `/admin/questions/${question.body.id}/publish`,
+          `/admin/questions/${questionId}/publish`,
           ),
           201,
         );
@@ -327,9 +342,27 @@ export const phase9IntegrationJourney: JourneyDefinition = {
     await step(
       'Granting course access and delivering the real PDF and video to the student',
       async () => {
+        const registration = await clients.public.request<any>(
+          'POST',
+          '/auth/students/register',
+          {
+            fullName: factory.title('Phase 9 delivery student'),
+            nationalId: factory.nationalId(),
+            phone: `+20${factory.phone().slice(1)}`,
+            parentPhone: factory.phone(),
+            governorateId: String(context.academic.governorateId),
+            academicGradeId: gradeId,
+            password: factory.password('Delivery'),
+          },
+        );
+        expectStatus(registration, 201);
+        deliveryStudentId = String(registration.body.user.id);
+        deliveryStudentToken = String(registration.body.accessToken);
+        context.created.students.push(deliveryStudentId);
+
         expectStatus(
           await admin.request<any>('POST', '/admin/entitlements', {
-            studentUserId: entitledStudent.id,
+            studentUserId: deliveryStudentId,
             courseId,
           }),
           201,
@@ -338,28 +371,27 @@ export const phase9IntegrationJourney: JourneyDefinition = {
           'GET',
           `/student/content-items/${pdfContentId}/assets/${pdfAssetId}/access`,
           undefined,
-          { accessToken: entitledStudent.accessToken },
+          { accessToken: deliveryStudentToken },
         );
         expectStatus(pdf, 200);
-        expectString(pdf.body.url, 'PDF access URL');
-        const pdfFetch = await fetch(pdf.body.url);
-        assert(
-          pdfFetch.ok,
-          `Signed PDF URL must resolve (received ${pdfFetch.status})`,
+        await fetchDeliveryUrl(pdf.body.url, 'Student PDF delivery');
+        const questionAsset = await clients.student.request<any>(
+          'GET',
+          `/student/practice/questions/${questionId}/assets/${pdfAssetId}/access`,
+          undefined,
+          { accessToken: deliveryStudentToken },
         );
+        expectStatus(questionAsset, 200);
+        await fetchDeliveryUrl(questionAsset.body.url, 'Student practice-question PDF delivery');
         const playback = await clients.student.request<any>(
           'GET',
           `/student/content-items/${videoContentId}/assets/${videoAssetId}/access`,
           undefined,
-          { accessToken: entitledStudent.accessToken },
+          { accessToken: deliveryStudentToken },
         );
         expectStatus(playback, 200);
         expectString(playback.body.embedUrl, 'video playback URL');
-        const player = await fetch(playback.body.embedUrl);
-        assert(
-          player.ok,
-          `Signed Bunny player URL must resolve (received ${player.status})`,
-        );
+        await fetchDeliveryUrl(playback.body.embedUrl, 'Student video playback');
       },
     );
 

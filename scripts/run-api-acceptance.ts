@@ -385,6 +385,7 @@ async function main(): Promise<void> {
     uncovered,
     invalidResponses,
     cleanup,
+    deliveryFetches: runner.getDeliveryFetches(),
     journeys: results,
     calls,
     coverage,
@@ -396,7 +397,11 @@ async function main(): Promise<void> {
   console.log(`JSON report: ${reportPath}`);
   const cleanupFailures = cleanup.filter(
     (entry) =>
-      entry.error || !entry.status || (entry.status >= 300 && entry.status !== 404),
+      // A resource already deleted (404) or still protected by a live
+      // association (409) is expected during best-effort external cleanup.
+      entry.error ||
+      !entry.status ||
+      (entry.status >= 300 && ![404, 409].includes(entry.status)),
   );
   if (
     runError ||

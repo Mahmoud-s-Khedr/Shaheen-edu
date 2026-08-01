@@ -410,6 +410,7 @@ export class SectionsService {
     publishedAt: Date | null;
     archivedAt: Date | null;
     accessType: AccessType;
+    coverAssetId: string | null;
   }) {
     return {
       id: record.id,
@@ -420,6 +421,7 @@ export class SectionsService {
       sortOrder: record.sortOrder,
       status: record.status,
       accessType: record.accessType,
+      coverAssetId: record.coverAssetId,
       createdAt: record.createdAt,
       updatedAt: record.updatedAt,
       publishedAt: record.publishedAt,

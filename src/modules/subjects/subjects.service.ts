@@ -432,6 +432,7 @@ export class SubjectsService {
     updatedAt: Date;
     publishedAt: Date | null;
     archivedAt: Date | null;
+    coverAssetId: string | null;
   }) {
     return {
       id: record.id,
@@ -445,6 +446,7 @@ export class SubjectsService {
       updatedAt: record.updatedAt,
       publishedAt: record.publishedAt,
       archivedAt: record.archivedAt,
+      coverAssetId: record.coverAssetId,
     };
   }
 }

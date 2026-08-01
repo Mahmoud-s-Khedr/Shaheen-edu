@@ -2,6 +2,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { ApiClient } from './api-client.js';
 import { DataFactory } from './data-factory.js';
+import { getDeliveryFetches, resetDeliveryFetches } from './delivery.js';
 import { redact } from './redaction.js';
 import type {
   JourneyContext,
@@ -25,6 +26,7 @@ export class JourneyRunner {
     definitions: JourneyDefinition[],
     private readonly options: { verbose: boolean; quiet: boolean },
   ) {
+    resetDeliveryFetches();
     this.byId = new Map(definitions.map((journey) => [journey.id, journey]));
     this.factory = new DataFactory();
     this.context = {
@@ -75,6 +77,9 @@ export class JourneyRunner {
   }
   getOperations(): readonly import('./types.js').OperationRecord[] {
     return this.operations;
+  }
+  getDeliveryFetches(): readonly import('./delivery.js').DeliveryFetchRecord[] {
+    return getDeliveryFetches();
   }
   getClient(name: string): ApiClient {
     const client = this.clients[name];
@@ -166,7 +171,7 @@ export class JourneyRunner {
     const path = resolve(directory, `${this.context.runId}.json`);
     await writeFile(
       path,
-      `${JSON.stringify({ runId: this.context.runId, target: this.environment.baseUrl, results }, null, 2)}\n`,
+      `${JSON.stringify({ runId: this.context.runId, target: this.environment.baseUrl, deliveryFetches: this.getDeliveryFetches(), results }, null, 2)}\n`,
       'utf8',
     );
     return path;
