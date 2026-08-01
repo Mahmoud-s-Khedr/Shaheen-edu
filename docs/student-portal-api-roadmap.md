@@ -5,7 +5,7 @@
 > Implemented endpoints remain documented in
 > [api-reference-compact.md](api-reference-compact.md).
 
-## Implementation status (reviewed 2026-07-31)
+## Implementation status (reviewed 2026-08-01)
 
 - [x] Student registration and profile updates persist a published
   `academicGradeId`.
@@ -16,8 +16,11 @@
   exist; entitled students can retrieve published content and protected assets.
 - [x] Manual commerce supports carts, immutable EGP orders, receipt-proof
   submission, staff review, and payment-backed course/chapter entitlements.
-- [ ] Progress, assessments, and analytics APIs in this roadmap are not
-  implemented.
+- [x] Content-item completion, current-grade and library progress, direct
+  practice, immutable practice attempts, student performance, and selected-child
+  parent performance are implemented.
+- [ ] Generated assessments and the broader student analytics APIs in this
+  roadmap are not implemented.
 
 `[x]` means the implementation exists. `[ ]` means the item remains planned;
 an existing endpoint with a narrower or different response is called out in
@@ -50,8 +53,8 @@ to a subject, and a chapter belongs to a course.
 | Grade selection | [x] | Registration accepts `academicGradeId`; `PATCH /api/v1/students/me` can change it. | — |
 | Public hierarchy | [x] Foundation | `GET /api/v1/academic-grades`, `GET /api/v1/catalog/subjects`, `GET /api/v1/catalog/courses`, and `GET /api/v1/catalog/courses/:id/outline` exist. | No public chapter/lesson hierarchy APIs; list APIs require callers to know parent IDs. |
 | Paid access | [x] | Course/chapter pricing, `StudentEntitlement`, carts, manual-payment orders, proof review, and payment-backed grants exist. | No refunds, payment expiry, or PSP integration. |
-| Questions | [x] Authoring only | Questions are linked to a course and may be placed at course/chapter/lesson/section level. | No learner-safe question delivery, generated quiz, attempt, answer, result, or history model. |
-| Content delivery | [x] Foundation | An entitled student can fetch a content item and its protected assets. | No progress, resume, next-item navigation, or completion view. |
+| Questions | [x] Authoring and direct practice | Questions are linked to a course and may be placed at course/chapter/lesson/section level; eligible published questions can be delivered for direct practice with immutable answer-attempt history. | No generated quiz/exam, assessment attempt, answer-autosave, result, or assessment-history model. |
+| Content delivery | [x] Foundation and completion | An entitled student can fetch a content item and its protected assets, view that item's completion state, and idempotently mark it complete. Current-grade and accessible-library progress rollups are available. | No resume, next-item navigation, or broader completion view. |
 
 Question banks and sources are authoring/provenance metadata. They are not a
 student catalogue concept and must not be exposed in learner responses.
@@ -221,6 +224,7 @@ payment and must grant no access until approved.
 | `GET /api/v1/student/practice/questions` | [x] Learner-safe published direct-practice questions for one hierarchy scope and descendants. |
 | `POST /api/v1/student/practice/questions/:questionId/attempts` | [x] Store an immutable selected-answer attempt and return immediate feedback. |
 | `GET /api/v1/student/practice/questions/:questionId/attempts` | [x] Paginated personal retry history. |
+| `GET /api/v1/student/practice/questions/:questionId/assets/:assetId/access` | [x] Protected access to an asset or video attached to an eligible direct-practice question. |
 | `GET /api/v1/student/performance` | [x] Current-grade question totals, accuracy, solved count, and first-try correctness. |
 | `GET /api/v1/parent/selected-child/performance` | [x] Selected-child summary-only progress and question performance. |
 

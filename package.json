@@ -21,6 +21,7 @@
     "dev:stop": "node scripts/dev.mjs stop",
     "dev:clear": "node scripts/dev.mjs clear",
     "dev:update": "node scripts/dev.mjs update",
+    "dev:seed": "tsx scripts/dev-seed.ts",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "test": "jest",
     "test:watch": "jest --watch",

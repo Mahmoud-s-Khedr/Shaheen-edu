@@ -10,8 +10,8 @@ coverage/
 *.tsbuildinfo
 reports/journeys/
 reports/api-tests/
+reports/dev-seed/
 .env.api-tests.local
 .journey-debug/
 .claude/
 .pnpm-store/
-test-files
