@@ -2565,7 +2565,7 @@ No path, query, or header input.
 
 - path `id` (required)
 
-**Success response — HTTP 200 (ContentItemSummaryDto)**
+**Success response — HTTP 200 (ContentItemDetailDto)**
 
 ```json
 {
@@ -2579,6 +2579,16 @@ No path, query, or header input.
   "estimatedDuration?": "number | null",
   "status": "DRAFT | PUBLISHED | ARCHIVED",
   "primaryAssetId?": "string | null",
+  "attachments": [
+    {
+      "id": "string",
+      "kind": "COVER_IMAGE | IMAGE | PAYMENT_PROOF | PDF | DOCUMENT | DOWNLOADABLE_FILE | VIDEO",
+      "filename": "string",
+      "mimeType": "string",
+      "sizeBytes?": "number | null",
+      "sortOrder": "number"
+    }
+  ],
   "placement": {
     "id": "string",
     "courseId?": "string | null",

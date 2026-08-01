@@ -179,7 +179,15 @@ export const apiCoverageJourney: JourneyDefinition = {
       expectStatus(await admin.request('POST', `/admin/content-items/${item.id}/primary-asset`, { assetId: pdf.id }), 201);
       expectStatus(await admin.request('POST', `/admin/content-items/${item.id}/attachments`, { assetId: pdf.id }), 201);
       expectStatus(await admin.request('POST', `/admin/content-items/${item.id}/attachments/reorder`, { assetIds: [pdf.id] }), 201);
-      expectStatus(await admin.request('DELETE', `/admin/content-items/${item.id}/attachments/${pdf.id}`), 200);
+      const adminDetail = await admin.request<any>('GET', `/admin/content-items/${item.id}`);
+      expectStatus(adminDetail, 200);
+      assert(
+        Array.isArray(adminDetail.body.attachments) &&
+          adminDetail.body.attachments.length === 1 &&
+          adminDetail.body.attachments[0].id === pdf.id &&
+          adminDetail.body.attachments[0].sortOrder === 1,
+        'Admin content detail must return its ordered attachment metadata',
+      );
       expectStatus(await admin.request('POST', `/admin/content-items/${item.id}/publish`), 201);
       expectStatus(await clients.public.request('GET', `/catalog/content-items/${item.id}`, undefined, { accessToken: catalogStudent.accessToken }), 200);
       expectStatus(await admin.request('PATCH', `/admin/content-items/${item.id}/access`, { accessType: 'PAID' }), 200);
@@ -191,7 +199,16 @@ export const apiCoverageJourney: JourneyDefinition = {
       assert(typeof login.body.accessToken === 'string', 'Entitlement student login must return an access token');
       const entitlement = await create('/admin/entitlements', { studentUserId: entitlementStudent.id, courseId: course });
       expectStatus(await admin.request('GET', `/admin/entitlements?studentUserId=${entitlementStudent.id}`), 200);
-      expectStatus(await clients.student.request('GET', `/student/content-items/${item.id}`, undefined, { accessToken: login.body.accessToken }), 200);
+      const studentDetail = await clients.student.request<any>('GET', `/student/content-items/${item.id}`, undefined, { accessToken: login.body.accessToken });
+      expectStatus(studentDetail, 200);
+      assert(
+        Array.isArray(studentDetail.body.attachments) &&
+          studentDetail.body.attachments.length === 1 &&
+          studentDetail.body.attachments[0].id === pdf.id &&
+          studentDetail.body.attachments[0].sortOrder === 1,
+        'Student content detail must return its ordered attachment metadata',
+      );
+      expectStatus(await admin.request('DELETE', `/admin/content-items/${item.id}/attachments/${pdf.id}`), 200);
       expectStatus(await admin.request('POST', `/admin/entitlements/${entitlement.id}/revoke`), 201);
       const agreement = await create('/admin/publisher-agreements', { lessonId: lesson, publisherUserId: String(context.partner.id), revenueShareBps: 1000, startsAt: new Date().toISOString(), isPrimary: false });
       expectStatus(await admin.request('PATCH', `/admin/publisher-agreements/${agreement.id}`, { revenueShareBps: 1200 }), 200);

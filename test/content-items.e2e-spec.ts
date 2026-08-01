@@ -1,6 +1,8 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return */
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
+import { AssetKind, AssetProvider, AssetStatus } from '@prisma/client';
 import { createTestApp } from './utils/create-test-app';
+import { PrismaService } from '../src/database/prisma.service';
 import {
   cleanDatabase,
   flushTestRedis,
@@ -12,6 +14,7 @@ describe('Content items (e2e)', () => {
   let app: NestFastifyApplication;
   let token: string;
   let studentToken: string;
+  let adminUserId: string;
   let courseId: string;
   let chapterId: string;
   let initialContent: { id: string };
@@ -23,7 +26,9 @@ describe('Content items (e2e)', () => {
     app = await createTestApp();
     await cleanDatabase(app);
     await flushTestRedis(app);
-    await seedSuperAdmin(app, 'content-sa@example.com', 'SuperAdminP@ss1!');
+    adminUserId = (
+      await seedSuperAdmin(app, 'content-sa@example.com', 'SuperAdminP@ss1!')
+    ).id;
     const login = await app.inject({
       method: 'POST',
       url: '/api/v1/auth/admins/login',
@@ -138,6 +143,82 @@ describe('Content items (e2e)', () => {
       },
     });
     expect(multiple.statusCode).toBe(400);
+  });
+
+  it('returns ordered attachment metadata from the admin content-item detail endpoint', async () => {
+    const created = await app.inject({
+      method: 'POST',
+      url: '/api/v1/admin/content-items',
+      headers: auth(),
+      payload: {
+        type: 'TEXT',
+        title: 'Attachment detail',
+        textBody: 'Attachment metadata is available to admins.',
+        placement: { courseId },
+      },
+    });
+    expect(created.statusCode).toBe(201);
+    const contentItemId = json(created).id as string;
+    const prisma = app.get(PrismaService);
+    const first = await prisma.asset.create({
+      data: {
+        provider: AssetProvider.BUNNY_STORAGE,
+        kind: AssetKind.PDF,
+        status: AssetStatus.READY,
+        originalFilename: 'first.pdf',
+        filename: 'first.pdf',
+        storageKey: 'tests/content-items/first.pdf',
+        mimeType: 'application/pdf',
+        sizeBytes: 100,
+        uploadedById: adminUserId,
+      },
+    });
+    const second = await prisma.asset.create({
+      data: {
+        provider: AssetProvider.BUNNY_STORAGE,
+        kind: AssetKind.DOCUMENT,
+        status: AssetStatus.READY,
+        originalFilename: 'second.docx',
+        filename: 'second.docx',
+        storageKey: 'tests/content-items/second.docx',
+        mimeType:
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        sizeBytes: 200,
+        uploadedById: adminUserId,
+      },
+    });
+    await prisma.assetReference.createMany({
+      data: [
+        { contentItemId, assetId: second.id, sortOrder: 2 },
+        { contentItemId, assetId: first.id, sortOrder: 1 },
+      ],
+    });
+
+    const response = await app.inject({
+      method: 'GET',
+      url: `/api/v1/admin/content-items/${contentItemId}`,
+      headers: auth(),
+    });
+    expect(response.statusCode).toBe(200);
+    expect(json(response).attachments).toEqual([
+      {
+        id: first.id,
+        kind: 'PDF',
+        filename: 'first.pdf',
+        mimeType: 'application/pdf',
+        sizeBytes: 100,
+        sortOrder: 1,
+      },
+      {
+        id: second.id,
+        kind: 'DOCUMENT',
+        filename: 'second.docx',
+        mimeType:
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        sizeBytes: 200,
+        sortOrder: 2,
+      },
+    ]);
   });
 
   it('moves, atomically reorders, and hides archived items from normal lists', async () => {

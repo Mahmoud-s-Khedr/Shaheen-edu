@@ -109,6 +109,34 @@ export class ContentItemsService {
     };
   }
 
+  private async getDetailOrThrow(id: string) {
+    const item = await this.prisma.contentItem.findUnique({
+      where: { id },
+      include: {
+        placement: true,
+        assetReferences: {
+          orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
+          include: {
+            asset: {
+              select: {
+                id: true,
+                kind: true,
+                filename: true,
+                mimeType: true,
+                sizeBytes: true,
+              },
+            },
+          },
+        },
+      },
+    });
+    if (!item || !item.placement)
+      throw new NotFoundException('Content item not found');
+    return item as typeof item & {
+      placement: NonNullable<typeof item.placement>;
+    };
+  }
+
   private assertTypeFields(
     type: ContentItemType,
     textBody: string | null,
@@ -195,7 +223,7 @@ export class ContentItemsService {
 
   async getById(actor: RequestUser, id: string) {
     this.assertActorRole(actor);
-    return this.toSummary(await this.getOrThrow(id));
+    return this.toDetail(await this.getDetailOrThrow(id));
   }
 
   async list(actor: RequestUser, query: QueryContentItemDto) {
@@ -534,6 +562,18 @@ export class ContentItemsService {
       publishedAt: item.publishedAt,
       archivedAt: item.archivedAt,
       primaryAssetId: item.primaryAssetId,
+    };
+  }
+
+  private toDetail(
+    item: Awaited<ReturnType<ContentItemsService['getDetailOrThrow']>>,
+  ) {
+    return {
+      ...this.toSummary(item),
+      attachments: item.assetReferences.map((reference) => ({
+        ...reference.asset,
+        sortOrder: reference.sortOrder,
+      })),
     };
   }
 }

@@ -20,6 +20,7 @@ import { ApiStandardErrors } from '../../common/decorators/api-standard-errors.d
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import {
+  ContentItemDetailDto,
   ContentItemSummaryDto,
   PaginatedContentItemResponseDto,
 } from '../../common/dto/api-response.dto';
@@ -59,7 +60,7 @@ export class ContentItemsController {
 
   @Get(':id')
   @ApiOperation({ summary: 'Get a content item by ID' })
-  @ApiOkResponse({ type: ContentItemSummaryDto })
+  @ApiOkResponse({ type: ContentItemDetailDto })
   getById(@CurrentUser() actor: RequestUser, @Param('id') id: string) {
     return this.contentItemsService.getById(actor, id);
   }

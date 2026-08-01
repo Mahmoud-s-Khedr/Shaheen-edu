@@ -6,6 +6,7 @@ import {
   Role,
   ContentItemType,
   AccessType,
+  AssetKind,
 } from '../types/roles.enum';
 
 /** Localized values returned by persisted resources; migrated records may not have English yet. */
@@ -405,7 +406,7 @@ export class ContentItemSummaryDto {
   @ApiProperty({ enum: ContentStatus })
   status!: ContentStatus;
 
-  @ApiPropertyOptional({ nullable: true })
+  @ApiPropertyOptional({ type: String, nullable: true })
   primaryAssetId!: string | null;
 
   @ApiProperty({ type: ContentPlacementSummaryDto })
@@ -423,6 +424,32 @@ export class ContentItemSummaryDto {
   @ApiPropertyOptional({ type: String, format: 'date-time', nullable: true })
   archivedAt!: Date | null;
 
+}
+
+export class ContentAttachmentDto {
+  @ApiProperty()
+  id!: string;
+
+  @ApiProperty({ enum: AssetKind })
+  kind!: AssetKind;
+
+  @ApiProperty()
+  filename!: string;
+
+  @ApiProperty()
+  mimeType!: string;
+
+  @ApiPropertyOptional({ type: Number, nullable: true })
+  sizeBytes!: number | null;
+
+  @ApiProperty()
+  sortOrder!: number;
+}
+
+/** Full admin read shape; list and mutation responses remain summaries. */
+export class ContentItemDetailDto extends ContentItemSummaryDto {
+  @ApiProperty({ type: [ContentAttachmentDto] })
+  attachments!: ContentAttachmentDto[];
 }
 
 export class PaginatedContentItemResponseDto {
