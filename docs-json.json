@@ -7575,35 +7575,10 @@
                 ]
             }
         },
-        "/api/v1/admin/assets/upload": {
-            "post": {
-                "operationId": "AssetsController_upload_v1",
-                "parameters": [
-                    {
-                        "name": "kind",
-                        "required": true,
-                        "in": "query",
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "responses": {
-                    "201": {
-                        "description": ""
-                    }
-                },
-                "security": [
-                    {
-                        "bearer": []
-                    }
-                ],
-                "summary": "Upload a file asset",
-                "tags": [
-                    "admin/assets"
-                ]
-            }
-        },
+        "/api/v1/admin/assets/upload": { "post": { "operationId": "AssetsController_authorize_v1", "parameters": [{ "name": "kind", "required": true, "in": "query", "schema": { "type": "string" } }], "responses": { "201": { "description": "" } }, "security": [{ "bearer": [] }], "summary": "Authorize a direct Bunny file upload", "tags": ["admin/assets"] } },
+        "/api/v1/admin/assets/{id}/complete": { "post": { "operationId": "AssetsController_complete_v1", "parameters": [{ "name": "id", "required": true, "in": "path", "schema": { "type": "string" } }], "responses": { "201": { "description": "" } }, "security": [{ "bearer": [] }], "summary": "Verify a direct Bunny upload and mark its asset ready", "tags": ["admin/assets"] } },
+        "/api/v1/student/orders/{id}/payment-proof/complete": { "post": { "operationId": "CommerceController_completeProof_v1", "parameters": [{ "name": "id", "required": true, "in": "path", "schema": { "type": "string" } }], "responses": { "201": { "description": "" } }, "security": [{ "bearer": [] }], "summary": "Confirm a direct payment-proof upload", "tags": ["student/commerce"] } },
+        "/api/v1/student/orders/{orderId}/payment-submissions/{submissionId}/resubmit/complete": { "post": { "operationId": "CommerceController_completeResubmission_v1", "parameters": [{ "name": "orderId", "required": true, "in": "path", "schema": { "type": "string" } }, { "name": "submissionId", "required": true, "in": "path", "schema": { "type": "string" } }], "responses": { "201": { "description": "" } }, "security": [{ "bearer": [] }], "summary": "Confirm a direct replacement receipt upload", "tags": ["student/commerce"] } },
         "/api/v1/admin/assets": {
             "get": {
                 "operationId": "AssetsController_list_v1",
@@ -8085,6 +8060,35 @@
                 ]
             }
         },
+        "/api/v1/admin/video-assets/{id}/playback": {
+            "get": {
+                "operationId": "VideosController_playback_v1",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    }
+                ],
+                "summary": "Get a short-lived preview URL for an admin video asset",
+                "tags": [
+                    "admin/videos"
+                ]
+            }
+        },
         "/api/v1/admin/video-assets/{id}/upload-authorization": {
             "post": {
                 "operationId": "VideosController_authorization_v1",
@@ -8109,6 +8113,35 @@
                     }
                 ],
                 "summary": "Create a short-lived direct-upload authorization",
+                "tags": [
+                    "admin/videos"
+                ]
+            }
+        },
+        "/api/v1/admin/video-assets/{id}/upload-confirmation": {
+            "post": {
+                "operationId": "VideosController_confirmation_v1",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": ""
+                    }
+                },
+                "security": [
+                    {
+                        "bearer": []
+                    }
+                ],
+                "summary": "Record client-reported direct-upload completion",
                 "tags": [
                     "admin/videos"
                 ]

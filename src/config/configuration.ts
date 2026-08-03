@@ -24,7 +24,7 @@ export interface AppConfig {
     email: string;
     password: string;
   };
-  storage: { endpoint: string; bucket: string; accessKeyId: string; secretAccessKey: string; pullZoneUrl: string; tokenKey: string; urlTtlSeconds: number; imageMaxBytes: number; documentMaxBytes: number; downloadMaxBytes: number };
+  storage: { endpoint: string; bucket: string; accessKeyId: string; secretAccessKey: string; pullZoneUrl: string; tokenKey: string; urlTtlSeconds: number; uploadTtlSeconds: number; imageMaxBytes: number; documentMaxBytes: number; downloadMaxBytes: number };
   stream: { libraryId: string; apiKey: string; readOnlyKey: string; playerTokenKey: string; uploadTtlSeconds: number; playbackTtlSeconds: number };
 }
 
@@ -65,7 +65,7 @@ export default (): AppConfig => ({
   },
   storage: {
     endpoint: process.env.BUNNY_STORAGE_S3_ENDPOINT ?? '', bucket: process.env.BUNNY_STORAGE_BUCKET ?? '', accessKeyId: process.env.BUNNY_STORAGE_ACCESS_KEY_ID ?? '', secretAccessKey: process.env.BUNNY_STORAGE_SECRET_ACCESS_KEY ?? '', pullZoneUrl: process.env.BUNNY_STORAGE_PULL_ZONE_URL ?? '', tokenKey: process.env.BUNNY_STORAGE_TOKEN_KEY ?? '',
-    urlTtlSeconds: parseInt(process.env.ASSET_URL_TTL_SECONDS ?? '300', 10), imageMaxBytes: parseInt(process.env.ASSET_IMAGE_MAX_BYTES ?? '10485760', 10), documentMaxBytes: parseInt(process.env.ASSET_DOCUMENT_MAX_BYTES ?? '26214400', 10), downloadMaxBytes: parseInt(process.env.ASSET_DOWNLOAD_MAX_BYTES ?? '104857600', 10),
+    urlTtlSeconds: parseInt(process.env.ASSET_URL_TTL_SECONDS ?? '300', 10), uploadTtlSeconds: parseInt(process.env.ASSET_UPLOAD_TTL_SECONDS ?? '900', 10), imageMaxBytes: parseInt(process.env.ASSET_IMAGE_MAX_BYTES ?? '10485760', 10), documentMaxBytes: parseInt(process.env.ASSET_DOCUMENT_MAX_BYTES ?? '52428800', 10), downloadMaxBytes: parseInt(process.env.ASSET_DOWNLOAD_MAX_BYTES ?? '104857600', 10),
   },
   stream: {
     libraryId: process.env.BUNNY_STREAM_LIBRARY_ID ?? '', apiKey: process.env.BUNNY_STREAM_API_KEY ?? '', readOnlyKey: process.env.BUNNY_STREAM_READ_ONLY_KEY ?? '', playerTokenKey: process.env.BUNNY_STREAM_PLAYER_TOKEN_KEY ?? '', uploadTtlSeconds: parseInt(process.env.BUNNY_STREAM_UPLOAD_TTL_SECONDS ?? '10800', 10), playbackTtlSeconds: parseInt(process.env.BUNNY_STREAM_PLAYBACK_TTL_SECONDS ?? '300', 10),

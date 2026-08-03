@@ -104,8 +104,30 @@ export class ApiClient {
     }
   }
 
-  /** Uploads a single file as multipart/form-data (field name `file`); used by the Bunny Storage asset endpoints. */
+  /** Uploads a single file. Asset uploads use the direct Bunny authorization flow. */
   async upload<T>(
+    path: string,
+    file: { buffer: Buffer; filename: string; contentType: string },
+    options: { expected?: number | number[]; accessToken?: string; fields?: Record<string, string>; headers?: Record<string, string> } = {},
+  ): Promise<ApiResponse<T>> {
+    const assetMatch = path.match(/^\/admin\/assets\/upload\?kind=([^&]+)$/);
+    const paymentProofMatch = path.match(/^\/student\/orders\/[^/]+\/payment-proof$/) || path.match(/^\/student\/orders\/[^/]+\/payment-submissions\/[^/]+\/resubmit$/);
+    if (assetMatch || paymentProofMatch) {
+      // The authorization call deliberately keeps the former upload URL and
+      // multipart payload. Return authorization failures unchanged so callers
+      // can still assert the legacy 400/403 responses.
+      const authorization = await this.multipartUpload<any>(path, file, { accessToken: options.accessToken, fields: options.fields, headers: options.headers });
+      if (authorization.status !== 201) return authorization as ApiResponse<T>;
+      const upload = authorization.body.upload;
+      const direct = await fetch(upload.url, { method: upload.method, headers: upload.headers, body: file.buffer });
+      if (!direct.ok) throw new Error(`Direct Bunny upload failed with ${direct.status}`);
+      if (assetMatch) return this.request<T>('POST', `/admin/assets/${authorization.body.asset.id}/complete`, undefined, { expected: options.expected, accessToken: options.accessToken, headers: options.headers });
+      return this.request<T>('POST', `${path}/complete`, { assetId: authorization.body.asset.id, ...options.fields }, { expected: options.expected, accessToken: options.accessToken, headers: options.headers });
+    }
+    return this.multipartUpload<T>(path, file, options);
+  }
+
+  private async multipartUpload<T>(
     path: string,
     file: { buffer: Buffer; filename: string; contentType: string },
     options: { expected?: number | number[]; accessToken?: string; fields?: Record<string, string>; headers?: Record<string, string> } = {},

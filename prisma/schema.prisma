@@ -103,6 +103,8 @@ enum AssetKind {
 enum AssetStatus {
   PENDING_UPLOAD
   UPLOADING
+  UPLOADED_AWAITING_PROCESSING
+  PROCESSING
   READY
   FAILED
   ARCHIVED
@@ -598,6 +600,7 @@ model VideoAsset {
   processingProgress Int @default(0)
   durationSeconds    Int?
   thumbnailUrl       String?
+  clientUploadCompletedAt DateTime?
   lastWebhookAt      DateTime?
   failureMetadata    Json?
   attempt            Int @default(1)
@@ -958,7 +961,7 @@ model ManualPaymentSubmission {
   order                Order                         @relation(fields: [orderId], references: [id], onDelete: Restrict)
   proofAssetId         String
   proofAsset           Asset                         @relation("ManualPaymentProof", fields: [proofAssetId], references: [id], onDelete: Restrict)
-  transactionReference String
+  transactionReference String?
   note                 String?
   status               ManualPaymentSubmissionStatus @default(SUBMITTED)
   reviewedById         String?

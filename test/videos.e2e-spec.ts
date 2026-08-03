@@ -142,6 +142,35 @@ describe('Video assets (e2e)', () => {
       assetId = body.id;
     });
 
+    it('restricts admin playback and refuses videos that are not ready', async () => {
+      const unauthenticated = await app.inject({
+        method: 'GET',
+        url: `/api/v1/admin/video-assets/${assetId}/playback`,
+      });
+      expect(unauthenticated.statusCode).toBe(401);
+
+      const student = await app.inject({
+        method: 'GET',
+        url: `/api/v1/admin/video-assets/${assetId}/playback`,
+        headers: { authorization: `Bearer ${studentToken}` },
+      });
+      expect(student.statusCode).toBe(403);
+
+      const pending = await app.inject({
+        method: 'GET',
+        url: `/api/v1/admin/video-assets/${assetId}/playback`,
+        headers: admin(),
+      });
+      expect(pending.statusCode).toBe(409);
+
+      const missing = await app.inject({
+        method: 'GET',
+        url: '/api/v1/admin/video-assets/missing-video/playback',
+        headers: admin(),
+      });
+      expect(missing.statusCode).toBe(404);
+    });
+
     it('issues signed upload authorization and moves to UPLOADING', async () => {
       const response = await app.inject({
         method: 'POST',
@@ -154,6 +183,50 @@ describe('Video assets (e2e)', () => {
       expect(body.signature).toMatch(/^[0-9a-f]{64}$/);
       expect(response.body).not.toContain(process.env.BUNNY_STREAM_API_KEY);
       expect(response.body).not.toContain(READ_ONLY_KEY);
+    });
+
+    it('restricts upload confirmation to administrators', async () => {
+      const unauthenticated = await app.inject({
+        method: 'POST',
+        url: `/api/v1/admin/video-assets/${assetId}/upload-confirmation`,
+      });
+      expect(unauthenticated.statusCode).toBe(401);
+      const student = await app.inject({
+        method: 'POST',
+        url: `/api/v1/admin/video-assets/${assetId}/upload-confirmation`,
+        headers: { authorization: `Bearer ${studentToken}` },
+      });
+      expect(student.statusCode).toBe(403);
+    });
+
+    it('records client-reported TUS completion without treating it as Bunny processing', async () => {
+      const response = await app.inject({
+        method: 'POST',
+        url: `/api/v1/admin/video-assets/${assetId}/upload-confirmation`,
+        headers: admin(),
+      });
+      expect(response.statusCode).toBe(201);
+      const body = json(response);
+      expect(body.status).toBe('UPLOADED_AWAITING_PROCESSING');
+      expect(body.video.processingStatus).toBe('UPLOADING');
+      expect(body.video.clientUploadCompletedAt).toBeTruthy();
+    });
+
+    it('treats repeated upload confirmation as safe and does not overwrite the timestamp', async () => {
+      const first = await app
+        .get(PrismaService)
+        .videoAsset.findUnique({ where: { assetId } });
+      const response = await app.inject({
+        method: 'POST',
+        url: `/api/v1/admin/video-assets/${assetId}/upload-confirmation`,
+        headers: admin(),
+      });
+      expect(response.statusCode).toBe(201);
+      expect(json(response).status).toBe('UPLOADED_AWAITING_PROCESSING');
+      const second = await app
+        .get(PrismaService)
+        .videoAsset.findUnique({ where: { assetId } });
+      expect(second?.clientUploadCompletedAt).toEqual(first?.clientUploadCompletedAt);
     });
 
     it('blocks attaching the video to content while it is not ready', async () => {
@@ -251,6 +324,21 @@ describe('Video assets (e2e)', () => {
         .get(PrismaService)
         .asset.findUnique({ where: { id: assetId } });
       expect(asset?.status).toBe('READY');
+    });
+
+    it('lets an administrator preview a ready, unattached video', async () => {
+      const access = await app.inject({
+        method: 'GET',
+        url: `/api/v1/admin/video-assets/${assetId}/playback`,
+        headers: admin(),
+      });
+      expect(access.statusCode).toBe(200);
+      const body = json(access);
+      expect(body.embedUrl).toContain('iframe.mediadelivery.net');
+      expect(body.embedUrl).toContain('token=');
+      expect(access.body).not.toContain(
+        process.env.BUNNY_STREAM_PLAYER_TOKEN_KEY,
+      );
     });
 
     it('rejects a webhook with an invalid signature', async () => {

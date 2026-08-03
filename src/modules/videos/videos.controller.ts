@@ -39,10 +39,20 @@ export class VideosController {
   ) {
     return this.videos.get(actor, id);
   }
+  @Get(':id/playback')
+  @ApiOperation({ summary: 'Get a short-lived preview URL for an admin video asset' })
+  playback(@CurrentUser() actor: RequestUser, @Param('id') id: string) {
+    return this.videos.adminPlayback(actor, id);
+  }
   @Post(':id/upload-authorization')
   @ApiOperation({ summary: 'Create a short-lived direct-upload authorization' })
   authorization(@CurrentUser() actor: RequestUser, @Param('id') id: string) {
     return this.videos.authorization(actor, id);
+  }
+  @Post(':id/upload-confirmation')
+  @ApiOperation({ summary: 'Record client-reported direct-upload completion' })
+  confirmation(@CurrentUser() actor: RequestUser, @Param('id') id: string) {
+    return this.videos.confirmation(actor, id);
   }
   @Post(':id/retry')
   @ApiOperation({ summary: 'Retry a failed video asset' })

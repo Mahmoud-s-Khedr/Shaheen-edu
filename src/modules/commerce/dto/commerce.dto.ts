@@ -28,6 +28,7 @@ export class PaymentSubmissionQueryDto extends PaginationQueryDto {
   @ApiPropertyOptional() @IsOptional() @IsString() studentUserId?: string;
 }
 export class SubmitPaymentProofDto {
-  @ApiProperty() @IsString() @MinLength(1) @MaxLength(200) transactionReference!: string;
+  @ApiProperty() @IsString() assetId!: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MinLength(1) @MaxLength(200) transactionReference?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(2000) note?: string;
 }

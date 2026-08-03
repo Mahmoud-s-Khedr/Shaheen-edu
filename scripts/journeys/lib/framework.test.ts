@@ -65,6 +65,40 @@ test('API client sends isolated bearer token and assertion failures throw', asyn
   } finally { globalThis.fetch = originalFetch; }
 });
 
+test('asset upload retains the legacy multipart endpoint around the direct Bunny flow', async () => {
+  const originalFetch = globalThis.fetch; const calls: string[] = [];
+  globalThis.fetch = (async (input: RequestInfo | URL) => {
+    const url = String(input); calls.push(url);
+    if (url.endsWith('/api/v1/admin/assets/upload?kind=PDF')) return new Response(JSON.stringify({ asset: { id: 'asset-1' }, upload: { url: 'https://bunny.example.test/upload', method: 'PUT', headers: { 'content-type': 'application/pdf' } } }), { status: 201, headers: { 'content-type': 'application/json' } });
+    if (url === 'https://bunny.example.test/upload') return new Response('', { status: 201 });
+    if (url.endsWith('/api/v1/admin/assets/asset-1/complete')) return new Response(JSON.stringify({ id: 'asset-1', status: 'READY' }), { status: 201, headers: { 'content-type': 'application/json' } });
+    throw new Error(`Unexpected URL: ${url}`);
+  }) as typeof fetch;
+  try {
+    const client = new ApiClient({ baseUrl: 'http://localhost:3000', apiPrefix: '/api/v1', timeoutMs: 1000 }, 'test');
+    const result = await client.upload<{ id: string; status: string }>('/admin/assets/upload?kind=PDF', { buffer: Buffer.from('%PDF-'), filename: 'lesson.pdf', contentType: 'application/pdf' }, { expected: 201 });
+    assert.deepEqual(result.body, { id: 'asset-1', status: 'READY' });
+    assert.deepEqual(calls, ['http://localhost:3000/api/v1/admin/assets/upload?kind=PDF', 'https://bunny.example.test/upload', 'http://localhost:3000/api/v1/admin/assets/asset-1/complete']);
+  } finally { globalThis.fetch = originalFetch; }
+});
+
+test('payment-proof upload retains its legacy order endpoint for authorization and confirmation', async () => {
+  const originalFetch = globalThis.fetch; const calls: Array<{ url: string; body?: string }> = [];
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input); calls.push({ url, body: typeof init?.body === 'string' ? init.body : undefined });
+    if (url.endsWith('/api/v1/student/orders/order-1/payment-proof') && !(typeof init?.body === 'string')) return new Response(JSON.stringify({ asset: { id: 'proof-1' }, upload: { url: 'https://bunny.example.test/proof', method: 'PUT', headers: { 'content-type': 'image/jpeg' } } }), { status: 201, headers: { 'content-type': 'application/json' } });
+    if (url === 'https://bunny.example.test/proof') return new Response('', { status: 201 });
+    if (url.endsWith('/api/v1/student/orders/order-1/payment-proof/complete')) return new Response(JSON.stringify({ id: 'submission-1', status: 'SUBMITTED' }), { status: 201, headers: { 'content-type': 'application/json' } });
+    throw new Error(`Unexpected URL: ${url}`);
+  }) as typeof fetch;
+  try {
+    const client = new ApiClient({ baseUrl: 'http://localhost:3000', apiPrefix: '/api/v1', timeoutMs: 1000 }, 'test');
+    const result = await client.upload<{ id: string; status: string }>('/student/orders/order-1/payment-proof', { buffer: Buffer.from([0xff, 0xd8, 0xff]), filename: 'receipt.jpg', contentType: 'image/jpeg' }, { expected: 201, fields: { transactionReference: 'REF-1' } });
+    assert.deepEqual(result.body, { id: 'submission-1', status: 'SUBMITTED' });
+    assert.deepEqual(JSON.parse(calls[2].body ?? '{}'), { assetId: 'proof-1', transactionReference: 'REF-1' });
+  } finally { globalThis.fetch = originalFetch; }
+});
+
 test('delivery URL fetch consumes a successful non-empty response', async () => {
   const originalFetch = globalThis.fetch;
   globalThis.fetch = (async () => new Response('asset-bytes', { status: 200 })) as typeof fetch;

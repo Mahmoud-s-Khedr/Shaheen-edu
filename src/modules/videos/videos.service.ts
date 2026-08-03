@@ -118,6 +118,34 @@ export class VideosService {
     };
   }
 
+  async confirmation(actor: RequestUser, assetId: string) {
+    this.assertAdmin(actor);
+    const asset = await this.getWithVideo(assetId);
+    if (
+      asset.status === AssetStatus.PENDING_UPLOAD ||
+      asset.status === AssetStatus.ARCHIVED
+    )
+      throw new ConflictException('Video upload has not started');
+
+    if (asset.status !== AssetStatus.UPLOADING) return this.summary(asset);
+
+    const updated = await this.prisma.asset.update({
+      where: { id: assetId },
+      data: {
+        status: AssetStatus.UPLOADED_AWAITING_PROCESSING,
+        video: { update: { clientUploadCompletedAt: new Date() } },
+      },
+      include: { video: true },
+    });
+    await this.audit.record({
+      actorUserId: actor.id,
+      action: 'VIDEO_UPLOAD_CONFIRMED_BY_CLIENT',
+      targetType: 'Asset',
+      targetId: assetId,
+    });
+    return this.summary(updated);
+  }
+
   async retry(actor: RequestUser, assetId: string) {
     this.assertAdmin(actor);
     const old = await this.getWithVideo(assetId);
@@ -220,6 +248,11 @@ export class VideosService {
     };
   }
 
+  async adminPlayback(actor: RequestUser, assetId: string) {
+    this.assertAdmin(actor);
+    return this.playback(assetId);
+  }
+
   verifyWebhook(
     raw: string,
     signature: string | undefined,
@@ -314,7 +347,7 @@ export class VideosService {
             ? { status: AssetStatus.READY, readyAt: new Date(), failedAt: null }
             : next === VideoProcessingStatus.FAILED
               ? { status: AssetStatus.FAILED, failedAt: new Date() }
-              : { status: AssetStatus.UPLOADING },
+              : { status: AssetStatus.PROCESSING },
       }),
     ]);
     return { received: true };
@@ -343,6 +376,7 @@ export class VideosService {
         processingProgress: asset.video?.processingProgress,
         durationSeconds: asset.video?.durationSeconds,
         thumbnailUrl: asset.video?.thumbnailUrl,
+        clientUploadCompletedAt: asset.video?.clientUploadCompletedAt,
         attempt: asset.video?.attempt,
       },
     };

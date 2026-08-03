@@ -6,7 +6,7 @@ import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Role } from '../../common/types/roles.enum';
 import type { RequestUser } from '../../common/types/request-with-user.types';
-import { CartTargetDto, CheckoutDto, CreatePaymentMethodDto, PaymentSubmissionQueryDto, RejectPaymentDto, ReorderPaymentMethodsDto, UpdatePaymentMethodDto } from './dto/commerce.dto';
+import { CartTargetDto, CheckoutDto, CreatePaymentMethodDto, PaymentSubmissionQueryDto, RejectPaymentDto, ReorderPaymentMethodsDto, SubmitPaymentProofDto, UpdatePaymentMethodDto } from './dto/commerce.dto';
 import { CommerceService } from './commerce.service';
 
 @ApiTags('student/commerce') @ApiBearerAuth() @UseGuards(RolesGuard) @Roles(Role.STUDENT)
@@ -21,16 +21,24 @@ export class CommerceController {
   @Get('orders') orders(@CurrentUser() user: RequestUser, @Query() query: PaginationQueryDto) { return this.commerce.orders(user.id, query); }
   @Get('orders/:id') order(@CurrentUser() user: RequestUser, @Param('id') id: string) { return this.commerce.order(user.id, id); }
   @Post('orders/:id/cancel') cancel(@CurrentUser() user: RequestUser, @Param('id') id: string) { return this.commerce.cancel(user.id, id); }
-  @Post('orders/:id/payment-proof') @ApiConsumes('multipart/form-data') @ApiOperation({ summary: 'Submit a receipt image for manual payment review' })
+  // This preserves the original multipart request as the direct-upload
+  // authorization step; the separate /complete route confirms the upload.
+  @Post('orders/:id/payment-proof') @ApiConsumes('multipart/form-data') @ApiOperation({ summary: 'Authorize a manual-payment receipt upload' })
   async proof(@CurrentUser() user: RequestUser, @Param('id') id: string, @Headers('idempotency-key') key: string, @Req() req: any) {
     const part = await req.file(); if (!part) throw new BadRequestException('A file is required');
-    return this.commerce.submitProof(user.id, id, key, { transactionReference: String(part.fields?.transactionReference?.value ?? ''), note: part.fields?.note?.value ? String(part.fields.note.value) : undefined, part });
+    try { return await this.commerce.authorizeProofUpload(user.id, id, key, { filename: part.filename, mimeType: part.mimetype, transactionReference: part.fields?.transactionReference?.value ? String(part.fields.transactionReference.value) : undefined, note: part.fields?.note?.value ? String(part.fields.note.value) : undefined }); }
+    finally { for await (const _chunk of part.file) { /* drain */ } }
   }
-  @Post('orders/:orderId/payment-submissions/:submissionId/resubmit') @ApiConsumes('multipart/form-data') @ApiOperation({ summary: 'Submit replacement receipt proof for a rejected payment submission' })
+  @Post('orders/:id/payment-proof/complete') @ApiOperation({ summary: 'Confirm a direct payment-proof upload' })
+  completeProof(@CurrentUser() user: RequestUser, @Param('id') id: string, @Headers('idempotency-key') key: string, @Body() dto: SubmitPaymentProofDto) { return this.commerce.submitProof(user.id, id, key, dto); }
+  @Post('orders/:orderId/payment-submissions/:submissionId/resubmit') @ApiConsumes('multipart/form-data') @ApiOperation({ summary: 'Authorize a replacement receipt upload' })
   async resubmit(@CurrentUser() user: RequestUser, @Param('orderId') orderId: string, @Param('submissionId') submissionId: string, @Headers('idempotency-key') key: string, @Req() req: any) {
     const part = await req.file(); if (!part) throw new BadRequestException('A file is required');
-    return this.commerce.resubmitProof(user.id, orderId, submissionId, key, { transactionReference: String(part.fields?.transactionReference?.value ?? ''), note: part.fields?.note?.value ? String(part.fields.note.value) : undefined, part });
+    try { return await this.commerce.authorizeResubmitProofUpload(user.id, orderId, submissionId, key, { filename: part.filename, mimeType: part.mimetype, transactionReference: part.fields?.transactionReference?.value ? String(part.fields.transactionReference.value) : undefined, note: part.fields?.note?.value ? String(part.fields.note.value) : undefined }); }
+    finally { for await (const _chunk of part.file) { /* drain */ } }
   }
+  @Post('orders/:orderId/payment-submissions/:submissionId/resubmit/complete') @ApiOperation({ summary: 'Confirm a direct replacement receipt upload' })
+  completeResubmission(@CurrentUser() user: RequestUser, @Param('orderId') orderId: string, @Param('submissionId') submissionId: string, @Headers('idempotency-key') key: string, @Body() dto: SubmitPaymentProofDto) { return this.commerce.resubmitProof(user.id, orderId, submissionId, key, dto); }
 }
 
 @ApiTags('admin/manual-payments') @ApiBearerAuth() @UseGuards(RolesGuard) @Roles(Role.ADMIN, Role.SUPER_ADMIN)

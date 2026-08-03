@@ -170,6 +170,23 @@ export const phase9IntegrationJourney: JourneyDefinition = {
           videoBytes,
           `${filePrefix}-video.mp4`,
         );
+        const confirmation = await admin.request<any>(
+          'POST',
+          `/admin/video-assets/${videoAssetId}/upload-confirmation`,
+        );
+        expectStatus(confirmation, 201);
+        assert(
+          confirmation.body.status === 'UPLOADED_AWAITING_PROCESSING',
+          'Client TUS completion must create the Bunny-processing diagnostic boundary',
+        );
+        assert(
+          confirmation.body.video?.processingStatus === 'UPLOADING',
+          'Client confirmation must not claim Bunny processing has started',
+        );
+        expectString(
+          confirmation.body.video?.clientUploadCompletedAt,
+          'client upload completion timestamp',
+        );
         const deadline = Date.now() + environment.videoReadyTimeoutMs;
         while (Date.now() < deadline) {
           const state = await admin.request<any>(
@@ -193,6 +210,12 @@ export const phase9IntegrationJourney: JourneyDefinition = {
     await step(
       'Publishing video content, publisher terms, and a question bank',
       async () => {
+        const adminPreview = await admin.request<any>(
+          'GET',
+          `/admin/video-assets/${videoAssetId}/playback`,
+        );
+        expectStatus(adminPreview, 200);
+        expectString(adminPreview.body.embedUrl, 'admin video preview URL');
         const videoItem = await admin.request<any>(
           'POST',
           '/admin/content-items',

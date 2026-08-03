@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { CommerceTargetType, ContentStatus, EntitlementSource, EntitlementStatus, ManualPaymentSubmissionStatus, OrderStatus, Role } from '../../common/types/roles.enum';
+import { AssetKind, CommerceTargetType, ContentStatus, EntitlementSource, EntitlementStatus, ManualPaymentSubmissionStatus, OrderStatus, Role } from '../../common/types/roles.enum';
 import { toPaginationMeta, type PaginationQueryDto } from '../../common/dto/pagination-query.dto';
 import type { RequestUser } from '../../common/types/request-with-user.types';
 import { PrismaService } from '../../database/prisma.service';
@@ -38,7 +38,18 @@ export class CommerceService {
     if (grant) throw new ConflictException('Content is already entitled');
   }
   private cartItem(item: any) { return { id: item.id, targetType: item.targetType, targetId: item.courseId ?? item.chapterId, title: item.course?.title ?? item.chapter?.title, price: { amountMinor: item.course?.priceMinor ?? (item.chapter?.isPurchasable === null ? item.chapter.course.priceMinor : item.chapter?.priceMinor), currency: item.course?.currency ?? (item.chapter?.isPurchasable === null ? item.chapter.course.currency : item.chapter?.currency) } }; }
-  private async discardProof(part: any) { try { for await (const _chunk of part.file) { /* drain rejected multipart uploads before responding */ } } catch { /* request teardown is safe to ignore */ } }
+  private async paymentProof(studentUserId: string, assetId: string) {
+    // Direct Bunny uploads remain UPLOADING until the application verifies the
+    // object. Completing here keeps receipt submission atomic from the
+    // student's perspective: an uploaded proof cannot be submitted before its
+    // size, MIME type, and signature have been checked.
+    await this.assets.completeUpload({ id: studentUserId, role: Role.STUDENT } as RequestUser, assetId);
+    const asset = await this.assets.getReady(assetId);
+    if (asset.kind !== AssetKind.PAYMENT_PROOF || asset.uploadedById !== studentUserId) throw new ConflictException('Payment proof must be a ready asset uploaded by the student');
+    const used = await (this.prisma as any).manualPaymentSubmission.findFirst({ where: { proofAssetId: assetId }, select: { id: true } });
+    if (used) throw new ConflictException('Payment proof asset has already been submitted');
+    return asset;
+  }
 
   async methods() { return { data: await this.prisma.manualPaymentMethod.findMany({ where: { isActive: true }, orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }], select: { id: true, titleAr: true, instructionsAr: true, titleEn: true, instructionsEn: true } }) }; }
   async cart(studentUserId: string) { const cart = await this.prisma.cart.findUnique({ where: { studentUserId }, include: { items: { include: { course: true, chapter: { include: { course: true } } }, orderBy: { createdAt: 'asc' } } } }); const items = cart?.items ?? []; return { data: items.map((item) => this.cartItem(item)), total: { amountMinor: items.reduce((sum, item) => sum + (item.course?.priceMinor ?? (item.chapter?.isPurchasable === null ? item.chapter.course.priceMinor : item.chapter?.priceMinor) ?? 0), 0), currency: 'EGP' } }; }
@@ -72,24 +83,34 @@ export class CommerceService {
   async orders(studentUserId: string, query: PaginationQueryDto) { const where = { studentUserId }; const [data, total] = await this.prisma.$transaction([this.prisma.order.findMany({ where, include: { items: true, submissions: { orderBy: { createdAt: 'desc' } } }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], skip: (query.page - 1) * query.limit, take: query.limit }), this.prisma.order.count({ where })]); return { data: data.map((x) => this.orderDto(x)), meta: toPaginationMeta(query.page, query.limit, total) }; }
   async order(studentUserId: string, id: string) { const order = await this.prisma.order.findFirst({ where: { id, studentUserId }, include: { items: true, submissions: { orderBy: { createdAt: 'desc' } } } }); if (!order) throw new NotFoundException('Order not found'); return this.orderDto(order); }
   async cancel(studentUserId: string, id: string) { const order = await this.prisma.order.findFirst({ where: { id, studentUserId } }); if (!order) throw new NotFoundException('Order not found'); if (order.status !== OrderStatus.AWAITING_PAYMENT && order.status !== OrderStatus.REJECTED) throw new ConflictException('Order cannot be cancelled'); const updated = await this.prisma.order.update({ where: { id }, data: { status: OrderStatus.CANCELLED, cancelledAt: new Date() } }); await this.audit.record({ actorUserId: studentUserId, action: 'ORDER_CANCELLED', targetType: 'Order', targetId: id }); return this.orderDto({ ...updated, items: [], submissions: [] }); }
-  async submitProof(studentUserId: string, orderId: string, key: string, data: { transactionReference: string; note?: string; part: any }) {
-    if (!key?.trim()) { await this.discardProof(data.part); throw new BadRequestException('Idempotency-Key header is required'); } if (!data.transactionReference?.trim() || data.transactionReference.length > 200) { await this.discardProof(data.part); throw new BadRequestException('transactionReference is required'); }
-    const previous = await this.prisma.commerceIdempotencyKey.findUnique({ where: { studentUserId_operation_key: { studentUserId, operation: `PROOF:${orderId}`, key } } }); if (previous) { await this.discardProof(data.part); return { id: previous.resourceId }; }
-    const order = await this.prisma.order.findFirst({ where: { id: orderId, studentUserId } }); if (!order) { await this.discardProof(data.part); throw new NotFoundException('Order not found'); } if (order.status !== OrderStatus.AWAITING_PAYMENT) { await this.discardProof(data.part); throw new ConflictException('Order cannot accept an initial payment proof'); }
-    const proof = await this.assets.uploadPaymentProof({ id: studentUserId, role: Role.STUDENT } as RequestUser, data.part);
-    try { const submission = await this.prisma.$transaction(async (tx) => { const created = await tx.manualPaymentSubmission.create({ data: { orderId, proofAssetId: proof.id, transactionReference: data.transactionReference.trim(), note: data.note?.trim() || null } }); await tx.order.update({ where: { id: orderId }, data: { status: OrderStatus.SUBMITTED } }); await tx.commerceIdempotencyKey.create({ data: { studentUserId, operation: `PROOF:${orderId}`, key, resourceId: created.id } }); return created; }); await this.audit.record({ actorUserId: studentUserId, action: 'MANUAL_PAYMENT_SUBMITTED', targetType: 'ManualPaymentSubmission', targetId: submission.id, metadata: { orderId } }); return { id: submission.id, status: submission.status }; } catch (error: any) { if (error.code === 'P2002') { const saved = await this.prisma.commerceIdempotencyKey.findUnique({ where: { studentUserId_operation_key: { studentUserId, operation: `PROOF:${orderId}`, key } } }); if (saved) return { id: saved.resourceId }; } throw error; }
+  async authorizeProofUpload(studentUserId: string, orderId: string, key: string, data: { filename: string; mimeType: string; transactionReference?: string; note?: string }) {
+    if (!key?.trim()) throw new BadRequestException('Idempotency-Key header is required'); if (data.transactionReference && data.transactionReference.length > 200) throw new BadRequestException('transactionReference must not exceed 200 characters');
+    const order = await this.prisma.order.findFirst({ where: { id: orderId, studentUserId } }); if (!order) throw new NotFoundException('Order not found'); if (order.status !== OrderStatus.AWAITING_PAYMENT) throw new ConflictException('Order cannot accept an initial payment proof');
+    return this.assets.authorizePaymentProof({ id: studentUserId, role: Role.STUDENT } as RequestUser, data);
   }
-  async resubmitProof(studentUserId: string, orderId: string, submissionId: string, key: string, data: { transactionReference: string; note?: string; part: any }) {
-    if (!key?.trim()) { await this.discardProof(data.part); throw new BadRequestException('Idempotency-Key header is required'); } if (!data.transactionReference?.trim() || data.transactionReference.length > 200) { await this.discardProof(data.part); throw new BadRequestException('transactionReference is required'); }
+  async authorizeResubmitProofUpload(studentUserId: string, orderId: string, submissionId: string, key: string, data: { filename: string; mimeType: string; transactionReference?: string; note?: string }) {
+    if (!key?.trim()) throw new BadRequestException('Idempotency-Key header is required'); if (data.transactionReference && data.transactionReference.length > 200) throw new BadRequestException('transactionReference must not exceed 200 characters');
+    const rejected = await this.prisma.manualPaymentSubmission.findFirst({ where: { id: submissionId, orderId, status: ManualPaymentSubmissionStatus.REJECTED, order: { studentUserId, status: OrderStatus.REJECTED } } }); if (!rejected) throw new ConflictException('Payment submission is not eligible for resubmission');
+    return this.assets.authorizePaymentProof({ id: studentUserId, role: Role.STUDENT } as RequestUser, data);
+  }
+  async submitProof(studentUserId: string, orderId: string, key: string, data: { assetId: string; transactionReference?: string; note?: string }) {
+    if (!key?.trim()) throw new BadRequestException('Idempotency-Key header is required'); if (!data.assetId?.trim()) throw new BadRequestException('assetId is required'); if (data.transactionReference && data.transactionReference.length > 200) throw new BadRequestException('transactionReference must not exceed 200 characters');
+    const previous = await this.prisma.commerceIdempotencyKey.findUnique({ where: { studentUserId_operation_key: { studentUserId, operation: `PROOF:${orderId}`, key } } }); if (previous) return { id: previous.resourceId };
+    const order = await this.prisma.order.findFirst({ where: { id: orderId, studentUserId } }); if (!order) throw new NotFoundException('Order not found'); if (order.status !== OrderStatus.AWAITING_PAYMENT) throw new ConflictException('Order cannot accept an initial payment proof');
+    const proof = await this.paymentProof(studentUserId, data.assetId);
+    try { const submission = await this.prisma.$transaction(async (tx) => { const created = await tx.manualPaymentSubmission.create({ data: { orderId, proofAssetId: proof.id, transactionReference: data.transactionReference?.trim() || null, note: data.note?.trim() || null } }); await tx.order.update({ where: { id: orderId }, data: { status: OrderStatus.SUBMITTED } }); await tx.commerceIdempotencyKey.create({ data: { studentUserId, operation: `PROOF:${orderId}`, key, resourceId: created.id } }); return created; }); await this.audit.record({ actorUserId: studentUserId, action: 'MANUAL_PAYMENT_SUBMITTED', targetType: 'ManualPaymentSubmission', targetId: submission.id, metadata: { orderId } }); return { id: submission.id, status: submission.status }; } catch (error: any) { if (error.code === 'P2002') { const saved = await this.prisma.commerceIdempotencyKey.findUnique({ where: { studentUserId_operation_key: { studentUserId, operation: `PROOF:${orderId}`, key } } }); if (saved) return { id: saved.resourceId }; } throw error; }
+  }
+  async resubmitProof(studentUserId: string, orderId: string, submissionId: string, key: string, data: { assetId: string; transactionReference?: string; note?: string }) {
+    if (!key?.trim()) throw new BadRequestException('Idempotency-Key header is required'); if (!data.assetId?.trim()) throw new BadRequestException('assetId is required'); if (data.transactionReference && data.transactionReference.length > 200) throw new BadRequestException('transactionReference must not exceed 200 characters');
     const operation = `RESUBMIT:${submissionId}`;
-    const previous = await this.prisma.commerceIdempotencyKey.findUnique({ where: { studentUserId_operation_key: { studentUserId, operation, key } } }); if (previous) { await this.discardProof(data.part); return { id: previous.resourceId, status: ManualPaymentSubmissionStatus.SUBMITTED }; }
+    const previous = await this.prisma.commerceIdempotencyKey.findUnique({ where: { studentUserId_operation_key: { studentUserId, operation, key } } }); if (previous) return { id: previous.resourceId, status: ManualPaymentSubmissionStatus.SUBMITTED };
     const rejected = await this.prisma.manualPaymentSubmission.findFirst({ where: { id: submissionId, orderId, status: ManualPaymentSubmissionStatus.REJECTED, order: { studentUserId, status: OrderStatus.REJECTED } } });
-    if (!rejected) { await this.discardProof(data.part); throw new ConflictException('Payment submission is not eligible for resubmission'); }
-    const proof = await this.assets.uploadPaymentProof({ id: studentUserId, role: Role.STUDENT } as RequestUser, data.part);
+    if (!rejected) throw new ConflictException('Payment submission is not eligible for resubmission');
+    const proof = await this.paymentProof(studentUserId, data.assetId);
     try { const submission = await this.prisma.$transaction(async (tx) => {
       const current = await tx.manualPaymentSubmission.findFirst({ where: { id: submissionId, orderId, status: ManualPaymentSubmissionStatus.REJECTED, order: { studentUserId, status: OrderStatus.REJECTED } } });
       if (!current) throw new ConflictException('Payment submission is not eligible for resubmission');
-      const created = await tx.manualPaymentSubmission.create({ data: { orderId, proofAssetId: proof.id, transactionReference: data.transactionReference.trim(), note: data.note?.trim() || null } });
+      const created = await tx.manualPaymentSubmission.create({ data: { orderId, proofAssetId: proof.id, transactionReference: data.transactionReference?.trim() || null, note: data.note?.trim() || null } });
       await tx.order.update({ where: { id: orderId }, data: { status: OrderStatus.SUBMITTED } });
       await tx.commerceIdempotencyKey.create({ data: { studentUserId, operation, key, resourceId: created.id } }); return created;
     }, { isolationLevel: 'Serializable' });

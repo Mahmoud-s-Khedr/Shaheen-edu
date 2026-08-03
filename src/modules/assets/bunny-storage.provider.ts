@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { DeleteObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { DeleteObjectCommand, GetObjectCommand, HeadObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { Upload } from '@aws-sdk/lib-storage';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { createHmac } from 'node:crypto';
 import { Readable } from 'node:stream';
 import type { AppConfig } from '../../config/configuration';
@@ -25,6 +26,20 @@ export class BunnyStorageProvider implements FileStorageProvider {
 
   async delete(key: string): Promise<void> {
     await this.client.send(new DeleteObjectCommand({ Bucket: this.config.bucket, Key: key }));
+  }
+
+  async createUploadUrl(key: string, mimeType: string, expiresIn: number): Promise<string> {
+    // Bunny's S3 client and its presigner resolve compatible runtime middleware;
+    // the AWS packages can expose duplicate Smithy type declarations in pnpm.
+    return getSignedUrl(this.client as never, new PutObjectCommand({ Bucket: this.config.bucket, Key: key, ContentType: mimeType }) as never, { expiresIn });
+  }
+
+  async inspect(key: string): Promise<{ sizeBytes: number; mimeType?: string; first: Buffer }> {
+    const head = await this.client.send(new HeadObjectCommand({ Bucket: this.config.bucket, Key: key }));
+    const output = await this.client.send(new GetObjectCommand({ Bucket: this.config.bucket, Key: key, Range: 'bytes=0-15' }));
+    const chunks: Buffer[] = [];
+    for await (const chunk of output.Body as Readable) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    return { sizeBytes: head.ContentLength ?? 0, mimeType: head.ContentType, first: Buffer.concat(chunks) };
   }
 
   createProtectedUrl(key: string, expiresAt: Date): string {

@@ -182,8 +182,10 @@ Request cheat sheet for the implementation-backed API contract. Base URL is `/ap
 | `GET /api/v1/student/content-items/{contentItemId}/assets/{assetId}/access` | Get a protected asset access URL for an entitled student | Bearer token; role must be `STUDENT` | path: contentItemId<br>path: assetId |
 | `POST /api/v1/admin/video-assets` | Create a video asset | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | — |
 | `GET /api/v1/admin/video-assets/{id}` | Get a video asset by ID | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id |
+| `GET /api/v1/admin/video-assets/{id}/playback` | Get a short-lived preview URL for an admin video asset | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id |
 | `DELETE /api/v1/admin/video-assets/{id}` | Delete an unreferenced Bunny video asset | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id |
 | `POST /api/v1/admin/video-assets/{id}/upload-authorization` | Create a short-lived direct-upload authorization | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id |
+| `POST /api/v1/admin/video-assets/{id}/upload-confirmation` | Record client-reported direct-upload completion | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id |
 | `POST /api/v1/admin/video-assets/{id}/retry` | Retry a failed video asset | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id |
 | `POST /api/v1/admin/video-assets/{id}/archive` | Archive a video asset | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id |
 | `POST /api/v1/integrations/bunny-stream/webhook` | Receive a Bunny Stream processing webhook | Signed Bunny webhook (not bearer authentication) | header: x-bunnystream-signature<br>header: x-bunnystream-signature-version<br>header: x-bunnystream-signature-algorithm |

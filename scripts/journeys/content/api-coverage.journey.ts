@@ -235,6 +235,15 @@ export const apiCoverageJourney: JourneyDefinition = {
       const bunnyVideoId = String(context.academic.coverageVideoBunnyId ?? '');
       assert(videoId && bunnyVideoId, 'CONTENT-007 must provide a Bunny video ID');
       expectStatus(await admin.request('GET', `/admin/video-assets/${videoId}`), 200);
+      const delayedConfirmation = await admin.request<any>(
+        'POST',
+        `/admin/video-assets/${videoId}/upload-confirmation`,
+      );
+      expectStatus(delayedConfirmation, 201);
+      assert(
+        delayedConfirmation.body.status === 'READY',
+        'A delayed client confirmation must not regress a Bunny-ready video',
+      );
       const payload = JSON.stringify({ VideoGuid: bunnyVideoId, Status: 3, Length: 1 });
       const key = environment.bunnyReadOnlyKey;
       assert(key, 'JOURNEY_BUNNY_READ_ONLY_KEY is required for direct webhook coverage');

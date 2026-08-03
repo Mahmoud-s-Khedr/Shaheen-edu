@@ -35,6 +35,7 @@ export const envValidationSchema = Joi.object({
   BUNNY_STORAGE_PULL_ZONE_URL: Joi.string().uri().required(),
   BUNNY_STORAGE_TOKEN_KEY: Joi.string().min(16).required(),
   ASSET_URL_TTL_SECONDS: Joi.number().integer().min(30).default(300),
+  ASSET_UPLOAD_TTL_SECONDS: Joi.number().integer().min(60).max(3600).default(900),
   ASSET_IMAGE_MAX_BYTES: Joi.number().integer().positive().default(10485760),
   ASSET_DOCUMENT_MAX_BYTES: Joi.number().integer().positive().default(26214400),
   ASSET_DOWNLOAD_MAX_BYTES: Joi.number().integer().positive().default(104857600),

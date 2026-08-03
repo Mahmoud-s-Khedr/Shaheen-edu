@@ -1,5 +1,9 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument -- jest mock plumbing is untyped by design */
-import { BadRequestException, ConflictException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { createHmac } from 'node:crypto';
 import {
   AssetStatus,
@@ -109,8 +113,8 @@ describe('VideosService', () => {
     it.each([
       [3, VideoProcessingStatus.READY, AssetStatus.READY],
       [5, VideoProcessingStatus.FAILED, AssetStatus.FAILED],
-      [1, VideoProcessingStatus.PROCESSING, AssetStatus.UPLOADING],
-      [0, VideoProcessingStatus.QUEUED, AssetStatus.UPLOADING],
+      [1, VideoProcessingStatus.PROCESSING, AssetStatus.PROCESSING],
+      [0, VideoProcessingStatus.QUEUED, AssetStatus.PROCESSING],
     ])(
       'maps Bunny status %i to processing/asset state',
       async (status, procStatus, assetStatus) => {
@@ -312,6 +316,69 @@ describe('VideosService', () => {
     });
   });
 
+  describe('confirmation', () => {
+    it('records client completion after upload authorization', async () => {
+      const { service, prisma, audit } = buildService();
+      prisma.asset.findUnique.mockResolvedValue({
+        id: 'a1',
+        status: AssetStatus.UPLOADING,
+        video: { assetId: 'a1', processingStatus: VideoProcessingStatus.UPLOADING },
+      });
+      prisma.asset.update.mockResolvedValue({
+        id: 'a1',
+        status: AssetStatus.UPLOADED_AWAITING_PROCESSING,
+        video: {
+          processingStatus: VideoProcessingStatus.UPLOADING,
+          clientUploadCompletedAt: new Date('2026-08-03T12:00:00.000Z'),
+        },
+      });
+
+      const result = await service.confirmation(admin, 'a1');
+
+      expect(result).toMatchObject({
+        status: AssetStatus.UPLOADED_AWAITING_PROCESSING,
+        video: { processingStatus: VideoProcessingStatus.UPLOADING },
+      });
+      expect(prisma.asset.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            status: AssetStatus.UPLOADED_AWAITING_PROCESSING,
+          }),
+        }),
+      );
+      expect(audit.record).toHaveBeenCalledWith(
+        expect.objectContaining({ action: 'VIDEO_UPLOAD_CONFIRMED_BY_CLIENT' }),
+      );
+    });
+
+    it('rejects confirmation before an upload has started', async () => {
+      const { service, prisma } = buildService();
+      prisma.asset.findUnique.mockResolvedValue({
+        id: 'a1',
+        status: AssetStatus.PENDING_UPLOAD,
+        video: { assetId: 'a1' },
+      });
+      await expect(service.confirmation(admin, 'a1')).rejects.toBeInstanceOf(
+        ConflictException,
+      );
+      expect(prisma.asset.update).not.toHaveBeenCalled();
+    });
+
+    it('does not regress a Bunny-driven state on a delayed confirmation', async () => {
+      const { service, prisma } = buildService();
+      const processing = {
+        id: 'a1',
+        status: AssetStatus.PROCESSING,
+        video: { assetId: 'a1', processingStatus: VideoProcessingStatus.PROCESSING },
+      };
+      prisma.asset.findUnique.mockResolvedValue(processing);
+      await expect(service.confirmation(admin, 'a1')).resolves.toMatchObject({
+        status: AssetStatus.PROCESSING,
+      });
+      expect(prisma.asset.update).not.toHaveBeenCalled();
+    });
+  });
+
   describe('retry', () => {
     it('rejects retrying a non-failed asset', async () => {
       const { service, prisma } = buildService();
@@ -359,6 +426,16 @@ describe('VideosService', () => {
   });
 
   describe('playback', () => {
+    it('allows only administrators to request an unscoped preview', async () => {
+      const { service } = buildService();
+      await expect(
+        service.adminPlayback(
+          { id: 'student-1', role: Role.STUDENT, sessionId: 's1' },
+          'a1',
+        ),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
     it('refuses playback until the asset and video are both ready', async () => {
       const { service, prisma } = buildService();
       prisma.asset.findUnique.mockResolvedValue({

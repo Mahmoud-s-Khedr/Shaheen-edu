@@ -165,16 +165,29 @@ and memory pressure.
    TUS client with the returned `videoId`, `libraryId`, `expires`, and
    `signature` in the request headers required by Bunny Stream. Do not expose
    `BUNNY_STREAM_API_KEY` in the frontend.
-5. Bunny Stream encodes the video and posts progress/final status to the
-   webhook. The API records each event idempotently and changes the asset to
-   `READY` only after Bunny reports a completed encode.
-6. The client can poll `GET /api/v1/admin/video-assets/:assetId` while an
+5. After TUS reports success, the frontend records that client-side completion:
+
+   ```text
+   POST /api/v1/admin/video-assets/:assetId/upload-confirmation
+   Authorization: Bearer <admin-token>
+   ```
+
+   This changes the asset to `UPLOADED_AWAITING_PROCESSING`. It is a
+   client-reported diagnostic boundary, not confirmation that Bunny received
+   the bytes.
+6. Bunny Stream encodes the video and posts progress/final status to the
+   webhook. The API records each event idempotently, changes the asset to
+   `PROCESSING`, and changes it to `READY` only after Bunny reports a
+   completed encode.
+7. The client can poll `GET /api/v1/admin/video-assets/:assetId` while an
    administrator is uploading or waiting for encoding. Failed assets may be
    recreated with `POST /api/v1/admin/video-assets/:assetId/retry`.
 
-For authorised viewing, the content asset access endpoint returns a signed
-`iframe.mediadelivery.net` embed URL instead of a raw video URL. Embed that URL
-in an iframe; do not construct Bunny player URLs in the frontend.
+For authorised viewing, content asset access endpoints return a signed
+`iframe.mediadelivery.net` embed URL instead of a raw video URL. Administrators
+can preview a ready, unattached video through
+`GET /api/v1/admin/video-assets/:assetId/playback`. Embed the returned URL in
+an iframe; do not construct Bunny player URLs in the frontend.
 
 ### Frontend TUS example
 
@@ -209,6 +222,9 @@ const previousUploads = await upload.findPreviousUploads();
 if (previousUploads.length > 0) upload.resumeFromPreviousUpload(previousUploads[0]);
 upload.start();
 ```
+
+Call the upload-confirmation endpoint from the TUS completion callback. Do not
+call it for a failed or interrupted upload.
 
 The authorization must remain valid for the entire upload. The configured
 three-hour default exceeds Bunny's recommended one-hour minimum for direct

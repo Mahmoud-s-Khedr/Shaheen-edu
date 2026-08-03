@@ -3038,6 +3038,12 @@ No response body.
 
 ### `POST /api/v1/admin/assets/upload`
 
+### `POST /api/v1/admin/assets/{id}/complete`
+
+### `POST /api/v1/student/orders/{id}/payment-proof/complete`
+
+### `POST /api/v1/student/orders/{orderId}/payment-submissions/{submissionId}/resubmit/complete`
+
 **Authorization:** Bearer token; role must be `ADMIN` or `SUPER_ADMIN`
 
 **Request**
@@ -3484,6 +3490,7 @@ No path, query, or header input.
     "processingProgress": "number",
     "durationSeconds?": "number | null",
     "thumbnailUrl?": "string | null",
+    "clientUploadCompletedAt?": "ISO-8601 date-time | null",
     "attempt": "number"
   }
 }
@@ -3514,8 +3521,29 @@ No path, query, or header input.
     "processingProgress": "number",
     "durationSeconds?": "number | null",
     "thumbnailUrl?": "string | null",
+    "clientUploadCompletedAt?": "ISO-8601 date-time | null",
     "attempt": "number"
   }
+}
+```
+
+### `GET /api/v1/admin/video-assets/{id}/playback`
+
+**Authorization:** Bearer token; role must be `ADMIN` or `SUPER_ADMIN`
+
+Returns a short-lived Bunny Stream iframe URL for a ready video, without
+requiring the video to be attached to content.
+
+**Request**
+
+- path `id` (required)
+
+**Success response — HTTP 200**
+
+```json
+{
+  "embedUrl": "string",
+  "expiresAt": "ISO-8601 date-time"
 }
 ```
 
@@ -3556,6 +3584,25 @@ No path, query, or header input.
 }
 ```
 
+### `POST /api/v1/admin/video-assets/{id}/upload-confirmation`
+
+**Authorization:** Bearer token; role must be `ADMIN` or `SUPER_ADMIN`
+
+Records the client-reported successful completion of its TUS upload. It does
+not verify Bunny received the video. The asset transitions from `UPLOADING` to
+`UPLOADED_AWAITING_PROCESSING`; repeat calls are safe and return the current
+asset state.
+
+**Request**
+
+- path `id` (required)
+- no request body
+
+**Success response — HTTP 201**
+
+Returns the video asset summary, including
+`video.clientUploadCompletedAt`.
+
 ### `POST /api/v1/admin/video-assets/{id}/retry`
 
 **Authorization:** Bearer token; role must be `ADMIN` or `SUPER_ADMIN`
@@ -3581,6 +3628,7 @@ No path, query, or header input.
     "processingProgress": "number",
     "durationSeconds?": "number | null",
     "thumbnailUrl?": "string | null",
+    "clientUploadCompletedAt?": "ISO-8601 date-time | null",
     "attempt": "number"
   }
 }
@@ -3611,6 +3659,7 @@ No path, query, or header input.
     "processingProgress": "number",
     "durationSeconds?": "number | null",
     "thumbnailUrl?": "string | null",
+    "clientUploadCompletedAt?": "ISO-8601 date-time | null",
     "attempt": "number"
   }
 }

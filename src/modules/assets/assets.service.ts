@@ -1,8 +1,6 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { createHash, randomUUID } from 'node:crypto';
-import { PassThrough, Transform, type Readable } from 'node:stream';
-import { pipeline } from 'node:stream/promises';
+import { randomUUID } from 'node:crypto';
 import { AssetKind, AssetStatus, ContentItemType, ContentStatus, Role } from '../../common/types/roles.enum';
 import type { RequestUser } from '../../common/types/request-with-user.types';
 import type { AppConfig } from '../../config/configuration';
@@ -30,37 +28,46 @@ export class AssetsService {
   private filename(name: string) { const sanitized = name.normalize('NFKC').replace(/[^A-Za-z0-9._-]/g, '_').replace(/_+/g, '_').slice(0, 180); if (!sanitized || sanitized === '.' || sanitized === '..') throw new BadRequestException('Invalid filename'); return sanitized; }
   private assertExtension(mimetype: string, filename: string) { const dot = filename.lastIndexOf('.'); const extension = dot >= 0 ? filename.slice(dot).toLowerCase() : ''; if (!(mimeExtensions[mimetype] ?? []).includes(extension)) throw new BadRequestException('Filename extension does not match declared type'); }
 
-  async upload(actor: RequestUser, kind: AssetKind, part: { file: Readable; filename: string; mimetype: string }) {
+  async authorizeUpload(actor: RequestUser, kind: AssetKind, input: { filename: string; mimeType: string }) {
     this.assertAdmin(actor);
     if (kind === AssetKind.PAYMENT_PROOF) throw new BadRequestException('Payment proofs must use the student payment endpoint');
-    return this.uploadFor(actor, kind, part);
+    return this.authorizeFor(actor, kind, input);
   }
 
-  async uploadPaymentProof(actor: RequestUser, part: { file: Readable; filename: string; mimetype: string }) {
+  async authorizePaymentProof(actor: RequestUser, input: { filename: string; mimeType: string }) {
     if (actor.role !== Role.STUDENT) throw new ForbiddenException('Forbidden');
-    return this.uploadFor(actor, AssetKind.PAYMENT_PROOF, part);
+    return this.authorizeFor(actor, AssetKind.PAYMENT_PROOF, input);
   }
 
-  private async uploadFor(actor: RequestUser, kind: AssetKind, part: { file: Readable; filename: string; mimetype: string }) {
+  private async authorizeFor(actor: RequestUser, kind: AssetKind, input: { filename: string; mimeType: string }) {
     if (kind === AssetKind.VIDEO) throw new BadRequestException('Use the video asset endpoint for videos');
-    const filename = this.filename(part.filename);
-    if (!this.allowed(kind).has(part.mimetype)) throw new BadRequestException('Unsupported MIME type for asset kind');
-    this.assertExtension(part.mimetype, filename);
+    const filename = this.filename(input.filename);
+    if (!this.allowed(kind).has(input.mimeType)) throw new BadRequestException('Unsupported MIME type for asset kind');
+    this.assertExtension(input.mimeType, filename);
     const key = `assets/${kind.toLowerCase()}/${randomUUID()}-${filename}`;
-    const asset = await this.prisma.asset.create({ data: { provider: 'BUNNY_STORAGE', kind, status: AssetStatus.UPLOADING, originalFilename: part.filename, filename, storageKey: key, mimeType: part.mimetype, uploadedById: actor.id } });
-    let bytes = 0; const hash = createHash('sha256'); const first = Buffer.alloc(16); let firstLength = 0;
-    const validator = new Transform({ transform: (chunk: Buffer, _encoding, callback) => { bytes += chunk.length; if (bytes > this.limit(kind)) return callback(new BadRequestException('File exceeds configured size limit')); if (firstLength < first.length) { const count = Math.min(first.length - firstLength, chunk.length); chunk.copy(first, firstLength, 0, count); firstLength += count; } hash.update(chunk); callback(null, chunk); } });
-    const output = new PassThrough();
+    const asset = await this.prisma.asset.create({ data: { provider: 'BUNNY_STORAGE', kind, status: AssetStatus.UPLOADING, originalFilename: input.filename, filename, storageKey: key, mimeType: input.mimeType, uploadedById: actor.id } });
+    const expiresAt = new Date(Date.now() + this.config.uploadTtlSeconds * 1000);
+    return { asset: this.summary(asset), upload: { url: await this.storage.createUploadUrl(key, input.mimeType, this.config.uploadTtlSeconds), method: 'PUT', headers: { 'content-type': input.mimeType }, expiresAt } };
+  }
+
+  async completeUpload(actor: RequestUser, id: string) {
+    const asset = await this.getReadyOrAny(id);
+    if (asset.provider !== 'BUNNY_STORAGE' || asset.kind === AssetKind.VIDEO || asset.uploadedById !== actor.id || (actor.role !== Role.STUDENT && actor.role !== Role.ADMIN && actor.role !== Role.SUPER_ADMIN)) throw new NotFoundException('Asset not found');
+    if (actor.role === Role.STUDENT && asset.kind !== AssetKind.PAYMENT_PROOF) throw new NotFoundException('Asset not found');
+    if (asset.status === AssetStatus.READY) return this.summary(asset);
+    if (asset.status !== AssetStatus.UPLOADING || !asset.storageKey) throw new ConflictException('Asset cannot be completed in its current state');
     try {
-      await Promise.all([this.storage.upload(key, output, part.mimetype), pipeline(part.file, validator, output)]);
-      if (!bytes) throw new BadRequestException('Empty files are not allowed');
-      this.assertMagic(kind, part.mimetype, first.subarray(0, firstLength));
-      const ready = await this.prisma.asset.update({ where: { id: asset.id }, data: { status: AssetStatus.READY, sizeBytes: bytes, checksum: hash.digest('hex'), readyAt: new Date() } });
-      await this.audit.record({ actorUserId: actor.id, action: 'ASSET_UPLOADED', targetType: 'Asset', targetId: ready.id, metadata: { kind, sizeBytes: bytes } });
+      const object = await this.storage.inspect(asset.storageKey);
+      if (!object.sizeBytes) throw new BadRequestException('Empty files are not allowed');
+      if (object.sizeBytes > this.limit(asset.kind)) throw new BadRequestException('File exceeds configured size limit');
+      if (object.mimeType && object.mimeType !== asset.mimeType) throw new BadRequestException('Uploaded MIME type does not match authorization');
+      this.assertMagic(asset.kind, asset.mimeType, object.first);
+      const ready = await this.prisma.asset.update({ where: { id }, data: { status: AssetStatus.READY, sizeBytes: object.sizeBytes, readyAt: new Date(), failedAt: null } });
+      await this.audit.record({ actorUserId: actor.id, action: 'ASSET_UPLOADED', targetType: 'Asset', targetId: id, metadata: { kind: asset.kind, sizeBytes: object.sizeBytes } });
       return this.summary(ready);
     } catch (error) {
-      await this.prisma.asset.update({ where: { id: asset.id }, data: { status: AssetStatus.FAILED, failedAt: new Date(), metadata: { error: 'upload_failed' } } });
-      void this.storage.delete(key).catch(() => undefined);
+      await this.prisma.asset.update({ where: { id }, data: { status: AssetStatus.FAILED, failedAt: new Date(), metadata: { error: 'upload_verification_failed' } } });
+      void this.storage.delete(asset.storageKey).catch(() => undefined);
       throw error;
     }
   }

@@ -1,6 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return -- e2e tests parse raw JSON bodies and stub provider internals */
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
-import { Readable } from 'node:stream';
 import { createTestApp } from './utils/create-test-app';
 import {
   cleanDatabase,
@@ -24,7 +23,7 @@ function multipart(
   fileBuffer: Buffer,
   filename: string,
   mimetype: string,
-): { body: Buffer; contentType: string } {
+): { body: Buffer; contentType: string; fileBuffer: Buffer; filename: string; mimetype: string } {
   const boundary = `----eduTestBoundary${Date.now()}${Math.random().toString(16).slice(2)}`;
   const head = Buffer.from(
     `--${boundary}\r\n` +
@@ -34,7 +33,7 @@ function multipart(
   const tail = Buffer.from(`\r\n--${boundary}--\r\n`);
   return {
     body: Buffer.concat([head, fileBuffer, tail]),
-    contentType: `multipart/form-data; boundary=${boundary}`,
+    contentType: `multipart/form-data; boundary=${boundary}`, fileBuffer, filename, mimetype,
   };
 }
 
@@ -42,23 +41,27 @@ describe('Assets (e2e)', () => {
   let app: NestFastifyApplication;
   let adminToken: string;
   let studentToken: string;
-  let uploadSpy: jest.SpyInstance;
+  let inspectSpy: jest.SpyInstance;
   let deleteSpy: jest.SpyInstance;
 
   const json = (response: { body: string }) => JSON.parse(response.body);
   const admin = () => ({ authorization: `Bearer ${adminToken}` });
 
-  const upload = (
+  const upload = async (
     kind: string,
-    file: { body: Buffer; contentType: string },
+    file: { body: Buffer; contentType: string; fileBuffer: Buffer; filename: string; mimetype: string },
     headers: Record<string, string> = admin(),
-  ) =>
-    app.inject({
+  ) => {
+    const authorization = await app.inject({
       method: 'POST',
       url: `/api/v1/admin/assets/upload?kind=${kind}`,
       headers: { ...headers, 'content-type': file.contentType },
       payload: file.body,
     });
+    if (authorization.statusCode !== 201) return authorization;
+    inspectSpy.mockResolvedValueOnce({ sizeBytes: file.fileBuffer.length, mimeType: file.mimetype, first: file.fileBuffer.subarray(0, 16) });
+    return app.inject({ method: 'POST', url: `/api/v1/admin/assets/${json(authorization).asset.id}/complete`, headers });
+  };
 
   beforeAll(async () => {
     app = await createTestApp();
@@ -66,11 +69,8 @@ describe('Assets (e2e)', () => {
     await flushTestRedis(app);
 
     // Never touch real Bunny Storage: drain the stream and report success.
-    uploadSpy = jest
-      .spyOn(BunnyStorageProvider.prototype, 'upload')
-      .mockImplementation(async (_key, body: Readable) => {
-        body.resume();
-      });
+    jest.spyOn(BunnyStorageProvider.prototype, 'createUploadUrl').mockResolvedValue('https://bunny.example.test/presigned');
+    inspectSpy = jest.spyOn(BunnyStorageProvider.prototype, 'inspect');
     deleteSpy = jest
       .spyOn(BunnyStorageProvider.prototype, 'delete')
       .mockResolvedValue(undefined);
@@ -106,7 +106,7 @@ describe('Assets (e2e)', () => {
   });
 
   afterAll(async () => {
-    uploadSpy.mockRestore();
+    inspectSpy.mockRestore();
     deleteSpy.mockRestore();
     await app.close();
   });
@@ -218,7 +218,7 @@ describe('Assets (e2e)', () => {
     });
 
     it('records a provider failure as a FAILED asset', async () => {
-      uploadSpy.mockRejectedValueOnce(new Error('bunny outage'));
+      inspectSpy.mockRejectedValueOnce(new Error('bunny outage'));
       const response = await upload(
         'PDF',
         multipart(PDF_BYTES, 'boom.pdf', 'application/pdf'),
