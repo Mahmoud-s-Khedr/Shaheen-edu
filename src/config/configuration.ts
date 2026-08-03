@@ -4,6 +4,7 @@ export interface AppConfig {
   host: string;
   corsOrigins: string[];
   cookieSecure: boolean;
+  cookieSameSite: 'lax' | 'strict' | 'none';
   cookieSecret: string;
   databaseUrl: string;
   redisUrl: string;
@@ -36,6 +37,7 @@ export default (): AppConfig => ({
     .map((origin) => origin.trim())
     .filter(Boolean),
   cookieSecure: (process.env.COOKIE_SECURE ?? 'true') === 'true',
+  cookieSameSite: (process.env.COOKIE_SAME_SITE ?? 'lax') as AppConfig['cookieSameSite'],
   cookieSecret: process.env.COOKIE_SECRET ?? '',
   databaseUrl: process.env.DATABASE_URL ?? '',
   redisUrl: process.env.REDIS_URL ?? '',

@@ -26,6 +26,7 @@ function testEnvironment(
     REDIS_URL: redisUrl,
     CORS_ORIGINS: 'http://localhost:3000',
     COOKIE_SECURE: 'false',
+    COOKIE_SAME_SITE: 'lax',
     COOKIE_SECRET: 'test_cookie_secret_at_least_32_characters_long',
     JWT_ACCESS_SECRET: 'test_access_secret_at_least_32_characters_long',
     JWT_ACCESS_TTL_SECONDS: '900',

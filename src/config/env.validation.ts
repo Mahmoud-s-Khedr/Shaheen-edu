@@ -12,6 +12,7 @@ export const envValidationSchema = Joi.object({
 
   CORS_ORIGINS: Joi.string().required(),
   COOKIE_SECURE: Joi.boolean().default(true),
+  COOKIE_SAME_SITE: Joi.string().valid('lax', 'strict', 'none').default('lax'),
   COOKIE_SECRET: Joi.string().min(32).required(),
 
   JWT_ACCESS_SECRET: Joi.string().min(32).required(),

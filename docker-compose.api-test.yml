@@ -36,6 +36,7 @@ services:
       DATABASE_URL: postgresql://api_test:api_test_password@postgres:5432/api_test?schema=public
       REDIS_URL: redis://redis:6379/0
       COOKIE_SECURE: 'false'
+      COOKIE_SAME_SITE: lax
       CORS_ORIGINS: http://localhost:${API_TEST_PORT:-3101}
     ports:
       - '127.0.0.1:${API_TEST_PORT:-3101}:3000'

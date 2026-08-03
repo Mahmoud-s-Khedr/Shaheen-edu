@@ -11,13 +11,14 @@ export function setRefreshCookie(
   configService: ConfigService<AppConfig, true>,
 ): void {
   const cookieSecure = configService.get('cookieSecure', { infer: true });
+  const cookieSameSite = configService.get('cookieSameSite', { infer: true });
   const refreshTtlSeconds = configService.get('jwt', {
     infer: true,
   }).refreshTtlSeconds;
   void reply.setCookie(REFRESH_COOKIE_NAME, token, {
     httpOnly: true,
     secure: cookieSecure,
-    sameSite: 'lax',
+    sameSite: cookieSameSite,
     path: REFRESH_COOKIE_PATH,
     maxAge: refreshTtlSeconds,
     signed: false,
@@ -29,10 +30,11 @@ export function clearRefreshCookie(
   configService: ConfigService<AppConfig, true>,
 ): void {
   const cookieSecure = configService.get('cookieSecure', { infer: true });
+  const cookieSameSite = configService.get('cookieSameSite', { infer: true });
   void reply.clearCookie(REFRESH_COOKIE_NAME, {
     path: REFRESH_COOKIE_PATH,
     secure: cookieSecure,
-    sameSite: 'lax',
+    sameSite: cookieSameSite,
     httpOnly: true,
   });
 }
