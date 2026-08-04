@@ -73,7 +73,7 @@ export async function createApp(
     const swaggerConfig = new DocumentBuilder()
       .setTitle('Shaheen Edu API')
       .setDescription(
-        'Authentication and identity/authorization system for the Shaheen Edu platform',
+        'REST API for Shaheen Edu authentication, academic content, learning, assets, commerce, and administration.',
       )
       .setVersion('1.0')
       .addBearerAuth()

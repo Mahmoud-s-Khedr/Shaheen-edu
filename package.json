@@ -48,6 +48,7 @@
     "journey:current": "tsx scripts/run-journey.ts current",
     "journey:test": "tsx --test scripts/journeys/lib/*.test.ts",
     "api:contract:check": "tsx scripts/api-contract-check.ts",
+    "api:docs:generate": "ts-node scripts/generate-openapi.ts",
     "api:test:full": "node scripts/api-test.mjs",
     "test:all": "pnpm test && pnpm test:e2e && pnpm build",
     "prisma:generate": "prisma generate",

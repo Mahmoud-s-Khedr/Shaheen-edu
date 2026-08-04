@@ -104,6 +104,94 @@ describe('Swagger (e2e)', () => {
       429: expect.any(Object),
     });
 
+    const paymentMethods = document.paths[
+      '/api/v1/admin/manual-payment-methods'
+    ].get;
+    expect(paymentMethods.summary).toBe('List all manual payment methods');
+    expect(paymentMethods.responses[200].content['application/json'].schema).toMatchObject({
+      $ref: '#/components/schemas/ManualPaymentMethodsResponseDto',
+    });
+
+    const updatePaymentMethod = document.paths[
+      '/api/v1/admin/manual-payment-methods/{id}'
+    ].patch;
+    expect(updatePaymentMethod.requestBody.content['application/json'].schema).toMatchObject({
+      $ref: '#/components/schemas/UpdatePaymentMethodDto',
+    });
+    expect(document.components.schemas.UpdatePaymentMethodDto.properties).toEqual(
+      expect.objectContaining({
+        titleAr: expect.any(Object),
+        instructionsAr: expect.any(Object),
+        titleEn: expect.objectContaining({ nullable: true }),
+        instructionsEn: expect.objectContaining({ nullable: true }),
+        isActive: expect.any(Object),
+      }),
+    );
+    expect(updatePaymentMethod.responses[200].content['application/json'].schema).toMatchObject({
+      $ref: '#/components/schemas/ManualPaymentMethodDto',
+    });
+
+    const reorderPaymentMethods = document.paths[
+      '/api/v1/admin/manual-payment-methods/reorder'
+    ].post;
+    expect(reorderPaymentMethods.requestBody.content['application/json'].schema).toMatchObject({
+      $ref: '#/components/schemas/ReorderPaymentMethodsDto',
+    });
+    expect(document.components.schemas.ReorderPaymentMethodsDto.properties.methodIds).toMatchObject({
+      type: 'array',
+      items: { type: 'string' },
+    });
+
+    const proofUpload = document.paths[
+      '/api/v1/student/orders/{id}/payment-proof'
+    ].post;
+    expect(proofUpload.requestBody.content['multipart/form-data'].schema).toMatchObject({
+      required: ['file'],
+      properties: { file: { type: 'string', format: 'binary' } },
+    });
+    expect(proofUpload.responses[201].content['application/json'].schema).toMatchObject({
+      $ref: '#/components/schemas/PaymentProofUploadAuthorizationResponseDto',
+    });
+
+    const hasDocumentedShape = (
+      schema: Record<string, unknown> | undefined,
+      seen = new Set<string>(),
+    ): boolean => {
+      if (!schema) return false;
+      const ref = schema.$ref;
+      if (typeof ref === 'string') {
+        const name = ref.split('/').at(-1);
+        if (!name || seen.has(name)) return false;
+        seen.add(name);
+        return hasDocumentedShape(document.components.schemas[name], seen);
+      }
+      const properties = schema.properties;
+      if (properties && typeof properties === 'object' && Object.keys(properties).length)
+        return true;
+      return ['allOf', 'oneOf', 'anyOf'].some((key) => {
+        const variants = schema[key];
+        return Array.isArray(variants) && variants.some((item) =>
+          hasDocumentedShape(item as Record<string, unknown>, new Set(seen)),
+        );
+      });
+    };
+
+    const emptyRequestSchemas: string[] = [];
+    for (const [pathName, path] of Object.entries(document.paths) as Array<
+      [string, Record<string, { requestBody?: { content?: Record<string, { schema?: Record<string, unknown> }> } }>]
+    >) {
+      for (const method of ['post', 'put', 'patch']) {
+        const requestBody = path[method]?.requestBody;
+        if (!requestBody) continue;
+        const schemas = Object.values(requestBody.content ?? {}).map(
+          (content) => content.schema,
+        );
+        if (!schemas.length || schemas.some((schema) => !hasDocumentedShape(schema)))
+          emptyRequestSchemas.push(`${method.toUpperCase()} ${pathName}`);
+      }
+    }
+    expect(emptyRequestSchemas).toEqual([]);
+
     const httpMethods = new Set([
       'get',
       'put',
