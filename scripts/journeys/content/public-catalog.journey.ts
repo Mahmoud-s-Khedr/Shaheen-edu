@@ -114,17 +114,14 @@ export const publicCatalogJourney: JourneyDefinition = {
           'Catalog course detail must include its published ancestry',
         );
 
-        const outline = await clients.public.request<any>(
-          'GET',
-          `/catalog/courses/${paidCourseId}/outline`,
-        );
+        const outline = await clients.public.request<any>('GET', `/catalog/courses/${paidCourseId}/content-items`);
         expectStatus(outline, 200);
-        const item = outline.body.contentItems.find(
+        const item = outline.body.data.find(
           (entry: any) => entry.id === paidContentId,
         );
         assert(
-          item?.isLocked === true,
-          'Anonymous users must see paid content as locked',
+          item?.id === paidContentId,
+          'Anonymous users must see published content previews',
         );
         const serialized = JSON.stringify(outline.body);
         assert(
@@ -146,17 +143,17 @@ export const publicCatalogJourney: JourneyDefinition = {
 
         const outline = await clients.public.request<any>(
           'GET',
-          `/catalog/courses/${paidCourseId}/outline`,
+          `/catalog/courses/${paidCourseId}/content-items`,
           undefined,
           { accessToken: studentToken },
         );
         expectStatus(outline, 200);
-        const item = outline.body.contentItems.find(
+        const item = outline.body.data.find(
           (entry: any) => entry.id === paidContentId,
         );
         assert(
-          item?.isLocked === false,
-          'An active course entitlement must unlock the catalog outline',
+          item?.id === paidContentId,
+          'An active course entitlement must retain catalog preview visibility',
         );
       },
     );

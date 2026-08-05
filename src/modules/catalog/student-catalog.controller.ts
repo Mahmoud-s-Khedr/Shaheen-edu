@@ -3,6 +3,7 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
+import { CursorPaginationQueryDto } from '../../common/dto/cursor-pagination-query.dto';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Role } from '../../common/types/roles.enum';
 import type { RequestUser } from '../../common/types/request-with-user.types';
@@ -42,7 +43,7 @@ export class StudentCatalogController {
   }
 
   @Get('catalog/courses/:courseId')
-  @ApiOperation({ summary: 'Get a grade-scoped course and published chapters' })
+  @ApiOperation({ summary: 'Get a grade-scoped course' })
   course(
     @CurrentUser() user: RequestUser,
     @Param('courseId') courseId: string,
@@ -50,16 +51,21 @@ export class StudentCatalogController {
     return this.catalog.course(user.id, courseId);
   }
 
-  @Get('catalog/chapters/:chapterId')
-  @ApiOperation({
-    summary: 'Get a grade-scoped chapter and its published outline',
-  })
-  chapter(
-    @CurrentUser() user: RequestUser,
-    @Param('chapterId') chapterId: string,
-  ) {
-    return this.catalog.chapter(user.id, chapterId);
-  }
+  @Get('catalog/courses/:courseId/chapters')
+  @ApiOperation({ summary: 'List published chapters in a grade-scoped course' })
+  chapters(@CurrentUser() user: RequestUser, @Param('courseId') courseId: string, @Query() query: CursorPaginationQueryDto) { return this.catalog.chapters(user.id, courseId, query); }
+
+  @Get('catalog/chapters/:chapterId/lessons')
+  @ApiOperation({ summary: 'List published lessons in a grade-scoped chapter' })
+  lessons(@CurrentUser() user: RequestUser, @Param('chapterId') chapterId: string, @Query() query: CursorPaginationQueryDto) { return this.catalog.lessons(user.id, chapterId, query); }
+
+  @Get('catalog/lessons/:lessonId/sections')
+  @ApiOperation({ summary: 'List published sections in a grade-scoped lesson' })
+  sections(@CurrentUser() user: RequestUser, @Param('lessonId') lessonId: string, @Query() query: CursorPaginationQueryDto) { return this.catalog.sections(user.id, lessonId, query); }
+
+  @Get('catalog/:resource/:id/content-items')
+  @ApiOperation({ summary: 'List published content previews directly placed on a hierarchy node' })
+  contentItems(@CurrentUser() user: RequestUser, @Param('resource') resource: string, @Param('id') id: string, @Query() query: CursorPaginationQueryDto) { return this.catalog.contentItems(user.id, resource, id, query); }
 
   @Get('library')
   @ApiOperation({ summary: 'List the student active library across grades' })

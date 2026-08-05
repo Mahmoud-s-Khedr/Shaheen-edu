@@ -55,6 +55,8 @@ describe('Entitlements and student delivery (e2e)', () => {
   let paidDraftItemId: string;
   let paidCourseId: string;
   let chapterAId: string;
+  let lessonAId: string;
+  let sectionAId: string;
   let pdfItemId: string;
   let pdfAssetId: string;
   let catalogGradeId: string;
@@ -254,6 +256,28 @@ describe('Entitlements and student delivery (e2e)', () => {
       chapterId: chapterBId,
     });
 
+    const createLesson = async (title: string) => {
+      const id = json(
+        await post('/api/v1/admin/lessons', { title, chapterId: chapterAId }),
+      ).id;
+      await publish('lessons', id);
+      return id as string;
+    };
+    lessonAId = await createLesson('Paid Lesson A');
+    const lessonBId = await createLesson('Paid Lesson B');
+    const createSection = async (title: string) => {
+      const id = json(
+        await post('/api/v1/admin/sections', { title, lessonId: lessonAId }),
+      ).id;
+      await publish('sections', id);
+      return id as string;
+    };
+    sectionAId = await createSection('Paid Section A');
+    await createSection('Paid Section B');
+    await createPublishedItem('Lesson A item', { lessonId: lessonAId });
+    await createPublishedItem('Lesson B item', { lessonId: lessonBId });
+    await createPublishedItem('Section A item', { sectionId: sectionAId });
+
     // A draft item under fully published, entitled ancestry.
     paidDraftItemId = json(
       await post('/api/v1/admin/content-items', {
@@ -386,35 +410,85 @@ describe('Entitlements and student delivery (e2e)', () => {
       expect(unexpectedParameter.statusCode).toBe(400);
     });
 
-    it('returns published metadata only and personalizes locks for a student', async () => {
+    it('returns published metadata in bounded catalog child pages', async () => {
+      const chapters = await app.inject({
+        method: 'GET',
+        url: `/api/v1/catalog/courses/${paidCourseId}/chapters?limit=1`,
+      });
+      expect(chapters.statusCode).toBe(200);
+      expect(json(chapters).data).toHaveLength(1);
+      expect(json(chapters).pageInfo.hasNextPage).toBe(true);
+      const next = await app.inject({
+        method: 'GET',
+        url: `/api/v1/catalog/courses/${paidCourseId}/chapters?limit=1&cursor=${encodeURIComponent(json(chapters).pageInfo.nextCursor)}`,
+      });
+      expect(next.statusCode).toBe(200);
+      expect(json(next).data).toHaveLength(1);
+      expect(json(next).data[0].id).not.toBe(json(chapters).data[0].id);
       const anonymous = await app.inject({
         method: 'GET',
-        url: `/api/v1/catalog/courses/${paidCourseId}/outline`,
+        url: `/api/v1/catalog/chapters/${chapterAId}/content-items?limit=1`,
       });
       expect(anonymous.statusCode).toBe(200);
-      const anonymousBody = json(anonymous);
-      expect(anonymousBody.chapters).toHaveLength(2);
-      expect(anonymousBody.chapters[0].isLocked).toBe(true);
-      const item = anonymousBody.chapters[0].contentItems[0];
-      expect(item).toMatchObject({ id: paidChapterAItemId, isLocked: true });
+      const item = json(anonymous).data[0];
+      expect(item).toMatchObject({ id: paidChapterAItemId });
+      expect(json(anonymous)).toMatchObject({
+        pageInfo: { hasNextPage: true },
+      });
+      const nextContent = await app.inject({
+        method: 'GET',
+        url: `/api/v1/catalog/chapters/${chapterAId}/content-items?limit=1&cursor=${encodeURIComponent(json(anonymous).pageInfo.nextCursor)}`,
+      });
+      expect(nextContent.statusCode).toBe(200);
+      expect(json(nextContent).data[0].id).not.toBe(item.id);
       expect(item.textBody).toBeUndefined();
       expect(item.externalUrl).toBeUndefined();
       expect(anonymous.body).not.toContain('storageKey');
+    });
 
-      const entitled = await app.inject({
+    it('lists published lessons and sections one hierarchy level at a time', async () => {
+      const lessons = await app.inject({
         method: 'GET',
-        url: `/api/v1/catalog/courses/${paidCourseId}/outline`,
-        headers: bearer(students.entitled.token),
+        url: `/api/v1/catalog/chapters/${chapterAId}/lessons`,
       });
-      expect(entitled.statusCode).toBe(200);
-      expect(json(entitled).chapters[0].isLocked).toBe(false);
+      expect(lessons.statusCode).toBe(200);
+      expect(json(lessons)).toMatchObject({
+        parent: { id: chapterAId },
+        data: [{ id: lessonAId }],
+      });
+
+      const sections = await app.inject({
+        method: 'GET',
+        url: `/api/v1/catalog/lessons/${lessonAId}/sections`,
+      });
+      expect(sections.statusCode).toBe(200);
+      expect(json(sections)).toMatchObject({
+        parent: { id: lessonAId },
+        data: [{ id: sectionAId }],
+      });
+    });
+
+    it('rejects malformed cursors and unsupported catalog resources', async () => {
+      const invalidCursor = await app.inject({
+        method: 'GET',
+        url: `/api/v1/catalog/courses/${paidCourseId}/chapters?cursor=not-a-cursor`,
+      });
+      expect(invalidCursor.statusCode).toBe(400);
+      const invalidResource = await app.inject({
+        method: 'GET',
+        url: `/api/v1/catalog/unknown/${paidCourseId}/content-items`,
+      });
+      expect(invalidResource.statusCode).toBe(400);
     });
 
     it('uses a safe delivery DTO instead of raw Prisma ancestry', async () => {
       const response = await readAsStudent('entitled', paidChapterAItemId);
       expect(response.statusCode).toBe(200);
       const body = json(response);
-      expect(body).toMatchObject({ id: paidChapterAItemId, title: 'Chapter A item' });
+      expect(body).toMatchObject({
+        id: paidChapterAItemId,
+        title: 'Chapter A item',
+      });
       expect(body.status).toBeUndefined();
       expect(body.createdById).toBeUndefined();
       expect(body.placement.chapterId).toBe(chapterAId);
@@ -503,22 +577,93 @@ describe('Entitlements and student delivery (e2e)', () => {
         (await grant({ studentUserId: student.user.id, chapterId: chapterAId }))
           .statusCode,
       ).toBe(201);
+      const firstChapters = await app.inject({
+        method: 'GET',
+        url: `/api/v1/student/catalog/courses/${paidCourseId}/chapters?limit=1`,
+        headers,
+      });
+      expect(firstChapters.statusCode).toBe(200);
+      expect(json(firstChapters)).toMatchObject({
+        parent: { id: paidCourseId, access: { state: 'PURCHASABLE' } },
+        data: [
+          { id: chapterAId, access: { state: 'ENTITLED' }, isLocked: false },
+        ],
+        pageInfo: { hasNextPage: true },
+      });
+      const secondChapters = await app.inject({
+        method: 'GET',
+        url: `/api/v1/student/catalog/courses/${paidCourseId}/chapters?limit=1&cursor=${encodeURIComponent(json(firstChapters).pageInfo.nextCursor)}`,
+        headers,
+      });
+      expect(secondChapters.statusCode).toBe(200);
+      expect(json(secondChapters).data[0].id).not.toBe(chapterAId);
+
+      const lessons = await app.inject({
+        method: 'GET',
+        url: `/api/v1/student/catalog/chapters/${chapterAId}/lessons`,
+        headers,
+      });
+      expect(lessons.statusCode).toBe(200);
+      expect(json(lessons)).toMatchObject({
+        parent: {
+          id: chapterAId,
+          access: { state: 'ENTITLED' },
+          isLocked: false,
+        },
+        data: [
+          { id: lessonAId, access: { state: 'ENTITLED' }, isLocked: false },
+        ],
+      });
+      const sections = await app.inject({
+        method: 'GET',
+        url: `/api/v1/student/catalog/lessons/${lessonAId}/sections`,
+        headers,
+      });
+      expect(sections.statusCode).toBe(200);
+      expect(json(sections)).toMatchObject({
+        parent: {
+          id: lessonAId,
+          access: { state: 'ENTITLED' },
+          isLocked: false,
+        },
+        data: [
+          { id: sectionAId, access: { state: 'ENTITLED' }, isLocked: false },
+        ],
+      });
+
       const chapter = await app.inject({
         method: 'GET',
-        url: `/api/v1/student/catalog/chapters/${chapterAId}`,
+        url: `/api/v1/student/catalog/chapters/${chapterAId}/content-items?limit=1`,
         headers,
       });
       expect(chapter.statusCode).toBe(200);
       expect(json(chapter)).toMatchObject({
-        id: chapterAId,
-        access: { state: 'ENTITLED' },
-        isLocked: false,
+        parent: {
+          id: chapterAId,
+          access: { state: 'ENTITLED' },
+          isLocked: false,
+        },
       });
-      expect(json(chapter).contentItems[0]).toMatchObject({
+      expect(json(chapter)).toMatchObject({ pageInfo: { hasNextPage: true } });
+      expect(json(chapter).data[0]).toMatchObject({
         id: paidChapterAItemId,
         access: { state: 'ENTITLED' },
         isLocked: false,
       });
+      const nextContent = await app.inject({
+        method: 'GET',
+        url: `/api/v1/student/catalog/chapters/${chapterAId}/content-items?limit=1&cursor=${encodeURIComponent(json(chapter).pageInfo.nextCursor)}`,
+        headers,
+      });
+      expect(nextContent.statusCode).toBe(200);
+      expect(json(nextContent).data[0].id).not.toBe(paidChapterAItemId);
+
+      const invalidResource = await app.inject({
+        method: 'GET',
+        url: `/api/v1/student/catalog/unknown/${paidCourseId}/content-items`,
+        headers,
+      });
+      expect(invalidResource.statusCode).toBe(400);
 
       const library = await app.inject({
         method: 'GET',

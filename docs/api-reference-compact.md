@@ -197,12 +197,18 @@ Request cheat sheet for the implementation-backed API contract. Base URL is `/ap
 | `GET /api/v1/catalog/subjects` | List published catalog subjects | Public | query: page?<br>query: limit?<br>query: academicGradeId? |
 | `GET /api/v1/catalog/courses` | List published catalog courses | Public | query: page?<br>query: limit?<br>query: subjectId? |
 | `GET /api/v1/catalog/courses/{id}` | Get published catalog course details | Public | path: id |
-| `GET /api/v1/catalog/courses/{id}/outline` | Get a published course outline with access locks | Public | path: id |
+| `GET /api/v1/catalog/courses/{id}/chapters` | List published course chapters | Public | path: id<br>query: cursor?<br>query: limit? |
+| `GET /api/v1/catalog/chapters/{id}/lessons` | List published chapter lessons | Public | path: id<br>query: cursor?<br>query: limit? |
+| `GET /api/v1/catalog/lessons/{id}/sections` | List published lesson sections | Public | path: id<br>query: cursor?<br>query: limit? |
+| `GET /api/v1/catalog/{resource}/{id}/content-items` | List published directly placed content previews | Public | path: resource (`courses|chapters|lessons|sections`)<br>path: id<br>query: cursor?<br>query: limit? |
 | `GET /api/v1/student/catalog` | Get the authenticated student's grade-scoped catalogue summary | Bearer token; role must be `STUDENT` | — |
 | `GET /api/v1/student/catalog/subjects` | List published subjects in the student's current grade | Bearer token; role must be `STUDENT` | query: page?<br>query: limit? |
 | `GET /api/v1/student/catalog/subjects/{subjectId}/courses` | List grade-scoped courses for a subject with access state | Bearer token; role must be `STUDENT` | path: subjectId<br>query: page?<br>query: limit? |
-| `GET /api/v1/student/catalog/courses/{courseId}` | Get a grade-scoped course and its published chapters | Bearer token; role must be `STUDENT` | path: courseId |
-| `GET /api/v1/student/catalog/chapters/{chapterId}` | Get a grade-scoped chapter and published outline | Bearer token; role must be `STUDENT` | path: chapterId |
+| `GET /api/v1/student/catalog/courses/{courseId}` | Get a grade-scoped course | Bearer token; role must be `STUDENT` | path: courseId |
+| `GET /api/v1/student/catalog/courses/{courseId}/chapters` | List grade-scoped course chapters | Bearer token; role must be `STUDENT` | path: courseId<br>query: cursor?<br>query: limit? |
+| `GET /api/v1/student/catalog/chapters/{chapterId}/lessons` | List grade-scoped chapter lessons | Bearer token; role must be `STUDENT` | path: chapterId<br>query: cursor?<br>query: limit? |
+| `GET /api/v1/student/catalog/lessons/{lessonId}/sections` | List grade-scoped lesson sections | Bearer token; role must be `STUDENT` | path: lessonId<br>query: cursor?<br>query: limit? |
+| `GET /api/v1/student/catalog/{resource}/{id}/content-items` | List grade-scoped directly placed content previews | Bearer token; role must be `STUDENT` | path: resource (`courses|chapters|lessons|sections`)<br>path: id<br>query: cursor?<br>query: limit? |
 | `GET /api/v1/student/library` | List active owned courses and chapters across grades | Bearer token; role must be `STUDENT` | — |
 | `GET /api/v1/student/entitlements` | List the student's active entitlement records | Bearer token; role must be `STUDENT` | query: page?<br>query: limit? |
 

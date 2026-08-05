@@ -51,7 +51,7 @@ to a subject, and a chapter belongs to a course.
 | Area | Status | Already present | Gap to close |
 | --- | --- | --- | --- |
 | Grade selection | [x] | Registration accepts `academicGradeId`; `PATCH /api/v1/students/me` can change it. | — |
-| Public hierarchy | [x] Foundation | `GET /api/v1/academic-grades`, `GET /api/v1/catalog/subjects`, `GET /api/v1/catalog/courses`, and `GET /api/v1/catalog/courses/:id/outline` exist. | No public chapter/lesson hierarchy APIs; list APIs require callers to know parent IDs. |
+| Public hierarchy | [x] | Published grade/subject/course discovery plus cursor-paginated course chapters, chapter lessons, lesson sections, and direct content previews. | — |
 | Paid access | [x] | Course/chapter pricing, `StudentEntitlement`, carts, manual-payment orders, proof review, and payment-backed grants exist. | No refunds, payment expiry, or PSP integration. |
 | Questions | [x] Authoring and direct practice | Questions are linked to a course and may be placed at course/chapter/lesson/section level; eligible published questions can be delivered for direct practice with immutable answer-attempt history. | No generated quiz/exam, assessment attempt, answer-autosave, result, or assessment-history model. |
 | Content delivery | [x] Foundation and completion | An entitled student can fetch a content item and its protected assets, view that item's completion state, and idempotently mark it complete. Current-grade and accessible-library progress rollups are available. | No resume, next-item navigation, or broader completion view. |
@@ -73,8 +73,9 @@ only published records and contain no personal entitlement information.
 | `GET /api/v1/catalog/grades/:gradeId/subjects` | Subjects belonging to one published grade. |
 | `GET /api/v1/catalog/subjects/:subjectId/courses` | Courses belonging to one published subject. |
 | `GET /api/v1/catalog/courses/:courseId` | Existing public course detail; include effective public price/purchasability. |
-| `GET /api/v1/catalog/courses/:courseId/chapters` | Published chapter list, with public price/purchasability and no student access state. |
-| `GET /api/v1/catalog/chapters/:chapterId` | Published chapter detail and its lessons/sections/content preview metadata. |
+| `GET /api/v1/catalog/courses/:courseId/chapters` | Cursor-paginated published chapter list. |
+| `GET /api/v1/catalog/chapters/:chapterId/lessons` | Cursor-paginated published lesson list. |
+| `GET /api/v1/catalog/lessons/:lessonId/sections` | Cursor-paginated published section list. |
 
 Completed equivalents:
 
@@ -82,10 +83,7 @@ Completed equivalents:
 - [x] `GET /api/v1/catalog/subjects?academicGradeId=`
 - [x] `GET /api/v1/catalog/courses?subjectId=`
 - [x] `GET /api/v1/catalog/courses/:courseId`
-- [x] `GET /api/v1/catalog/courses/:courseId/outline` — an implemented equivalent
-  that returns the published nested outline and entitlement-aware locks. It
-  does not yet expose the proposed public pricing fields or dedicated chapter
-  routes.
+- [x] Cursor-paginated child routes replace the former nested outline endpoint.
 
 The existing `GET /api/v1/catalog/subjects?academicGradeId=` and
 `GET /api/v1/catalog/courses?subjectId=` can remain. The nested routes above make the
@@ -102,14 +100,13 @@ student from browsing other grades by changing a query parameter.
 | [x] | `GET /api/v1/student/catalog` | Current grade and published hierarchy summary counts. |
 | [x] | `GET /api/v1/student/catalog/subjects` | Only published subjects of the student's current grade. |
 | [x] | `GET /api/v1/student/catalog/subjects/:subjectId/courses` | Grade-scoped published courses with server-resolved `access`, lock state, and effective course price. |
-| [x] | `GET /api/v1/student/catalog/courses/:courseId` | Grade-scoped course detail and published chapters, each with server-resolved access, price, and lock state. |
-| [x] | `GET /api/v1/student/catalog/chapters/:chapterId` | Grade-scoped chapter detail with published lessons, sections, content preview metadata, and lock/access states. |
+| [x] | `GET /api/v1/student/catalog/courses/:courseId` | Grade-scoped course detail. |
+| [x] | Cursor-paginated student child routes | Chapters, lessons, sections, and content previews with server-resolved access, price, and lock state. |
 | [x] | `GET /api/v1/student/library` | Active course/chapter entitlements across grades, grouped with their published hierarchy and expiry. |
 | [x] | `GET /api/v1/student/entitlements` | The authenticated student's raw, paginated active entitlement records. |
 
-Completion/progress summaries and last activity remain future work. The public
-course outline continues to provide a visitor-friendly alternative, but the
-routes above are the grade-scoped student catalogue.
+Completion/progress summaries and last activity remain future work. Public and
+student catalogue routes traverse one hierarchy level at a time.
 
 For a course/chapter response, return one explicit `access` object rather than
 forcing the frontend to infer it from many fields:

@@ -3779,30 +3779,25 @@ Returns the video asset summary, including
 }
 ```
 
-### `GET /api/v1/catalog/courses/{id}/outline`
+### Cursor-paginated catalog children
 
-**Authorization:** Public
+### `GET /api/v1/catalog/courses/{id}/chapters`
 
-**Request**
+### `GET /api/v1/catalog/chapters/{id}/lessons`
 
-- path `id` (required)
+### `GET /api/v1/catalog/lessons/{id}/sections`
 
-**Success response — HTTP 200 (CourseSummary)**
+### `GET /api/v1/catalog/{resource}/{id}/content-items`
+
+These public routes list direct children or direct content previews for `courses`, `chapters`, `lessons`, or `sections`.
+
+Each takes path `id`, optional opaque query `cursor`, and optional query `limit` (`1..100`, default `20`). The response is:
 
 ```json
 {
-  "id": "string",
-  "title": "string",
-  "slug": "string",
-  "description?": "string | null",
-  "sortOrder": "number",
-  "status": "DRAFT | PUBLISHED | ARCHIVED",
-  "accessType?": "PUBLIC | FREE | PAID | INHERIT",
-  "createdAt": "ISO-8601 date-time",
-  "updatedAt": "ISO-8601 date-time",
-  "publishedAt?": "ISO-8601 date-time | null",
-  "archivedAt?": "ISO-8601 date-time | null",
-  "subjectId": "string"
+  "parent": { "id": "string", "title": "string", "coverAssetId": "string | null" },
+  "data": [],
+  "pageInfo": { "hasNextPage": "boolean", "nextCursor": "string | null" }
 }
 ```
 
@@ -3889,25 +3884,21 @@ No path, query, or header input.
 
 **Success response — HTTP 200**
 
-Returns the grade-scoped course, its subject, and published chapters. The course
-and every chapter use the `access` and `isLocked` fields shown in the preceding
-course-list response.
+Returns the grade-scoped course and subject. Chapters are fetched separately.
 
-### `GET /api/v1/student/catalog/chapters/{chapterId}`
+### Cursor-paginated student catalog children
 
-**Authorization:** Bearer token; role must be `STUDENT`
+### `GET /api/v1/student/catalog/courses/{courseId}/chapters`
 
-**Request**
+### `GET /api/v1/student/catalog/chapters/{chapterId}/lessons`
 
-- path `chapterId` (required)
+### `GET /api/v1/student/catalog/lessons/{lessonId}/sections`
 
-**Success response — HTTP 200**
+### `GET /api/v1/student/catalog/{resource}/{id}/content-items`
 
-Returns the grade-scoped chapter, course, published lessons/sections, and
-content preview metadata. Every hierarchy node and content item includes its
-effective `access` object and `isLocked` flag. Content previews include `id`,
-`type`, `title`, `description`, `estimatedDuration`, and `sortOrder`; they do
-not expose protected item bodies or asset URLs.
+These are the student equivalents of the public child routes.
+
+They require a student bearer token and use the same `cursor`, `limit`, and response envelope as the public child routes. Each hierarchy node and content preview includes effective `access` and `isLocked`; content responses never include protected bodies or asset URLs.
 
 ### `GET /api/v1/student/library`
 

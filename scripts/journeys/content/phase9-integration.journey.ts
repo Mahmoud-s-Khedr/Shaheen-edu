@@ -336,7 +336,7 @@ export const phase9IntegrationJourney: JourneyDefinition = {
     );
 
     await step(
-      'Showing a safe locked catalog outline before access is granted',
+      'Showing a safe bounded catalog preview before access is granted',
       async () => {
         expectStatus(
           await admin.request<any>(
@@ -346,14 +346,11 @@ export const phase9IntegrationJourney: JourneyDefinition = {
           ),
           200,
         );
-        const outline = await clients.public.request<any>(
-          'GET',
-          `/catalog/courses/${courseId}/outline`,
-        );
+        const outline = await clients.public.request<any>('GET', `/catalog/courses/${courseId}/content-items`);
         expectStatus(outline, 200);
         assert(
-          JSON.stringify(outline.body).includes('"isLocked":true'),
-          'Anonymous outline must show protected content as locked',
+          outline.body.data.length > 0,
+          'Anonymous catalog returns bounded published previews',
         );
         assert(
           !JSON.stringify(outline.body).includes('storageKey'),

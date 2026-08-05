@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access -- Prisma's nested catalogue response is rendered through deliberately narrow learner DTOs. */
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
@@ -14,6 +15,7 @@ import {
   type PaginationQueryDto,
 } from '../../common/dto/pagination-query.dto';
 import { PrismaService } from '../../database/prisma.service';
+import { CursorPaginationQueryDto } from '../../common/dto/cursor-pagination-query.dto';
 
 const published = ContentStatus.PUBLISHED;
 const order = [{ sortOrder: 'asc' as const }, { id: 'asc' as const }];
@@ -130,10 +132,7 @@ export class StudentCatalogService {
           academicGrade: { status: published },
         },
       },
-      include: {
-        subject: true,
-        chapters: { where: { status: published }, orderBy: order },
-      },
+      include: { subject: true },
     });
     if (!course) throw new NotFoundException('Published course not found');
     const grants = await this.activeGrants(studentUserId);
@@ -143,22 +142,61 @@ export class StudentCatalogService {
         this.access(grants, course.id, undefined, [course.accessType], course),
       ),
       subject: this.node(course.subject),
-      chapters: course.chapters.map((chapter) =>
-        this.withAccess(
-          this.node(chapter),
-          this.access(
-            grants,
-            course.id,
-            chapter.id,
-            [chapter.accessType, course.accessType],
-            this.chapterPricing(chapter, course),
+    };
+  }
+
+  async chapters(
+    studentUserId: string,
+    courseId: string,
+    query: CursorPaginationQueryDto,
+  ) {
+    const grade = await this.gradeFor(studentUserId);
+    const course = await this.prisma.course.findFirst({
+      where: {
+        id: courseId,
+        status: published,
+        subject: {
+          academicGradeId: grade.id,
+          status: published,
+          academicGrade: { status: published },
+        },
+      },
+    });
+    if (!course) throw new NotFoundException('Published course not found');
+    const grants = await this.activeGrants(studentUserId);
+    const rows = await this.prisma.chapter.findMany({
+      where: { courseId, status: published, ...this.after(query.cursor) },
+      orderBy: order,
+      take: query.limit + 1,
+    });
+    return {
+      parent: this.withAccess(
+        this.node(course),
+        this.access(grants, course.id, undefined, [course.accessType], course),
+      ),
+      ...this.page(
+        rows.map((chapter) =>
+          this.withAccess(
+            this.node(chapter),
+            this.access(
+              grants,
+              course.id,
+              chapter.id,
+              [chapter.accessType, course.accessType],
+              this.chapterPricing(chapter, course),
+            ),
           ),
         ),
+        query.limit,
       ),
     };
   }
 
-  async chapter(studentUserId: string, chapterId: string) {
+  async lessons(
+    studentUserId: string,
+    chapterId: string,
+    query: CursorPaginationQueryDto,
+  ) {
     const grade = await this.gradeFor(studentUserId);
     const chapter = await this.prisma.chapter.findFirst({
       where: {
@@ -173,100 +211,235 @@ export class StudentCatalogService {
           },
         },
       },
-      include: {
-        course: true,
-        contentPlacements: this.placements(),
-        lessons: {
-          where: { status: published },
-          orderBy: order,
-          include: {
-            contentPlacements: this.placements(),
-            sections: {
-              where: { status: published },
-              orderBy: order,
-              include: { contentPlacements: this.placements() },
+      include: { course: true },
+    });
+    if (!chapter) throw new NotFoundException('Published chapter not found');
+    const grants = await this.activeGrants(studentUserId);
+    const rows = await this.prisma.lesson.findMany({
+      where: { chapterId, status: published, ...this.after(query.cursor) },
+      orderBy: order,
+      take: query.limit + 1,
+    });
+    const access = (record: any) =>
+      this.access(
+        grants,
+        chapter.courseId,
+        chapter.id,
+        [record.accessType, chapter.accessType, chapter.course.accessType],
+        this.chapterPricing(chapter, chapter.course),
+      );
+    return {
+      parent: this.withAccess(this.node(chapter), access(chapter)),
+      ...this.page(
+        rows.map((lesson) =>
+          this.withAccess(this.node(lesson), access(lesson)),
+        ),
+        query.limit,
+      ),
+    };
+  }
+
+  async sections(
+    studentUserId: string,
+    lessonId: string,
+    query: CursorPaginationQueryDto,
+  ) {
+    const grade = await this.gradeFor(studentUserId);
+    const lesson = await this.prisma.lesson.findFirst({
+      where: {
+        id: lessonId,
+        status: published,
+        chapter: {
+          status: published,
+          course: {
+            status: published,
+            subject: {
+              academicGradeId: grade.id,
+              status: published,
+              academicGrade: { status: published },
             },
           },
         },
       },
+      include: { chapter: { include: { course: true } } },
     });
-    if (!chapter) throw new NotFoundException('Published chapter not found');
+    if (!lesson) throw new NotFoundException('Published lesson not found');
     const grants = await this.activeGrants(studentUserId);
-    const chapterAccess = this.access(
+    const chapter = lesson.chapter;
+    const rows = await this.prisma.section.findMany({
+      where: { lessonId, status: published, ...this.after(query.cursor) },
+      orderBy: order,
+      take: query.limit + 1,
+    });
+    const access = (record: any) =>
+      this.access(
+        grants,
+        chapter.courseId,
+        chapter.id,
+        [
+          record.accessType,
+          lesson.accessType,
+          chapter.accessType,
+          chapter.course.accessType,
+        ],
+        this.chapterPricing(chapter, chapter.course),
+      );
+    return {
+      parent: this.withAccess(this.node(lesson), access(lesson)),
+      ...this.page(
+        rows.map((section) =>
+          this.withAccess(this.node(section), access(section)),
+        ),
+        query.limit,
+      ),
+    };
+  }
+
+  async contentItems(
+    studentUserId: string,
+    resource: string,
+    id: string,
+    query: CursorPaginationQueryDto,
+  ) {
+    const grade = await this.gradeFor(studentUserId);
+    const configs: Record<string, any> = {
+      courses: {
+        model: this.prisma.course,
+        field: 'courseId',
+        include: { subject: true },
+        course: (x: any) => x,
+        chapter: () => undefined,
+        accesses: (x: any) => [x.accessType],
+        pricing: (x: any) => x,
+        where: {
+          subject: {
+            academicGradeId: grade.id,
+            status: published,
+            academicGrade: { status: published },
+          },
+        },
+      },
+      chapters: {
+        model: this.prisma.chapter,
+        field: 'chapterId',
+        include: { course: true },
+        course: (x: any) => x.course,
+        chapter: (x: any) => x,
+        accesses: (x: any) => [x.accessType, x.course.accessType],
+        pricing: (x: any) => this.chapterPricing(x, x.course),
+        where: {
+          course: {
+            status: published,
+            subject: {
+              academicGradeId: grade.id,
+              status: published,
+              academicGrade: { status: published },
+            },
+          },
+        },
+      },
+      lessons: {
+        model: this.prisma.lesson,
+        field: 'lessonId',
+        include: { chapter: { include: { course: true } } },
+        course: (x: any) => x.chapter.course,
+        chapter: (x: any) => x.chapter,
+        accesses: (x: any) => [
+          x.accessType,
+          x.chapter.accessType,
+          x.chapter.course.accessType,
+        ],
+        pricing: (x: any) => this.chapterPricing(x.chapter, x.chapter.course),
+        where: {
+          chapter: {
+            status: published,
+            course: {
+              status: published,
+              subject: {
+                academicGradeId: grade.id,
+                status: published,
+                academicGrade: { status: published },
+              },
+            },
+          },
+        },
+      },
+      sections: {
+        model: this.prisma.section,
+        field: 'sectionId',
+        include: {
+          lesson: { include: { chapter: { include: { course: true } } } },
+        },
+        course: (x: any) => x.lesson.chapter.course,
+        chapter: (x: any) => x.lesson.chapter,
+        accesses: (x: any) => [
+          x.accessType,
+          x.lesson.accessType,
+          x.lesson.chapter.accessType,
+          x.lesson.chapter.course.accessType,
+        ],
+        pricing: (x: any) =>
+          this.chapterPricing(x.lesson.chapter, x.lesson.chapter.course),
+        where: {
+          lesson: {
+            status: published,
+            chapter: {
+              status: published,
+              course: {
+                status: published,
+                subject: {
+                  academicGradeId: grade.id,
+                  status: published,
+                  academicGrade: { status: published },
+                },
+              },
+            },
+          },
+        },
+      },
+    };
+    const config = configs[resource];
+    if (!config) throw new BadRequestException('Unsupported catalog resource');
+    const parent = await config.model.findFirst({
+      where: { id, status: published, ...config.where },
+      include: config.include,
+    });
+    if (!parent)
+      throw new NotFoundException('Published hierarchy record not found');
+    const grants = await this.activeGrants(studentUserId);
+    const course = config.course(parent);
+    const chapter = config.chapter(parent);
+    const rows = await this.prisma.contentPlacement.findMany({
+      where: {
+        [config.field]: id,
+        contentItem: { status: published },
+        ...this.after(query.cursor),
+      },
+      include: { contentItem: true },
+      orderBy: order,
+      take: query.limit + 1,
+    });
+    const parentAccess = this.access(
       grants,
-      chapter.courseId,
-      chapter.id,
-      [chapter.accessType, chapter.course.accessType],
-      this.chapterPricing(chapter, chapter.course),
+      course.id,
+      chapter?.id,
+      config.accesses(parent),
+      config.pricing(parent),
     );
-    const renderItem = (placement: any, accessTypes: AccessType[]) =>
+    const render = (placement: any) =>
       this.withAccess(
         this.contentItem(placement.contentItem, placement.sortOrder),
         this.access(
           grants,
-          chapter.courseId,
-          chapter.id,
-          [placement.contentItem.accessType, ...accessTypes],
-          this.chapterPricing(chapter, chapter.course),
+          course.id,
+          chapter?.id,
+          [placement.contentItem.accessType, ...config.accesses(parent)],
+          config.pricing(parent),
         ),
       );
-    const renderSection = (section: any, inherited: AccessType[]) => ({
-      ...this.withAccess(
-        this.node(section),
-        this.access(
-          grants,
-          chapter.courseId,
-          chapter.id,
-          [section.accessType, ...inherited],
-          this.chapterPricing(chapter, chapter.course),
-        ),
-      ),
-      contentItems: section.contentPlacements.map((placement: any) =>
-        renderItem(placement, [section.accessType, ...inherited]),
-      ),
-    });
-    const renderLesson = (lesson: any) => ({
-      ...this.withAccess(
-        this.node(lesson),
-        this.access(
-          grants,
-          chapter.courseId,
-          chapter.id,
-          [lesson.accessType, chapter.accessType, chapter.course.accessType],
-          this.chapterPricing(chapter, chapter.course),
-        ),
-      ),
-      contentItems: lesson.contentPlacements.map((placement: any) =>
-        renderItem(placement, [
-          lesson.accessType,
-          chapter.accessType,
-          chapter.course.accessType,
-        ]),
-      ),
-      sections: lesson.sections.map((section: any) =>
-        renderSection(section, [
-          lesson.accessType,
-          chapter.accessType,
-          chapter.course.accessType,
-        ]),
-      ),
-    });
     return {
-      ...this.withAccess(this.node(chapter), chapterAccess),
-      course: this.withAccess(
-        this.node(chapter.course),
-        this.access(
-          grants,
-          chapter.courseId,
-          undefined,
-          [chapter.course.accessType],
-          chapter.course,
-        ),
-      ),
-      contentItems: chapter.contentPlacements.map((placement: any) =>
-        renderItem(placement, [chapter.accessType, chapter.course.accessType]),
-      ),
-      lessons: chapter.lessons.map(renderLesson),
+      parent: this.withAccess(this.node(parent), parentAccess),
+      ...this.placementPage(rows, query.limit, render),
     };
   }
 
@@ -317,34 +490,117 @@ export class StudentCatalogService {
   }
 
   private async archivedLibrary(studentUserId: string) {
-    const snapshots = await (this.prisma as any).archivedAccessSnapshot.findMany({ where: { studentUserId, revokedAt: null }, orderBy: [{ archivedAt: 'desc' }, { id: 'desc' }] });
+    const snapshots = await (
+      this.prisma as any
+    ).archivedAccessSnapshot.findMany({
+      where: { studentUserId, revokedAt: null },
+      orderBy: [{ archivedAt: 'desc' }, { id: 'desc' }],
+    });
     const rows: any[] = [];
     for (const snapshot of snapshots) {
-      const record = await this.archivedRecord(snapshot.resourceType, snapshot.resourceId);
+      const record = await this.archivedRecord(
+        snapshot.resourceType,
+        snapshot.resourceId,
+      );
       if (!record) continue;
       const path = this.archivedPath(snapshot.resourceType, record);
-      rows.push({ archivedAccessSnapshotId: snapshot.id, targetType: snapshot.resourceType, target: this.node(record), course: path.course ? this.node(path.course) : null, subject: path.subject ? this.node(path.subject) : null, academicGrade: path.grade ? this.gradeDto(path.grade) : null, retainedAccess: true, archivedAt: snapshot.archivedAt });
+      rows.push({
+        archivedAccessSnapshotId: snapshot.id,
+        targetType: snapshot.resourceType,
+        target: this.node(record),
+        course: path.course ? this.node(path.course) : null,
+        subject: path.subject ? this.node(path.subject) : null,
+        academicGrade: path.grade ? this.gradeDto(path.grade) : null,
+        retainedAccess: true,
+        archivedAt: snapshot.archivedAt,
+      });
     }
     return rows;
   }
 
   private async archivedRecord(type: string, id: string): Promise<any> {
-    if (type === 'ACADEMIC_GRADE') return this.prisma.academicGrade.findUnique({ where: { id } });
-    if (type === 'SUBJECT') return this.prisma.subject.findUnique({ where: { id }, include: { academicGrade: true } });
-    if (type === 'COURSE') return this.prisma.course.findUnique({ where: { id }, include: { subject: { include: { academicGrade: true } } } });
-    if (type === 'CHAPTER') return this.prisma.chapter.findUnique({ where: { id }, include: { course: { include: { subject: { include: { academicGrade: true } } } } } });
-    if (type === 'LESSON') return this.prisma.lesson.findUnique({ where: { id }, include: { chapter: { include: { course: { include: { subject: { include: { academicGrade: true } } } } } } } });
-    if (type === 'SECTION') return this.prisma.section.findUnique({ where: { id }, include: { lesson: { include: { chapter: { include: { course: { include: { subject: { include: { academicGrade: true } } } } } } } } } });
+    if (type === 'ACADEMIC_GRADE')
+      return this.prisma.academicGrade.findUnique({ where: { id } });
+    if (type === 'SUBJECT')
+      return this.prisma.subject.findUnique({
+        where: { id },
+        include: { academicGrade: true },
+      });
+    if (type === 'COURSE')
+      return this.prisma.course.findUnique({
+        where: { id },
+        include: { subject: { include: { academicGrade: true } } },
+      });
+    if (type === 'CHAPTER')
+      return this.prisma.chapter.findUnique({
+        where: { id },
+        include: {
+          course: {
+            include: { subject: { include: { academicGrade: true } } },
+          },
+        },
+      });
+    if (type === 'LESSON')
+      return this.prisma.lesson.findUnique({
+        where: { id },
+        include: {
+          chapter: {
+            include: {
+              course: {
+                include: { subject: { include: { academicGrade: true } } },
+              },
+            },
+          },
+        },
+      });
+    if (type === 'SECTION')
+      return this.prisma.section.findUnique({
+        where: { id },
+        include: {
+          lesson: {
+            include: {
+              chapter: {
+                include: {
+                  course: {
+                    include: { subject: { include: { academicGrade: true } } },
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
     return null;
   }
 
   private archivedPath(type: string, record: any) {
-    if (type === 'ACADEMIC_GRADE') return { grade: record, subject: null, course: null };
-    if (type === 'SUBJECT') return { grade: record.academicGrade, subject: record, course: null };
-    if (type === 'COURSE') return { grade: record.subject.academicGrade, subject: record.subject, course: record };
-    if (type === 'CHAPTER') return { grade: record.course.subject.academicGrade, subject: record.course.subject, course: record.course };
-    if (type === 'LESSON') return { grade: record.chapter.course.subject.academicGrade, subject: record.chapter.course.subject, course: record.chapter.course };
-    return { grade: record.lesson.chapter.course.subject.academicGrade, subject: record.lesson.chapter.course.subject, course: record.lesson.chapter.course };
+    if (type === 'ACADEMIC_GRADE')
+      return { grade: record, subject: null, course: null };
+    if (type === 'SUBJECT')
+      return { grade: record.academicGrade, subject: record, course: null };
+    if (type === 'COURSE')
+      return {
+        grade: record.subject.academicGrade,
+        subject: record.subject,
+        course: record,
+      };
+    if (type === 'CHAPTER')
+      return {
+        grade: record.course.subject.academicGrade,
+        subject: record.course.subject,
+        course: record.course,
+      };
+    if (type === 'LESSON')
+      return {
+        grade: record.chapter.course.subject.academicGrade,
+        subject: record.chapter.course.subject,
+        course: record.chapter.course,
+      };
+    return {
+      grade: record.lesson.chapter.course.subject.academicGrade,
+      subject: record.lesson.chapter.course.subject,
+      course: record.lesson.chapter.course,
+    };
   }
 
   async entitlements(studentUserId: string, query: PaginationQueryDto) {
@@ -375,6 +631,66 @@ export class StudentCatalogService {
         targetId: record.courseId ?? record.chapterId,
       })),
       meta: toPaginationMeta(query.page, query.limit, total),
+    };
+  }
+
+  private cursor(cursor?: string) {
+    if (!cursor) return undefined;
+    try {
+      const value = JSON.parse(Buffer.from(cursor, 'base64url').toString());
+      if (!Number.isInteger(value.sortOrder) || typeof value.id !== 'string')
+        throw new Error();
+      return value as { sortOrder: number; id: string };
+    } catch {
+      throw new BadRequestException('Invalid cursor');
+    }
+  }
+  private after(cursor?: string) {
+    const value = this.cursor(cursor);
+    return value
+      ? {
+          OR: [
+            { sortOrder: { gt: value.sortOrder } },
+            { sortOrder: value.sortOrder, id: { gt: value.id } },
+          ],
+        }
+      : {};
+  }
+  private page(items: any[], limit: number) {
+    const hasNextPage = items.length > limit;
+    const data = items.slice(0, limit);
+    const last = data.at(-1);
+    return {
+      data,
+      pageInfo: {
+        hasNextPage,
+        nextCursor:
+          hasNextPage && last
+            ? Buffer.from(
+                JSON.stringify({ sortOrder: last.sortOrder, id: last.id }),
+              ).toString('base64url')
+            : null,
+      },
+    };
+  }
+  private placementPage(
+    items: any[],
+    limit: number,
+    render: (placement: any) => any,
+  ) {
+    const rows = items.slice(0, limit);
+    const last = rows.at(-1);
+    return {
+      data: rows.map(render),
+      pageInfo: {
+        hasNextPage: items.length > limit,
+        nextCursor:
+          items.length > limit && last
+            ? Buffer.from(
+                JSON.stringify({ sortOrder: last.sortOrder, id: last.id }),
+              ).toString('base64url')
+            : null,
+      },
     };
   }
 
@@ -504,13 +820,6 @@ export class StudentCatalogService {
       ...node,
       access,
       isLocked: access.state === 'LOCKED' || access.state === 'PURCHASABLE',
-    };
-  }
-  private placements() {
-    return {
-      where: { contentItem: { status: published } },
-      include: { contentItem: true },
-      orderBy: order,
     };
   }
 }

@@ -1,8 +1,8 @@
-import { Controller, Get, Param, Query, Req, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Public } from '../../common/decorators/public.decorator';
 import { OptionalStudentAuthGuard } from '../../common/guards/optional-student-auth.guard';
-import type { RequestWithUser } from '../../common/types/request-with-user.types';
+import { CursorPaginationQueryDto } from '../../common/dto/cursor-pagination-query.dto';
 import { CatalogService } from './catalog.service';
 import { CatalogCoursesQueryDto } from './dto/catalog-courses-query.dto';
 import { CatalogSubjectsQueryDto } from './dto/catalog-subjects-query.dto';
@@ -33,12 +33,19 @@ export class CatalogController {
     return this.catalog.course(id);
   }
 
-  @Get('courses/:id/outline')
-  @ApiOperation({ summary: 'Get a published course outline with access locks' })
-  outline(@Param('id') id: string, @Req() request: RequestWithUser) {
-    return this.catalog.outline(
-      id,
-      request.user?.role === 'STUDENT' ? request.user.id : undefined,
-    );
-  }
+  @Get('courses/:id/chapters')
+  @ApiOperation({ summary: 'List published course chapters' })
+  chapters(@Param('id') id: string, @Query() query: CursorPaginationQueryDto) { return this.catalog.chapters(id, query); }
+
+  @Get('chapters/:id/lessons')
+  @ApiOperation({ summary: 'List published chapter lessons' })
+  lessons(@Param('id') id: string, @Query() query: CursorPaginationQueryDto) { return this.catalog.lessons(id, query); }
+
+  @Get('lessons/:id/sections')
+  @ApiOperation({ summary: 'List published lesson sections' })
+  sections(@Param('id') id: string, @Query() query: CursorPaginationQueryDto) { return this.catalog.sections(id, query); }
+
+  @Get(':resource/:id/content-items')
+  @ApiOperation({ summary: 'List published content previews directly placed on a hierarchy node' })
+  contentItems(@Param('resource') resource: string, @Param('id') id: string, @Query() query: CursorPaginationQueryDto) { return this.catalog.contentItems(resource, id, query); }
 }

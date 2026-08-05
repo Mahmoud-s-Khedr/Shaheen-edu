@@ -276,12 +276,12 @@ export const studentCatalogJourney: JourneyDefinition = {
 
         const chapter = await studentRequest<any>(
           'GET',
-          `/student/catalog/chapters/${entitledChapterId}`,
+          `/student/catalog/chapters/${entitledChapterId}/content-items`,
         );
         expectStatus(chapter, 200);
         assert(
-          chapter.body.access?.state === 'ENTITLED' &&
-            chapter.body.contentItems?.some(
+          chapter.body.parent?.access?.state === 'ENTITLED' &&
+            chapter.body.data?.some(
               (item: any) =>
                 item.id === contentItemId &&
                 item.access?.state === 'ENTITLED' &&
