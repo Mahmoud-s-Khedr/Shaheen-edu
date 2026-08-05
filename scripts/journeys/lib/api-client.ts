@@ -2,6 +2,10 @@ import { randomUUID } from 'node:crypto';
 import { CookieJar } from './cookie-jar.js';
 import type { ApiResponse, HttpMethod, OperationRecord } from './types.js';
 
+function headersToRecord(headers: Headers): Record<string, string> {
+  return Object.fromEntries(headers.entries());
+}
+
 export class ApiClient {
   readonly jar = new CookieJar();
   accessToken?: string;
@@ -84,6 +88,14 @@ export class ApiClient {
           durationMs: performance.now() - started,
           correlationId,
           client: this.name,
+          request: {
+            headers: headersToRecord(headers),
+            body: options.rawBody ?? body,
+          },
+          response: {
+            headers: headersToRecord(response.headers),
+            body: parsed,
+          },
           body: parsed,
         });
       this.onResponse?.(correlationId);
@@ -184,6 +196,22 @@ export class ApiClient {
         durationMs: performance.now() - started,
         correlationId,
         client: this.name,
+        request: {
+          headers: headersToRecord(headers),
+          body: {
+            fields: options.fields ?? {},
+            file: {
+              filename: file.filename,
+              contentType: file.contentType,
+              size: file.buffer.length,
+              contentBase64: file.buffer.toString('base64'),
+            },
+          },
+        },
+        response: {
+          headers: headersToRecord(response.headers),
+          body: parsed,
+        },
         body: parsed,
       });
       this.onResponse?.(correlationId);

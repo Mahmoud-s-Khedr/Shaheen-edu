@@ -206,15 +206,15 @@ export const studentCatalogJourney: JourneyDefinition = {
           'An unentitled paid course must expose its effective EGP price',
         );
 
-        const detail = await studentRequest<any>(
+        const chapters = await studentRequest<any>(
           'GET',
-          `/student/catalog/courses/${courseId}`,
+          `/student/catalog/courses/${courseId}/chapters`,
         );
-        expectStatus(detail, 200);
-        const inherited = detail.body.chapters?.find(
+        expectStatus(chapters, 200);
+        const inherited = chapters.body.data?.find(
           (item: any) => item.id === entitledChapterId,
         );
-        const overridden = detail.body.chapters?.find(
+        const overridden = chapters.body.data?.find(
           (item: any) => item.id === lockedChapterId,
         );
         assert(
@@ -254,19 +254,19 @@ export const studentCatalogJourney: JourneyDefinition = {
           201,
         );
 
-        const detail = await studentRequest<any>(
+        const chapters = await studentRequest<any>(
           'GET',
-          `/student/catalog/courses/${courseId}`,
+          `/student/catalog/courses/${courseId}/chapters`,
         );
-        expectStatus(detail, 200);
-        const entitled = detail.body.chapters?.find(
+        expectStatus(chapters, 200);
+        const entitled = chapters.body.data?.find(
           (item: any) => item.id === entitledChapterId,
         );
-        const locked = detail.body.chapters?.find(
+        const locked = chapters.body.data?.find(
           (item: any) => item.id === lockedChapterId,
         );
         assert(
-          detail.body.access?.state === 'PURCHASABLE' &&
+          chapters.body.parent?.access?.state === 'PURCHASABLE' &&
             entitled?.access?.state === 'ENTITLED' &&
             entitled.isLocked === false &&
             locked?.access?.state === 'PURCHASABLE' &&

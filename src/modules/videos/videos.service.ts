@@ -127,7 +127,26 @@ export class VideosService {
     )
       throw new ConflictException('Video upload has not started');
 
-    if (asset.status !== AssetStatus.UPLOADING) return this.summary(asset);
+    // Bunny can deliver its first processing webhook before the client reaches
+    // this endpoint. Preserve that newer provider state, but still retain the
+    // client-completion audit signal.
+    if (asset.status !== AssetStatus.UPLOADING) {
+      if (asset.video.clientUploadCompletedAt) return this.summary(asset);
+      const updated = await this.prisma.asset.update({
+        where: { id: assetId },
+        data: {
+          video: { update: { clientUploadCompletedAt: new Date() } },
+        },
+        include: { video: true },
+      });
+      await this.audit.record({
+        actorUserId: actor.id,
+        action: 'VIDEO_UPLOAD_CONFIRMED_BY_CLIENT',
+        targetType: 'Asset',
+        targetId: assetId,
+      });
+      return this.summary(updated);
+    }
 
     const updated = await this.prisma.asset.update({
       where: { id: assetId },

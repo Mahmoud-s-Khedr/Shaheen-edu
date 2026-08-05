@@ -3589,9 +3589,11 @@ requiring the video to be attached to content.
 **Authorization:** Bearer token; role must be `ADMIN` or `SUPER_ADMIN`
 
 Records the client-reported successful completion of its TUS upload. It does
-not verify Bunny received the video. The asset transitions from `UPLOADING` to
-`UPLOADED_AWAITING_PROCESSING`; repeat calls are safe and return the current
-asset state.
+not verify Bunny received the video. If Bunny has not yet sent a processing
+webhook, the asset transitions from `UPLOADING` to
+`UPLOADED_AWAITING_PROCESSING`. If Bunny has already advanced the asset, that
+newer provider state is preserved. Repeat calls are safe, preserve the original
+client-completion timestamp, and return the current asset state.
 
 **Request**
 

@@ -1,4 +1,4 @@
-export type HttpMethod = 'GET' | 'POST' | 'PATCH' | 'DELETE';
+export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
 export interface ApiResponse<T = unknown> {
   status: number;
@@ -9,7 +9,7 @@ export interface ApiResponse<T = unknown> {
   path: string;
 }
 
-/** A redacted record of a real HTTP call made during an acceptance run. */
+/** A complete record of a real HTTP call made during a local journey run. */
 export interface OperationRecord {
   method: HttpMethod;
   path: string;
@@ -17,6 +17,15 @@ export interface OperationRecord {
   durationMs: number;
   correlationId: string;
   client: string;
+  request: {
+    headers: Record<string, string>;
+    body?: unknown;
+  };
+  response: {
+    headers: Record<string, string>;
+    body: unknown;
+  };
+  /** Kept for the response-schema coverage checker. */
   body: unknown;
 }
 

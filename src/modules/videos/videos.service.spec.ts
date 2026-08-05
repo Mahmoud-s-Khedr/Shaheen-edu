@@ -364,18 +364,57 @@ describe('VideosService', () => {
       expect(prisma.asset.update).not.toHaveBeenCalled();
     });
 
-    it('does not regress a Bunny-driven state on a delayed confirmation', async () => {
-      const { service, prisma } = buildService();
+    it('records a delayed confirmation without regressing Bunny-driven state', async () => {
+      const { service, prisma, audit } = buildService();
       const processing = {
         id: 'a1',
         status: AssetStatus.PROCESSING,
-        video: { assetId: 'a1', processingStatus: VideoProcessingStatus.PROCESSING },
+        video: {
+          assetId: 'a1',
+          processingStatus: VideoProcessingStatus.PROCESSING,
+          clientUploadCompletedAt: null,
+        },
       };
       prisma.asset.findUnique.mockResolvedValue(processing);
+      prisma.asset.update.mockResolvedValue({
+        ...processing,
+        video: {
+          ...processing.video,
+          clientUploadCompletedAt: new Date('2026-08-05T16:18:21.000Z'),
+        },
+      });
+      await expect(service.confirmation(admin, 'a1')).resolves.toMatchObject({
+        status: AssetStatus.PROCESSING,
+        video: { processingStatus: VideoProcessingStatus.PROCESSING },
+      });
+      expect(prisma.asset.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: {
+            video: { update: { clientUploadCompletedAt: expect.any(Date) } },
+          },
+        }),
+      );
+      expect(audit.record).toHaveBeenCalledWith(
+        expect.objectContaining({ action: 'VIDEO_UPLOAD_CONFIRMED_BY_CLIENT' }),
+      );
+    });
+
+    it('keeps a previously recorded delayed confirmation idempotent', async () => {
+      const { service, prisma, audit } = buildService();
+      prisma.asset.findUnique.mockResolvedValue({
+        id: 'a1',
+        status: AssetStatus.PROCESSING,
+        video: {
+          assetId: 'a1',
+          processingStatus: VideoProcessingStatus.QUEUED,
+          clientUploadCompletedAt: new Date('2026-08-05T16:18:21.000Z'),
+        },
+      });
       await expect(service.confirmation(admin, 'a1')).resolves.toMatchObject({
         status: AssetStatus.PROCESSING,
       });
       expect(prisma.asset.update).not.toHaveBeenCalled();
+      expect(audit.record).not.toHaveBeenCalled();
     });
   });
 

@@ -5,6 +5,7 @@ import { resolve } from 'node:path';
 const root = resolve(import.meta.dirname, '..');
 const envPath = resolve(root, '.env.api-tests.local');
 const apiTestPort = process.env.API_TEST_PORT ?? '3101';
+const requestedBaseUrl = process.env.JOURNEY_BASE_URL?.trim();
 const compose = [
   'compose',
   '-f',
@@ -68,7 +69,44 @@ function runDocker(args) {
   });
 }
 
-if (!existsSync(envPath)) {
+function runAcceptance(testEnv, baseUrl) {
+  const result = spawnSync('pnpm', ['tsx', 'scripts/run-api-acceptance.ts'], {
+    cwd: root,
+    stdio: 'inherit',
+    env: {
+      ...process.env,
+      JOURNEY_ALLOW_MUTATIONS: 'true',
+      JOURNEY_BASE_URL: baseUrl,
+      JOURNEY_API_PREFIX: process.env.JOURNEY_API_PREFIX ?? '/api/v1',
+      JOURNEY_SUPER_ADMIN_EMAIL:
+        process.env.JOURNEY_SUPER_ADMIN_EMAIL ??
+        process.env.SUPER_ADMIN_EMAIL ??
+        testEnv.SUPER_ADMIN_EMAIL,
+      JOURNEY_SUPER_ADMIN_PASSWORD:
+        process.env.JOURNEY_SUPER_ADMIN_PASSWORD ??
+        process.env.SUPER_ADMIN_PASSWORD ??
+        testEnv.SUPER_ADMIN_PASSWORD,
+      JOURNEY_BUNNY_WEBHOOK_URL:
+        process.env.JOURNEY_BUNNY_WEBHOOK_URL ?? testEnv.API_TEST_BUNNY_WEBHOOK_URL,
+      JOURNEY_BUNNY_READ_ONLY_KEY:
+        process.env.JOURNEY_BUNNY_READ_ONLY_KEY ?? testEnv.BUNNY_STREAM_READ_ONLY_KEY,
+    },
+  });
+  return result.status ?? 1;
+}
+
+if (requestedBaseUrl) {
+  // An explicit target is an existing environment. Do not create or tear down
+  // the local Docker stack in this mode.
+  const testEnv = existsSync(envPath) ? parseEnv(envPath) : {};
+  try {
+    if (existsSync(envPath)) requireSafeProviderConfig(testEnv);
+    process.exitCode = runAcceptance(testEnv, requestedBaseUrl);
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exitCode = 1;
+  }
+} else if (!existsSync(envPath)) {
   console.error(
     'Missing .env.api-tests.local. Copy .env.api-tests.example and add dedicated non-production Bunny credentials.',
   );
@@ -78,21 +116,10 @@ if (!existsSync(envPath)) {
   try {
     requireSafeProviderConfig(testEnv);
     runDocker(['up', '--build', '--wait']);
-    const result = spawnSync('pnpm', ['tsx', 'scripts/run-api-acceptance.ts'], {
-      cwd: root,
-      stdio: 'inherit',
-      env: {
-        ...process.env,
-        JOURNEY_ALLOW_MUTATIONS: 'true',
-        JOURNEY_BASE_URL: `http://127.0.0.1:${apiTestPort}`,
-        JOURNEY_API_PREFIX: '/api/v1',
-        JOURNEY_SUPER_ADMIN_EMAIL: testEnv.SUPER_ADMIN_EMAIL,
-        JOURNEY_SUPER_ADMIN_PASSWORD: testEnv.SUPER_ADMIN_PASSWORD,
-        JOURNEY_BUNNY_WEBHOOK_URL: testEnv.API_TEST_BUNNY_WEBHOOK_URL,
-        JOURNEY_BUNNY_READ_ONLY_KEY: testEnv.BUNNY_STREAM_READ_ONLY_KEY,
-      },
-    });
-    process.exitCode = result.status ?? 1;
+    process.exitCode = runAcceptance(
+      testEnv,
+      `http://127.0.0.1:${apiTestPort}`,
+    );
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));
     process.exitCode = 1;

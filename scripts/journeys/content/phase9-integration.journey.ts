@@ -175,18 +175,22 @@ export const phase9IntegrationJourney: JourneyDefinition = {
           `/admin/video-assets/${videoAssetId}/upload-confirmation`,
         );
         expectStatus(confirmation, 201);
-        assert(
-          confirmation.body.status === 'UPLOADED_AWAITING_PROCESSING',
-          'Client TUS completion must create the Bunny-processing diagnostic boundary',
-        );
-        assert(
-          confirmation.body.video?.processingStatus === 'UPLOADING',
-          'Client confirmation must not claim Bunny processing has started',
-        );
         expectString(
           confirmation.body.video?.clientUploadCompletedAt,
           'client upload completion timestamp',
         );
+        const status = confirmation.body.status;
+        const processingStatus = confirmation.body.video?.processingStatus;
+        assert(
+          (status === 'UPLOADED_AWAITING_PROCESSING' &&
+            processingStatus === 'UPLOADING') ||
+            (status === 'PROCESSING' &&
+              (processingStatus === 'QUEUED' ||
+                processingStatus === 'PROCESSING')) ||
+            status === 'READY',
+          'Client confirmation must preserve either the client-upload boundary or a newer Bunny processing state',
+        );
+        if (status === 'READY') return;
         const deadline = Date.now() + environment.videoReadyTimeoutMs;
         while (Date.now() < deadline) {
           const state = await admin.request<any>(

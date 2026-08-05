@@ -54,14 +54,16 @@ test('operation template matching prefers static paths over parameters', () => {
   );
 });
 
-test('API client sends isolated bearer token and assertion failures throw', async () => {
-  const originalFetch = globalThis.fetch; let authorization = ''; let signature = ''; const operations: string[] = [];
+test('API client sends isolated bearer token and records complete exchanges', async () => {
+  const originalFetch = globalThis.fetch; let authorization = ''; let signature = ''; const operations: import('./types.js').OperationRecord[] = [];
   globalThis.fetch = (async (_input: RequestInfo | URL, init?: RequestInit) => { const headers = new Headers(init?.headers); authorization = headers.get('authorization') ?? ''; signature = headers.get('x-test-signature') ?? ''; return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'content-type': 'application/json' } }); }) as typeof fetch;
   try {
-    const client = new ApiClient({ baseUrl: 'http://localhost:3000', apiPrefix: '/api/v1', timeoutMs: 1000 }, 'test', undefined, (record) => operations.push(record.path)); client.accessToken = 'actor-token';
-    const response = await client.request('GET', '/auth/me'); assert.equal(authorization, 'Bearer actor-token'); assert.throws(() => expectStatus(response, 201), JourneyAssertionError);
+    const client = new ApiClient({ baseUrl: 'http://localhost:3000', apiPrefix: '/api/v1', timeoutMs: 1000 }, 'test', undefined, (record) => operations.push(record)); client.accessToken = 'actor-token';
+    const response = await client.request('POST', '/auth/me', { password: 'test-password' }); assert.equal(authorization, 'Bearer actor-token'); assert.throws(() => expectStatus(response, 201), JourneyAssertionError);
     await client.request('POST', '/webhook', undefined, { rawBody: '{}', headers: { 'x-test-signature': 'signed' }, track: false });
-    assert.equal(signature, 'signed'); assert.deepEqual(operations, ['/api/v1/auth/me']);
+    assert.equal(signature, 'signed'); assert.equal(operations.length, 1);
+    assert.deepEqual(operations[0].request, { headers: { accept: 'application/json', authorization: 'Bearer actor-token', 'content-type': 'application/json', 'x-correlation-id': operations[0].correlationId }, body: { password: 'test-password' } });
+    assert.deepEqual(operations[0].response, { headers: { 'content-type': 'application/json' }, body: { ok: true } });
   } finally { globalThis.fetch = originalFetch; }
 });
 
@@ -120,7 +122,7 @@ test('delivery URL fetch rejects failed and empty responses', async () => {
   } finally { globalThis.fetch = originalFetch; }
 });
 
-test('runner executes dependencies in order and writes redacted report', async () => {
+test('runner executes dependencies in order and writes a report', async () => {
   env({}); const order: string[] = [];
   const definitions: JourneyDefinition[] = [
     { id: 'A', name: 'A', category: 'auth', run: async () => { order.push('A'); } },

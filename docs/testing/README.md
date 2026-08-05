@@ -25,15 +25,33 @@ pnpm api:test:full
 
 The same file already supplies `BUNNY_STREAM_READ_ONLY_KEY`; the runner passes
 it only as `JOURNEY_BUNNY_READ_ONLY_KEY` to sign the direct webhook acceptance
-case. It is redacted from reports and never sent to the API as an application
-credential.
+case. It is never sent to the API as an application credential, but is retained
+in the complete local test report.
 
-The command starts `docker-compose.api-test.yml` as the
+Without `JOURNEY_BASE_URL`, the command starts `docker-compose.api-test.yml` as the
 `shaheen-edu-api-test` Compose project, exposing only its API on
 `127.0.0.1:3101`. It creates a fresh database and Redis instance, runs the
 real HTTP journeys, checks runtime OpenAPI against both documentation files,
-writes a redacted per-operation report to `reports/api-tests/`, attempts to
+writes a complete per-operation report to `reports/api-tests/`, attempts to
 delete created Bunny-backed resources, and removes only that test project and
 its volumes on exit. It never uses the normal local Compose project or its
 data. A failed remote cleanup makes the command fail and is listed in the
 report for manual follow-up.
+
+## Full API acceptance against an existing development environment
+
+Set `JOURNEY_BASE_URL` to skip Docker completely and test the supplied API
+instead. Non-local targets require the journey safety confirmation:
+
+```sh
+JOURNEY_TARGET=staging \
+JOURNEY_CONFIRM_STAGING_MUTATIONS=true \
+JOURNEY_BASE_URL=https://api-edu.mydevtest.website \
+JOURNEY_SUPER_ADMIN_EMAIL=superadmin@example.com \
+JOURNEY_SUPER_ADMIN_PASSWORD='ChangeThisPassword123!' \
+pnpm api:test:full
+```
+
+When present, `.env.api-tests.local` still supplies the dedicated Bunny test
+configuration. The command does not start, build, stop, or remove any Docker
+containers in explicit-base-URL mode.

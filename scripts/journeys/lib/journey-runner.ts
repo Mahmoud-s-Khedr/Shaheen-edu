@@ -171,7 +171,7 @@ export class JourneyRunner {
     const path = resolve(directory, `${this.context.runId}.json`);
     await writeFile(
       path,
-      `${JSON.stringify({ runId: this.context.runId, target: this.environment.baseUrl, deliveryFetches: this.getDeliveryFetches(), results }, null, 2)}\n`,
+      `${JSON.stringify({ runId: this.context.runId, target: this.environment.baseUrl, deliveryFetches: this.getDeliveryFetches(), results, calls: this.getOperations() }, null, 2)}\n`,
       'utf8',
     );
     return path;
