@@ -74,6 +74,24 @@ export const apiCoverageJourney: JourneyDefinition = {
       await reorder('sections', { lessonId: lesson });
     });
 
+    await step('Browsing every catalog hierarchy child-list endpoint', async () => {
+      const publicChapters = await clients.public.request<any>('GET', `/catalog/courses/${course}/chapters`);
+      expectStatus(publicChapters, 200);
+      assert(publicChapters.body.data.some((item: any) => item.id === chapter), 'Public catalog must return the known chapter');
+      const publicLessons = await clients.public.request<any>('GET', `/catalog/chapters/${chapter}/lessons`);
+      expectStatus(publicLessons, 200);
+      assert(publicLessons.body.data.some((item: any) => item.id === lesson), 'Public catalog must return the known lesson');
+      const publicSections = await clients.public.request<any>('GET', `/catalog/lessons/${lesson}/sections`);
+      expectStatus(publicSections, 200);
+      assert(publicSections.body.data.some((item: any) => item.id === section), 'Public catalog must return the known section');
+      const studentLessons = await clients.public.request<any>('GET', `/student/catalog/chapters/${chapter}/lessons`, undefined, { accessToken: catalogStudent.accessToken });
+      expectStatus(studentLessons, 200);
+      assert(studentLessons.body.data.some((item: any) => item.id === lesson), 'Student catalog must return the known lesson');
+      const studentSections = await clients.public.request<any>('GET', `/student/catalog/lessons/${lesson}/sections`, undefined, { accessToken: catalogStudent.accessToken });
+      expectStatus(studentSections, 200);
+      assert(studentSections.body.data.some((item: any) => item.id === section), 'Student catalog must return the known section');
+    });
+
     await step('Setting and removing a hierarchy cover image', async () => {
       const assets = await admin.request<any>('GET', '/admin/assets');
       expectStatus(assets, 200);

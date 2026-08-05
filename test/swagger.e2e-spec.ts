@@ -130,6 +130,32 @@ describe('Swagger (e2e)', () => {
     expect(updatePaymentMethod.responses[200].content['application/json'].schema).toMatchObject({
       $ref: '#/components/schemas/ManualPaymentMethodDto',
     });
+    expect(document.components.schemas.ManualPaymentMethodDto.properties).toEqual(
+      expect.objectContaining({
+        titleEn: expect.objectContaining({ type: 'string', nullable: true }),
+        instructionsEn: expect.objectContaining({ type: 'string', nullable: true }),
+      }),
+    );
+    expect(document.components.schemas.PaymentMethodSnapshotDto.properties).toEqual(
+      expect.objectContaining({
+        titleEn: expect.objectContaining({ type: 'string', nullable: true }),
+        instructionsEn: expect.objectContaining({ type: 'string', nullable: true }),
+      }),
+    );
+    expect(document.components.schemas.PaymentSubmissionSummaryDto.properties).toEqual(
+      expect.objectContaining({
+        transactionReference: expect.objectContaining({ type: 'string', nullable: true }),
+        note: expect.objectContaining({ type: 'string', nullable: true }),
+        rejectionReason: expect.objectContaining({ type: 'string', nullable: true }),
+      }),
+    );
+    expect(document.components.schemas.PaymentSubmissionDetailDto.required).toEqual(
+      expect.arrayContaining(['createdAt', 'reviewedAt']),
+    );
+    expect(document.components.schemas.CourseSummaryDto.properties.description).toMatchObject({
+      type: 'string',
+      nullable: true,
+    });
 
     const reorderPaymentMethods = document.paths[
       '/api/v1/admin/manual-payment-methods/reorder'

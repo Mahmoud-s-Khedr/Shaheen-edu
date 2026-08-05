@@ -220,7 +220,7 @@ export class HierarchySummaryDto {
   @ApiProperty()
   slug!: string;
 
-  @ApiPropertyOptional({ nullable: true })
+  @ApiPropertyOptional({ type: String, nullable: true })
   description!: string | null;
 
   @ApiProperty()

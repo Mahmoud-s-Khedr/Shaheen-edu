@@ -43,8 +43,8 @@ export class ManualPaymentMethodDto {
   @ApiProperty({ example: 'payment-method-id' }) id!: string;
   @ApiProperty({ example: 'فودافون كاش' }) titleAr!: string;
   @ApiProperty({ example: 'حوّل المبلغ ثم ارفع الإيصال.' }) instructionsAr!: string;
-  @ApiProperty({ example: 'Vodafone Cash', nullable: true }) titleEn!: string | null;
-  @ApiProperty({ example: 'Transfer the amount, then upload the receipt.', nullable: true }) instructionsEn!: string | null;
+  @ApiProperty({ type: String, example: 'Vodafone Cash', nullable: true }) titleEn!: string | null;
+  @ApiProperty({ type: String, example: 'Transfer the amount, then upload the receipt.', nullable: true }) instructionsEn!: string | null;
   @ApiPropertyOptional({ example: true }) isActive?: boolean;
   @ApiPropertyOptional({ example: 1 }) sortOrder?: number;
   @ApiPropertyOptional({ example: 'admin-user-id' }) createdById?: string;
@@ -72,8 +72,8 @@ export class CartResponseDto {
 export class PaymentMethodSnapshotDto {
   @ApiProperty({ example: 'فودافون كاش' }) titleAr!: string;
   @ApiProperty({ example: 'حوّل المبلغ ثم ارفع الإيصال.' }) instructionsAr!: string;
-  @ApiProperty({ example: 'Vodafone Cash', nullable: true }) titleEn!: string | null;
-  @ApiProperty({ example: 'Transfer the amount, then upload the receipt.', nullable: true }) instructionsEn!: string | null;
+  @ApiProperty({ type: String, example: 'Vodafone Cash', nullable: true }) titleEn!: string | null;
+  @ApiProperty({ type: String, example: 'Transfer the amount, then upload the receipt.', nullable: true }) instructionsEn!: string | null;
 }
 
 export class OrderItemDto {
@@ -87,9 +87,9 @@ export class OrderItemDto {
 export class PaymentSubmissionSummaryDto {
   @ApiProperty({ example: 'payment-submission-id' }) id!: string;
   @ApiProperty({ enum: ManualPaymentSubmissionStatus }) status!: ManualPaymentSubmissionStatus;
-  @ApiProperty({ example: 'TXN-12345', nullable: true }) transactionReference!: string | null;
-  @ApiProperty({ example: 'Receipt note', nullable: true }) note!: string | null;
-  @ApiProperty({ example: 'Receipt is unreadable', nullable: true }) rejectionReason!: string | null;
+  @ApiProperty({ type: String, example: 'TXN-12345', nullable: true }) transactionReference!: string | null;
+  @ApiProperty({ type: String, example: 'Receipt note', nullable: true }) note!: string | null;
+  @ApiProperty({ type: String, example: 'Receipt is unreadable', nullable: true }) rejectionReason!: string | null;
   @ApiProperty({ type: String, format: 'date-time', example: '2026-08-04T10:00:00.000Z' }) createdAt!: Date;
   @ApiProperty({ type: String, format: 'date-time', example: '2026-08-04T10:05:00.000Z', nullable: true }) reviewedAt!: Date | null;
 }
@@ -117,7 +117,7 @@ export class IdStatusResponseDto { @ApiProperty({ example: 'payment-submission-i
 export class PaymentSubmissionAdminDto {
   @ApiProperty({ example: 'payment-submission-id' }) id!: string;
   @ApiProperty({ enum: ManualPaymentSubmissionStatus }) status!: ManualPaymentSubmissionStatus;
-  @ApiProperty({ example: 'TXN-12345', nullable: true }) transactionReference!: string | null;
+  @ApiProperty({ type: String, example: 'TXN-12345', nullable: true }) transactionReference!: string | null;
   @ApiProperty({ example: 'order-id' }) orderId!: string;
   @ApiProperty({ enum: OrderStatus }) orderStatus!: OrderStatus;
   @ApiProperty({ example: 'student-user-id' }) studentUserId!: string;
