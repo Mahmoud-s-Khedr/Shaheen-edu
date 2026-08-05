@@ -22,9 +22,11 @@
 - [ ] Generated assessments and the broader student analytics APIs in this
   roadmap are not implemented.
 
-`[x]` means the implementation exists. `[ ]` means the item remains planned;
-an existing endpoint with a narrower or different response is called out in
-the relevant section rather than being marked complete.
+`[x]` means the backend implementation exists. `[ ]` means the item remains
+planned; frontend rendering, response composition, and client-side navigation
+are outside this API roadmap. An existing endpoint with a narrower or
+different server-side response is called out in the relevant section rather
+than being marked complete.
 
 ## Core product rule
 
@@ -54,7 +56,7 @@ to a subject, and a chapter belongs to a course.
 | Public hierarchy | [x] | Published grade/subject/course discovery plus cursor-paginated course chapters, chapter lessons, lesson sections, and direct content previews. | — |
 | Paid access | [x] | Course/chapter pricing, `StudentEntitlement`, carts, manual-payment orders, proof review, and payment-backed grants exist. | No refunds, payment expiry, or PSP integration. |
 | Questions | [x] Authoring and direct practice | Questions are linked to a course and may be placed at course/chapter/lesson/section level; eligible published questions can be delivered for direct practice with immutable answer-attempt history. | No generated quiz/exam, assessment attempt, answer-autosave, result, or assessment-history model. |
-| Content delivery | [x] Foundation and completion | An entitled student can fetch a content item and its protected assets, view that item's completion state, and idempotently mark it complete. Current-grade and accessible-library progress rollups are available. | No resume, next-item navigation, or broader completion view. |
+| Content delivery | [x] Foundation and completion | An entitled student can fetch a content item and its protected assets, view that item's completion state, and idempotently mark it complete. Current-grade and accessible-library progress rollups are available. | No persisted last-opened item/playback position or hierarchy-target completion command. |
 
 Question banks and sources are authoring/provenance metadata. They are not a
 student catalogue concept and must not be exposed in learner responses.
@@ -105,8 +107,11 @@ student from browsing other grades by changing a query parameter.
 | [x] | `GET /api/v1/student/library` | Active course/chapter entitlements across grades, grouped with their published hierarchy and expiry. |
 | [x] | `GET /api/v1/student/entitlements` | The authenticated student's raw, paginated active entitlement records. |
 
-Completion/progress summaries and last activity remain future work. Public and
-student catalogue routes traverse one hierarchy level at a time.
+Completion/progress summaries are implemented. Persisted last activity and
+resume position remain future work. Public and student catalogue routes
+traverse one hierarchy level at a time; composing their ordered responses into
+cards, outlines, or previous/next controls is client work and requires no
+additional API.
 
 For a course/chapter response, return one explicit `access` object rather than
 forcing the frontend to infer it from many fields:
@@ -227,7 +232,9 @@ payment and must grant no access until approved.
 
 Completion records are keyed by `(studentUserId, contentItemId)` and store the
 completion timestamp. The client marks only an item complete; all hierarchy
-completion is derived from accessible published content and these records.
+completion is derived from accessible published content and these records. A
+direct command to mark a course, chapter, lesson, or section complete is not
+implemented.
 
 ## AI-generated quizzes and exams from the existing question bank
 

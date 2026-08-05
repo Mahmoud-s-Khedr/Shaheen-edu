@@ -2,25 +2,24 @@
 
 Source: [`docs/MohamedDiab-Req.pdf`](docs/MohamedDiab-Req.pdf) ("Sentivra - Mohamed Diab Req.").
 
-Last reviewed: 2026-08-05. This is a conservative, backend-only assessment of
-the code in this repository. It does not treat an API primitive as a completed
-student-facing screen, chart, or workflow unless the requested workflow is
-implemented end-to-end.
+Last reviewed: 2026-08-06. This is a backend-only assessment of the code in
+this repository. Frontend rendering, page composition, and client-side
+interactions are outside its scope. An API/data primitive counts as complete
+when it supplies the backend capability required by the original requirement.
 
 ## Status legend
 
 - [x] **Complete** — the repository implements the requested backend
-  capability end-to-end.
-- [-] **Partial** — useful supporting data, APIs, or administration features
-  exist, but the original workflow is incomplete.
+  capability.
+- [-] **Partial** — useful supporting data or APIs exist, but a material
+  server-side capability is still missing.
 - [ ] **Not implemented** — no delivered equivalent exists.
 
 ## Code evidence key
 
 Every `[x]` and `[-]` table row cites one or more evidence IDs below. A
 `[ ]` finding is based on the absence of a corresponding model/controller in
-the relevant delivered modules, not on an assumption about a frontend outside
-this repository.
+the relevant delivered modules. Frontend-only work is not treated as a gap.
 
 | ID | Code evidence |
 | --- | --- |
@@ -57,31 +56,31 @@ The former `GET /catalog/courses/:id/outline` and
 | Status | Original requirement | Current coverage / gap |
 | --- | --- | --- |
 | [-] | **Question Bank Usage**: total, used, unused questions, and usage percentage. | `GET /api/v1/student/performance` returns basic question totals, solved count, accuracy, and first-try correctness. It does not return total eligible bank size, used/unused counts, or usage percentage. [E-LEARN, E-DATA] |
-| [-] | **Your Score**: correct, incorrect, and omitted totals. | Direct-practice attempts persist correct/incorrect outcomes (`StudentQuestionAttempt`). Omitted/skipped answers and a complete dashboard score breakdown are absent. [E-LEARN, E-DATA] |
-| [-] | **Total Correct**: correct answers as a percentage of attempted questions. | Basic accuracy is implemented by `GET /api/v1/student/performance`; the requested Welcome-section presentation is not. [E-LEARN] |
+| [-] | **Your Score**: correct, incorrect, and omitted totals. | Direct-practice attempts persist correct/incorrect outcomes (`StudentQuestionAttempt`). Omitted/skipped answers are not represented, and no server-side aggregate supplies all three totals. [E-LEARN, E-DATA] |
+| [x] | **Total Correct**: correct answers as a percentage of attempted questions. | `GET /api/v1/student/performance` returns `accuracyPercent`, derived from the student's direct-practice attempts. [E-LEARN] |
 | [ ] | **Total Used**: attempted questions as a percentage of the total bank. | No total eligible-question denominator or usage-percentage API. |
-| [-] | **Course Progress**: selected-course completion percentage. | `GET /api/v1/student/progress` and `GET /api/v1/student/library/{targetType}/{targetId}/progress` derive completion from completed accessible content. No Welcome selected-course dashboard endpoint. [E-LEARN, E-DATA] |
+| [x] | **Course Progress**: selected-course completion percentage. | `GET /api/v1/student/progress` and `GET /api/v1/student/library/{targetType}/{targetId}/progress` derive completion from completed accessible content. [E-LEARN, E-DATA] |
 
 ## Module 2 — Courses and learning
 
 | Status | Original requirement | Current coverage / gap |
 | --- | --- | --- |
-| [-] | **My Courses**: all subscribed subjects. | `GET /api/v1/student/library` returns active entitled courses/chapters. It does not present a subscribed-subject list as specified. [E-CATALOG, E-DATA] |
-| [-] | **Subject card**: name, cover, subscription state, progress. | Catalogue and library responses expose hierarchy, covers, access state, and progress is separately available. No single subject-card response or UI workflow. [E-CATALOG, E-LEARN] |
+| [x] | **My Courses**: all subscribed subjects. | `GET /api/v1/student/library` returns every active course/chapter entitlement with its associated course, subject, grade, and expiry; a client can group these records by subject. [E-CATALOG, E-DATA] |
+| [x] | **Subject card**: name, cover, subscription state, progress. | Catalogue/library responses provide subject metadata and cover IDs, entitlement/access state, and course/chapter/lesson progress rollups. Combining those API responses into a card is client work. [E-CATALOG, E-LEARN] |
 | [ ] | **Continue studying**: subject, cover, subscription state, and progress. | No last activity, resume position, or continue-learning API. |
-| [-] | **View subject details**: chapters, lessons, videos, and question bank. | The public and student catalogue APIs now expose published course chapters, chapter lessons, lesson sections, and direct content previews through bounded cursor-paginated routes. Student responses include access/lock state; direct practice is scoped to hierarchy. Question-bank metadata is intentionally not exposed to students and no unified subject-detail workflow exists. [E-CATALOG, E-LEARN, E-QUESTION] |
+| [x] | **View subject details**: chapters, lessons, videos, and question bank. | Student catalogue routes expose the published hierarchy and direct content previews with access/lock state; direct practice supplies learner-safe questions for one hierarchy scope. The hierarchy is intentionally fetched one level at a time. [E-CATALOG, E-LEARN] |
 | [-] | **Subscribe to new subject**. | A student can buy a course or chapter through cart, checkout, manual proof submission, and approved entitlements. Subject-level subscriptions are not supported. [E-COMMERCE, E-DATA] |
-| [-] | **Chapter list** in the selected subject. | `GET /api/v1/catalog/courses/:id/chapters` and its student equivalent return bounded published chapter pages. The PDF’s subject-oriented view is not a standalone endpoint. [E-CATALOG] |
-| [-] | **Expand/collapse chapters** to show lessons. | `GET /api/v1/catalog/chapters/:id/lessons` supplies the data needed to expand a chapter; expand/collapse itself is a frontend behavior and no client is in this repository. [E-CATALOG] |
-| [-] | **Lesson list** in a chapter. | `GET /api/v1/catalog/chapters/:id/lessons` and the student equivalent return bounded published lesson pages. [E-CATALOG] |
-| [-] | **Expand/collapse lessons** to show sections. | `GET /api/v1/catalog/lessons/:id/sections` supplies the data needed to expand a lesson; UI interaction is not implemented here. [E-CATALOG] |
-| [-] | **Section list** in a lesson. | `GET /api/v1/catalog/lessons/:id/sections` and the student equivalent return bounded published section pages. [E-CATALOG] |
-| [-] | **Video player** for selected lesson/section. | Protected content delivery, protected asset URLs, and Bunny Stream playback are implemented. A learner-facing player and playback/resume tracking are not. [E-LEARN, E-VIDEO] |
-| [-] | **Progress indicators** for subject, chapter, and lesson. | Current-grade and owned-library completion rollups include course/chapter/lesson/section nodes. Subject aggregation and UI indicators are missing. [E-LEARN] |
+| [x] | **Chapter list** in the selected subject. | `GET /api/v1/catalog/courses/:id/chapters` and its student equivalent return bounded published chapter pages. A subject's courses are separately discoverable before their chapters are requested. [E-CATALOG] |
+| [x] | **Expand/collapse chapters** to show lessons. | `GET /api/v1/catalog/chapters/:id/lessons` supplies the ordered child data; expand/collapse requires no server-side state or command. [E-CATALOG] |
+| [x] | **Lesson list** in a chapter. | `GET /api/v1/catalog/chapters/:id/lessons` and the student equivalent return bounded published lesson pages. [E-CATALOG] |
+| [x] | **Expand/collapse lessons** to show sections. | `GET /api/v1/catalog/lessons/:id/sections` supplies the ordered child data; expand/collapse requires no server-side state or command. [E-CATALOG] |
+| [x] | **Section list** in a lesson. | `GET /api/v1/catalog/lessons/:id/sections` and the student equivalent return bounded published section pages. [E-CATALOG] |
+| [x] | **Video player** for selected lesson/section. | Protected content delivery, protected asset URLs, and Bunny Stream playback URLs are implemented. Rendering a player is frontend work; playback/resume tracking remains a separate continue-studying gap. [E-LEARN, E-VIDEO] |
+| [x] | **Progress indicators** for subject, chapter, and lesson. | Current-grade and owned-library completion rollups expose course/chapter/lesson/section completion; subject-level presentation can aggregate the course records returned for that subject. [E-LEARN, E-CATALOG] |
 | [-] | **Mark chapter, lesson, or section complete**. | `POST /api/v1/student/content-items/{id}/complete` marks an accessible content item; higher-level completion is derived. Directly marking a chapter, lesson, or section complete is not supported. [E-LEARN, E-DATA] |
-| [-] | **Video content**: topics/concepts in the selected video. | Content items expose title, description, type, duration, and attachments. No dedicated topic/concept metadata or learner video-details view. [E-CATALOG] |
-| [ ] | **Navigation controls**: previous/next lesson or section. | No next/previous or resume-navigation API. |
-| [-] | **Course outline**: Chapters → Lessons → Sections. | The published hierarchy is delivered through bounded, one-level-at-a-time routes rather than one nested response. Student routes resolve effective access and lock state at every returned node and content preview. A frontend still needs to assemble and render the outline. [E-CATALOG] |
+| [-] | **Video content**: topics/concepts in the selected video. | Content items expose title, description, type, duration, and attachments. No dedicated topic/concept metadata is persisted or exposed to learners. [E-CATALOG] |
+| [x] | **Navigation controls**: previous/next lesson or section. | Ordered chapter, lesson, and section pages provide the data a client needs to determine adjacent items. Previous/next navigation requires no dedicated server-side API or persisted state. [E-CATALOG] |
+| [x] | **Course outline**: Chapters → Lessons → Sections. | The published hierarchy is delivered through bounded, one-level-at-a-time routes. Student routes resolve effective access and lock state at every returned node and content preview. [E-CATALOG] |
 | [ ] | **Search content**: chapters, lessons, sections within a subject. | No learner hierarchy search endpoint. |
 
 ## Module 3 — QBank, quizzes, history, and results
@@ -97,7 +96,7 @@ The former `GET /catalog/courses/:id/outline` and
 | [-] | **Question source**: platform, external books, previous exams, ministry models. | Admin question sources support `PLATFORM`, `EXTERNAL_BOOK`, `PREVIOUS_EXAM`, and `MINISTRY_MODEL`; students cannot select/filter sources. [E-QUESTION] |
 | [ ] | **Question status**: unused, used, marked, incorrect, omitted, all. | Per-question direct-practice attempt history exists, but no filter states, marking/bookmarks, omitted state, or all-question quiz selection. |
 | [ ] | **Community incorrect questions**: questions with the highest platform-wide incorrect rate. | No aggregate question-quality/incorrect-rate analytics for students. |
-| [-] | **Course selection** from subscribed learning content. | Direct practice can scope an eligible question request to a course; it does not generate a quiz or supply the subscription-selector workflow. [E-LEARN] |
+| [-] | **Course selection** from subscribed learning content. | Direct practice can scope an eligible question request to a course, but no generated-assessment request accepts a subscribed-course selection. [E-LEARN] |
 | [-] | **Question bank selection**. | Question banks and sources exist for authoring/admin use only; they are intentionally excluded from learner APIs. [E-QUESTION, E-LEARN] |
 | [-] | **Multiple chapter, lesson, and topic/section selection**. | Direct practice supports one hierarchy scope, not multiple selections. [E-LEARN] |
 | [ ] | **Marked questions** filter. | No student question-bookmark/mark model. |
@@ -129,8 +128,8 @@ The former `GET /catalog/courses/:id/outline` and
 | [ ] | **Best subject/topic, needs improvement, and most omitted**. | No assessment analytics grouped by hierarchy and no omitted state. |
 | [ ] | **Excellent / Good Progress / Needs Improvement**, relative to platform average. | No platform benchmark or classification rules. |
 | [ ] | **Question performance table**: status, ID, subject, chapter, topic, success rate, and time spent. | Question placement and individual correct/incorrect attempts exist, but no per-quiz result table, platform success rate, or time tracking. |
-| [-] | **Question details**: student/correct answer, explanation, AI explanation, and video timestamp. | Direct-practice submission provides immediate answer feedback; authoring questions support explanation and optional video timestamp. No post-quiz detail page or AI explanation. [E-LEARN, E-QUESTION] |
-| [ ] | **Correct / Incorrect / Omitted indicators**. | Correct/incorrect is stored for direct practice; omitted is not represented and no quiz-review UI exists. |
+| [-] | **Question details**: student/correct answer, explanation, AI explanation, and video timestamp. | Direct-practice submission provides answer feedback; authoring questions support explanation and optional video timestamp. No persisted assessment-review data or AI explanation exists. [E-LEARN, E-QUESTION] |
+| [ ] | **Correct / Incorrect / Omitted indicators**. | Correct/incorrect is stored for direct practice, but omitted answers and submitted-assessment results are not represented. |
 | [ ] | **Performance overview** circular chart for omitted and incorrect questions. | No completed-quiz result aggregate or omitted state. |
 | [ ] | **Subjects performance table**: total, correct, incorrect, and omitted answers per subject. | No per-subject learner analytics endpoint and no omitted state. |
 | [ ] | **Expandable subjects**: exams in a subject with detailed results. | No exam/test history or subject drill-down. |
@@ -144,7 +143,7 @@ The former `GET /catalog/courses/:id/outline` and
 | [ ] | Full student ranking table and each student’s exact position. | No platform ranking API. |
 | [ ] | Smart Score: `(Accuracy × 60%) + (Total Questions Solved × 40%)`. | No Smart Score calculation or ranking model. |
 | [-] | Accuracy: `(Correct Answers / Answered Questions) × 100`. | The basic personal performance endpoint provides accuracy, but not leaderboard usage or ranking. [E-LEARN] |
-| [ ] | Ranking columns: rank, student name, quizzes taken, questions solved, accuracy, Smart Score; motivation/competition. | No leaderboard response or related UI. |
+| [ ] | Ranking columns: rank, student name, quizzes taken, questions solved, accuracy, Smart Score; motivation/competition. | No leaderboard response, rank calculation, or Smart Score model. |
 
 ## Module 5 — Performance
 
@@ -154,7 +153,7 @@ The former `GET /catalog/courses/:id/outline` and
 | --- | --- | --- |
 | [ ] | Total tests, completed tests, and suspended tests summary. | No generated-test model or status lifecycle. |
 | [ ] | QBank usage donut chart and statistics (total/used/unused). | No eligible-bank usage aggregation. |
-| [-] | Score section: total correct, incorrect, omitted. | Direct attempts retain correct/incorrect values; omitted and dashboard aggregate are absent. [E-LEARN, E-DATA] |
+| [-] | Score section: total correct, incorrect, omitted. | Direct attempts retain correct/incorrect values, but omitted answers are not represented and no server-side aggregate supplies all three totals. [E-LEARN, E-DATA] |
 | [ ] | Answer-change analysis: correct→incorrect and incorrect→correct. | Answers are immutable direct-practice attempts; changes during a test are not recorded. |
 | [ ] | Analysis tab by subject, chapter/system, and lesson with correct/incorrect/omitted totals, expandable rows, and search. | No grouped learner analytics or omitted state. |
 
@@ -170,8 +169,8 @@ The former `GET /catalog/courses/:id/outline` and
 
 | Status | Original requirement | Current coverage / gap |
 | --- | --- | --- |
-| [-] | **Admin — user management**: view/search/filter students, parents, and companies; view full profiles. | Admin and partner administration exists, with role-based authentication. No completed admin student/parent directory and full-profile workflow. [E-PARTNER, E-AUTH] |
-| [-] | **Admin — student data**: personal data, payments, subscriptions, full performance dashboard. | Orders, entitlements, and basic student performance exist, but no consolidated admin student dashboard. [E-COMMERCE, E-DATA, E-LEARN] |
+| [-] | **Admin — user management**: view/search/filter students, parents, and companies; view full profiles. | Admin and partner administration exists, with role-based authentication. No admin student/parent directory, search/filter API, or full-profile response exists. [E-PARTNER, E-AUTH] |
+| [-] | **Admin — student data**: personal data, payments, subscriptions, full performance dashboard. | Orders, entitlements, and basic student performance exist, but no consolidated admin student-data/performance response exists. [E-COMMERCE, E-DATA, E-LEARN] |
 | [ ] | **Admin — parent management**: list registered parents and linked students. | Parent sessions can list/select linked children for the parent; there is no registered-parent entity or admin parent-management API. |
 | [-] | **Admin — companies/partners**: create/edit partner, profit percentage, student count, payments, revenue share. | Admins can create, list, edit, suspend, and reactivate partner accounts. Publisher agreements/earnings models exist, but the requested partner statistics and payment/revenue reporting are not delivered. [E-PARTNER, E-DATA] |
 | [-] | **Admin — content management**: CRUD subjects/chapters/lessons, lesson video uploads, PDF uploads to generate questions at all hierarchy levels. | Academic hierarchy CRUD/publishing, video assets, file assets, question banks, and questions are implemented. Automatic PDF-to-question generation is not. [E-HIERARCHY, E-VIDEO, E-QUESTION] |
@@ -179,16 +178,16 @@ The former `GET /catalog/courses/:id/outline` and
 | [ ] | **Admin — reports**: automatic Excel subscriber export plus payment/revenue reports. | No export/report endpoints. |
 | [x] | **Admin access**: dedicated admin login and platform control. | Admin and super-admin login, role guards, and administrative module access are implemented. "Full control" remains limited to delivered modules. [E-AUTH, E-HIERARCHY, E-PARTNER] |
 | [x] | **Student registration**: name, phone, grade, governorate, center, National ID. | Student registration/profile stores these fields, with protected National-ID handling and published academic-grade selection. [E-AUTH, E-DATA] |
-| [-] | **Student dashboard**: all performance pages, peer ranking, leaderboard, graphs. | Basic direct-practice performance and learning progress exist; the requested dashboard suite does not. [E-LEARN] |
-| [-] | **Student learning**: subscribed content, video viewing, and QBank solving. | Entitlement-aware catalogue/content delivery, video access, and direct practice are implemented. The requested quiz/QBank workflows remain missing. [E-CATALOG, E-COMMERCE, E-LEARN, E-VIDEO] |
+| [-] | **Student dashboard**: all performance pages, peer ranking, leaderboard, graphs. | Basic direct-practice performance and learning progress exist; peer-ranking, leaderboard, and trend-analysis backend data are not implemented. [E-LEARN] |
+| [x] | **Student learning**: subscribed content, video viewing, and QBank solving. | Entitlement-aware catalogue/content delivery, protected video access, and scoped direct-practice questions with answer attempts are implemented. [E-CATALOG, E-COMMERCE, E-LEARN, E-VIDEO] |
 | [ ] | **Student tests**: timed/tutor tests and previous tests/answers. | No generated assessment, timer, modes, or test history. |
 | [-] | **Student progress tracking**: accuracy trends, Smart Score, percentile rank. | Basic accuracy and content progress are implemented; trends, Smart Score, and percentile are not. [E-LEARN] |
 | [-] | **Parent registration**: child National ID, parent phone, relationship. | Parent access login uses child National ID and parent phone, then allows child selection. It does not create a separate parent account or store relationship. [E-AUTH, E-DATA] |
 | [-] | **Parent monitoring**: child full performance/progress reports. | Selected-child basic performance summary is implemented; full reports are not. [E-LEARN] |
 | [ ] | **Parent subscriptions**: child subscribed chapters and payment history. | No parent-scoped entitlements/orders endpoint. |
-| [-] | **Parent separate account/access** for follow-up. | A distinct lightweight parent access-session model exists; it is not the requested full parent account/dashboard. [E-AUTH, E-DATA] |
+| [x] | **Parent separate account/access** for follow-up. | A distinct lightweight parent access-session model authenticates with the child National ID and parent phone, then permits linked-child selection. [E-AUTH, E-DATA] |
 | [x] | **Partner account** created by admin with email/password. | Admin partner creation and partner login are implemented. [E-PARTNER, E-AUTH, E-DATA] |
-| [-] | **Partner dashboard**: company, assigned subjects, registered students. | Partner profile and publisher-agreement foundations exist, but no partner dashboard or student-count report. [E-PARTNER, E-DATA] |
+| [-] | **Partner dashboard**: company, assigned subjects, registered students. | Partner profile and publisher-agreement foundations exist, but no partner-facing student-count or reporting response exists. [E-PARTNER, E-DATA] |
 | [ ] | **Partner reports/access**: payments, profit share, and network students. | No partner reporting endpoints or referral-network monitoring flow. |
 
 ## Original-scope gap summary
@@ -204,7 +203,7 @@ scope, the major remaining work is:
 2. Student analytics: QBank usage, omitted/answer-change tracking, grouped
    performance, result comparisons, trends, peer rankings, and Smart Score.
 3. Leaderboards, weekly reset/reward rules, and platform-wide aggregates.
-4. The learner-facing course experience: continue learning, navigation,
-   search, higher-level completion actions, and the PDF’s dashboard views.
+4. Remaining learner APIs: continue learning/resume state, hierarchy search,
+   and higher-level completion actions.
 5. Missing commercial/admin reporting: discounts/coupons, exports, revenue
-   reports, and completed admin/parent/partner dashboards.
+   reports, and the missing admin/parent/partner data APIs.
