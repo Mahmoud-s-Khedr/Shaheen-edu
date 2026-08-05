@@ -84,10 +84,22 @@ export const apiCoverageJourney: JourneyDefinition = {
       const publicSections = await clients.public.request<any>('GET', `/catalog/lessons/${lesson}/sections`);
       expectStatus(publicSections, 200);
       assert(publicSections.body.data.some((item: any) => item.id === section), 'Public catalog must return the known section');
-      const studentLessons = await clients.public.request<any>('GET', `/student/catalog/chapters/${chapter}/lessons`, undefined, { accessToken: catalogStudent.accessToken });
+      const scopedStudent = await clients.public.request<any>('POST', '/auth/students/register', {
+        fullName: factory.title('Catalog coverage student'),
+        nationalId: factory.nationalId(),
+        phone: `+20${factory.phone().slice(1)}`,
+        parentPhone: factory.phone(),
+        governorateId: String(context.academic.governorateId),
+        academicGradeId: grade,
+        password: factory.password('CatalogCoverage'),
+      });
+      expectStatus(scopedStudent, 201);
+      context.created.students.push(scopedStudent.body.user.id);
+      const accessToken = scopedStudent.body.accessToken;
+      const studentLessons = await clients.public.request<any>('GET', `/student/catalog/chapters/${chapter}/lessons`, undefined, { accessToken });
       expectStatus(studentLessons, 200);
       assert(studentLessons.body.data.some((item: any) => item.id === lesson), 'Student catalog must return the known lesson');
-      const studentSections = await clients.public.request<any>('GET', `/student/catalog/lessons/${lesson}/sections`, undefined, { accessToken: catalogStudent.accessToken });
+      const studentSections = await clients.public.request<any>('GET', `/student/catalog/lessons/${lesson}/sections`, undefined, { accessToken });
       expectStatus(studentSections, 200);
       assert(studentSections.body.data.some((item: any) => item.id === section), 'Student catalog must return the known section');
     });
