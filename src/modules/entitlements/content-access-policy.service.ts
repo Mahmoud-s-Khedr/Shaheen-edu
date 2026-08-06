@@ -51,6 +51,29 @@ export class ContentAccessPolicyService {
     return item;
   }
 
+  /** ACTIVE/non-revoked/time-window/course-or-chapter entitlement predicate over an
+   * ordered ancestor chain (nearest node first, course last). Shared by any caller
+   * that already has its own hierarchy nodes loaded (e.g. LearningService and
+   * AssessmentsService question-placement checks) instead of a ContentItem id. */
+  async entitledForNodes(studentId: string, nodes: any[]): Promise<boolean> {
+    if (nodes.some((node) => node.status !== ContentStatus.PUBLISHED)) return false;
+    const effective = nodes.find((node) => node.accessType && node.accessType !== AccessType.INHERIT)?.accessType;
+    if (effective === AccessType.PUBLIC || effective === AccessType.FREE) return true;
+    const now = new Date();
+    const course = nodes.at(-1);
+    const chapterIds = nodes.filter((node) => node.courseId).map((node) => node.id);
+    const entitlement = await this.prisma.studentEntitlement.findFirst({
+      where: {
+        studentUserId: studentId,
+        status: EntitlementStatus.ACTIVE,
+        revokedAt: null,
+        startsAt: { lte: now },
+        AND: [{ OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] }, { OR: [{ courseId: course.id }, { chapterId: { in: chapterIds } }] }],
+      },
+    });
+    return Boolean(entitlement);
+  }
+
   /** A catalog-safe predicate for callers that need a lock indicator instead of a 403. */
   async canAccessContentItem(contentItemId: string, studentUserId?: string): Promise<boolean> {
     try {

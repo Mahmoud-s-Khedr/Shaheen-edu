@@ -5,9 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import {
-  AccessType,
   ContentStatus,
-  EntitlementStatus,
   QuestionStatus,
   QuestionType,
 } from '../../common/types/roles.enum';
@@ -508,7 +506,6 @@ export class LearningService {
   }
 
   private async questionAccessible(studentId: string, placements: any[]) {
-    const now = new Date();
     for (const placement of placements) {
       const nodes = placement.section
         ? [
@@ -526,37 +523,7 @@ export class LearningService {
           : placement.chapter
             ? [placement.chapter, placement.chapter.course]
             : [placement.course];
-      if (nodes.some((node: any) => node.status !== ContentStatus.PUBLISHED))
-        continue;
-      const effective = nodes.find(
-        (node: any) => node.accessType !== AccessType.INHERIT,
-      )?.accessType;
-      if (effective === AccessType.PUBLIC || effective === AccessType.FREE)
-        return true;
-      const course = nodes.at(-1);
-      const chapterIds = nodes
-        .filter((node: any) => node.courseId)
-        .map((node: any) => node.id);
-      if (
-        await this.prisma.studentEntitlement.findFirst({
-          where: {
-            studentUserId: studentId,
-            status: EntitlementStatus.ACTIVE,
-            revokedAt: null,
-            startsAt: { lte: now },
-            AND: [
-              { OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] },
-              {
-                OR: [
-                  { courseId: course.id },
-                  { chapterId: { in: chapterIds } },
-                ],
-              },
-            ],
-          },
-        })
-      )
-        return true;
+      if (await this.access.entitledForNodes(studentId, nodes)) return true;
     }
     return false;
   }

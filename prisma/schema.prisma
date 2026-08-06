@@ -153,138 +153,167 @@ enum QuestionType {
   MULTIPLE_CHOICE
 }
 
+enum AssessmentOwnerType {
+  STUDENT
+  ADMIN
+}
+
+enum AssessmentGenerationType {
+  STANDARD
+  CUSTOM
+}
+
+enum AssessmentMode {
+  TUTOR
+  EXAM
+}
+
+enum AssessmentStatus {
+  DRAFT
+  READY
+  ARCHIVED
+}
+
+enum AssessmentAttemptStatus {
+  SUSPENDED
+  COMPLETED
+}
+
 model User {
-  id               String        @id @default(cuid())
-  role             Role
-  status           AccountStatus @default(ACTIVE)
-  loginIdentifier  String        @unique
-  passwordHash     String
-  lastLoginAt      DateTime?
-  createdAt        DateTime      @default(now())
-  updatedAt        DateTime      @updatedAt
+  id              String        @id @default(cuid())
+  role            Role
+  status          AccountStatus @default(ACTIVE)
+  loginIdentifier String        @unique
+  passwordHash    String
+  lastLoginAt     DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
 
-  studentProfile   StudentProfile?
-  partnerProfile   PartnerProfile?
-  authSessions     AuthSession[]
-  auditLogsActor   AdminAuditLog[]
-  partnerProfilesCreated PartnerProfile[] @relation("PartnerProfileCreatedBy")
-  entitlementsGranted StudentEntitlement[] @relation("EntitlementGrantedBy")
-  entitlementsRevoked StudentEntitlement[] @relation("EntitlementRevokedBy")
-  manualPaymentMethodsCreated ManualPaymentMethod[] @relation("ManualPaymentMethodCreatedBy")
-  manualPaymentSubmissionsReviewed ManualPaymentSubmission[] @relation("ManualPaymentSubmissionReviewedBy")
-  publisherAgreementsCreated PublisherAgreement[] @relation("PublisherAgreementCreatedBy")
-  earningsStatementsCreated PublisherEarningsStatement[] @relation("EarningsStatementCreatedBy")
+  studentProfile                   StudentProfile?
+  partnerProfile                   PartnerProfile?
+  authSessions                     AuthSession[]
+  auditLogsActor                   AdminAuditLog[]
+  partnerProfilesCreated           PartnerProfile[]             @relation("PartnerProfileCreatedBy")
+  entitlementsGranted              StudentEntitlement[]         @relation("EntitlementGrantedBy")
+  entitlementsRevoked              StudentEntitlement[]         @relation("EntitlementRevokedBy")
+  manualPaymentMethodsCreated      ManualPaymentMethod[]        @relation("ManualPaymentMethodCreatedBy")
+  manualPaymentSubmissionsReviewed ManualPaymentSubmission[]    @relation("ManualPaymentSubmissionReviewedBy")
+  publisherAgreementsCreated       PublisherAgreement[]         @relation("PublisherAgreementCreatedBy")
+  earningsStatementsCreated        PublisherEarningsStatement[] @relation("EarningsStatementCreatedBy")
 
-  academicGradesCreated AcademicGrade[] @relation("AcademicGradeCreatedBy")
-  academicGradesUpdated AcademicGrade[] @relation("AcademicGradeUpdatedBy")
-  subjectsCreated       Subject[]       @relation("SubjectCreatedBy")
-  subjectsUpdated       Subject[]       @relation("SubjectUpdatedBy")
-  coursesCreated        Course[]        @relation("CourseCreatedBy")
-  coursesUpdated        Course[]        @relation("CourseUpdatedBy")
-  chaptersCreated       Chapter[]       @relation("ChapterCreatedBy")
-  chaptersUpdated       Chapter[]       @relation("ChapterUpdatedBy")
-  lessonsCreated        Lesson[]        @relation("LessonCreatedBy")
-  lessonsUpdated        Lesson[]        @relation("LessonUpdatedBy")
-  sectionsCreated       Section[]       @relation("SectionCreatedBy")
-  sectionsUpdated       Section[]       @relation("SectionUpdatedBy")
-  contentItemsCreated   ContentItem[]   @relation("ContentItemCreatedBy")
-  contentItemsUpdated   ContentItem[]   @relation("ContentItemUpdatedBy")
-  assetsUploaded       Asset[] @relation("AssetUploadedBy")
+  academicGradesCreated     AcademicGrade[]          @relation("AcademicGradeCreatedBy")
+  academicGradesUpdated     AcademicGrade[]          @relation("AcademicGradeUpdatedBy")
+  subjectsCreated           Subject[]                @relation("SubjectCreatedBy")
+  subjectsUpdated           Subject[]                @relation("SubjectUpdatedBy")
+  coursesCreated            Course[]                 @relation("CourseCreatedBy")
+  coursesUpdated            Course[]                 @relation("CourseUpdatedBy")
+  chaptersCreated           Chapter[]                @relation("ChapterCreatedBy")
+  chaptersUpdated           Chapter[]                @relation("ChapterUpdatedBy")
+  lessonsCreated            Lesson[]                 @relation("LessonCreatedBy")
+  lessonsUpdated            Lesson[]                 @relation("LessonUpdatedBy")
+  sectionsCreated           Section[]                @relation("SectionCreatedBy")
+  sectionsUpdated           Section[]                @relation("SectionUpdatedBy")
+  contentItemsCreated       ContentItem[]            @relation("ContentItemCreatedBy")
+  contentItemsUpdated       ContentItem[]            @relation("ContentItemUpdatedBy")
+  assetsUploaded            Asset[]                  @relation("AssetUploadedBy")
   archivedAccessRevocations ArchivedAccessSnapshot[] @relation("ArchivedAccessRevokedBy")
-  questionSourcesCreated QuestionSource[] @relation("QuestionSourceCreatedBy")
-  questionSourcesUpdated QuestionSource[] @relation("QuestionSourceUpdatedBy")
-  questionBanksCreated QuestionBank[] @relation("QuestionBankCreatedBy")
-  questionBanksUpdated QuestionBank[] @relation("QuestionBankUpdatedBy")
-  questionsCreated Question[] @relation("QuestionCreatedBy")
-  questionsUpdated Question[] @relation("QuestionUpdatedBy")
-  questionsReviewed Question[] @relation("QuestionReviewedBy")
+  questionSourcesCreated    QuestionSource[]         @relation("QuestionSourceCreatedBy")
+  questionSourcesUpdated    QuestionSource[]         @relation("QuestionSourceUpdatedBy")
+  questionBanksCreated      QuestionBank[]           @relation("QuestionBankCreatedBy")
+  questionBanksUpdated      QuestionBank[]           @relation("QuestionBankUpdatedBy")
+  questionsCreated          Question[]               @relation("QuestionCreatedBy")
+  questionsUpdated          Question[]               @relation("QuestionUpdatedBy")
+  questionsReviewed         Question[]               @relation("QuestionReviewedBy")
+  assessmentsCreated        Assessment[]             @relation("AssessmentCreatedByAdmin")
 
   @@index([role])
   @@index([role, createdAt, id])
 }
 
 model StudentProfile {
-  userId               String   @id
-  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId                  String                     @id
+  user                    User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
   archivedAccessSnapshots ArchivedAccessSnapshot[]
-  fullName             String
-  nationalIdHash        String   @unique
-  nationalIdEncrypted   String?
-  nationalIdLast4       String
-  nationalIdKeyVersion  Int      @default(1)
-  academicGradeId       String?
-  academicGrade         AcademicGrade? @relation(fields: [academicGradeId], references: [id], onDelete: Restrict)
-  governorate           String
-  center                String?
-  governorateId         String
-  centerId              String?
-  governorateRef        Governorate? @relation(fields: [governorateId], references: [id], onDelete: Restrict)
-  centerRef             Center?      @relation(fields: [centerId], references: [id], onDelete: Restrict)
-  parentPhoneNormalized String
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
-  entitlements          StudentEntitlement[]
-  contentStudyStates    StudentContentStudyState[]
-  cart                  Cart?
-  orders                Order[]
-  parentAccessSessions  ParentAccessSession[]
-  contentProgress       StudentContentProgress[]
-  questionAttempts      StudentQuestionAttempt[]
+  fullName                String
+  nationalIdHash          String                     @unique
+  nationalIdEncrypted     String?
+  nationalIdLast4         String
+  nationalIdKeyVersion    Int                        @default(1)
+  academicGradeId         String?
+  academicGrade           AcademicGrade?             @relation(fields: [academicGradeId], references: [id], onDelete: Restrict)
+  governorate             String
+  center                  String?
+  governorateId           String
+  centerId                String?
+  governorateRef          Governorate?               @relation(fields: [governorateId], references: [id], onDelete: Restrict)
+  centerRef               Center?                    @relation(fields: [centerId], references: [id], onDelete: Restrict)
+  parentPhoneNormalized   String
+  createdAt               DateTime                   @default(now())
+  updatedAt               DateTime                   @updatedAt
+  entitlements            StudentEntitlement[]
+  contentStudyStates      StudentContentStudyState[]
+  cart                    Cart?
+  orders                  Order[]
+  parentAccessSessions    ParentAccessSession[]
+  contentProgress         StudentContentProgress[]
+  questionAttempts        StudentQuestionAttempt[]
+  assessments             Assessment[]
+  assessmentAttempts      AssessmentAttempt[]
 
+  @@unique([userId, parentPhoneNormalized])
   @@index([parentPhoneNormalized])
   @@index([parentPhoneNormalized, createdAt, userId])
   @@index([academicGradeId])
-  @@unique([userId, parentPhoneNormalized])
   @@index([governorateId])
   @@index([centerId])
 }
 
 model PartnerProfile {
-  userId          String      @id
-  user            User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  partnerType     PartnerType
-  displayName     String
-  legalName       String?
-  phone           String?
-  createdByAdminId String
-  createdByAdmin User @relation("PartnerProfileCreatedBy", fields: [createdByAdminId], references: [id], onDelete: Restrict)
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
+  userId              String               @id
+  user                User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  partnerType         PartnerType
+  displayName         String
+  legalName           String?
+  phone               String?
+  createdByAdminId    String
+  createdByAdmin      User                 @relation("PartnerProfileCreatedBy", fields: [createdByAdminId], references: [id], onDelete: Restrict)
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
   publisherAgreements PublisherAgreement[] @relation("AgreementPublisher")
-  questionSources QuestionSource[] @relation("QuestionSourcePublisher")
+  questionSources     QuestionSource[]     @relation("QuestionSourcePublisher")
 }
 
 model AuthSession {
-  id                   String    @id @default(cuid())
-  userId               String
-  user                 User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  refreshTokenHash     String    @unique
-  familyId             String
-  revoked              Boolean   @default(false)
-  revokedAt            DateTime?
-  replacedBySessionId  String? @unique
-  replacedBy           AuthSession? @relation("AuthSessionReplacement", fields: [replacedBySessionId], references: [id], onDelete: Restrict)
-  replaces             AuthSession? @relation("AuthSessionReplacement")
-  ipAddress            String?
-  userAgent            String?
-  expiresAt            DateTime
-  createdAt            DateTime  @default(now())
+  id                  String       @id @default(cuid())
+  userId              String
+  user                User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  refreshTokenHash    String       @unique
+  familyId            String
+  revoked             Boolean      @default(false)
+  revokedAt           DateTime?
+  replacedBySessionId String?      @unique
+  replacedBy          AuthSession? @relation("AuthSessionReplacement", fields: [replacedBySessionId], references: [id], onDelete: Restrict)
+  replaces            AuthSession? @relation("AuthSessionReplacement")
+  ipAddress           String?
+  userAgent           String?
+  expiresAt           DateTime
+  createdAt           DateTime     @default(now())
 
   @@index([userId])
   @@index([familyId])
 }
 
 model ParentAccessSession {
-  id                     String    @id @default(cuid())
-  parentPhoneNormalized  String
-  activeStudentId        String?
-  activeStudent          StudentProfile? @relation(fields: [activeStudentId, parentPhoneNormalized], references: [userId, parentPhoneNormalized], onDelete: Restrict)
-  revoked                Boolean   @default(false)
-  revokedAt              DateTime?
-  ipAddress              String?
-  userAgent              String?
-  expiresAt              DateTime
-  createdAt              DateTime  @default(now())
+  id                    String          @id @default(cuid())
+  parentPhoneNormalized String
+  activeStudentId       String?
+  activeStudent         StudentProfile? @relation(fields: [activeStudentId, parentPhoneNormalized], references: [userId, parentPhoneNormalized], onDelete: Restrict)
+  revoked               Boolean         @default(false)
+  revokedAt             DateTime?
+  ipAddress             String?
+  userAgent             String?
+  expiresAt             DateTime
+  createdAt             DateTime        @default(now())
 
   @@index([parentPhoneNormalized])
 }
@@ -305,14 +334,14 @@ model AdminAuditLog {
 }
 
 model AcademicGrade {
-  id          String        @id @default(cuid())
-  titleAr     String
-  titleEn     String?
-  slug        String
+  id            String        @id @default(cuid())
+  titleAr       String
+  titleEn       String?
+  slug          String
   descriptionAr String?
   descriptionEn String?
-  sortOrder   Int
-  status      ContentStatus @default(DRAFT)
+  sortOrder     Int
+  status        ContentStatus @default(DRAFT)
 
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -326,7 +355,7 @@ model AcademicGrade {
 
   subjects        Subject[]
   studentProfiles StudentProfile[]
-  coverAsset      Asset? @relation("AcademicGradeCover", fields: [coverAssetId], references: [id], onDelete: Restrict)
+  coverAsset      Asset?           @relation("AcademicGradeCover", fields: [coverAssetId], references: [id], onDelete: Restrict)
   coverAssetId    String?
 
   @@unique([slug])
@@ -355,9 +384,9 @@ model Subject {
   createdBy User @relation("SubjectCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
   updatedBy User @relation("SubjectUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
 
-  courses Course[]
-  coverAsset      Asset? @relation("SubjectCover", fields: [coverAssetId], references: [id], onDelete: Restrict)
-  coverAssetId    String?
+  courses      Course[]
+  coverAsset   Asset?   @relation("SubjectCover", fields: [coverAssetId], references: [id], onDelete: Restrict)
+  coverAssetId String?
 
   @@unique([academicGradeId, slug])
   @@unique([academicGradeId, sortOrder])
@@ -375,31 +404,32 @@ model Course {
   sortOrder   Int
   status      ContentStatus @default(DRAFT)
 
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  publishedAt DateTime?
-  archivedAt  DateTime?
-  createdById String
-  updatedById String
-  accessType  AccessType @default(PAID)
-  priceMinor     Int?
-  currency       String?
-  isPurchasable  Boolean @default(false)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  publishedAt   DateTime?
+  archivedAt    DateTime?
+  createdById   String
+  updatedById   String
+  accessType    AccessType @default(PAID)
+  priceMinor    Int?
+  currency      String?
+  isPurchasable Boolean    @default(false)
 
   createdBy User @relation("CourseCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
   updatedBy User @relation("CourseUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
 
-  chapters Chapter[]
-  questions Question[]
-  questionPlacements QuestionPlacement[] @relation("QuestionPlacementCourse")
-  entitlements StudentEntitlement[]
-  cartItems CartItem[] @relation("CartItemCourse")
-  orderItems OrderItem[] @relation("OrderItemCourse")
-  publisherAgreements PublisherAgreement[] @relation("PublisherAgreementCourse")
-  earningsStatements PublisherEarningsStatement[] @relation("EarningsCourse")
-  contentPlacements ContentPlacement[] @relation("ContentPlacementCourse")
-  coverAsset      Asset? @relation("CourseCover", fields: [coverAssetId], references: [id], onDelete: Restrict)
-  coverAssetId    String?
+  chapters            Chapter[]
+  questions           Question[]
+  questionPlacements  QuestionPlacement[]          @relation("QuestionPlacementCourse")
+  assessmentScopes    AssessmentScope[]            @relation("AssessmentScopeCourse")
+  entitlements        StudentEntitlement[]
+  cartItems           CartItem[]                   @relation("CartItemCourse")
+  orderItems          OrderItem[]                  @relation("OrderItemCourse")
+  publisherAgreements PublisherAgreement[]         @relation("PublisherAgreementCourse")
+  earningsStatements  PublisherEarningsStatement[] @relation("EarningsCourse")
+  contentPlacements   ContentPlacement[]           @relation("ContentPlacementCourse")
+  coverAsset          Asset?                       @relation("CourseCover", fields: [coverAssetId], references: [id], onDelete: Restrict)
+  coverAssetId        String?
 
   @@unique([subjectId, slug])
   @@unique([subjectId, sortOrder])
@@ -417,30 +447,31 @@ model Chapter {
   sortOrder   Int
   status      ContentStatus @default(DRAFT)
 
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  publishedAt DateTime?
-  archivedAt  DateTime?
-  createdById String
-  updatedById String
-  accessType  AccessType @default(INHERIT)
-  priceMinor     Int?
-  currency       String?
-  isPurchasable  Boolean?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  publishedAt   DateTime?
+  archivedAt    DateTime?
+  createdById   String
+  updatedById   String
+  accessType    AccessType @default(INHERIT)
+  priceMinor    Int?
+  currency      String?
+  isPurchasable Boolean?
 
   createdBy User @relation("ChapterCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
   updatedBy User @relation("ChapterUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
 
-  lessons Lesson[]
-  entitlements StudentEntitlement[]
-  cartItems CartItem[] @relation("CartItemChapter")
-  orderItems OrderItem[] @relation("OrderItemChapter")
-  publisherAgreements PublisherAgreement[] @relation("PublisherAgreementChapter")
-  earningsStatements PublisherEarningsStatement[] @relation("EarningsChapter")
-  contentPlacements ContentPlacement[] @relation("ContentPlacementChapter")
-  questionPlacements QuestionPlacement[] @relation("QuestionPlacementChapter")
-  coverAsset      Asset? @relation("ChapterCover", fields: [coverAssetId], references: [id], onDelete: Restrict)
-  coverAssetId    String?
+  lessons             Lesson[]
+  entitlements        StudentEntitlement[]
+  cartItems           CartItem[]                   @relation("CartItemChapter")
+  orderItems          OrderItem[]                  @relation("OrderItemChapter")
+  publisherAgreements PublisherAgreement[]         @relation("PublisherAgreementChapter")
+  earningsStatements  PublisherEarningsStatement[] @relation("EarningsChapter")
+  contentPlacements   ContentPlacement[]           @relation("ContentPlacementChapter")
+  questionPlacements  QuestionPlacement[]          @relation("QuestionPlacementChapter")
+  assessmentScopes    AssessmentScope[]            @relation("AssessmentScopeChapter")
+  coverAsset          Asset?                       @relation("ChapterCover", fields: [coverAssetId], references: [id], onDelete: Restrict)
+  coverAssetId        String?
 
   @@unique([courseId, slug])
   @@unique([courseId, sortOrder])
@@ -458,27 +489,28 @@ model Lesson {
   sortOrder   Int
   status      ContentStatus @default(DRAFT)
 
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  publishedAt DateTime?
-  archivedAt  DateTime?
-  createdById String
-  updatedById String
-  accessType  AccessType @default(INHERIT)
-  priceMinor     Int?
-  currency       String?
-  isPurchasable  Boolean?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  publishedAt   DateTime?
+  archivedAt    DateTime?
+  createdById   String
+  updatedById   String
+  accessType    AccessType @default(INHERIT)
+  priceMinor    Int?
+  currency      String?
+  isPurchasable Boolean?
 
   createdBy User @relation("LessonCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
   updatedBy User @relation("LessonUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
 
-  sections Section[]
-  publisherAgreements PublisherAgreement[] @relation("PublisherAgreementLesson")
-  earningsStatements PublisherEarningsStatement[] @relation("EarningsLesson")
-  contentPlacements ContentPlacement[] @relation("ContentPlacementLesson")
-  coverAsset      Asset? @relation("LessonCover", fields: [coverAssetId], references: [id], onDelete: Restrict)
-  coverAssetId    String?
-  questionPlacements QuestionPlacement[] @relation("QuestionPlacementLesson")
+  sections            Section[]
+  publisherAgreements PublisherAgreement[]         @relation("PublisherAgreementLesson")
+  earningsStatements  PublisherEarningsStatement[] @relation("EarningsLesson")
+  contentPlacements   ContentPlacement[]           @relation("ContentPlacementLesson")
+  coverAsset          Asset?                       @relation("LessonCover", fields: [coverAssetId], references: [id], onDelete: Restrict)
+  coverAssetId        String?
+  questionPlacements  QuestionPlacement[]          @relation("QuestionPlacementLesson")
+  assessmentScopes    AssessmentScope[]            @relation("AssessmentScopeLesson")
 
   @@unique([chapterId, slug])
   @@unique([chapterId, sortOrder])
@@ -496,8 +528,8 @@ model Section {
   sortOrder   Int
   status      ContentStatus @default(DRAFT)
 
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
   publishedAt DateTime?
   archivedAt  DateTime?
   createdById String
@@ -507,10 +539,11 @@ model Section {
   createdBy User @relation("SectionCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
   updatedBy User @relation("SectionUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
 
-  contentPlacements ContentPlacement[] @relation("ContentPlacementSection")
-  coverAsset      Asset? @relation("SectionCover", fields: [coverAssetId], references: [id], onDelete: Restrict)
-  coverAssetId    String?
+  contentPlacements  ContentPlacement[]  @relation("ContentPlacementSection")
+  coverAsset         Asset?              @relation("SectionCover", fields: [coverAssetId], references: [id], onDelete: Restrict)
+  coverAssetId       String?
   questionPlacements QuestionPlacement[] @relation("QuestionPlacementSection")
+  assessmentScopes   AssessmentScope[]   @relation("AssessmentScopeSection")
 
   @@unique([lessonId, slug])
   @@unique([lessonId, sortOrder])
@@ -518,95 +551,98 @@ model Section {
 }
 
 model ContentItem {
-  id                String             @id @default(cuid())
+  id                String          @id @default(cuid())
   type              ContentItemType
   title             String
   description       String?
   textBody          String?
   externalUrl       String?
-  accessType        AccessType         @default(INHERIT)
+  accessType        AccessType      @default(INHERIT)
   estimatedDuration Int?
-  status            ContentStatus      @default(DRAFT)
+  status            ContentStatus   @default(DRAFT)
 
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
   publishedAt DateTime?
   archivedAt  DateTime?
   createdById String
   updatedById String
 
-  createdBy User @relation("ContentItemCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
-  updatedBy User @relation("ContentItemUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
-  placement ContentPlacement?
-  primaryAssetId String?
-  primaryAsset Asset? @relation("ContentPrimaryAsset", fields: [primaryAssetId], references: [id], onDelete: Restrict)
-  assetReferences AssetReference[]
-  studentProgress StudentContentProgress[]
+  createdBy          User                       @relation("ContentItemCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  updatedBy          User                       @relation("ContentItemUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
+  placement          ContentPlacement?
+  primaryAssetId     String?
+  primaryAsset       Asset?                     @relation("ContentPrimaryAsset", fields: [primaryAssetId], references: [id], onDelete: Restrict)
+  assetReferences    AssetReference[]
+  studentProgress    StudentContentProgress[]
   studentStudyStates StudentContentStudyState[]
 
   @@index([status, createdAt, id])
 }
 
 model Asset {
-  id                String @id @default(cuid())
-  provider          AssetProvider
-  kind              AssetKind
-  status            AssetStatus @default(PENDING_UPLOAD)
-  originalFilename  String
-  filename          String
-  storageKey        String? @unique
-  mimeType          String
-  sizeBytes         Int?
-  checksum          String?
-  metadata          Json?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-  readyAt           DateTime?
-  failedAt          DateTime?
-  archivedAt        DateTime?
-  uploadedById      String
-  uploadedBy        User @relation("AssetUploadedBy", fields: [uploadedById], references: [id], onDelete: Restrict)
-  primaryFor        ContentItem[] @relation("ContentPrimaryAsset")
-  references        AssetReference[]
-  gradeCovers       AcademicGrade[] @relation("AcademicGradeCover")
-  subjectCovers     Subject[] @relation("SubjectCover")
-  courseCovers      Course[] @relation("CourseCover")
-  chapterCovers     Chapter[] @relation("ChapterCover")
-  lessonCovers      Lesson[] @relation("LessonCover")
-  sectionCovers     Section[] @relation("SectionCover")
-  video             VideoAsset?
-  questionAssets    QuestionAsset[] @relation("QuestionAttachmentAsset")
-  paymentProofFor    ManualPaymentSubmission[] @relation("ManualPaymentProof")
+  id               String                    @id @default(cuid())
+  provider         AssetProvider
+  kind             AssetKind
+  status           AssetStatus               @default(PENDING_UPLOAD)
+  originalFilename String
+  filename         String
+  storageKey       String?                   @unique
+  mimeType         String
+  sizeBytes        Int?
+  checksum         String?
+  metadata         Json?
+  createdAt        DateTime                  @default(now())
+  updatedAt        DateTime                  @updatedAt
+  readyAt          DateTime?
+  failedAt         DateTime?
+  archivedAt       DateTime?
+  uploadedById     String
+  uploadedBy       User                      @relation("AssetUploadedBy", fields: [uploadedById], references: [id], onDelete: Restrict)
+  primaryFor       ContentItem[]             @relation("ContentPrimaryAsset")
+  references       AssetReference[]
+  gradeCovers      AcademicGrade[]           @relation("AcademicGradeCover")
+  subjectCovers    Subject[]                 @relation("SubjectCover")
+  courseCovers     Course[]                  @relation("CourseCover")
+  chapterCovers    Chapter[]                 @relation("ChapterCover")
+  lessonCovers     Lesson[]                  @relation("LessonCover")
+  sectionCovers    Section[]                 @relation("SectionCover")
+  video            VideoAsset?
+  questionAssets   QuestionAsset[]           @relation("QuestionAttachmentAsset")
+  paymentProofFor  ManualPaymentSubmission[] @relation("ManualPaymentProof")
+
   @@index([status, kind, createdAt])
 }
 
 model AssetReference {
-  id            String @id @default(cuid())
+  id            String             @id @default(cuid())
   contentItemId String
   assetId       String
   type          AssetReferenceType @default(CONTENT_ATTACHMENT)
   sortOrder     Int
-  createdAt     DateTime @default(now())
-  contentItem   ContentItem @relation(fields: [contentItemId], references: [id], onDelete: Cascade)
-  asset         Asset @relation(fields: [assetId], references: [id], onDelete: Restrict)
+  createdAt     DateTime           @default(now())
+  contentItem   ContentItem        @relation(fields: [contentItemId], references: [id], onDelete: Cascade)
+  asset         Asset              @relation(fields: [assetId], references: [id], onDelete: Restrict)
+
   @@unique([contentItemId, assetId])
   @@unique([contentItemId, sortOrder])
 }
 
 model VideoAsset {
-  assetId           String @id
-  asset             Asset @relation(fields: [assetId], references: [id], onDelete: Cascade)
-  libraryId          String
-  bunnyVideoId       String @unique
-  processingStatus   VideoProcessingStatus @default(CREATED)
-  processingProgress Int @default(0)
-  durationSeconds    Int?
-  thumbnailUrl       String?
+  assetId                 String                @id
+  asset                   Asset                 @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  libraryId               String
+  bunnyVideoId            String                @unique
+  processingStatus        VideoProcessingStatus @default(CREATED)
+  processingProgress      Int                   @default(0)
+  durationSeconds         Int?
+  thumbnailUrl            String?
   clientUploadCompletedAt DateTime?
-  lastWebhookAt      DateTime?
-  failureMetadata    Json?
-  attempt            Int @default(1)
-  questionVideoLinks QuestionVideoLink[]
+  lastWebhookAt           DateTime?
+  failureMetadata         Json?
+  attempt                 Int                   @default(1)
+  questionVideoLinks      QuestionVideoLink[]
+
   @@index([processingStatus])
 }
 
@@ -653,33 +689,33 @@ model QuestionBank {
 }
 
 model Question {
-  id           String         @id @default(cuid())
-  bankId       String
-  sourceId     String
-  courseId     String
-  type         QuestionType   @default(SINGLE_CHOICE)
-  body         String
-  explanation  String?
-  status       QuestionStatus @default(DRAFT)
-  reviewNote   String?
-  reviewedAt   DateTime?
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
-  publishedAt  DateTime?
-  archivedAt   DateTime?
-  createdById  String
-  updatedById  String
-  reviewedById String?
-  bank         QuestionBank   @relation(fields: [bankId], references: [id], onDelete: Restrict)
-  source       QuestionSource @relation(fields: [sourceId], references: [id], onDelete: Restrict)
-  course       Course         @relation(fields: [courseId], references: [id], onDelete: Restrict)
-  createdBy    User           @relation("QuestionCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
-  updatedBy    User           @relation("QuestionUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
-  reviewedBy   User?          @relation("QuestionReviewedBy", fields: [reviewedById], references: [id], onDelete: Restrict)
-  options      QuestionOption[]
-  assets       QuestionAsset[]
-  videoLink    QuestionVideoLink?
-  placements   QuestionPlacement[]
+  id              String                   @id @default(cuid())
+  bankId          String
+  sourceId        String
+  courseId        String
+  type            QuestionType             @default(SINGLE_CHOICE)
+  body            String
+  explanation     String?
+  status          QuestionStatus           @default(DRAFT)
+  reviewNote      String?
+  reviewedAt      DateTime?
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime                 @updatedAt
+  publishedAt     DateTime?
+  archivedAt      DateTime?
+  createdById     String
+  updatedById     String
+  reviewedById    String?
+  bank            QuestionBank             @relation(fields: [bankId], references: [id], onDelete: Restrict)
+  source          QuestionSource           @relation(fields: [sourceId], references: [id], onDelete: Restrict)
+  course          Course                   @relation(fields: [courseId], references: [id], onDelete: Restrict)
+  createdBy       User                     @relation("QuestionCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  updatedBy       User                     @relation("QuestionUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
+  reviewedBy      User?                    @relation("QuestionReviewedBy", fields: [reviewedById], references: [id], onDelete: Restrict)
+  options         QuestionOption[]
+  assets          QuestionAsset[]
+  videoLink       QuestionVideoLink?
+  placements      QuestionPlacement[]
   studentAttempts StudentQuestionAttempt[]
 
   @@index([status, createdAt, id])
@@ -689,14 +725,14 @@ model Question {
 }
 
 model QuestionOption {
-  id         String   @id @default(cuid())
-  questionId String
-  body       String
-  isCorrect  Boolean  @default(false)
-  sortOrder  Int
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  id             String                         @id @default(cuid())
+  questionId     String
+  body           String
+  isCorrect      Boolean                        @default(false)
+  sortOrder      Int
+  createdAt      DateTime                       @default(now())
+  updatedAt      DateTime                       @updatedAt
+  question       Question                       @relation(fields: [questionId], references: [id], onDelete: Cascade)
   attemptAnswers StudentQuestionAttemptAnswer[]
 
   @@unique([questionId, sortOrder])
@@ -716,13 +752,13 @@ model QuestionAsset {
 }
 
 model QuestionVideoLink {
-  id               String   @id @default(cuid())
-  questionId       String   @unique
+  id               String     @id @default(cuid())
+  questionId       String     @unique
   videoAssetId     String
   timestampSeconds Int
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-  question         Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+  question         Question   @relation(fields: [questionId], references: [id], onDelete: Cascade)
   videoAsset       VideoAsset @relation(fields: [videoAssetId], references: [assetId], onDelete: Restrict)
 
   @@index([videoAssetId])
@@ -749,37 +785,165 @@ model QuestionPlacement {
   @@index([sectionId])
 }
 
+/// A student-generated or admin-generated quiz/exam. Ownership determines
+/// visibility: a STUDENT-owned assessment is private to its owner; an
+/// ADMIN-owned assessment is public to any student entitled to at least one
+/// of its AssessmentScope targets.
+model Assessment {
+  id               String              @id @default(cuid())
+  ownerType        AssessmentOwnerType
+  studentUserId    String?
+  student          StudentProfile?     @relation(fields: [studentUserId], references: [userId], onDelete: Cascade)
+  createdByAdminId String?
+  createdByAdmin   User?               @relation("AssessmentCreatedByAdmin", fields: [createdByAdminId], references: [id], onDelete: Restrict)
+
+  title           String
+  generationType  AssessmentGenerationType
+  mode            AssessmentMode           @default(EXAM)
+  isTimed         Boolean                  @default(false)
+  durationSeconds Int?
+  questionCount   Int
+  status          AssessmentStatus         @default(READY)
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  publishedAt DateTime?
+  archivedAt  DateTime?
+
+  scopes    AssessmentScope[]
+  questions AssessmentQuestion[]
+  attempts  AssessmentAttempt[]
+
+  @@index([ownerType, studentUserId, status, createdAt, id])
+  @@index([ownerType, createdByAdminId, status, createdAt, id])
+  @@index([status, createdAt, id])
+}
+
+/// The hierarchy node(s) an assessment was generated from / is targeted at.
+/// For an ADMIN-owned assessment, these rows also gate student visibility.
+model AssessmentScope {
+  id           String     @id @default(cuid())
+  assessmentId String
+  assessment   Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  courseId     String?
+  course       Course?    @relation("AssessmentScopeCourse", fields: [courseId], references: [id], onDelete: Restrict)
+  chapterId    String?
+  chapter      Chapter?   @relation("AssessmentScopeChapter", fields: [chapterId], references: [id], onDelete: Restrict)
+  lessonId     String?
+  lesson       Lesson?    @relation("AssessmentScopeLesson", fields: [lessonId], references: [id], onDelete: Restrict)
+  sectionId    String?
+  section      Section?   @relation("AssessmentScopeSection", fields: [sectionId], references: [id], onDelete: Restrict)
+  createdAt    DateTime   @default(now())
+
+  @@index([assessmentId])
+  @@index([courseId])
+  @@index([chapterId])
+  @@index([lessonId])
+  @@index([sectionId])
+}
+
+/// Immutable frozen snapshot of a question as included in an assessment at
+/// generation time. sourceQuestionId is a plain (non-FK) reference so
+/// archiving or hard-deleting the live Question can never alter or block
+/// deletion of history already generated from it.
+model AssessmentQuestion {
+  id               String                     @id @default(cuid())
+  assessmentId     String
+  assessment       Assessment                 @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  sourceQuestionId String
+  sortOrder        Int
+  type             QuestionType
+  body             String
+  explanation      String?
+  options          AssessmentQuestionOption[]
+  answers          AssessmentAttemptAnswer[]
+
+  @@unique([assessmentId, sortOrder])
+  @@index([assessmentId])
+}
+
+model AssessmentQuestionOption {
+  id                   String             @id @default(cuid())
+  assessmentQuestionId String
+  assessmentQuestion   AssessmentQuestion @relation(fields: [assessmentQuestionId], references: [id], onDelete: Cascade)
+  body                 String
+  isCorrect            Boolean
+  sortOrder            Int
+
+  @@unique([assessmentQuestionId, sortOrder])
+}
+
+/// One attempt per (assessment, student), enforced by the unique constraint
+/// below. SUSPENDED attempts are mutable via autosave; COMPLETED attempts
+/// are immutable (score/timestamps fixed at submission).
+model AssessmentAttempt {
+  id             String                    @id @default(cuid())
+  assessmentId   String
+  assessment     Assessment                @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  studentUserId  String
+  student        StudentProfile            @relation(fields: [studentUserId], references: [userId], onDelete: Cascade)
+  status         AssessmentAttemptStatus   @default(SUSPENDED)
+  startedAt      DateTime                  @default(now())
+  expiresAt      DateTime?
+  lastActivityAt DateTime                  @default(now())
+  submittedAt    DateTime?
+  score          Int?
+  totalQuestions Int
+  answers        AssessmentAttemptAnswer[]
+
+  @@unique([assessmentId, studentUserId])
+  @@index([studentUserId, status, lastActivityAt])
+  @@index([assessmentId])
+}
+
+/// Autosaved answer state per snapshot question. Upserted while the parent
+/// attempt is SUSPENDED; frozen once it is COMPLETED.
+model AssessmentAttemptAnswer {
+  id                   String             @id @default(cuid())
+  attemptId            String
+  attempt              AssessmentAttempt  @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  assessmentQuestionId String
+  assessmentQuestion   AssessmentQuestion @relation(fields: [assessmentQuestionId], references: [id], onDelete: Cascade)
+  selectedOptionIds    String[]
+  isCorrect            Boolean?
+  answeredAt           DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  @@unique([attemptId, assessmentQuestionId])
+  @@index([attemptId])
+}
+
 model BunnyStreamWebhookEvent {
-  id          String @id @default(cuid())
-  eventKey    String @unique
+  id           String   @id @default(cuid())
+  eventKey     String   @unique
   bunnyVideoId String
-  status      Int
-  payload     Json
-  receivedAt  DateTime @default(now())
+  status       Int
+  payload      Json
+  receivedAt   DateTime @default(now())
 }
 
 model ContentPlacement {
-  id            String   @id @default(cuid())
-  contentItemId String   @unique
-  courseId      String?
-  chapterId     String?
-  lessonId      String?
-  sectionId     String?
-  academicGradeId String
-  subjectId       String
-  resolvedCourseId String
+  id                String   @id @default(cuid())
+  contentItemId     String   @unique
+  courseId          String?
+  chapterId         String?
+  lessonId          String?
+  sectionId         String?
+  academicGradeId   String
+  subjectId         String
+  resolvedCourseId  String
   resolvedChapterId String?
-  resolvedLessonId String?
+  resolvedLessonId  String?
   resolvedSectionId String?
-  sortOrder     Int
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  sortOrder         Int
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
   contentItem ContentItem @relation(fields: [contentItemId], references: [id], onDelete: Cascade)
-  course      Course? @relation("ContentPlacementCourse", fields: [courseId], references: [id], onDelete: Restrict)
-  chapter     Chapter? @relation("ContentPlacementChapter", fields: [chapterId], references: [id], onDelete: Restrict)
-  lesson      Lesson? @relation("ContentPlacementLesson", fields: [lessonId], references: [id], onDelete: Restrict)
-  section     Section? @relation("ContentPlacementSection", fields: [sectionId], references: [id], onDelete: Restrict)
+  course      Course?     @relation("ContentPlacementCourse", fields: [courseId], references: [id], onDelete: Restrict)
+  chapter     Chapter?    @relation("ContentPlacementChapter", fields: [chapterId], references: [id], onDelete: Restrict)
+  lesson      Lesson?     @relation("ContentPlacementLesson", fields: [lessonId], references: [id], onDelete: Restrict)
+  section     Section?    @relation("ContentPlacementSection", fields: [sectionId], references: [id], onDelete: Restrict)
 
   @@index([courseId, sortOrder, id])
   @@index([chapterId, sortOrder, id])
@@ -792,12 +956,12 @@ model ContentPlacement {
 /// The only persisted content-completion state. Progress above an item is
 /// intentionally derived from these rows, rather than stored redundantly.
 model StudentContentProgress {
-  id            String       @id @default(cuid())
+  id            String         @id @default(cuid())
   studentUserId String
   contentItemId String
   completedAt   DateTime
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
   student       StudentProfile @relation(fields: [studentUserId], references: [userId], onDelete: Cascade)
   contentItem   ContentItem    @relation(fields: [contentItemId], references: [id], onDelete: Cascade)
 
@@ -827,14 +991,14 @@ model StudentContentStudyState {
 
 /// Every submission is retained, including wrong answers and retries.
 model StudentQuestionAttempt {
-  id            String       @id @default(cuid())
+  id            String                         @id @default(cuid())
   studentUserId String
   questionId    String
   attemptNumber Int
   isCorrect     Boolean
-  submittedAt   DateTime     @default(now())
-  student       StudentProfile @relation(fields: [studentUserId], references: [userId], onDelete: Cascade)
-  question      Question       @relation(fields: [questionId], references: [id], onDelete: Restrict)
+  submittedAt   DateTime                       @default(now())
+  student       StudentProfile                 @relation(fields: [studentUserId], references: [userId], onDelete: Cascade)
+  question      Question                       @relation(fields: [questionId], references: [id], onDelete: Restrict)
   answers       StudentQuestionAttemptAnswer[]
 
   @@unique([studentUserId, questionId, attemptNumber])
@@ -854,27 +1018,27 @@ model StudentQuestionAttemptAnswer {
 }
 
 model StudentEntitlement {
-  id            String            @id @default(cuid())
-  studentUserId String
-  student       StudentProfile    @relation(fields: [studentUserId], references: [userId], onDelete: Restrict)
-  courseId      String?
-  course        Course?           @relation(fields: [courseId], references: [id], onDelete: Restrict)
-  chapterId     String?
-  chapter       Chapter?          @relation(fields: [chapterId], references: [id], onDelete: Restrict)
-  orderItemId   String?           @unique
-  orderItem     OrderItem?        @relation(fields: [orderItemId], references: [id], onDelete: Restrict)
-  source        EntitlementSource @default(ADMIN)
-  status        EntitlementStatus @default(ACTIVE)
-  startsAt      DateTime          @default(now())
-  expiresAt     DateTime?
-  revokedAt     DateTime?
-  grantedById   String
-  grantedBy     User              @relation("EntitlementGrantedBy", fields: [grantedById], references: [id], onDelete: Restrict)
-  revokedById   String?
-  revokedBy     User?             @relation("EntitlementRevokedBy", fields: [revokedById], references: [id], onDelete: Restrict)
+  id                      String                   @id @default(cuid())
+  studentUserId           String
+  student                 StudentProfile           @relation(fields: [studentUserId], references: [userId], onDelete: Restrict)
+  courseId                String?
+  course                  Course?                  @relation(fields: [courseId], references: [id], onDelete: Restrict)
+  chapterId               String?
+  chapter                 Chapter?                 @relation(fields: [chapterId], references: [id], onDelete: Restrict)
+  orderItemId             String?                  @unique
+  orderItem               OrderItem?               @relation(fields: [orderItemId], references: [id], onDelete: Restrict)
+  source                  EntitlementSource        @default(ADMIN)
+  status                  EntitlementStatus        @default(ACTIVE)
+  startsAt                DateTime                 @default(now())
+  expiresAt               DateTime?
+  revokedAt               DateTime?
+  grantedById             String
+  grantedBy               User                     @relation("EntitlementGrantedBy", fields: [grantedById], references: [id], onDelete: Restrict)
+  revokedById             String?
+  revokedBy               User?                    @relation("EntitlementRevokedBy", fields: [revokedById], references: [id], onDelete: Restrict)
   archivedAccessSnapshots ArchivedAccessSnapshot[]
-  createdAt     DateTime          @default(now())
-  updatedAt     DateTime          @updatedAt
+  createdAt               DateTime                 @default(now())
+  updatedAt               DateTime                 @updatedAt
 
   @@index([studentUserId, status, startsAt, expiresAt])
   @@index([courseId])
@@ -884,18 +1048,18 @@ model StudentEntitlement {
 /// A durable record that a student held an effective entitlement when a hierarchy
 /// node was archived. It intentionally survives expiry/revocation of its source.
 model ArchivedAccessSnapshot {
-  id                  String                       @id @default(cuid())
+  id                  String                     @id @default(cuid())
   studentUserId       String
-  student             StudentProfile               @relation(fields: [studentUserId], references: [userId], onDelete: Restrict)
+  student             StudentProfile             @relation(fields: [studentUserId], references: [userId], onDelete: Restrict)
   resourceType        ArchivedAccessResourceType
   resourceId          String
   sourceEntitlementId String
-  sourceEntitlement   StudentEntitlement           @relation(fields: [sourceEntitlementId], references: [id], onDelete: Restrict)
+  sourceEntitlement   StudentEntitlement         @relation(fields: [sourceEntitlementId], references: [id], onDelete: Restrict)
   archivedAt          DateTime
   revokedAt           DateTime?
   revokedById         String?
-  revokedBy           User?                        @relation("ArchivedAccessRevokedBy", fields: [revokedById], references: [id], onDelete: Restrict)
-  createdAt           DateTime                     @default(now())
+  revokedBy           User?                      @relation("ArchivedAccessRevokedBy", fields: [revokedById], references: [id], onDelete: Restrict)
+  createdAt           DateTime                   @default(now())
 
   @@unique([studentUserId, resourceType, resourceId])
   @@index([studentUserId, revokedAt])
@@ -903,12 +1067,12 @@ model ArchivedAccessSnapshot {
 }
 
 model Cart {
-  id            String          @id @default(cuid())
-  studentUserId String          @unique
-  student       StudentProfile  @relation(fields: [studentUserId], references: [userId], onDelete: Cascade)
+  id            String         @id @default(cuid())
+  studentUserId String         @unique
+  student       StudentProfile @relation(fields: [studentUserId], references: [userId], onDelete: Cascade)
   items         CartItem[]
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
 }
 
 model CartItem {
@@ -928,58 +1092,58 @@ model CartItem {
 }
 
 model ManualPaymentMethod {
-  id              String   @id @default(cuid())
-  titleAr         String
-  instructionsAr  String
-  titleEn         String?
-  instructionsEn  String?
-  isActive        Boolean  @default(true)
-  sortOrder       Int
-  createdById     String
-  createdBy       User     @relation("ManualPaymentMethodCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  orders          Order[]
+  id             String   @id @default(cuid())
+  titleAr        String
+  instructionsAr String
+  titleEn        String?
+  instructionsEn String?
+  isActive       Boolean  @default(true)
+  sortOrder      Int
+  createdById    String
+  createdBy      User     @relation("ManualPaymentMethodCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  orders         Order[]
 
   @@unique([sortOrder])
   @@index([isActive, sortOrder, id])
 }
 
 model Order {
-  id                      String      @id @default(cuid())
-  studentUserId           String
-  student                 StudentProfile @relation(fields: [studentUserId], references: [userId], onDelete: Restrict)
-  manualPaymentMethodId   String
-  manualPaymentMethod     ManualPaymentMethod @relation(fields: [manualPaymentMethodId], references: [id], onDelete: Restrict)
-  paymentMethodSnapshot   Json
-  totalMinor              Int
-  currency                String
-  status                  OrderStatus @default(AWAITING_PAYMENT)
-  items                   OrderItem[]
-  submissions             ManualPaymentSubmission[]
-  createdAt               DateTime    @default(now())
-  updatedAt               DateTime    @updatedAt
-  approvedAt              DateTime?
-  cancelledAt             DateTime?
+  id                    String                    @id @default(cuid())
+  studentUserId         String
+  student               StudentProfile            @relation(fields: [studentUserId], references: [userId], onDelete: Restrict)
+  manualPaymentMethodId String
+  manualPaymentMethod   ManualPaymentMethod       @relation(fields: [manualPaymentMethodId], references: [id], onDelete: Restrict)
+  paymentMethodSnapshot Json
+  totalMinor            Int
+  currency              String
+  status                OrderStatus               @default(AWAITING_PAYMENT)
+  items                 OrderItem[]
+  submissions           ManualPaymentSubmission[]
+  createdAt             DateTime                  @default(now())
+  updatedAt             DateTime                  @updatedAt
+  approvedAt            DateTime?
+  cancelledAt           DateTime?
 
   @@index([studentUserId, createdAt, id])
   @@index([status, createdAt, id])
 }
 
 model OrderItem {
-  id              String             @id @default(cuid())
-  orderId         String
-  order           Order              @relation(fields: [orderId], references: [id], onDelete: Restrict)
-  targetType      CommerceTargetType
-  courseId        String?
-  course          Course?            @relation("OrderItemCourse", fields: [courseId], references: [id], onDelete: Restrict)
-  chapterId       String?
-  chapter         Chapter?           @relation("OrderItemChapter", fields: [chapterId], references: [id], onDelete: Restrict)
-  titleSnapshot   String
-  priceMinor      Int
-  currency        String
-  entitlement     StudentEntitlement?
-  createdAt       DateTime           @default(now())
+  id            String              @id @default(cuid())
+  orderId       String
+  order         Order               @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  targetType    CommerceTargetType
+  courseId      String?
+  course        Course?             @relation("OrderItemCourse", fields: [courseId], references: [id], onDelete: Restrict)
+  chapterId     String?
+  chapter       Chapter?            @relation("OrderItemChapter", fields: [chapterId], references: [id], onDelete: Restrict)
+  titleSnapshot String
+  priceMinor    Int
+  currency      String
+  entitlement   StudentEntitlement?
+  createdAt     DateTime            @default(now())
 
   @@index([orderId])
 }
@@ -1045,24 +1209,24 @@ model PublisherAgreement {
 }
 
 model PublisherEarningsStatement {
-  id                    String             @id @default(cuid())
-  agreementId           String
-  agreement             PublisherAgreement @relation(fields: [agreementId], references: [id], onDelete: Restrict)
-  courseId              String?
-  course                Course?            @relation("EarningsCourse", fields: [courseId], references: [id], onDelete: Restrict)
-  chapterId             String?
-  chapter               Chapter?           @relation("EarningsChapter", fields: [chapterId], references: [id], onDelete: Restrict)
-  lessonId              String?
-  lesson                Lesson?            @relation("EarningsLesson", fields: [lessonId], references: [id], onDelete: Restrict)
-  periodStartsAt        DateTime
-  periodEndsAt          DateTime
-  grossRevenueMinor     Int
-  currency              String
-  revenueShareBps       Int
+  id                     String             @id @default(cuid())
+  agreementId            String
+  agreement              PublisherAgreement @relation(fields: [agreementId], references: [id], onDelete: Restrict)
+  courseId               String?
+  course                 Course?            @relation("EarningsCourse", fields: [courseId], references: [id], onDelete: Restrict)
+  chapterId              String?
+  chapter                Chapter?           @relation("EarningsChapter", fields: [chapterId], references: [id], onDelete: Restrict)
+  lessonId               String?
+  lesson                 Lesson?            @relation("EarningsLesson", fields: [lessonId], references: [id], onDelete: Restrict)
+  periodStartsAt         DateTime
+  periodEndsAt           DateTime
+  grossRevenueMinor      Int
+  currency               String
+  revenueShareBps        Int
   publisherEarningsMinor Int
-  createdById           String
-  createdBy             User               @relation("EarningsStatementCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
-  createdAt             DateTime           @default(now())
+  createdById            String
+  createdBy              User               @relation("EarningsStatementCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  createdAt              DateTime           @default(now())
 
   @@index([agreementId, periodStartsAt, periodEndsAt])
   @@index([courseId, periodStartsAt])
@@ -1071,24 +1235,24 @@ model PublisherEarningsStatement {
 }
 
 model Governorate {
-  id       String @id @default(cuid())
-  nameAr   String @unique
-  nameEn   String?
-  centers  Center[]
-  students StudentProfile[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id        String           @id @default(cuid())
+  nameAr    String           @unique
+  nameEn    String?
+  centers   Center[]
+  students  StudentProfile[]
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
 }
 
 model Center {
-  id            String @id @default(cuid())
+  id            String           @id @default(cuid())
   governorateId String
-  governorate   Governorate @relation(fields: [governorateId], references: [id], onDelete: Restrict)
+  governorate   Governorate      @relation(fields: [governorateId], references: [id], onDelete: Restrict)
   nameAr        String
   nameEn        String?
   students      StudentProfile[]
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
 
   @@unique([governorateId, nameAr])
   @@index([governorateId])

@@ -22,4 +22,9 @@ export {
   QuestionSourceType,
   QuestionStatus,
   QuestionType,
+  AssessmentOwnerType,
+  AssessmentGenerationType,
+  AssessmentMode,
+  AssessmentStatus,
+  AssessmentAttemptStatus,
 } from '@prisma/client';

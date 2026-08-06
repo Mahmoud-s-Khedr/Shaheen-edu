@@ -5,7 +5,7 @@
 > Implemented endpoints remain documented in
 > [api-reference-compact.md](api-reference-compact.md).
 
-## Implementation status (reviewed 2026-08-01)
+## Implementation status (reviewed 2026-08-06)
 
 - [x] Student registration and profile updates persist a published
       `academicGradeId`.
@@ -19,8 +19,12 @@
 - [x] Content-item completion, current-grade and library progress, direct
       practice, immutable practice attempts, student performance, and selected-child
       parent performance are implemented.
-- [ ] Generated assessments and the broader student analytics APIs in this
-      roadmap are not implemented.
+- [x] Generated assessments (student-owned private quizzes/exams and
+      admin-owned public quizzes/exams) exist, built from standard random
+      sampling or admin hand-picked questions, with a full attempt lifecycle
+      (start/resume, autosave, submit, result).
+- [ ] AI-assisted question selection and the broader student analytics APIs in
+      this roadmap remain not implemented.
 
 `[x]` means the backend implementation exists. `[ ]` means the item remains
 planned; frontend rendering, response composition, and client-side navigation
@@ -55,7 +59,7 @@ to a subject, and a chapter belongs to a course.
 | Grade selection  | [x]                                         | Registration accepts `academicGradeId`; `PATCH /api/v1/students/me` can change it.                                                                                                                                                                      | —                                                                                                 |
 | Public hierarchy | [x]                                         | Published grade/subject/course discovery plus cursor-paginated course chapters, chapter lessons, lesson sections, and direct content previews.                                                                                                          | —                                                                                                 |
 | Paid access      | [x]                                         | Course/chapter pricing, `StudentEntitlement`, carts, manual-payment orders, proof review, and payment-backed grants exist.                                                                                                                              | No refunds, payment expiry, or PSP integration.                                                   |
-| Questions        | [x] Authoring and direct practice           | Questions are linked to a course and may be placed at course/chapter/lesson/section level; eligible published questions can be delivered for direct practice with immutable answer-attempt history.                                                     | No generated quiz/exam, assessment attempt, answer-autosave, result, or assessment-history model. |
+| Questions        | [x] Authoring, direct practice, and assessments | Questions are linked to a course and may be placed at course/chapter/lesson/section level; eligible published questions can be delivered for direct practice with immutable answer-attempt history. Student- and admin-generated assessments freeze an immutable question/option snapshot with a full attempt lifecycle. | No AI-assisted selection, difficulty bands, marked/omitted-question filters, or assessment-history analytics. |
 | Content delivery | [x] Foundation, completion, and study state | An entitled student can fetch a content item and its protected assets, view completion/study state, record activity/resume position, and retrieve the next continue-learning item. Current-grade and accessible-library progress rollups are available. | Higher-level completion remains derived from content-item completion.                             |
 
 Question banks and sources are authoring/provenance metadata. They are not a
@@ -236,59 +240,86 @@ completion is derived from accessible published content and these records. A
 direct command to mark a course, chapter, lesson, or section complete is not
 implemented.
 
-## AI-generated quizzes and exams from the existing question bank
+## Generated quizzes and exams from the existing question bank
 
-There is no generated assessment domain today. Direct practice is implemented:
-students receive eligible published questions and every answer submission is
-retained as an immutable attempt. The student creates a quiz/exam request;
-AI may help choose a balanced set of **existing reviewed, published questions**.
-AI must not create unreviewed live questions or change correct answers.
+The generated-assessment domain is implemented for both owners. A student can
+generate their own private quiz/exam, and an admin can build a public one, in
+both cases from **existing reviewed, published questions** only. AI-assisted
+selection is explicitly **deferred by product decision** (not a gap to close
+yet) — every generation path today is either random sampling (`STANDARD`) or
+exact hand-picked question IDs (`CUSTOM`, admin only). No path creates
+unreviewed live questions or changes correct answers.
 
-Question selection must always be limited to:
+Visibility is owner-based: a `STUDENT`-owned assessment is private to its
+creator; an `ADMIN`-owned assessment becomes public, once published, to any
+student entitled to every one of its target scopes — the frozen snapshot is
+the union of all scopes' questions, so partial entitlement to only some
+scopes must not surface the whole assessment.
 
-1. The student's current academic grade.
-2. A selected course, chapter, lesson, or section in that grade.
-3. Published questions whose course and placement are published.
-4. Content the student is entitled to, unless the product explicitly defines a
-   free public practice set.
+Question selection is always limited to:
 
-### Required assessment schema
+1. Published questions whose course/chapter/lesson/section placement is
+   published.
+2. For student-owned generation, the student's current academic grade and
+   their own entitlement on the selected scope (mirroring direct practice's
+   eligibility rule).
+3. For admin-owned generation, any published question in the given scope;
+   visibility to a given student is enforced separately, at read/attempt time,
+   against that student's grade and entitlement.
+
+"Quiz" vs "exam" is not two separate models — it is the assessment's `mode`
+(`TUTOR` reveals per-question correctness immediately; `EXAM` withholds it
+until submission) plus an optional `isTimed`/`durationSeconds` pair. There is
+no retry: one attempt per (assessment, student), which is `SUSPENDED`
+(resumable) until submitted, then `COMPLETED`.
+
+### Implemented assessment schema
 
 | Model                       | Essential responsibility                                                                                                      |
 | --------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| `StudentAssessment`         | Student-owned generated quiz/exam: requested scope, type, question count, timing rules, generation status, and creation time. |
-| `StudentAssessmentQuestion` | Ordered immutable snapshot of selected question body, options, answer key, explanation, assets, and placement.                |
-| `StudentAssessmentAttempt`  | Start/submit/expiry state, score, duration, and result-release state.                                                         |
-| `StudentAssessmentAnswer`   | One saved selected-option set per attempt question, with timestamps.                                                          |
-| `QuestionReport`            | Student flag for a broken, incorrect, or unclear question.                                                                    |
+| `Assessment`                | Owner (`STUDENT` private or `ADMIN` public), title, generation type, mode, timer, question count, and status.                  |
+| `AssessmentScope`           | One or more course/chapter/lesson/section targets used to generate/visibility-gate the assessment.                            |
+| `AssessmentQuestion`        | Ordered immutable snapshot of a selected question's body/type/explanation, with a non-FK `sourceQuestionId` for traceability.  |
+| `AssessmentQuestionOption`  | Immutable snapshot of each option's body and correctness.                                                                     |
+| `AssessmentAttempt`         | One resumable attempt per (assessment, student): start/expiry/submit state and score.                                        |
+| `AssessmentAttemptAnswer`   | Autosaved selected options per snapshot question, upserted while the attempt is in progress.                                  |
 
-All assessment schema additions above remain [ ]. Existing question-bank
-records provide authoring data only; they are not a learner assessment model.
+All rows above are `[x]`. `QuestionReport` (student flag for a broken/unclear
+question) remains `[ ]` — not part of this pass.
 
-The snapshot is required: editing or archiving an authoring question must not
-change an assessment that a student has already created or completed.
+The snapshot is enforced: editing or archiving an authoring `Question` never
+changes an assessment already generated or completed from it, since
+`AssessmentQuestion`/`AssessmentQuestionOption` hold their own copies and
+`sourceQuestionId` is a plain non-relational reference.
 
-### Proposed student assessment APIs
+### Implemented assessment APIs
 
-| Proposed endpoint                                                       | Purpose                                                                                                                                                                     |
-| ----------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `POST /api/v1/student/assessments`                                      | Create an AI-assisted generation request. Input: scope (`courseId`/`chapterId`/`lessonId`/`sectionId`), quiz type, question count, optional duration/difficulty preference. |
-| `GET /api/v1/student/assessments`                                       | List only assessments created by the authenticated student, with generation, attempt, and result status.                                                                    |
-| `GET /api/v1/student/assessments/:assessmentId`                         | Read one owned assessment's metadata and generation state.                                                                                                                  |
-| `POST /api/v1/student/assessments/:assessmentId/attempts`               | Start or resume the student's attempt; return learner-safe question snapshots with no answer keys/explanations.                                                             |
-| `GET /api/v1/student/attempts/:attemptId`                               | Resume active attempt with saved answers and server-calculated remaining time.                                                                                              |
-| `PUT /api/v1/student/attempts/:attemptId/answers/:questionId`           | Idempotently autosave selected option IDs.                                                                                                                                  |
-| `POST /api/v1/student/attempts/:attemptId/submit`                       | Idempotently submit and score the attempt; server time controls expiry.                                                                                                     |
-| `GET /api/v1/student/attempts/:attemptId/result`                        | Score, correct/incorrect/unanswered outcomes, explanations, time, and scope breakdown after submission.                                                                     |
-| `POST /api/v1/student/attempts/:attemptId/questions/:questionId/report` | Flag a question for staff review.                                                                                                                                           |
+| Status | Endpoint                                                                       | Purpose                                                                                                    |
+| ------ | ------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------- |
+| [x]    | `POST /api/v1/student/assessments`                                             | Generate a private `STANDARD` (random-sample) assessment from a chosen scope/count/mode/timer.             |
+| [x]    | `GET /api/v1/student/assessments`                                              | Paginated list merging the student's own assessments with visible public admin assessments.                |
+| [x]    | `GET /api/v1/student/assessments/:id`                                          | Read one owned or publicly visible assessment's metadata.                                                  |
+| [x]    | `PATCH /api/v1/student/assessments/:id`                                        | Rename an owned assessment.                                                                                |
+| [x]    | `DELETE /api/v1/student/assessments/:id`                                       | Delete an owned assessment.                                                                                |
+| [x]    | `POST /api/v1/student/assessments/:id/attempts/start`                          | Start or idempotently resume the student's attempt.                                                        |
+| [x]    | `GET /api/v1/student/assessments/:id/attempts/current`                        | Resumable state: per-question answered flags and remaining time, with mode-aware answer visibility.        |
+| [x]    | `POST /api/v1/student/assessments/:id/attempts/current/answers/:questionId`   | Autosave one selected answer; force-submits if the timer has already expired.                              |
+| [x]    | `POST /api/v1/student/assessments/:id/attempts/current/submit`                | Idempotently finalize and score the attempt.                                                                |
+| [x]    | `GET /api/v1/student/assessments/:id/attempts/current/result`                 | Full review after submission: every question, correct answers, explanations, and the student's answers.   |
+| [x]    | `POST /api/v1/admin/assessments/standard`                                     | Admin: create via random sample.                                                                           |
+| [x]    | `POST /api/v1/admin/assessments/custom`                                       | Admin: create by hand-picking exact question IDs from the question bank.                                   |
+| [x]    | `GET /api/v1/admin/assessments`, `GET /api/v1/admin/assessments/:id`          | Admin listing/detail, including correct answers.                                                            |
+| [x]    | `PATCH /api/v1/admin/assessments/:id`                                          | Update title/mode/timer while still `DRAFT`.                                                                |
+| [x]    | `POST /api/v1/admin/assessments/:id/publish`                                   | `DRAFT` → `READY`, making it publicly visible to entitled students.                                          |
+| [x]    | `POST /api/v1/admin/assessments/:id/archive`                                   | `READY` → `ARCHIVED`, removing it from student lists; past attempts remain readable.                        |
+| [x]    | `DELETE /api/v1/admin/assessments/:id`                                        | Hard delete, `DRAFT` only.                                                                                  |
+| [ ]    | AI Prompt generation, difficulty bands, source/bank filters, marked/omitted/community-incorrect filters, multiple attempts, question reporting | Explicitly deferred; not built in this pass. |
 
-All student assessment APIs above remain [ ].
-
-Do not add a generic `GET /api/v1/student/questions` endpoint that returns raw question
-records. Questions must be delivered within an owned assessment attempt so
-correct answers, explanations, option metadata, and question exposure stay
-protected. If the product later wants a free question browser, it should still
-create a lightweight practice attempt behind the scenes.
+Do not add a generic `GET /api/v1/student/questions` endpoint that returns raw
+question records. Questions are delivered only within an owned/visible
+assessment's snapshot, so correct answers and explanations stay protected
+until the appropriate reveal point (immediately in `TUTOR` mode, or after
+submission in `EXAM` mode).
 
 ## Analytics to expose to students
 
@@ -334,8 +365,11 @@ answer keys, or staff-only question-quality data.
       chapter and descendants only.
 - [x] Checkout and manual-payment proof submission require idempotency keys;
       approval is safe to retry and cannot grant a second entitlement.
-- [ ] Answer autosave and assessment submission idempotency remain planned.
-- [x] Entitlement grants/revocations and implemented commerce events are
-      audited; grade-change and generated-assessment audits remain [ ].
+- [x] Assessment answer autosave upserts per question, and submission is
+      idempotent (resubmitting a completed attempt returns the existing score
+      rather than rescoring); neither uses an explicit `idempotency-key`
+      header the way checkout/payment-proof do.
+- [x] Entitlement grants/revocations and admin assessment publish/archive
+      actions are audited; grade-change audits remain [ ].
 - [x] Existing APIs use the current error envelope, bearer authentication,
       correlation IDs, and pagination conventions.

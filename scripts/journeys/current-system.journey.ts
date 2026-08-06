@@ -17,6 +17,7 @@ import { apiCoverageJourney } from './content/api-coverage.journey.js';
 import { manualCommerceJourney } from './content/manual-commerce.journey.js';
 import { studentLearningJourney } from './content/student-learning.journey.js';
 import { assetAccessJourney } from './content/asset-access.journey.js';
+import { assessmentsJourney } from './content/assessments.journey.js';
 import type { JourneyDefinition } from './lib/types.js';
 
 export const journeys: JourneyDefinition[] = [
@@ -39,4 +40,5 @@ export const journeys: JourneyDefinition[] = [
   manualCommerceJourney,
   studentLearningJourney,
   assetAccessJourney,
+  assessmentsJourney,
 ];

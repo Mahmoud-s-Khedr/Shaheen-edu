@@ -23,6 +23,16 @@ export async function cleanDatabase(
   await prisma.studentEntitlement.deleteMany();
   await prisma.publisherEarningsStatement.deleteMany();
   await prisma.publisherAgreement.deleteMany();
+  // Assessment cascades to its scopes/snapshot/attempts, but AssessmentScope
+  // holds restrictive FKs to Course/Chapter/Lesson/Section, so it must go
+  // before the hierarchy rows below. StudentQuestionAttempt and Question hold
+  // restrictive FKs to Question/Course respectively, so they must go before
+  // Question and Course/QuestionBank/QuestionSource in turn.
+  await prisma.assessment.deleteMany();
+  await prisma.studentQuestionAttempt.deleteMany();
+  await prisma.question.deleteMany();
+  await prisma.questionBank.deleteMany();
+  await prisma.questionSource.deleteMany();
   await prisma.section.deleteMany();
   await prisma.lesson.deleteMany();
   await prisma.chapter.deleteMany();
@@ -95,7 +105,7 @@ async function seedAcademicGrade(
   const sortOrder = (await prisma.academicGrade.count()) + 1;
   return prisma.academicGrade.create({
     data: {
-      title: slug,
+      titleAr: slug,
       slug,
       sortOrder,
       status,

@@ -17,7 +17,7 @@ describe('Publisher agreements and pricing (e2e)', () => {
     actor = { ...(await seedSuperAdmin(app, 'agreements-admin@example.com', 'SuperAdminP@ss1!')), role: Role.SUPER_ADMIN, sessionId: 'test-session' };
     prisma = app.get(PrismaService); service = app.get(PublisherAgreementsService);
     const publisher = await prisma.user.create({ data: { role: Role.PARTNER, status: AccountStatus.ACTIVE, loginIdentifier: 'publisher@example.com', passwordHash: 'unused', partnerProfile: { create: { partnerType: 'CONTENT_PUBLISHER', displayName: 'Publisher', createdByAdminId: actor.id } } } });
-    const grade = await prisma.academicGrade.create({ data: { title: 'Grade', slug: 'grade', sortOrder: 1, status: ContentStatus.DRAFT, createdById: actor.id, updatedById: actor.id } });
+    const grade = await prisma.academicGrade.create({ data: { titleAr: 'Grade', slug: 'grade', sortOrder: 1, status: ContentStatus.DRAFT, createdById: actor.id, updatedById: actor.id } });
     const subject = await prisma.subject.create({ data: { academicGradeId: grade.id, title: 'Subject', slug: 'subject', sortOrder: 1, status: ContentStatus.DRAFT, createdById: actor.id, updatedById: actor.id } });
     const course = await prisma.course.create({ data: { subjectId: subject.id, title: 'Course', slug: 'course', sortOrder: 1, createdById: actor.id, updatedById: actor.id } });
     const chapter = await prisma.chapter.create({ data: { courseId: course.id, title: 'Chapter', slug: 'chapter', sortOrder: 1, createdById: actor.id, updatedById: actor.id } });

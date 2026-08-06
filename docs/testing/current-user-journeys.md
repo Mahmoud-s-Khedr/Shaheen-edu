@@ -57,4 +57,8 @@ Purpose: create a content-publisher source and question bank, publish both, auth
 
 Purpose: use a real Bunny cover upload to verify that every returned admin-preview, public-cover, and retained-student-cover delivery URL is fetched successfully. It also proves that anonymous archived access is denied and explicit snapshot revocation blocks the retained student. Depends on CONTENT-007. Script: `scripts/journeys/content/asset-access.journey.ts`.
 
+## CONTENT-016 — Student and admin generated assessments
+
+Purpose: validate the generated quiz/exam domain end to end. Depends on CONTENT-013. Authors a published course and three published questions, then: has a student generate a private standard assessment and confirms it is absent from another student's list and returns 403 on direct access; runs the full attempt lifecycle (start, autosave with EXAM-mode answers hidden, resume, submit, and full result review); has an admin hand-pick questions into a DRAFT custom assessment, confirms it is invisible to students until published, then publishes it and confirms it becomes visible to every entitled student with TUTOR-mode answers revealed immediately; and finally archives it and confirms it disappears from student lists. Script: `scripts/journeys/content/assessments.journey.ts`.
+
 All journey delivery APIs returning a browser URL (`url` or `embedUrl`) fetch that URL and consume its body; an issued URL alone is not treated as successful delivery.
