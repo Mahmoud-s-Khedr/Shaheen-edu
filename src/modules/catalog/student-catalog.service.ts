@@ -143,7 +143,7 @@ export class StudentCatalogService {
           -1::int AS lesson_order, -1::int AS section_order, 0::int AS type_order
         FROM "Chapter" h
         JOIN "Course" c ON c.id = h."courseId"
-        WHERE h.status = ${published} AND c.status = ${published}
+        WHERE h.status = ${published}::"ContentStatus" AND c.status = ${published}::"ContentStatus"
           AND c."subjectId" = ${subject.id}
           AND (h.title ILIKE ${pattern} ESCAPE E'\\' OR h.description ILIKE ${pattern} ESCAPE E'\\')
       `);
@@ -155,7 +155,7 @@ export class StudentCatalogService {
         FROM "Lesson" l
         JOIN "Chapter" h ON h.id = l."chapterId"
         JOIN "Course" c ON c.id = h."courseId"
-        WHERE l.status = ${published} AND h.status = ${published} AND c.status = ${published}
+        WHERE l.status = ${published}::"ContentStatus" AND h.status = ${published}::"ContentStatus" AND c.status = ${published}::"ContentStatus"
           AND c."subjectId" = ${subject.id}
           AND (l.title ILIKE ${pattern} ESCAPE E'\\' OR l.description ILIKE ${pattern} ESCAPE E'\\')
       `);
@@ -168,8 +168,8 @@ export class StudentCatalogService {
         JOIN "Lesson" l ON l.id = x."lessonId"
         JOIN "Chapter" h ON h.id = l."chapterId"
         JOIN "Course" c ON c.id = h."courseId"
-        WHERE x.status = ${published} AND l.status = ${published}
-          AND h.status = ${published} AND c.status = ${published}
+        WHERE x.status = ${published}::"ContentStatus" AND l.status = ${published}::"ContentStatus"
+          AND h.status = ${published}::"ContentStatus" AND c.status = ${published}::"ContentStatus"
           AND c."subjectId" = ${subject.id}
           AND (x.title ILIKE ${pattern} ESCAPE E'\\' OR x.description ILIKE ${pattern} ESCAPE E'\\')
       `);

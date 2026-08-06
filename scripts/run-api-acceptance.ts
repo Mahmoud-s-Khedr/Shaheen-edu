@@ -192,7 +192,10 @@ async function cleanupRemoteResources(
         const match = call.path.match(
           /^\/api\/v1\/admin\/assets\/covers\/(grades|subjects|courses|chapters|lessons|sections)\/([^/?]+)(?:\?|$)/,
         );
-        return call.method === 'POST' && call.status >= 200 && call.status < 300 && match
+        return call.method === 'POST' &&
+          call.status >= 200 &&
+          call.status < 300 &&
+          match
           ? [`${match[1]}/${match[2]}`]
           : [];
       }),
@@ -205,9 +208,7 @@ async function cleanupRemoteResources(
           call.method === 'DELETE' &&
           call.status >= 200 &&
           call.status < 300 &&
-          /^\/api\/v1\/admin\/video-assets\/[^/?]+(?:\?|$)/.test(
-            call.path,
-          ),
+          /^\/api\/v1\/admin\/video-assets\/[^/?]+(?:\?|$)/.test(call.path),
       )
       .map((call) => call.path.split('?')[0].split('/').at(-1)!),
   );
@@ -260,7 +261,11 @@ async function cleanupRemoteResources(
           { track: false },
         );
         if (![201, 409].includes(archived.status)) {
-          cleanup.push({ resource: 'content-item', id, status: archived.status });
+          cleanup.push({
+            resource: 'content-item',
+            id,
+            status: archived.status,
+          });
           continue;
         }
         const restored = await admin.request(
@@ -270,7 +275,11 @@ async function cleanupRemoteResources(
           { track: false },
         );
         if (restored.status !== 201) {
-          cleanup.push({ resource: 'content-item', id, status: restored.status });
+          cleanup.push({
+            resource: 'content-item',
+            id,
+            status: restored.status,
+          });
           continue;
         }
       }
@@ -353,8 +362,11 @@ async function main(): Promise<void> {
     const schemaFailures = matching.flatMap((call) =>
       schemaErrors(
         call.body,
-        responseSchema(runtime, path, method, call.status),
-        runtime,
+        // Validate responses against the checked-in API contract. Deployments can
+        // temporarily expose stale Swagger metadata while returning the current
+        // response shape; the repository contract remains the test oracle.
+        responseSchema(snapshot, path, method, call.status),
+        snapshot,
       ).map((error) => `${call.status}: ${error}`),
     );
     return {

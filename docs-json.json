@@ -18164,6 +18164,27 @@
           "questionCount"
         ]
       },
+      "AssessmentScopeResponseDto": {
+        "type": "object",
+        "properties": {
+          "courseId": {
+            "type": "string",
+            "nullable": true
+          },
+          "chapterId": {
+            "type": "string",
+            "nullable": true
+          },
+          "lessonId": {
+            "type": "string",
+            "nullable": true
+          },
+          "sectionId": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
       "AssessmentDetailDto": {
         "type": "object",
         "properties": {
@@ -18211,7 +18232,7 @@
           "scopes": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/AssessmentScopeDto"
+              "$ref": "#/components/schemas/AssessmentScopeResponseDto"
             }
           }
         },
