@@ -145,7 +145,7 @@ export class StudentCatalogService {
         JOIN "Course" c ON c.id = h."courseId"
         WHERE h.status = ${published}::"ContentStatus" AND c.status = ${published}::"ContentStatus"
           AND c."subjectId" = ${subject.id}
-          AND (h.title ILIKE ${pattern} ESCAPE E'\\' OR h.description ILIKE ${pattern} ESCAPE E'\\')
+          AND (h.title ILIKE ${pattern} ESCAPE E'\\\\' OR h.description ILIKE ${pattern} ESCAPE E'\\\\')
       `);
     if (types.includes('LESSON'))
       searches.push(Prisma.sql`
@@ -157,7 +157,7 @@ export class StudentCatalogService {
         JOIN "Course" c ON c.id = h."courseId"
         WHERE l.status = ${published}::"ContentStatus" AND h.status = ${published}::"ContentStatus" AND c.status = ${published}::"ContentStatus"
           AND c."subjectId" = ${subject.id}
-          AND (l.title ILIKE ${pattern} ESCAPE E'\\' OR l.description ILIKE ${pattern} ESCAPE E'\\')
+          AND (l.title ILIKE ${pattern} ESCAPE E'\\\\' OR l.description ILIKE ${pattern} ESCAPE E'\\\\')
       `);
     if (types.includes('SECTION'))
       searches.push(Prisma.sql`
@@ -171,7 +171,7 @@ export class StudentCatalogService {
         WHERE x.status = ${published}::"ContentStatus" AND l.status = ${published}::"ContentStatus"
           AND h.status = ${published}::"ContentStatus" AND c.status = ${published}::"ContentStatus"
           AND c."subjectId" = ${subject.id}
-          AND (x.title ILIKE ${pattern} ESCAPE E'\\' OR x.description ILIKE ${pattern} ESCAPE E'\\')
+          AND (x.title ILIKE ${pattern} ESCAPE E'\\\\' OR x.description ILIKE ${pattern} ESCAPE E'\\\\')
       `);
     const rows = await this.prisma.$queryRaw<
       Array<{
