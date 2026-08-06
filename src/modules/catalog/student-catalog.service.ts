@@ -14,8 +14,10 @@ import {
   toPaginationMeta,
   type PaginationQueryDto,
 } from '../../common/dto/pagination-query.dto';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { CursorPaginationQueryDto } from '../../common/dto/cursor-pagination-query.dto';
+import { StudentCatalogSearchDto } from './dto/student-catalog-search.dto';
 
 const published = ContentStatus.PUBLISHED;
 const order = [{ sortOrder: 'asc' as const }, { id: 'asc' as const }];
@@ -117,6 +119,256 @@ export class StudentCatalogService {
         ),
       ),
       meta: toPaginationMeta(query.page, query.limit, total),
+    };
+  }
+
+  async search(studentUserId: string, query: StudentCatalogSearchDto) {
+    const grade = await this.gradeFor(studentUserId);
+    const subject = await this.prisma.subject.findFirst({
+      where: {
+        id: query.subjectId,
+        academicGradeId: grade.id,
+        status: published,
+      },
+    });
+    if (!subject) throw new NotFoundException('Published subject not found');
+    const types = this.searchTypes(query.types);
+    const cursor = this.searchCursor(query.cursor);
+    const pattern = `%${query.q.replace(/[\\%_]/g, '\\$&')}%`;
+    const searches: Prisma.Sql[] = [];
+    if (types.includes('CHAPTER'))
+      searches.push(Prisma.sql`
+        SELECT 'CHAPTER'::text AS type, h.id,
+          c."sortOrder" AS course_order, h."sortOrder" AS chapter_order,
+          -1::int AS lesson_order, -1::int AS section_order, 0::int AS type_order
+        FROM "Chapter" h
+        JOIN "Course" c ON c.id = h."courseId"
+        WHERE h.status = ${published} AND c.status = ${published}
+          AND c."subjectId" = ${subject.id}
+          AND (h.title ILIKE ${pattern} ESCAPE E'\\' OR h.description ILIKE ${pattern} ESCAPE E'\\')
+      `);
+    if (types.includes('LESSON'))
+      searches.push(Prisma.sql`
+        SELECT 'LESSON'::text AS type, l.id,
+          c."sortOrder" AS course_order, h."sortOrder" AS chapter_order,
+          l."sortOrder" AS lesson_order, -1::int AS section_order, 1::int AS type_order
+        FROM "Lesson" l
+        JOIN "Chapter" h ON h.id = l."chapterId"
+        JOIN "Course" c ON c.id = h."courseId"
+        WHERE l.status = ${published} AND h.status = ${published} AND c.status = ${published}
+          AND c."subjectId" = ${subject.id}
+          AND (l.title ILIKE ${pattern} ESCAPE E'\\' OR l.description ILIKE ${pattern} ESCAPE E'\\')
+      `);
+    if (types.includes('SECTION'))
+      searches.push(Prisma.sql`
+        SELECT 'SECTION'::text AS type, x.id,
+          c."sortOrder" AS course_order, h."sortOrder" AS chapter_order,
+          l."sortOrder" AS lesson_order, x."sortOrder" AS section_order, 2::int AS type_order
+        FROM "Section" x
+        JOIN "Lesson" l ON l.id = x."lessonId"
+        JOIN "Chapter" h ON h.id = l."chapterId"
+        JOIN "Course" c ON c.id = h."courseId"
+        WHERE x.status = ${published} AND l.status = ${published}
+          AND h.status = ${published} AND c.status = ${published}
+          AND c."subjectId" = ${subject.id}
+          AND (x.title ILIKE ${pattern} ESCAPE E'\\' OR x.description ILIKE ${pattern} ESCAPE E'\\')
+      `);
+    const rows = await this.prisma.$queryRaw<
+      Array<{
+        type: 'CHAPTER' | 'LESSON' | 'SECTION';
+        id: string;
+        course_order: number;
+        chapter_order: number;
+        lesson_order: number;
+        section_order: number;
+        type_order: number;
+      }>
+    >(Prisma.sql`
+      SELECT * FROM (${Prisma.join(searches, ' UNION ALL ')}) search
+      ${
+        cursor
+          ? Prisma.sql`
+              WHERE (course_order, chapter_order, lesson_order, section_order, type_order, id)
+                > (${cursor[0]}, ${cursor[1]}, ${cursor[2]}, ${cursor[3]}, ${cursor[4]}, ${cursor[5]})
+            `
+          : Prisma.empty
+      }
+      ORDER BY course_order, chapter_order, lesson_order, section_order, type_order, id
+      LIMIT ${query.limit + 1}
+    `);
+    const page = rows.slice(0, query.limit);
+    const [chapters, lessons, sections, grants] = await Promise.all([
+      this.prisma.chapter.findMany({
+        where: { id: { in: page.filter((row) => row.type === 'CHAPTER').map((row) => row.id) } },
+        include: { course: true },
+      }),
+      this.prisma.lesson.findMany({
+        where: { id: { in: page.filter((row) => row.type === 'LESSON').map((row) => row.id) } },
+        include: { chapter: { include: { course: true } } },
+      }),
+      this.prisma.section.findMany({
+        where: { id: { in: page.filter((row) => row.type === 'SECTION').map((row) => row.id) } },
+        include: { lesson: { include: { chapter: { include: { course: true } } } } },
+      }),
+      this.activeGrants(studentUserId),
+    ]);
+    const chaptersById = new Map(chapters.map((chapter) => [chapter.id, chapter]));
+    const lessonsById = new Map(lessons.map((lesson) => [lesson.id, lesson]));
+    const sectionsById = new Map(sections.map((section) => [section.id, section]));
+    const data = page.map((row) => {
+      if (row.type === 'CHAPTER') {
+        const chapter = chaptersById.get(row.id)!;
+        return this.searchNode(subject, chapter.course, chapter, null, null, grants);
+      }
+      if (row.type === 'LESSON') {
+        const lesson = lessonsById.get(row.id)!;
+        return this.searchNode(subject, lesson.chapter.course, lesson.chapter, lesson, null, grants);
+      }
+      const section = sectionsById.get(row.id)!;
+      return this.searchNode(subject, section.lesson.chapter.course, section.lesson.chapter, section.lesson, section, grants);
+    });
+    const last = page.at(-1);
+    return {
+      data,
+      pageInfo: {
+        hasNextPage: rows.length > query.limit,
+        nextCursor:
+          rows.length > query.limit && last
+            ? Buffer.from(JSON.stringify({ key: [last.course_order, last.chapter_order, last.lesson_order, last.section_order, last.type_order, last.id] })).toString(
+                'base64url',
+              )
+            : null,
+      },
+    };
+  }
+
+  async mySubjects(studentUserId: string, query: PaginationQueryDto) {
+    const entitlements = await this.prisma.studentEntitlement.findMany({
+      where: this.activeGrantWhere(studentUserId),
+      include: {
+        course: { include: { subject: { include: { academicGrade: true } } } },
+        chapter: {
+          include: {
+            course: {
+              include: { subject: { include: { academicGrade: true } } },
+            },
+          },
+        },
+      },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+    });
+    const grouped = new Map<string, { subject: any; entitlements: any[] }>();
+    for (const entitlement of entitlements) {
+      const course = entitlement.course ?? entitlement.chapter?.course;
+      const subject = course?.subject;
+      if (
+        !course ||
+        !subject ||
+        subject.status !== published ||
+        course.status !== published ||
+        subject.academicGrade.status !== published ||
+        (entitlement.chapter && entitlement.chapter.status !== published)
+      )
+        continue;
+      const group = grouped.get(subject.id) ?? { subject, entitlements: [] };
+      group.entitlements.push(entitlement);
+      grouped.set(subject.id, group);
+    }
+    const subjectPage = [...grouped.values()]
+      .sort(
+        (a, b) =>
+          a.subject.sortOrder - b.subject.sortOrder ||
+          a.subject.id.localeCompare(b.subject.id),
+      )
+      .slice((query.page - 1) * query.limit, query.page * query.limit);
+    const subjectIds = subjectPage.map(({ subject }) => subject.id);
+    const content = await this.prisma.contentItem.findMany({
+      where: {
+        status: published,
+        placement: { is: { subjectId: { in: subjectIds } } },
+      },
+      include: {
+        placement: {
+          include: {
+            course: { include: { subject: true } },
+            chapter: { include: { course: { include: { subject: true } } } },
+            lesson: {
+              include: {
+                chapter: {
+                  include: { course: { include: { subject: true } } },
+                },
+              },
+            },
+            section: {
+              include: {
+                lesson: {
+                  include: {
+                    chapter: {
+                      include: { course: { include: { subject: true } } },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+    const accessibleBySubject = new Map<string, any[]>();
+    for (const item of content) {
+      const path = this.subjectPath(item);
+      if (
+        !path ||
+        !grouped.has(path.subject.id) ||
+        path.subject.status !== published ||
+        path.nodes.some((node: any) => node.status !== published)
+      )
+        continue;
+      if (this.canAccessLoadedContent(item, entitlements))
+        accessibleBySubject.set(path.subject.id, [
+          ...(accessibleBySubject.get(path.subject.id) ?? []),
+          item,
+        ]);
+    }
+    const completed = new Set(
+      (
+        await this.prisma.studentContentProgress.findMany({
+          where: {
+            studentUserId,
+            contentItemId: { in: content.map((item) => item.id) },
+          },
+          select: { contentItemId: true },
+        })
+      ).map((row) => row.contentItemId),
+    );
+    const rows = subjectPage.map(({ subject, entitlements: activeEntitlements }) => {
+        const items = accessibleBySubject.get(subject.id) ?? [];
+        const completedContentItems = items.filter((item) =>
+          completed.has(item.id),
+        ).length;
+        return {
+          subject: this.node(subject),
+          subscription: {
+            state: 'ACTIVE',
+            entitlements: activeEntitlements.map((entitlement) => ({
+              id: entitlement.id,
+              targetType: entitlement.courseId ? 'COURSE' : 'CHAPTER',
+              targetId: entitlement.courseId ?? entitlement.chapterId,
+              expiresAt: entitlement.expiresAt,
+            })),
+          },
+          progress: {
+            totalContentItems: items.length,
+            completedContentItems,
+            completionPercent: items.length
+              ? Math.round((completedContentItems / items.length) * 100)
+              : 0,
+          },
+        };
+    });
+    return {
+      data: rows,
+      meta: toPaginationMeta(query.page, query.limit, grouped.size),
     };
   }
 
@@ -727,6 +979,123 @@ export class StudentCatalogService {
     });
   }
 
+  private searchTypes(value?: string) {
+    if (!value) return ['CHAPTER', 'LESSON', 'SECTION'] as const;
+    const types = value
+      .split(',')
+      .map((type) => type.trim().toUpperCase())
+      .filter(Boolean);
+    if (
+      !types.length ||
+      new Set(types).size !== types.length ||
+      types.some((type) => !['CHAPTER', 'LESSON', 'SECTION'].includes(type))
+    )
+      throw new BadRequestException(
+        'types must be a comma-separated subset of CHAPTER, LESSON, SECTION',
+      );
+    return types as Array<'CHAPTER' | 'LESSON' | 'SECTION'>;
+  }
+
+  private searchNode(
+    subject: any,
+    course: any,
+    chapter: any,
+    lesson: any,
+    section: any,
+    grants: Grant[],
+  ) {
+    const node = section ?? lesson ?? chapter;
+    const type = section ? 'SECTION' : lesson ? 'LESSON' : 'CHAPTER';
+    const pricing = chapter ? this.chapterPricing(chapter, course) : course;
+    const accessTypes = [
+      node.accessType,
+      lesson?.accessType,
+      chapter?.accessType,
+      course.accessType,
+    ].filter(Boolean);
+    return {
+      ...this.withAccess(
+        this.node(node),
+        this.access(grants, course.id, chapter?.id, accessTypes, pricing),
+      ),
+      type,
+      breadcrumb: {
+        subject: this.node(subject),
+        course: this.node(course),
+        chapter: this.node(chapter),
+        lesson: this.node(lesson),
+        section: this.node(section),
+      },
+    };
+  }
+
+  private searchCursor(cursor?: string) {
+    if (!cursor) return null;
+    try {
+      const value = JSON.parse(Buffer.from(cursor, 'base64url').toString());
+      if (
+        !Array.isArray(value.key) ||
+        value.key.length !== 6 ||
+        !value.key.slice(0, 5).every(Number.isInteger) ||
+        typeof value.key[5] !== 'string'
+      )
+        throw new Error();
+      return value.key as [number, number, number, number, number, string];
+    } catch {
+      throw new BadRequestException('Invalid cursor');
+    }
+  }
+
+  private subjectPath(item: any) {
+    const placement = item.placement;
+    if (!placement) return null;
+    if (placement.section) {
+      const section = placement.section;
+      return {
+        subject: section.lesson.chapter.course.subject,
+        nodes: [
+          section,
+          section.lesson,
+          section.lesson.chapter,
+          section.lesson.chapter.course,
+        ],
+      };
+    }
+    if (placement.lesson) {
+      const lesson = placement.lesson;
+      return {
+        subject: lesson.chapter.course.subject,
+        nodes: [lesson, lesson.chapter, lesson.chapter.course],
+      };
+    }
+    if (placement.chapter) {
+      const chapter = placement.chapter;
+      return {
+        subject: chapter.course.subject,
+        nodes: [chapter, chapter.course],
+      };
+    }
+    if (placement.course)
+      return { subject: placement.course.subject, nodes: [placement.course] };
+    return null;
+  }
+
+  private canAccessLoadedContent(item: any, entitlements: any[]) {
+    const path = this.subjectPath(item);
+    if (!path) return false;
+    const course = path.nodes.at(-1);
+    const chapter = path.nodes.find((node: any) => node.courseId);
+    const accessTypes = [item.accessType, ...path.nodes.map((node: any) => node.accessType)];
+    const effective = this.effectiveAccess(accessTypes);
+    if (effective === AccessType.PUBLIC || effective === AccessType.FREE)
+      return true;
+    return entitlements.some(
+      (entitlement) =>
+        entitlement.courseId === course.id ||
+        (chapter && entitlement.chapterId === chapter.id),
+    );
+  }
+
   private access(
     grants: Grant[],
     courseId: string,
@@ -785,7 +1154,8 @@ export class StudentCatalogService {
           currency: chapter.currency,
         };
   }
-  private node(record: any) {
+  private node(record: any): any {
+    if (!record) return null;
     return {
       id: record.id,
       title: record.title,

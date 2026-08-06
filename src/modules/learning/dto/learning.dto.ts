@@ -1,5 +1,12 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { ArrayMinSize, IsArray, IsOptional, IsString } from 'class-validator';
+import {
+  ArrayMinSize,
+  IsArray,
+  IsInt,
+  IsOptional,
+  IsString,
+  Min,
+} from 'class-validator';
 import { PaginationQueryDto } from '../../../common/dto/pagination-query.dto';
 
 export class PracticeScopeQueryDto extends PaginationQueryDto {
@@ -11,6 +18,21 @@ export class PracticeScopeQueryDto extends PaginationQueryDto {
 
 export class SubmitQuestionAttemptDto {
   @ApiProperty({ type: [String] })
-  @IsArray() @ArrayMinSize(1) @IsString({ each: true })
+  @IsArray()
+  @ArrayMinSize(1)
+  @IsString({ each: true })
   optionIds!: string[];
+}
+
+export class UpdateContentStudyStateDto {
+  @ApiPropertyOptional({
+    type: Number,
+    description: 'Video playback position in seconds. Send null to clear it.',
+    minimum: 0,
+    nullable: true,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  playbackPositionSeconds?: number | null;
 }

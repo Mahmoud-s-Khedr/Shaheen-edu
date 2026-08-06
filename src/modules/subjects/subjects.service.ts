@@ -21,6 +21,7 @@ import type { QuerySubjectDto } from './dto/query-subject.dto';
 import type { ReorderSubjectDto } from './dto/reorder-subject.dto';
 import type { MoveSubjectDto } from './dto/move-subject.dto';
 import { PublicationService } from '../publication/publication.service';
+import { contentPlacementAncestry } from '../../common/hierarchy/content-placement-ancestry.helper';
 
 /**
  * NOTE: this level models only the DRAFT/PUBLISHED/ARCHIVED lifecycle and the
@@ -310,6 +311,12 @@ export class SubjectsService {
             updatedById: actor.id,
           },
         });
+
+        await contentPlacementAncestry.subjectMoved(
+          tx,
+          id,
+          dto.newAcademicGradeId,
+        );
       });
     } catch (error) {
       this.mapUniqueConstraintError(

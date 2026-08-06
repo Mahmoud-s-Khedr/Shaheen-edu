@@ -14,10 +14,42 @@ import { PrismaService } from '../../database/prisma.service';
 @Roles(Role.STUDENT)
 @Controller({ path: 'student/content-items', version: '1' })
 export class StudentContentController {
-  constructor(private readonly policy: ContentAccessPolicyService, private readonly prisma: PrismaService) {}
-  @Get(':id') @ApiOperation({ summary: 'Get a content item the student can access' }) async get(@CurrentUser() user: RequestUser, @Param('id') id: string) {
+  constructor(
+    private readonly policy: ContentAccessPolicyService,
+    private readonly prisma: PrismaService,
+  ) {}
+  @Get(':id')
+  @ApiOperation({ summary: 'Get a content item the student can access' })
+  async get(@CurrentUser() user: RequestUser, @Param('id') id: string) {
     const item = await this.policy.assertContentItemAccess(id, user.id);
-    const progress = await this.prisma.studentContentProgress.findUnique({ where: { studentUserId_contentItemId: { studentUserId: user.id, contentItemId: id } } });
-    return { ...this.policy.toDeliveryDto(item), progress: { completed: Boolean(progress), completedAt: progress?.completedAt ?? null } };
+    const [progress, studyState] = await this.prisma.$transaction([
+      this.prisma.studentContentProgress.findUnique({
+        where: {
+          studentUserId_contentItemId: {
+            studentUserId: user.id,
+            contentItemId: id,
+          },
+        },
+      }),
+      this.prisma.studentContentStudyState.findUnique({
+        where: {
+          studentUserId_contentItemId: {
+            studentUserId: user.id,
+            contentItemId: id,
+          },
+        },
+      }),
+    ]);
+    return {
+      ...this.policy.toDeliveryDto(item),
+      progress: {
+        completed: Boolean(progress),
+        completedAt: progress?.completedAt ?? null,
+      },
+      studyState: {
+        lastOpenedAt: studyState?.lastOpenedAt ?? null,
+        playbackPositionSeconds: studyState?.playbackPositionSeconds ?? null,
+      },
+    };
   }
 }

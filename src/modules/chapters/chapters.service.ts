@@ -21,6 +21,7 @@ import type { QueryChapterDto } from './dto/query-chapter.dto';
 import type { ReorderChapterDto } from './dto/reorder-chapter.dto';
 import type { MoveChapterDto } from './dto/move-chapter.dto';
 import { PublicationService } from '../publication/publication.service';
+import { contentPlacementAncestry } from '../../common/hierarchy/content-placement-ancestry.helper';
 
 /**
  * NOTE: this level models only the DRAFT/PUBLISHED/ARCHIVED lifecycle and the
@@ -236,6 +237,7 @@ export class ChaptersService {
 
     const newParent = await this.prisma.course.findUnique({
       where: { id: dto.newCourseId },
+      include: { subject: true },
     });
     if (!newParent) {
       throw new NotFoundException('Course not found');
@@ -293,6 +295,12 @@ export class ChaptersService {
         await tx.chapter.updateMany({
           where: { id },
           data: { courseId: dto.newCourseId, sortOrder: targetSortOrder, updatedById: actor.id },
+        });
+
+        await contentPlacementAncestry.chapterMoved(tx, id, {
+          academicGradeId: newParent.subject.academicGradeId,
+          subjectId: newParent.subjectId,
+          courseId: newParent.id,
         });
       });
     } catch (error) {

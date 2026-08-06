@@ -21,6 +21,7 @@ import type { QuerySectionDto } from './dto/query-section.dto';
 import type { ReorderSectionDto } from './dto/reorder-section.dto';
 import type { MoveSectionDto } from './dto/move-section.dto';
 import { PublicationService } from '../publication/publication.service';
+import { contentPlacementAncestry } from '../../common/hierarchy/content-placement-ancestry.helper';
 
 /**
  * NOTE: this level models only the DRAFT/PUBLISHED/ARCHIVED lifecycle and the
@@ -239,6 +240,7 @@ export class SectionsService {
 
     const newParent = await this.prisma.lesson.findUnique({
       where: { id: dto.newLessonId },
+      include: { chapter: { include: { course: { include: { subject: true } } } } },
     });
     if (!newParent) {
       throw new NotFoundException('Lesson not found');
@@ -296,6 +298,14 @@ export class SectionsService {
         await tx.section.updateMany({
           where: { id },
           data: { lessonId: dto.newLessonId, sortOrder: targetSortOrder, updatedById: actor.id },
+        });
+
+        await contentPlacementAncestry.sectionMoved(tx, id, {
+          academicGradeId: newParent.chapter.course.subject.academicGradeId,
+          subjectId: newParent.chapter.course.subjectId,
+          courseId: newParent.chapter.courseId,
+          chapterId: newParent.chapterId,
+          lessonId: newParent.id,
         });
       });
     } catch (error) {

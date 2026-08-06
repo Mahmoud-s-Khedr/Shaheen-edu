@@ -7,13 +7,21 @@ Implementation-backed API contract. Every endpoint below is self-contained: its 
 ## Student learning
 
 ### `GET /api/v1/parent/selected-child/performance`
+
 ### `POST /api/v1/student/content-items/{id}/complete`
+
 ### `GET /api/v1/student/library/{targetType}/{targetId}/progress`
+
 ### `GET /api/v1/student/performance`
+
 ### `GET /api/v1/student/practice/questions`
+
 ### `GET /api/v1/student/practice/questions/{questionId}/assets/{assetId}/access`
+
 ### `GET /api/v1/student/practice/questions/{questionId}/attempts`
+
 ### `POST /api/v1/student/practice/questions/{questionId}/attempts`
+
 ### `GET /api/v1/student/progress`
 
 ### `GET /health`
@@ -36,22 +44,39 @@ No path, query, or header input.
 ## Manual commerce
 
 ### `GET /api/v1/admin/manual-payment-methods`
+
 ### `POST /api/v1/admin/manual-payment-methods`
+
 ### `PATCH /api/v1/admin/manual-payment-methods/{id}`
+
 ### `POST /api/v1/admin/manual-payment-methods/reorder`
+
 ### `GET /api/v1/admin/payment-submissions`
+
 ### `GET /api/v1/admin/payment-submissions/{id}`
+
 ### `POST /api/v1/admin/payment-submissions/{id}/approve`
+
 ### `POST /api/v1/admin/payment-submissions/{id}/reject`
+
 ### `GET /api/v1/student/manual-payment-methods`
+
 ### `GET /api/v1/student/cart`
+
 ### `POST /api/v1/student/cart/items`
+
 ### `DELETE /api/v1/student/cart/items/{id}`
+
 ### `POST /api/v1/student/checkout`
+
 ### `GET /api/v1/student/orders`
+
 ### `GET /api/v1/student/orders/{id}`
+
 ### `POST /api/v1/student/orders/{id}/cancel`
+
 ### `POST /api/v1/student/orders/{id}/payment-proof`
+
 ### `POST /api/v1/student/orders/{orderId}/payment-submissions/{submissionId}/resubmit`
 
 ## Authentication
@@ -3013,9 +3038,7 @@ No path, query, or header input.
 
 ```json
 {
-  "assetIds": [
-    "string"
-  ]
+  "assetIds": ["string"]
 }
 ```
 
@@ -3263,9 +3286,7 @@ No path, query, or header input.
 **Success response — HTTP 201**
 
 ```json
-[
-  "StudentEntitlement record[]"
-]
+["StudentEntitlement record[]"]
 ```
 
 ### `GET /api/v1/admin/entitlements`
@@ -3279,9 +3300,7 @@ No path, query, or header input.
 **Success response — HTTP 200**
 
 ```json
-[
-  "StudentEntitlement record[]"
-]
+["StudentEntitlement record[]"]
 ```
 
 ### `POST /api/v1/admin/entitlements/{id}/revoke`
@@ -3359,11 +3378,43 @@ No path, query, or header input.
     "mimeType": "string",
     "sizeBytes": "number"
   },
-  "attachments": [
-    "AssetSummary plus sortOrder"
-  ]
+  "attachments": ["AssetSummary plus sortOrder"],
+  "progress": {
+    "completed": "boolean",
+    "completedAt": "ISO-8601 date-time | null"
+  },
+  "studyState": {
+    "lastOpenedAt": "ISO-8601 date-time | null",
+    "playbackPositionSeconds": "number | null"
+  }
 }
 ```
+
+### `PUT /api/v1/student/content-items/{id}/study-state`
+
+**Authorization:** Bearer token; role must be `STUDENT`
+
+**Request**
+
+- path `id` (required; accessible content item)
+- body `playbackPositionSeconds` (optional non-negative integer; `null` clears)
+
+**Success response — HTTP 200**
+
+Returns the content ID and its persisted `{ lastOpenedAt, playbackPositionSeconds }`.
+The server owns the timestamp; omitted playback position leaves the existing
+saved value unchanged.
+
+### `GET /api/v1/student/learning/continue`
+
+**Authorization:** Bearer token; role must be `STUDENT`
+
+**Success response — HTTP 200**
+
+Returns `{ "data": null }` when no accessible activity exists. Otherwise,
+`data` contains safe content metadata and progress, saved study state, subject
+through section hierarchy context, subject cover ID, and calculated subject
+progress. Expired, revoked, unpublished, and inaccessible activity is skipped.
 
 ### `GET /api/v1/catalog/content-items/{id}`
 
@@ -3398,9 +3449,7 @@ No path, query, or header input.
     "mimeType": "string",
     "sizeBytes": "number"
   },
-  "attachments": [
-    "AssetSummary plus sortOrder"
-  ]
+  "attachments": ["AssetSummary plus sortOrder"]
 }
 ```
 
@@ -3797,7 +3846,11 @@ Each takes path `id`, optional opaque query `cursor`, and optional query `limit`
 
 ```json
 {
-  "parent": { "id": "string", "title": "string", "coverAssetId": "string | null" },
+  "parent": {
+    "id": "string",
+    "title": "string",
+    "coverAssetId": "string | null"
+  },
   "data": [],
   "pageInfo": { "hasNextPage": "boolean", "nextCursor": "string | null" }
 }
@@ -3839,10 +3892,41 @@ No path, query, or header input.
 
 ```json
 {
-  "data": [{ "id": "string", "title": "string", "slug": "string", "description": "string | null", "sortOrder": "number" }],
-  "meta": { "page": "number", "limit": "number", "total": "number", "totalPages": "number" }
+  "data": [
+    {
+      "id": "string",
+      "title": "string",
+      "slug": "string",
+      "description": "string | null",
+      "sortOrder": "number"
+    }
+  ],
+  "meta": {
+    "page": "number",
+    "limit": "number",
+    "total": "number",
+    "totalPages": "number"
+  }
 }
 ```
+
+### `GET /api/v1/student/catalog/search`
+
+**Authorization:** Bearer token; role must be `STUDENT`
+
+**Request**
+
+- query `subjectId` (required; published subject in the student's current grade)
+- query `q` (required; `1..120` trimmed characters)
+- query `types` (optional comma-separated `CHAPTER`, `LESSON`, `SECTION`)
+- query `cursor`, `limit` (optional cursor pagination; default `20`, maximum `100`)
+
+**Success response — HTTP 200**
+
+Returns `{ data, pageInfo }`. Each item has `type`, safe node metadata,
+`breadcrumb` (subject through the matched node), and the standard `access` and
+`isLocked` fields. Draft/archived content, other grades, protected bodies, and
+asset URLs are never returned.
 
 ### `GET /api/v1/student/catalog/subjects/{subjectId}/courses`
 
@@ -3858,21 +3942,28 @@ No path, query, or header input.
 
 ```json
 {
-  "data": [{
-    "id": "string",
-    "title": "string",
-    "slug": "string",
-    "description": "string | null",
-    "sortOrder": "number",
-    "access": {
-      "state": "ENTITLED | FREE | PUBLIC | PURCHASABLE | LOCKED",
-      "entitlementId?": "string",
-      "expiresAt?": "ISO-8601 date-time | null",
-      "price?": { "amountMinor": "number", "currency": "EGP" }
-    },
-    "isLocked": "boolean"
-  }],
-  "meta": { "page": "number", "limit": "number", "total": "number", "totalPages": "number" }
+  "data": [
+    {
+      "id": "string",
+      "title": "string",
+      "slug": "string",
+      "description": "string | null",
+      "sortOrder": "number",
+      "access": {
+        "state": "ENTITLED | FREE | PUBLIC | PURCHASABLE | LOCKED",
+        "entitlementId?": "string",
+        "expiresAt?": "ISO-8601 date-time | null",
+        "price?": { "amountMinor": "number", "currency": "EGP" }
+      },
+      "isLocked": "boolean"
+    }
+  ],
+  "meta": {
+    "page": "number",
+    "limit": "number",
+    "total": "number",
+    "totalPages": "number"
+  }
 }
 ```
 
@@ -3914,18 +4005,61 @@ No path, query, or header input.
 
 ```json
 {
-  "data": [{
-    "entitlementId": "string",
-    "targetType": "COURSE | CHAPTER",
-    "target": { "id": "string", "title": "string", "slug": "string", "description": "string | null", "sortOrder": "number" },
-    "course": { "id": "string", "title": "string", "slug": "string", "description": "string | null", "sortOrder": "number" },
-    "subject": { "id": "string", "title": "string", "slug": "string", "description": "string | null", "sortOrder": "number" },
-    "academicGrade": { "id": "string", "title": { "ar": "string", "en": "string | null" }, "slug": "string", "description": { "ar": "string | null", "en": "string | null" }, "sortOrder": "number" },
-    "startsAt": "ISO-8601 date-time",
-    "expiresAt": "ISO-8601 date-time | null"
-  }]
+  "data": [
+    {
+      "entitlementId": "string",
+      "targetType": "COURSE | CHAPTER",
+      "target": {
+        "id": "string",
+        "title": "string",
+        "slug": "string",
+        "description": "string | null",
+        "sortOrder": "number"
+      },
+      "course": {
+        "id": "string",
+        "title": "string",
+        "slug": "string",
+        "description": "string | null",
+        "sortOrder": "number"
+      },
+      "subject": {
+        "id": "string",
+        "title": "string",
+        "slug": "string",
+        "description": "string | null",
+        "sortOrder": "number"
+      },
+      "academicGrade": {
+        "id": "string",
+        "title": { "ar": "string", "en": "string | null" },
+        "slug": "string",
+        "description": { "ar": "string | null", "en": "string | null" },
+        "sortOrder": "number"
+      },
+      "startsAt": "ISO-8601 date-time",
+      "expiresAt": "ISO-8601 date-time | null"
+    }
+  ]
 }
 ```
+
+### `GET /api/v1/student/my-subjects`
+
+**Authorization:** Bearer token; role must be `STUDENT`
+
+**Request**
+
+- query `page` (optional; one-based, default `1`)
+- query `limit` (optional; `1..100`, default `20`)
+
+**Success response — HTTP 200**
+
+Returns active subjects derived from the student's active course/chapter
+entitlements across grades. Each row has `subject`, `subscription` (active
+entitlement summaries), and `progress` (`totalContentItems`,
+`completedContentItems`, `completionPercent`). It is not a subject-purchase
+or entitlement-creation API.
 
 ### `GET /api/v1/student/entitlements`
 
@@ -3940,19 +4074,26 @@ No path, query, or header input.
 
 ```json
 {
-  "data": [{
-    "id": "string",
-    "courseId": "string | null",
-    "chapterId": "string | null",
-    "targetType": "COURSE | CHAPTER",
-    "targetId": "string",
-    "source": "ADMIN | PROMOTION | MIGRATION | PAYMENT",
-    "status": "ACTIVE",
-    "startsAt": "ISO-8601 date-time",
-    "expiresAt": "ISO-8601 date-time | null",
-    "createdAt": "ISO-8601 date-time"
-  }],
-  "meta": { "page": "number", "limit": "number", "total": "number", "totalPages": "number" }
+  "data": [
+    {
+      "id": "string",
+      "courseId": "string | null",
+      "chapterId": "string | null",
+      "targetType": "COURSE | CHAPTER",
+      "targetId": "string",
+      "source": "ADMIN | PROMOTION | MIGRATION | PAYMENT",
+      "status": "ACTIVE",
+      "startsAt": "ISO-8601 date-time",
+      "expiresAt": "ISO-8601 date-time | null",
+      "createdAt": "ISO-8601 date-time"
+    }
+  ],
+  "meta": {
+    "page": "number",
+    "limit": "number",
+    "total": "number",
+    "totalPages": "number"
+  }
 }
 ```
 
@@ -4008,9 +4149,7 @@ No path, query, or header input.
 **Success response — HTTP 200**
 
 ```json
-[
-  "PublisherAgreement records with publisher"
-]
+["PublisherAgreement records with publisher"]
 ```
 
 ### `PATCH /api/v1/admin/publisher-agreements/{id}`
@@ -4171,9 +4310,7 @@ No path, query, or header input.
 **Success response — HTTP 200**
 
 ```json
-[
-  "PublisherEarningsStatement records with agreement.publisher"
-]
+["PublisherEarningsStatement records with agreement.publisher"]
 ```
 
 ### `POST /api/v1/admin/pricing/course/{id}`
@@ -4325,9 +4462,7 @@ No path, query, or header input.
 
 ```json
 {
-  "data": [
-    "QuestionSource records"
-  ],
+  "data": ["QuestionSource records"],
   "meta": {
     "page": "number",
     "limit": "number",
@@ -4520,9 +4655,7 @@ No path, query, or header input.
 
 ```json
 {
-  "data": [
-    "QuestionBank records"
-  ],
+  "data": ["QuestionBank records"],
   "meta": {
     "page": "number",
     "limit": "number",
@@ -4693,15 +4826,9 @@ No path, query, or header input.
   "body": "string",
   "explanation?": "string | null",
   "status": "DRAFT | IN_REVIEW | PUBLISHED | REJECTED | ARCHIVED",
-  "placements": [
-    "QuestionPlacement"
-  ],
-  "options": [
-    "QuestionOption"
-  ],
-  "assets": [
-    "QuestionAsset"
-  ],
+  "placements": ["QuestionPlacement"],
+  "options": ["QuestionOption"],
+  "assets": ["QuestionAsset"],
   "videoLink": "QuestionVideoLink | null"
 }
 ```
@@ -4728,9 +4855,7 @@ No path, query, or header input.
 
 ```json
 {
-  "data": [
-    "Question records with placements, options, assets, and videoLink"
-  ],
+  "data": ["Question records with placements, options, assets, and videoLink"],
   "meta": {
     "page": "number",
     "limit": "number",
@@ -4760,15 +4885,9 @@ No path, query, or header input.
   "body": "string",
   "explanation?": "string | null",
   "status": "DRAFT | IN_REVIEW | PUBLISHED | REJECTED | ARCHIVED",
-  "placements": [
-    "QuestionPlacement"
-  ],
-  "options": [
-    "QuestionOption"
-  ],
-  "assets": [
-    "QuestionAsset"
-  ],
+  "placements": ["QuestionPlacement"],
+  "options": ["QuestionOption"],
+  "assets": ["QuestionAsset"],
   "videoLink": "QuestionVideoLink | null"
 }
 ```
@@ -4805,15 +4924,9 @@ No path, query, or header input.
   "body": "string",
   "explanation?": "string | null",
   "status": "DRAFT | IN_REVIEW | PUBLISHED | REJECTED | ARCHIVED",
-  "placements": [
-    "QuestionPlacement"
-  ],
-  "options": [
-    "QuestionOption"
-  ],
-  "assets": [
-    "QuestionAsset"
-  ],
+  "placements": ["QuestionPlacement"],
+  "options": ["QuestionOption"],
+  "assets": ["QuestionAsset"],
   "videoLink": "QuestionVideoLink | null"
 }
 ```
@@ -4855,15 +4968,9 @@ No path, query, or header input.
   "body": "string",
   "explanation?": "string | null",
   "status": "DRAFT | IN_REVIEW | PUBLISHED | REJECTED | ARCHIVED",
-  "placements": [
-    "QuestionPlacement"
-  ],
-  "options": [
-    "QuestionOption"
-  ],
-  "assets": [
-    "QuestionAsset"
-  ],
+  "placements": ["QuestionPlacement"],
+  "options": ["QuestionOption"],
+  "assets": ["QuestionAsset"],
   "videoLink": "QuestionVideoLink | null"
 }
 ```
@@ -4888,15 +4995,9 @@ No path, query, or header input.
   "body": "string",
   "explanation?": "string | null",
   "status": "DRAFT | IN_REVIEW | PUBLISHED | REJECTED | ARCHIVED",
-  "placements": [
-    "QuestionPlacement"
-  ],
-  "options": [
-    "QuestionOption"
-  ],
-  "assets": [
-    "QuestionAsset"
-  ],
+  "placements": ["QuestionPlacement"],
+  "options": ["QuestionOption"],
+  "assets": ["QuestionAsset"],
   "videoLink": "QuestionVideoLink | null"
 }
 ```
@@ -4927,15 +5028,9 @@ No path, query, or header input.
   "body": "string",
   "explanation?": "string | null",
   "status": "DRAFT | IN_REVIEW | PUBLISHED | REJECTED | ARCHIVED",
-  "placements": [
-    "QuestionPlacement"
-  ],
-  "options": [
-    "QuestionOption"
-  ],
-  "assets": [
-    "QuestionAsset"
-  ],
+  "placements": ["QuestionPlacement"],
+  "options": ["QuestionOption"],
+  "assets": ["QuestionAsset"],
   "videoLink": "QuestionVideoLink | null"
 }
 ```
@@ -4960,15 +5055,9 @@ No path, query, or header input.
   "body": "string",
   "explanation?": "string | null",
   "status": "DRAFT | IN_REVIEW | PUBLISHED | REJECTED | ARCHIVED",
-  "placements": [
-    "QuestionPlacement"
-  ],
-  "options": [
-    "QuestionOption"
-  ],
-  "assets": [
-    "QuestionAsset"
-  ],
+  "placements": ["QuestionPlacement"],
+  "options": ["QuestionOption"],
+  "assets": ["QuestionAsset"],
   "videoLink": "QuestionVideoLink | null"
 }
 ```
@@ -5000,15 +5089,9 @@ No path, query, or header input.
   "body": "string",
   "explanation?": "string | null",
   "status": "DRAFT | IN_REVIEW | PUBLISHED | REJECTED | ARCHIVED",
-  "placements": [
-    "QuestionPlacement"
-  ],
-  "options": [
-    "QuestionOption"
-  ],
-  "assets": [
-    "QuestionAsset"
-  ],
+  "placements": ["QuestionPlacement"],
+  "options": ["QuestionOption"],
+  "assets": ["QuestionAsset"],
   "videoLink": "QuestionVideoLink | null"
 }
 ```
@@ -5041,15 +5124,9 @@ No path, query, or header input.
   "body": "string",
   "explanation?": "string | null",
   "status": "DRAFT | IN_REVIEW | PUBLISHED | REJECTED | ARCHIVED",
-  "placements": [
-    "QuestionPlacement"
-  ],
-  "options": [
-    "QuestionOption"
-  ],
-  "assets": [
-    "QuestionAsset"
-  ],
+  "placements": ["QuestionPlacement"],
+  "options": ["QuestionOption"],
+  "assets": ["QuestionAsset"],
   "videoLink": "QuestionVideoLink | null"
 }
 ```
@@ -5075,15 +5152,9 @@ No path, query, or header input.
   "body": "string",
   "explanation?": "string | null",
   "status": "DRAFT | IN_REVIEW | PUBLISHED | REJECTED | ARCHIVED",
-  "placements": [
-    "QuestionPlacement"
-  ],
-  "options": [
-    "QuestionOption"
-  ],
-  "assets": [
-    "QuestionAsset"
-  ],
+  "placements": ["QuestionPlacement"],
+  "options": ["QuestionOption"],
+  "assets": ["QuestionAsset"],
   "videoLink": "QuestionVideoLink | null"
 }
 ```
@@ -5114,15 +5185,9 @@ No path, query, or header input.
   "body": "string",
   "explanation?": "string | null",
   "status": "DRAFT | IN_REVIEW | PUBLISHED | REJECTED | ARCHIVED",
-  "placements": [
-    "QuestionPlacement"
-  ],
-  "options": [
-    "QuestionOption"
-  ],
-  "assets": [
-    "QuestionAsset"
-  ],
+  "placements": ["QuestionPlacement"],
+  "options": ["QuestionOption"],
+  "assets": ["QuestionAsset"],
   "videoLink": "QuestionVideoLink | null"
 }
 ```
@@ -5153,15 +5218,9 @@ No path, query, or header input.
   "body": "string",
   "explanation?": "string | null",
   "status": "DRAFT | IN_REVIEW | PUBLISHED | REJECTED | ARCHIVED",
-  "placements": [
-    "QuestionPlacement"
-  ],
-  "options": [
-    "QuestionOption"
-  ],
-  "assets": [
-    "QuestionAsset"
-  ],
+  "placements": ["QuestionPlacement"],
+  "options": ["QuestionOption"],
+  "assets": ["QuestionAsset"],
   "videoLink": "QuestionVideoLink | null"
 }
 ```
@@ -5187,15 +5246,9 @@ No path, query, or header input.
   "body": "string",
   "explanation?": "string | null",
   "status": "DRAFT | IN_REVIEW | PUBLISHED | REJECTED | ARCHIVED",
-  "placements": [
-    "QuestionPlacement"
-  ],
-  "options": [
-    "QuestionOption"
-  ],
-  "assets": [
-    "QuestionAsset"
-  ],
+  "placements": ["QuestionPlacement"],
+  "options": ["QuestionOption"],
+  "assets": ["QuestionAsset"],
   "videoLink": "QuestionVideoLink | null"
 }
 ```
@@ -5226,15 +5279,9 @@ No path, query, or header input.
   "body": "string",
   "explanation?": "string | null",
   "status": "DRAFT | IN_REVIEW | PUBLISHED | REJECTED | ARCHIVED",
-  "placements": [
-    "QuestionPlacement"
-  ],
-  "options": [
-    "QuestionOption"
-  ],
-  "assets": [
-    "QuestionAsset"
-  ],
+  "placements": ["QuestionPlacement"],
+  "options": ["QuestionOption"],
+  "assets": ["QuestionAsset"],
   "videoLink": "QuestionVideoLink | null"
 }
 ```
@@ -5266,15 +5313,9 @@ No path, query, or header input.
   "body": "string",
   "explanation?": "string | null",
   "status": "DRAFT | IN_REVIEW | PUBLISHED | REJECTED | ARCHIVED",
-  "placements": [
-    "QuestionPlacement"
-  ],
-  "options": [
-    "QuestionOption"
-  ],
-  "assets": [
-    "QuestionAsset"
-  ],
+  "placements": ["QuestionPlacement"],
+  "options": ["QuestionOption"],
+  "assets": ["QuestionAsset"],
   "videoLink": "QuestionVideoLink | null"
 }
 ```
@@ -5299,15 +5340,9 @@ No path, query, or header input.
   "body": "string",
   "explanation?": "string | null",
   "status": "DRAFT | IN_REVIEW | PUBLISHED | REJECTED | ARCHIVED",
-  "placements": [
-    "QuestionPlacement"
-  ],
-  "options": [
-    "QuestionOption"
-  ],
-  "assets": [
-    "QuestionAsset"
-  ],
+  "placements": ["QuestionPlacement"],
+  "options": ["QuestionOption"],
+  "assets": ["QuestionAsset"],
   "videoLink": "QuestionVideoLink | null"
 }
 ```
@@ -5338,9 +5373,7 @@ No path, query, or header input.
 **Success response — HTTP 200**
 
 ```json
-[
-  "{id, name, centers:[{id, name, governorateId}]}"
-]
+["{id, name, centers:[{id, name, governorateId}]}"]
 ```
 
 ### `POST /api/v1/admin/geography/governorates`
@@ -5360,9 +5393,7 @@ No path, query, or header input.
 **Success response — HTTP 201**
 
 ```json
-[
-  "{id, name, centers:[{id, name, governorateId}]}"
-]
+["{id, name, centers:[{id, name, governorateId}]}"]
 ```
 
 ### `POST /api/v1/admin/geography/governorates/{governorateId}/centers`

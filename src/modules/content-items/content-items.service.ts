@@ -31,6 +31,14 @@ import { PublicationService } from '../publication/publication.service';
 
 type PlacementField = 'courseId' | 'chapterId' | 'lessonId' | 'sectionId';
 type PlacementTarget = { field: PlacementField; id: string };
+type ResolvedPlacement = {
+  academicGradeId: string;
+  subjectId: string;
+  resolvedCourseId: string;
+  resolvedChapterId: string | null;
+  resolvedLessonId: string | null;
+  resolvedSectionId: string | null;
+};
 
 @Injectable()
 export class ContentItemsService {
@@ -82,19 +90,71 @@ export class ContentItemsService {
   private async assertValidTarget(target: PlacementTarget) {
     const record =
       target.field === 'courseId'
-        ? await this.prisma.course.findUnique({ where: { id: target.id } })
+        ? await this.prisma.course.findUnique({
+            where: { id: target.id },
+            include: { subject: true },
+          })
         : target.field === 'chapterId'
-          ? await this.prisma.chapter.findUnique({ where: { id: target.id } })
+          ? await this.prisma.chapter.findUnique({
+              where: { id: target.id },
+              include: { course: { include: { subject: true } } },
+            })
           : target.field === 'lessonId'
-            ? await this.prisma.lesson.findUnique({ where: { id: target.id } })
+            ? await this.prisma.lesson.findUnique({
+                where: { id: target.id },
+                include: {
+                  chapter: { include: { course: { include: { subject: true } } } },
+                },
+              })
             : await this.prisma.section.findUnique({
                 where: { id: target.id },
+                include: {
+                  lesson: {
+                    include: {
+                      chapter: { include: { course: { include: { subject: true } } } },
+                    },
+                  },
+                },
               });
     if (!record)
       throw new NotFoundException('Content placement target not found');
     if (record.status === ContentStatus.ARCHIVED)
       throw new ConflictException('Cannot place content in an archived target');
     return record;
+  }
+
+  private resolvedPlacement(
+    target: PlacementTarget,
+    record: any,
+  ): ResolvedPlacement {
+    const course =
+      target.field === 'courseId'
+        ? record
+        : target.field === 'chapterId'
+          ? record.course
+          : target.field === 'lessonId'
+            ? record.chapter.course
+            : record.lesson.chapter.course;
+    return {
+      academicGradeId: course.subject.academicGradeId,
+      subjectId: course.subjectId,
+      resolvedCourseId: course.id,
+      resolvedChapterId:
+        target.field === 'courseId'
+          ? null
+          : target.field === 'chapterId'
+            ? record.id
+            : target.field === 'lessonId'
+              ? record.chapter.id
+              : record.lesson.chapter.id,
+      resolvedLessonId:
+        target.field === 'lessonId'
+          ? record.id
+          : target.field === 'sectionId'
+            ? record.lesson.id
+            : null,
+      resolvedSectionId: target.field === 'sectionId' ? record.id : null,
+    };
   }
 
   private async getOrThrow(id: string) {
@@ -170,7 +230,7 @@ export class ContentItemsService {
   async create(actor: RequestUser, dto: CreateContentItemDto) {
     this.assertActorRole(actor);
     const target = this.targetFromDto(dto.placement);
-    await this.assertValidTarget(target);
+    const resolvedTarget = await this.assertValidTarget(target);
     this.assertTypeFields(
       dto.type,
       dto.textBody ?? null,
@@ -197,6 +257,7 @@ export class ContentItemsService {
             chapterId: target.field === 'chapterId' ? target.id : null,
             lessonId: target.field === 'lessonId' ? target.id : null,
             sectionId: target.field === 'sectionId' ? target.id : null,
+            ...this.resolvedPlacement(target, resolvedTarget),
             sortOrder: (max._max.sortOrder ?? 0) + 1,
           },
         },
@@ -369,7 +430,7 @@ export class ContentItemsService {
     if (item.status === ContentStatus.ARCHIVED)
       throw new ConflictException('Archived content cannot be moved');
     const target = this.targetFromDto(dto.placement);
-    await this.assertValidTarget(target);
+    const resolvedTarget = await this.assertValidTarget(target);
     const oldTarget = this.targetFromPlacement(item.placement);
     if (oldTarget.field === target.field && oldTarget.id === target.id) {
       throw new ConflictException('Use reorder to change position within the same parent');
@@ -415,6 +476,7 @@ export class ContentItemsService {
             chapterId: target.field === 'chapterId' ? target.id : null,
             lessonId: target.field === 'lessonId' ? target.id : null,
             sectionId: target.field === 'sectionId' ? target.id : null,
+            ...this.resolvedPlacement(target, resolvedTarget),
             sortOrder: targetSortOrder,
           },
         });

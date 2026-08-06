@@ -224,6 +224,7 @@ model StudentProfile {
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
   entitlements          StudentEntitlement[]
+  contentStudyStates    StudentContentStudyState[]
   cart                  Cart?
   orders                Order[]
   parentAccessSessions  ParentAccessSession[]
@@ -541,6 +542,7 @@ model ContentItem {
   primaryAsset Asset? @relation("ContentPrimaryAsset", fields: [primaryAssetId], references: [id], onDelete: Restrict)
   assetReferences AssetReference[]
   studentProgress StudentContentProgress[]
+  studentStudyStates StudentContentStudyState[]
 
   @@index([status, createdAt, id])
 }
@@ -763,6 +765,12 @@ model ContentPlacement {
   chapterId     String?
   lessonId      String?
   sectionId     String?
+  academicGradeId String
+  subjectId       String
+  resolvedCourseId String
+  resolvedChapterId String?
+  resolvedLessonId String?
+  resolvedSectionId String?
   sortOrder     Int
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -777,6 +785,8 @@ model ContentPlacement {
   @@index([chapterId, sortOrder, id])
   @@index([lessonId, sortOrder, id])
   @@index([sectionId, sortOrder, id])
+  @@index([subjectId, resolvedCourseId, resolvedChapterId])
+  @@index([academicGradeId, subjectId])
 }
 
 /// The only persisted content-completion state. Progress above an item is
@@ -793,6 +803,25 @@ model StudentContentProgress {
 
   @@unique([studentUserId, contentItemId])
   @@index([studentUserId, completedAt])
+  @@index([contentItemId])
+}
+
+/// Private learner activity state. Completion remains intentionally separate
+/// in StudentContentProgress so opening or resuming content never changes
+/// course-progress calculations.
+model StudentContentStudyState {
+  id                      String         @id @default(cuid())
+  studentUserId           String
+  contentItemId           String
+  lastOpenedAt            DateTime
+  playbackPositionSeconds Int?
+  createdAt               DateTime       @default(now())
+  updatedAt               DateTime       @updatedAt
+  student                 StudentProfile @relation(fields: [studentUserId], references: [userId], onDelete: Cascade)
+  contentItem             ContentItem    @relation(fields: [contentItemId], references: [id], onDelete: Cascade)
+
+  @@unique([studentUserId, contentItemId])
+  @@index([studentUserId, lastOpenedAt, id])
   @@index([contentItemId])
 }
 

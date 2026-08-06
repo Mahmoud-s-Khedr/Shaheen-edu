@@ -50,12 +50,15 @@ describe('Swagger (e2e)', () => {
       nullable: true,
     });
     expect(
-      document.components.schemas.ContentPlacementSummaryDto.properties.courseId,
+      document.components.schemas.ContentPlacementSummaryDto.properties
+        .courseId,
     ).toMatchObject({ type: 'string', nullable: true });
     expect(
       document.components.schemas.PartnerSummaryDto.properties.displayName,
     ).toMatchObject({ type: 'string', nullable: true });
-    expect(document.components.schemas.PartnerSummaryDto.properties.phone).toMatchObject({
+    expect(
+      document.components.schemas.PartnerSummaryDto.properties.phone,
+    ).toMatchObject({
       type: 'string',
       nullable: true,
     });
@@ -93,6 +96,32 @@ describe('Swagger (e2e)', () => {
       ]),
     );
 
+    expect(document.paths['/api/v1/student/my-subjects'].get.summary).toBe(
+      'List subjects with active course or chapter access and calculated progress',
+    );
+    expect(
+      document.paths['/api/v1/student/catalog/search'].get.parameters,
+    ).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: 'subjectId', in: 'query' }),
+        expect.objectContaining({ name: 'q', in: 'query' }),
+        expect.objectContaining({ name: 'types', in: 'query' }),
+      ]),
+    );
+    expect(
+      document.paths['/api/v1/student/content-items/{id}/study-state'].put
+        .requestBody.content['application/json'].schema,
+    ).toMatchObject({
+      $ref: '#/components/schemas/UpdateContentStudyStateDto',
+    });
+    expect(
+      document.components.schemas.UpdateContentStudyStateDto.properties
+        .playbackPositionSeconds,
+    ).toMatchObject({ type: 'number', nullable: true, minimum: 0 });
+    expect(
+      document.paths['/api/v1/student/learning/continue'].get.summary,
+    ).toBe('Get the most recently studied accessible content item');
+
     const refresh = document.paths['/api/v1/auth/refresh'].post;
     expect(refresh.summary).toBe('Refresh user access token');
     expect(refresh.security).toEqual([{ refresh_token: [] }]);
@@ -104,21 +133,25 @@ describe('Swagger (e2e)', () => {
       429: expect.any(Object),
     });
 
-    const paymentMethods = document.paths[
-      '/api/v1/admin/manual-payment-methods'
-    ].get;
+    const paymentMethods =
+      document.paths['/api/v1/admin/manual-payment-methods'].get;
     expect(paymentMethods.summary).toBe('List all manual payment methods');
-    expect(paymentMethods.responses[200].content['application/json'].schema).toMatchObject({
+    expect(
+      paymentMethods.responses[200].content['application/json'].schema,
+    ).toMatchObject({
       $ref: '#/components/schemas/ManualPaymentMethodsResponseDto',
     });
 
-    const updatePaymentMethod = document.paths[
-      '/api/v1/admin/manual-payment-methods/{id}'
-    ].patch;
-    expect(updatePaymentMethod.requestBody.content['application/json'].schema).toMatchObject({
+    const updatePaymentMethod =
+      document.paths['/api/v1/admin/manual-payment-methods/{id}'].patch;
+    expect(
+      updatePaymentMethod.requestBody.content['application/json'].schema,
+    ).toMatchObject({
       $ref: '#/components/schemas/UpdatePaymentMethodDto',
     });
-    expect(document.components.schemas.UpdatePaymentMethodDto.properties).toEqual(
+    expect(
+      document.components.schemas.UpdatePaymentMethodDto.properties,
+    ).toEqual(
       expect.objectContaining({
         titleAr: expect.any(Object),
         instructionsAr: expect.any(Object),
@@ -127,55 +160,83 @@ describe('Swagger (e2e)', () => {
         isActive: expect.any(Object),
       }),
     );
-    expect(updatePaymentMethod.responses[200].content['application/json'].schema).toMatchObject({
+    expect(
+      updatePaymentMethod.responses[200].content['application/json'].schema,
+    ).toMatchObject({
       $ref: '#/components/schemas/ManualPaymentMethodDto',
     });
-    expect(document.components.schemas.ManualPaymentMethodDto.properties).toEqual(
+    expect(
+      document.components.schemas.ManualPaymentMethodDto.properties,
+    ).toEqual(
       expect.objectContaining({
         titleEn: expect.objectContaining({ type: 'string', nullable: true }),
-        instructionsEn: expect.objectContaining({ type: 'string', nullable: true }),
+        instructionsEn: expect.objectContaining({
+          type: 'string',
+          nullable: true,
+        }),
       }),
     );
-    expect(document.components.schemas.PaymentMethodSnapshotDto.properties).toEqual(
+    expect(
+      document.components.schemas.PaymentMethodSnapshotDto.properties,
+    ).toEqual(
       expect.objectContaining({
         titleEn: expect.objectContaining({ type: 'string', nullable: true }),
-        instructionsEn: expect.objectContaining({ type: 'string', nullable: true }),
+        instructionsEn: expect.objectContaining({
+          type: 'string',
+          nullable: true,
+        }),
       }),
     );
-    expect(document.components.schemas.PaymentSubmissionSummaryDto.properties).toEqual(
+    expect(
+      document.components.schemas.PaymentSubmissionSummaryDto.properties,
+    ).toEqual(
       expect.objectContaining({
-        transactionReference: expect.objectContaining({ type: 'string', nullable: true }),
+        transactionReference: expect.objectContaining({
+          type: 'string',
+          nullable: true,
+        }),
         note: expect.objectContaining({ type: 'string', nullable: true }),
-        rejectionReason: expect.objectContaining({ type: 'string', nullable: true }),
+        rejectionReason: expect.objectContaining({
+          type: 'string',
+          nullable: true,
+        }),
       }),
     );
-    expect(document.components.schemas.PaymentSubmissionDetailDto.required).toEqual(
-      expect.arrayContaining(['createdAt', 'reviewedAt']),
-    );
-    expect(document.components.schemas.CourseSummaryDto.properties.description).toMatchObject({
+    expect(
+      document.components.schemas.PaymentSubmissionDetailDto.required,
+    ).toEqual(expect.arrayContaining(['createdAt', 'reviewedAt']));
+    expect(
+      document.components.schemas.CourseSummaryDto.properties.description,
+    ).toMatchObject({
       type: 'string',
       nullable: true,
     });
 
-    const reorderPaymentMethods = document.paths[
-      '/api/v1/admin/manual-payment-methods/reorder'
-    ].post;
-    expect(reorderPaymentMethods.requestBody.content['application/json'].schema).toMatchObject({
+    const reorderPaymentMethods =
+      document.paths['/api/v1/admin/manual-payment-methods/reorder'].post;
+    expect(
+      reorderPaymentMethods.requestBody.content['application/json'].schema,
+    ).toMatchObject({
       $ref: '#/components/schemas/ReorderPaymentMethodsDto',
     });
-    expect(document.components.schemas.ReorderPaymentMethodsDto.properties.methodIds).toMatchObject({
+    expect(
+      document.components.schemas.ReorderPaymentMethodsDto.properties.methodIds,
+    ).toMatchObject({
       type: 'array',
       items: { type: 'string' },
     });
 
-    const proofUpload = document.paths[
-      '/api/v1/student/orders/{id}/payment-proof'
-    ].post;
-    expect(proofUpload.requestBody.content['multipart/form-data'].schema).toMatchObject({
+    const proofUpload =
+      document.paths['/api/v1/student/orders/{id}/payment-proof'].post;
+    expect(
+      proofUpload.requestBody.content['multipart/form-data'].schema,
+    ).toMatchObject({
       required: ['file'],
       properties: { file: { type: 'string', format: 'binary' } },
     });
-    expect(proofUpload.responses[201].content['application/json'].schema).toMatchObject({
+    expect(
+      proofUpload.responses[201].content['application/json'].schema,
+    ).toMatchObject({
       $ref: '#/components/schemas/PaymentProofUploadAuthorizationResponseDto',
     });
 
@@ -192,19 +253,36 @@ describe('Swagger (e2e)', () => {
         return hasDocumentedShape(document.components.schemas[name], seen);
       }
       const properties = schema.properties;
-      if (properties && typeof properties === 'object' && Object.keys(properties).length)
+      if (
+        properties &&
+        typeof properties === 'object' &&
+        Object.keys(properties).length
+      )
         return true;
       return ['allOf', 'oneOf', 'anyOf'].some((key) => {
         const variants = schema[key];
-        return Array.isArray(variants) && variants.some((item) =>
-          hasDocumentedShape(item as Record<string, unknown>, new Set(seen)),
+        return (
+          Array.isArray(variants) &&
+          variants.some((item) =>
+            hasDocumentedShape(item as Record<string, unknown>, new Set(seen)),
+          )
         );
       });
     };
 
     const emptyRequestSchemas: string[] = [];
     for (const [pathName, path] of Object.entries(document.paths) as Array<
-      [string, Record<string, { requestBody?: { content?: Record<string, { schema?: Record<string, unknown> }> } }>]
+      [
+        string,
+        Record<
+          string,
+          {
+            requestBody?: {
+              content?: Record<string, { schema?: Record<string, unknown> }>;
+            };
+          }
+        >,
+      ]
     >) {
       for (const method of ['post', 'put', 'patch']) {
         const requestBody = path[method]?.requestBody;
@@ -212,7 +290,10 @@ describe('Swagger (e2e)', () => {
         const schemas = Object.values(requestBody.content ?? {}).map(
           (content) => content.schema,
         );
-        if (!schemas.length || schemas.some((schema) => !hasDocumentedShape(schema)))
+        if (
+          !schemas.length ||
+          schemas.some((schema) => !hasDocumentedShape(schema))
+        )
           emptyRequestSchemas.push(`${method.toUpperCase()} ${pathName}`);
       }
     }

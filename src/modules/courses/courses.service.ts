@@ -21,6 +21,7 @@ import type { QueryCourseDto } from './dto/query-course.dto';
 import type { ReorderCourseDto } from './dto/reorder-course.dto';
 import type { MoveCourseDto } from './dto/move-course.dto';
 import { PublicationService } from '../publication/publication.service';
+import { contentPlacementAncestry } from '../../common/hierarchy/content-placement-ancestry.helper';
 
 /**
  * NOTE: this level models only the DRAFT/PUBLISHED/ARCHIVED lifecycle and the
@@ -300,6 +301,12 @@ export class CoursesService {
         await tx.course.updateMany({
           where: { id },
           data: { subjectId: dto.newSubjectId, sortOrder: targetSortOrder, updatedById: actor.id },
+        });
+
+        await contentPlacementAncestry.courseMoved(tx, id, {
+          academicGradeId: newParent.academicGradeId,
+          subjectId: newParent.id,
+          courseId: id,
         });
       });
     } catch (error) {

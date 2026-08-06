@@ -43,7 +43,7 @@ describe('Entitlements and student delivery (e2e)', () => {
   let partnerToken: string;
   // entitled: course-wide grant. chapterOnly: single-chapter grant. outsider: no grant.
   const students: Record<
-    'entitled' | 'chapterOnly' | 'outsider',
+    'entitled' | 'chapterOnly' | 'outsider' | 'searcher',
     { id: string; token: string }
   > = {} as never;
 
@@ -695,6 +695,138 @@ describe('Entitlements and student delivery (e2e)', () => {
         ],
         meta: { page: 1, limit: 20, total: 1, totalPages: 1 },
       });
+    });
+  });
+
+  describe('student learning state and subject discovery', () => {
+    it('persists private study state, returns it from delivery, and resolves continue learning', async () => {
+      const headers = bearer(students.entitled.token);
+      const before = await readAsStudent('entitled', paidChapterAItemId);
+      expect(json(before).studyState).toEqual({
+        lastOpenedAt: null,
+        playbackPositionSeconds: null,
+      });
+
+      const saved = await app.inject({
+        method: 'PUT',
+        url: `/api/v1/student/content-items/${paidChapterAItemId}/study-state`,
+        headers,
+        payload: { playbackPositionSeconds: 245 },
+      });
+      expect(saved.statusCode).toBe(200);
+      expect(json(saved)).toMatchObject({
+        contentItemId: paidChapterAItemId,
+        studyState: { playbackPositionSeconds: 245 },
+      });
+
+      const delivery = await readAsStudent('entitled', paidChapterAItemId);
+      expect(json(delivery).studyState).toMatchObject({
+        playbackPositionSeconds: 245,
+      });
+      const continuation = await app.inject({
+        method: 'GET',
+        url: '/api/v1/student/learning/continue',
+        headers,
+      });
+      expect(continuation.statusCode).toBe(200);
+      expect(json(continuation)).toMatchObject({
+        data: {
+          contentItem: { id: paidChapterAItemId },
+          studyState: { playbackPositionSeconds: 245 },
+          subject: { id: catalogSubjectId },
+          course: { id: paidCourseId },
+          chapter: { id: chapterAId },
+        },
+      });
+
+      const forbidden = await app.inject({
+        method: 'PUT',
+        url: `/api/v1/student/content-items/${paidChapterAItemId}/study-state`,
+        headers: bearer(students.outsider.token),
+        payload: { playbackPositionSeconds: 1 },
+      });
+      expect(forbidden.statusCode).toBe(403);
+      const invalid = await app.inject({
+        method: 'PUT',
+        url: `/api/v1/student/content-items/${paidChapterAItemId}/study-state`,
+        headers,
+        payload: { playbackPositionSeconds: -1 },
+      });
+      expect(invalid.statusCode).toBe(400);
+    });
+
+    it('derives My Subjects from active grants and searches the current grade only', async () => {
+      const owned = await app.inject({
+        method: 'GET',
+        url: '/api/v1/student/my-subjects',
+        headers: bearer(students.entitled.token),
+      });
+      expect(owned.statusCode).toBe(200);
+      expect(json(owned).data).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            subject: expect.objectContaining({ id: catalogSubjectId }),
+            subscription: expect.objectContaining({ state: 'ACTIVE' }),
+            progress: expect.objectContaining({
+              totalContentItems: expect.any(Number),
+            }),
+          }),
+        ]),
+      );
+
+      await createStudent(
+        'searcher',
+        catalogGradeId,
+        '29903030342345',
+        '01099990004',
+      );
+      await grant({
+        studentUserId: students.searcher.id,
+        chapterId: chapterAId,
+      });
+      const search = await app.inject({
+        method: 'GET',
+        url: `/api/v1/student/catalog/search?subjectId=${catalogSubjectId}&q=Paid&types=CHAPTER,LESSON,SECTION`,
+        headers: bearer(students.searcher.token),
+      });
+      expect(search.statusCode).toBe(200);
+      expect(json(search).data).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            type: 'CHAPTER',
+            id: chapterAId,
+            breadcrumb: expect.objectContaining({
+              subject: expect.objectContaining({ id: catalogSubjectId }),
+              lesson: null,
+              section: null,
+            }),
+            access: expect.any(Object),
+          }),
+          expect.objectContaining({
+            type: 'LESSON',
+            id: lessonAId,
+            breadcrumb: expect.objectContaining({
+              subject: expect.objectContaining({ id: catalogSubjectId }),
+              section: null,
+            }),
+          }),
+          expect.objectContaining({
+            type: 'SECTION',
+            id: sectionAId,
+            breadcrumb: expect.objectContaining({
+              subject: expect.objectContaining({ id: catalogSubjectId }),
+              lesson: expect.objectContaining({ id: lessonAId }),
+              section: expect.objectContaining({ id: sectionAId }),
+            }),
+          }),
+        ]),
+      );
+      const invalidType = await app.inject({
+        method: 'GET',
+        url: `/api/v1/student/catalog/search?subjectId=${catalogSubjectId}&q=Paid&types=COURSE`,
+        headers: bearer(students.searcher.token),
+      });
+      expect(invalidType.statusCode).toBe(400);
     });
   });
 

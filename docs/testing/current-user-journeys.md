@@ -40,7 +40,14 @@ Purpose: validate public catalog discovery and personalized paid-content preview
 
 Purpose: validate the authenticated, grade-scoped catalogue. Depends on CONTENT-001 and AUTH-004. Creates an isolated paid hierarchy and student, verifies current-grade discovery, pricing inheritance/override, foreign-grade non-disclosure, chapter-only entitlement access, self-scoped paginated entitlements, and library retention after a grade change. Script: `scripts/journeys/content/student-catalog.journey.ts`.
 
-Dependency graph: `INFRA-001 → AUTH-001 → AUTH-002 → { AUTH-003, CONTENT-001 → { CONTENT-002, CONTENT-003, CONTENT-004, CONTENT-009 } }`; `AUTH-001 → { AUTH-004, AUTH-005 }`; CONTENT-004 and CONTENT-009 also depend on AUTH-004.
+## CONTENT-015 — Student learning state and subject discovery
+
+Purpose: validate private content activity/resume state, continue-learning
+selection, active-subject aggregation and progress, subject-scoped hierarchy
+search, entitlement boundaries, and safe locked-result rendering. Depends on
+CONTENT-009. Script: `scripts/journeys/content/student-learning-state.journey.ts`.
+
+Dependency graph: `INFRA-001 → AUTH-001 → AUTH-002 → { AUTH-003, CONTENT-001 → { CONTENT-002, CONTENT-003, CONTENT-004, CONTENT-009 → CONTENT-015 } }`; `AUTH-001 → { AUTH-004, AUTH-005 }`; CONTENT-004 and CONTENT-009 also depend on AUTH-004.
 
 ## CONTENT-006 — Manual question-bank authoring and review lifecycle
 

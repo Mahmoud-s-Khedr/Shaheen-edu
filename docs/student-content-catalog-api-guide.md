@@ -38,8 +38,8 @@ The `catalog/*` routes are public; a token is optional there. All examples use
 
 ### Get a published content item
 
-`GET /api/v1/catalog/content-items/{id}` returns the full *published and
-publicly accessible* delivery item. It is a public route. Use it after a
+`GET /api/v1/catalog/content-items/{id}` returns the full _published and
+publicly accessible_ delivery item. It is a public route. Use it after a
 catalogue preview indicates an item is public.
 
 ```bash
@@ -71,14 +71,16 @@ The log returned this PDF item (HTTP 200):
     "mimeType": "application/pdf",
     "sizeBytes": 2634119
   },
-  "attachments": [{
-    "id": "cmsgdi7vk01dlr3010af8vx0e",
-    "kind": "PDF",
-    "filename": "phase9-journey-20260805173810-49ee-resource.pdf",
-    "mimeType": "application/pdf",
-    "sizeBytes": 2634119,
-    "sortOrder": 1
-  }]
+  "attachments": [
+    {
+      "id": "cmsgdi7vk01dlr3010af8vx0e",
+      "kind": "PDF",
+      "filename": "phase9-journey-20260805173810-49ee-resource.pdf",
+      "mimeType": "application/pdf",
+      "sizeBytes": 2634119,
+      "sortOrder": 1
+    }
+  ]
 }
 ```
 
@@ -89,7 +91,7 @@ It intentionally supplies asset metadata, not the protected download URL.
 `GET /api/v1/student/content-items/{id}` is the delivery route for a signed-in
 student. It enforces the item's effective access rule (including its ancestors)
 and the student's entitlement. It returns the same core item data as the public
-route plus that student's item-level completion state.
+route plus that student's item-level completion and private study state.
 
 ```bash
 curl -H "Authorization: Bearer $STUDENT_TOKEN" \
@@ -117,8 +119,11 @@ The corresponding successful response in the log was:
     "mimeType": "application/pdf",
     "sizeBytes": 2634119
   },
-  "attachments": [{ "id": "cmsgdi7vk01dlr3010af8vx0e", "kind": "PDF", "sortOrder": 1 }],
-  "progress": { "completed": false, "completedAt": null }
+  "attachments": [
+    { "id": "cmsgdi7vk01dlr3010af8vx0e", "kind": "PDF", "sortOrder": 1 }
+  ],
+  "progress": { "completed": false, "completedAt": null },
+  "studyState": { "lastOpenedAt": null, "playbackPositionSeconds": null }
 }
 ```
 
@@ -126,14 +131,26 @@ For a text item, `textBody` is populated and `primaryAsset`/`attachments` can
 be `null`/`[]`. A student without access receives an authorization error rather
 than a preview of protected body data.
 
+### Record study state and continue learning
+
+`PUT /api/v1/student/content-items/{id}/study-state` records an access-checked
+open event. The server always writes `lastOpenedAt`; send a non-negative
+`playbackPositionSeconds` to save video position or `null` to clear it.
+
+`GET /api/v1/student/learning/continue` returns `{ "data": null }` until the
+student has opened accessible content. Afterwards it returns the latest still
+accessible item, its subject/course/chapter/lesson/section context, subject
+progress, cover image ID, and saved study state. It never returns stale data
+for expired, revoked, unpublished, or inaccessible content.
+
 ### Obtain an asset URL
 
 Both asset routes first verify that `assetId` is attached to `contentItemId`.
 They return a temporary delivery credential, not the asset bytes.
 
-| Route | Who can call it | When to use it |
-| --- | --- | --- |
-| `GET /api/v1/catalog/content-items/{contentItemId}/assets/{assetId}/access` | Anyone | The content item is public. |
+| Route                                                                       | Who can call it         | When to use it                                                                     |
+| --------------------------------------------------------------------------- | ----------------------- | ---------------------------------------------------------------------------------- |
+| `GET /api/v1/catalog/content-items/{contentItemId}/assets/{assetId}/access` | Anyone                  | The content item is public.                                                        |
 | `GET /api/v1/student/content-items/{contentItemId}/assets/{assetId}/access` | Authenticated `STUDENT` | The item is protected and the student is entitled; it also works for public items. |
 
 Public PDF request and response from the report:
@@ -148,6 +165,20 @@ curl "$BASE_URL/api/v1/catalog/content-items/cmsgdg5vj018fr301zyy5ishc/assets/cm
   "expiresAt": "2026-08-05T17:44:24.655Z"
 }
 ```
+
+### My Subjects and hierarchy search
+
+**`GET /api/v1/student/my-subjects`** is the subscribed-subjects view. It is
+paginated (`page`, `limit`) and derives each subject from active course/chapter
+entitlements across the student's library. Each row has a subject cover,
+active entitlement summaries, and backend-calculated progress for accessible
+published content. It does not create a separate subject purchase.
+
+**`GET /api/v1/student/catalog/search?subjectId={id}&q={text}`** searches the
+student's current-grade subject. `types` is an optional comma-separated subset
+of `CHAPTER`, `LESSON`, and `SECTION`; `cursor`/`limit` use the normal cursor
+envelope. Results include safe hierarchy breadcrumbs and existing `access` /
+`isLocked` fields, never protected content bodies or asset URLs.
 
 Entitled-student PDF request and response:
 
@@ -196,14 +227,16 @@ curl "$BASE_URL/api/v1/catalog/subjects?academicGradeId=cmsgdexml0161r301l6a8vj7
 
 ```json
 {
-  "data": [{
-    "id": "cmsgdexse0165r3013psj60wl",
-    "title": "Subject journey-20260805173810-49ee-21",
-    "slug": "subject-journey-20260805173810-49ee-22",
-    "description": null,
-    "sortOrder": 1,
-    "coverAssetId": null
-  }],
+  "data": [
+    {
+      "id": "cmsgdexse0165r3013psj60wl",
+      "title": "Subject journey-20260805173810-49ee-21",
+      "slug": "subject-journey-20260805173810-49ee-22",
+      "description": null,
+      "sortOrder": 1,
+      "coverAssetId": null
+    }
+  ],
   "meta": { "page": 1, "limit": 20, "total": 1, "totalPages": 1 }
 }
 ```
@@ -217,23 +250,26 @@ curl "$BASE_URL/api/v1/catalog/courses?subjectId=cmsgdexse0165r3013psj60wl"
 
 ```json
 {
-  "data": [{
-    "id": "cmsgdexy60169r3013al8lihd",
-    "title": "Course journey-20260805173810-49ee-23",
-    "slug": "course-journey-20260805173810-49ee-24",
-    "description": null,
-    "sortOrder": 1,
-    "coverAssetId": null,
-    "accessType": "PUBLIC"
-  }, {
-    "id": "cmsgdhpnu019er3017n86frdd",
-    "title": "Catalog paid course journey-20260805173810-49ee-51",
-    "slug": "catalog-paid-course-journey-20260805173810-49ee-52",
-    "description": null,
-    "sortOrder": 2,
-    "coverAssetId": null,
-    "accessType": "PAID"
-  }],
+  "data": [
+    {
+      "id": "cmsgdexy60169r3013al8lihd",
+      "title": "Course journey-20260805173810-49ee-23",
+      "slug": "course-journey-20260805173810-49ee-24",
+      "description": null,
+      "sortOrder": 1,
+      "coverAssetId": null,
+      "accessType": "PUBLIC"
+    },
+    {
+      "id": "cmsgdhpnu019er3017n86frdd",
+      "title": "Catalog paid course journey-20260805173810-49ee-51",
+      "slug": "catalog-paid-course-journey-20260805173810-49ee-52",
+      "description": null,
+      "sortOrder": 2,
+      "coverAssetId": null,
+      "accessType": "PAID"
+    }
+  ],
   "meta": { "page": 1, "limit": 20, "total": 2, "totalPages": 1 }
 }
 ```
@@ -253,8 +289,19 @@ curl "$BASE_URL/api/v1/catalog/courses/cmsgdhpnu019er3017n86frdd"
   "sortOrder": 2,
   "coverAssetId": null,
   "accessType": "PAID",
-  "subject": { "id": "cmsgdexse0165r3013psj60wl", "title": "Subject journey-20260805173810-49ee-21", "slug": "subject-journey-20260805173810-49ee-22", "sortOrder": 1, "coverAssetId": null },
-  "academicGrade": { "id": "cmsgdexml0161r301l6a8vj7u", "slug": "grade-journey-20260805173810-49ee-20", "sortOrder": 89, "coverAssetId": null }
+  "subject": {
+    "id": "cmsgdexse0165r3013psj60wl",
+    "title": "Subject journey-20260805173810-49ee-21",
+    "slug": "subject-journey-20260805173810-49ee-22",
+    "sortOrder": 1,
+    "coverAssetId": null
+  },
+  "academicGrade": {
+    "id": "cmsgdexml0161r301l6a8vj7u",
+    "slug": "grade-journey-20260805173810-49ee-20",
+    "sortOrder": 89,
+    "coverAssetId": null
+  }
 }
 ```
 
@@ -264,11 +311,11 @@ permission decision.
 
 ### Hierarchy and content previews
 
-| Purpose | Route |
-| --- | --- |
-| Chapters directly in a course | `GET /api/v1/catalog/courses/{id}/chapters` |
-| Lessons directly in a chapter | `GET /api/v1/catalog/chapters/{id}/lessons` |
-| Sections directly in a lesson | `GET /api/v1/catalog/lessons/{id}/sections` |
+| Purpose                           | Route                                               |
+| --------------------------------- | --------------------------------------------------- |
+| Chapters directly in a course     | `GET /api/v1/catalog/courses/{id}/chapters`         |
+| Lessons directly in a chapter     | `GET /api/v1/catalog/chapters/{id}/lessons`         |
+| Sections directly in a lesson     | `GET /api/v1/catalog/lessons/{id}/sections`         |
 | Content placed directly on a node | `GET /api/v1/catalog/{resource}/{id}/content-items` |
 
 For the generic content route, `resource` must be exactly one of `courses`,
@@ -296,15 +343,17 @@ from the report:
     "coverAssetId": null,
     "accessType": "PAID"
   },
-  "data": [{
-    "id": "cmsgdhpz4019kr301ktl1bl8i",
-    "type": "TEXT",
-    "title": "Catalog paid lesson journey-20260805173810-49ee-53",
-    "description": null,
-    "estimatedDuration": null,
-    "accessType": "INHERIT",
-    "sortOrder": 1
-  }],
+  "data": [
+    {
+      "id": "cmsgdhpz4019kr301ktl1bl8i",
+      "type": "TEXT",
+      "title": "Catalog paid lesson journey-20260805173810-49ee-53",
+      "description": null,
+      "estimatedDuration": null,
+      "accessType": "INHERIT",
+      "sortOrder": 1
+    }
+  ],
   "pageInfo": { "hasNextPage": false, "nextCursor": null }
 }
 ```
@@ -314,8 +363,19 @@ for example `GET .../courses/{id}/chapters` returned:
 
 ```json
 {
-  "parent": { "id": "cmsgdexy60169r3013al8lihd", "title": "Covered courses journey-20260805173810-49ee-83", "accessType": "PAID" },
-  "data": [{ "id": "cmsgdey37016dr301ekdz58iy", "title": "Covered chapters journey-20260805173810-49ee-84", "sortOrder": 1, "accessType": "INHERIT" }],
+  "parent": {
+    "id": "cmsgdexy60169r3013al8lihd",
+    "title": "Covered courses journey-20260805173810-49ee-83",
+    "accessType": "PAID"
+  },
+  "data": [
+    {
+      "id": "cmsgdey37016dr301ekdz58iy",
+      "title": "Covered chapters journey-20260805173810-49ee-84",
+      "sortOrder": 1,
+      "accessType": "INHERIT"
+    }
+  ],
   "pageInfo": { "hasNextPage": false, "nextCursor": null }
 }
 ```
@@ -340,7 +400,10 @@ curl -H "Authorization: Bearer $STUDENT_TOKEN" "$BASE_URL/api/v1/student/catalog
 {
   "academicGrade": {
     "id": "cmsgdhqzg019wr301kyrzrtwo",
-    "title": { "ar": "Student catalog grade journey-20260805173810-49ee-54", "en": "Student catalog grade journey-20260805173810-49ee-54" },
+    "title": {
+      "ar": "Student catalog grade journey-20260805173810-49ee-54",
+      "en": "Student catalog grade journey-20260805173810-49ee-54"
+    },
     "slug": "student-catalog-grade-journey-20260805173810-49ee-55",
     "description": { "ar": null, "en": null },
     "sortOrder": 92,
@@ -360,7 +423,16 @@ curl -H "Authorization: Bearer $STUDENT_TOKEN" \
 
 ```json
 {
-  "data": [{ "id": "cmsgdhr5801a0r301g3rreijn", "title": "Student catalog subject journey-20260805173810-49ee-56", "slug": "student-catalog-subject-journey-20260805173810-49ee-57", "description": null, "sortOrder": 1, "coverAssetId": null }],
+  "data": [
+    {
+      "id": "cmsgdhr5801a0r301g3rreijn",
+      "title": "Student catalog subject journey-20260805173810-49ee-56",
+      "slug": "student-catalog-subject-journey-20260805173810-49ee-57",
+      "description": null,
+      "sortOrder": 1,
+      "coverAssetId": null
+    }
+  ],
   "meta": { "page": 1, "limit": 20, "total": 1, "totalPages": 1 }
 }
 ```
@@ -378,15 +450,20 @@ curl -H "Authorization: Bearer $STUDENT_TOKEN" \
 
 ```json
 {
-  "data": [{
-    "id": "cmsgdhrax01a4r301rca5izra",
-    "title": "Student catalog paid course journey-20260805173810-49ee-58",
-    "slug": "student-catalog-paid-course-journey-20260805173810-49ee-59",
-    "sortOrder": 1,
-    "coverAssetId": null,
-    "access": { "state": "PURCHASABLE", "price": { "amountMinor": 20000, "currency": "EGP" } },
-    "isLocked": true
-  }],
+  "data": [
+    {
+      "id": "cmsgdhrax01a4r301rca5izra",
+      "title": "Student catalog paid course journey-20260805173810-49ee-58",
+      "slug": "student-catalog-paid-course-journey-20260805173810-49ee-59",
+      "sortOrder": 1,
+      "coverAssetId": null,
+      "access": {
+        "state": "PURCHASABLE",
+        "price": { "amountMinor": 20000, "currency": "EGP" }
+      },
+      "isLocked": true
+    }
+  ],
   "meta": { "page": 1, "limit": 20, "total": 1, "totalPages": 1 }
 }
 ```
@@ -410,20 +487,29 @@ Representative response (the report's course object has this exact shape):
   "description": null,
   "sortOrder": 1,
   "coverAssetId": null,
-  "access": { "state": "PURCHASABLE", "price": { "amountMinor": 20000, "currency": "EGP" } },
+  "access": {
+    "state": "PURCHASABLE",
+    "price": { "amountMinor": 20000, "currency": "EGP" }
+  },
   "isLocked": true,
-  "subject": { "id": "cmsgdhr5801a0r301g3rreijn", "title": "Student catalog subject journey-20260805173810-49ee-56", "slug": "student-catalog-subject-journey-20260805173810-49ee-57", "sortOrder": 1, "coverAssetId": null }
+  "subject": {
+    "id": "cmsgdhr5801a0r301g3rreijn",
+    "title": "Student catalog subject journey-20260805173810-49ee-56",
+    "slug": "student-catalog-subject-journey-20260805173810-49ee-57",
+    "sortOrder": 1,
+    "coverAssetId": null
+  }
 }
 ```
 
 Access states should be rendered as follows:
 
-| State | Meaning for the client |
-| --- | --- |
-| `PUBLIC` or `FREE` | The student can open it. |
-| `ENTITLED` | The student can open it using the listed entitlement; `expiresAt` may be present. |
-| `PURCHASABLE` | Show price/purchase UI; delivery is locked. |
-| `LOCKED` | Delivery is locked and no purchasable price is available at that node. |
+| State              | Meaning for the client                                                            |
+| ------------------ | --------------------------------------------------------------------------------- |
+| `PUBLIC` or `FREE` | The student can open it.                                                          |
+| `ENTITLED`         | The student can open it using the listed entitlement; `expiresAt` may be present. |
+| `PURCHASABLE`      | Show price/purchase UI; delivery is locked.                                       |
+| `LOCKED`           | Delivery is locked and no purchasable price is available at that node.            |
 
 After a chapter entitlement was granted in the report, the same chapter changed
 from `PURCHASABLE`/`isLocked: true` to:
@@ -442,11 +528,11 @@ from `PURCHASABLE`/`isLocked: true` to:
 
 ### Student hierarchy and student content previews
 
-| Purpose | Route |
-| --- | --- |
-| Chapters in a grade-scoped course | `GET /api/v1/student/catalog/courses/{courseId}/chapters` |
-| Lessons in a grade-scoped chapter | `GET /api/v1/student/catalog/chapters/{chapterId}/lessons` |
-| Sections in a grade-scoped lesson | `GET /api/v1/student/catalog/lessons/{lessonId}/sections` |
+| Purpose                            | Route                                                       |
+| ---------------------------------- | ----------------------------------------------------------- |
+| Chapters in a grade-scoped course  | `GET /api/v1/student/catalog/courses/{courseId}/chapters`   |
+| Lessons in a grade-scoped chapter  | `GET /api/v1/student/catalog/chapters/{chapterId}/lessons`  |
+| Sections in a grade-scoped lesson  | `GET /api/v1/student/catalog/lessons/{lessonId}/sections`   |
 | Previews placed directly on a node | `GET /api/v1/student/catalog/{resource}/{id}/content-items` |
 
 All accept optional cursor-pagination query parameters, `cursor` and `limit`.
@@ -468,18 +554,30 @@ The second call returned this entitlement-aware preview envelope:
   "parent": {
     "id": "cmsgdhrgu01a8r301sbh8u018",
     "title": "Entitled chapter journey-20260805173810-49ee-60",
-    "access": { "state": "ENTITLED", "entitlementId": "cmsgdhv2401bhr3016xrc5ghp", "expiresAt": null, "price": { "amountMinor": 20000, "currency": "EGP" } },
+    "access": {
+      "state": "ENTITLED",
+      "entitlementId": "cmsgdhv2401bhr3016xrc5ghp",
+      "expiresAt": null,
+      "price": { "amountMinor": 20000, "currency": "EGP" }
+    },
     "isLocked": false
   },
-  "data": [{
-    "id": "cmsgdhs6t01aor301kimylvkr",
-    "type": "TEXT",
-    "title": "Entitled chapter content journey-20260805173810-49ee-68",
-    "estimatedDuration": null,
-    "sortOrder": 1,
-    "access": { "state": "ENTITLED", "entitlementId": "cmsgdhv2401bhr3016xrc5ghp", "expiresAt": null, "price": { "amountMinor": 20000, "currency": "EGP" } },
-    "isLocked": false
-  }],
+  "data": [
+    {
+      "id": "cmsgdhs6t01aor301kimylvkr",
+      "type": "TEXT",
+      "title": "Entitled chapter content journey-20260805173810-49ee-68",
+      "estimatedDuration": null,
+      "sortOrder": 1,
+      "access": {
+        "state": "ENTITLED",
+        "entitlementId": "cmsgdhv2401bhr3016xrc5ghp",
+        "expiresAt": null,
+        "price": { "amountMinor": 20000, "currency": "EGP" }
+      },
+      "isLocked": false
+    }
+  ],
   "pageInfo": { "hasNextPage": false, "nextCursor": null }
 }
 ```
@@ -500,16 +598,49 @@ curl -H "Authorization: Bearer $STUDENT_TOKEN" "$BASE_URL/api/v1/student/library
 
 ```json
 {
-  "data": [{
-    "entitlementId": "cmsgdhv2401bhr3016xrc5ghp",
-    "targetType": "CHAPTER",
-    "target": { "id": "cmsgdhrgu01a8r301sbh8u018", "title": "Entitled chapter journey-20260805173810-49ee-60", "slug": "entitled-chapter-journey-20260805173810-49ee-61", "description": null, "sortOrder": 1, "coverAssetId": null },
-    "course": { "id": "cmsgdhrax01a4r301rca5izra", "title": "Student catalog paid course journey-20260805173810-49ee-58", "slug": "student-catalog-paid-course-journey-20260805173810-49ee-59", "description": null, "sortOrder": 1, "coverAssetId": null },
-    "subject": { "id": "cmsgdhr5801a0r301g3rreijn", "title": "Student catalog subject journey-20260805173810-49ee-56", "slug": "student-catalog-subject-journey-20260805173810-49ee-57", "description": null, "sortOrder": 1, "coverAssetId": null },
-    "academicGrade": { "id": "cmsgdhqzg019wr301kyrzrtwo", "title": { "ar": "Student catalog grade journey-20260805173810-49ee-54", "en": "Student catalog grade journey-20260805173810-49ee-54" }, "slug": "student-catalog-grade-journey-20260805173810-49ee-55", "description": { "ar": null, "en": null }, "sortOrder": 92, "coverAssetId": null },
-    "startsAt": "2026-08-05T17:40:42.748Z",
-    "expiresAt": null
-  }]
+  "data": [
+    {
+      "entitlementId": "cmsgdhv2401bhr3016xrc5ghp",
+      "targetType": "CHAPTER",
+      "target": {
+        "id": "cmsgdhrgu01a8r301sbh8u018",
+        "title": "Entitled chapter journey-20260805173810-49ee-60",
+        "slug": "entitled-chapter-journey-20260805173810-49ee-61",
+        "description": null,
+        "sortOrder": 1,
+        "coverAssetId": null
+      },
+      "course": {
+        "id": "cmsgdhrax01a4r301rca5izra",
+        "title": "Student catalog paid course journey-20260805173810-49ee-58",
+        "slug": "student-catalog-paid-course-journey-20260805173810-49ee-59",
+        "description": null,
+        "sortOrder": 1,
+        "coverAssetId": null
+      },
+      "subject": {
+        "id": "cmsgdhr5801a0r301g3rreijn",
+        "title": "Student catalog subject journey-20260805173810-49ee-56",
+        "slug": "student-catalog-subject-journey-20260805173810-49ee-57",
+        "description": null,
+        "sortOrder": 1,
+        "coverAssetId": null
+      },
+      "academicGrade": {
+        "id": "cmsgdhqzg019wr301kyrzrtwo",
+        "title": {
+          "ar": "Student catalog grade journey-20260805173810-49ee-54",
+          "en": "Student catalog grade journey-20260805173810-49ee-54"
+        },
+        "slug": "student-catalog-grade-journey-20260805173810-49ee-55",
+        "description": { "ar": null, "en": null },
+        "sortOrder": 92,
+        "coverAssetId": null
+      },
+      "startsAt": "2026-08-05T17:40:42.748Z",
+      "expiresAt": null
+    }
+  ]
 }
 ```
 
@@ -524,18 +655,20 @@ curl -H "Authorization: Bearer $STUDENT_TOKEN" \
 
 ```json
 {
-  "data": [{
-    "id": "cmsgdhv2401bhr3016xrc5ghp",
-    "courseId": null,
-    "chapterId": "cmsgdhrgu01a8r301sbh8u018",
-    "source": "ADMIN",
-    "status": "ACTIVE",
-    "startsAt": "2026-08-05T17:40:42.748Z",
-    "expiresAt": null,
-    "createdAt": "2026-08-05T17:40:42.748Z",
-    "targetType": "CHAPTER",
-    "targetId": "cmsgdhrgu01a8r301sbh8u018"
-  }],
+  "data": [
+    {
+      "id": "cmsgdhv2401bhr3016xrc5ghp",
+      "courseId": null,
+      "chapterId": "cmsgdhrgu01a8r301sbh8u018",
+      "source": "ADMIN",
+      "status": "ACTIVE",
+      "startsAt": "2026-08-05T17:40:42.748Z",
+      "expiresAt": null,
+      "createdAt": "2026-08-05T17:40:42.748Z",
+      "targetType": "CHAPTER",
+      "targetId": "cmsgdhrgu01a8r301sbh8u018"
+    }
+  ],
   "meta": { "page": 1, "limit": 1, "total": 1, "totalPages": 1 }
 }
 ```
@@ -547,10 +680,12 @@ curl -H "Authorization: Bearer $STUDENT_TOKEN" \
 2. After student login, start at `/student/catalog`, browse its hierarchy, and
    render `access`/`isLocked` exactly as returned.
 3. On an unlocked item, request `/student/content-items/{id}`. This is the
-   authoritative access check and returns student progress.
+   authoritative access check and returns student progress and study state;
+   record opens/resume positions with `/student/content-items/{id}/study-state`.
 4. If the item has `primaryAsset` or `attachments`, request the matching
    student asset `/access` endpoint immediately before opening/downloading it.
-5. Use `/student/library` for a cross-grade “My library” screen and
+5. Use `/student/my-subjects` for the subscribed-subjects screen,
+   `/student/library` for a cross-grade “My library” screen, and
    `/student/entitlements` for the underlying active grants.
 
 Common causes of an error are a non-published ID, a hierarchy record belonging
