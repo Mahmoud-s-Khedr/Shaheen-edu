@@ -79,6 +79,586 @@ No path, query, or header input.
 
 ### `POST /api/v1/student/orders/{orderId}/payment-submissions/{submissionId}/resubmit`
 
+## Assessments
+
+### `POST /api/v1/student/assessments`
+
+**Authorization:** Bearer token; role must be `STUDENT`
+
+**Request**
+
+No path, query, or header input.
+
+```json
+{
+  "scopes": [
+    {
+      "courseId?": "string",
+      "chapterId?": "string",
+      "lessonId?": "string",
+      "sectionId?": "string"
+    }
+  ],
+  "questionCount": "number (1-50)",
+  "mode?": "TUTOR | EXAM (default EXAM)",
+  "isTimed?": "boolean (default false)",
+  "durationSeconds?": "number (required when isTimed is true)",
+  "title?": "string"
+}
+```
+
+**Success response — HTTP 201 (AssessmentDetailDto)**
+
+```json
+{
+  "id": "string",
+  "title": "string",
+  "visibility": "MINE | PUBLIC",
+  "generationType": "string",
+  "mode": "string",
+  "isTimed": "boolean",
+  "durationSeconds?": "number | null",
+  "questionCount": "number",
+  "createdAt": "ISO-8601 date-time",
+  "attemptStatus?": "string | null",
+  "score?": "number | null",
+  "scopes": [
+    {
+      "courseId?": "string",
+      "chapterId?": "string",
+      "lessonId?": "string",
+      "sectionId?": "string"
+    }
+  ]
+}
+```
+
+### `GET /api/v1/student/assessments`
+
+**Authorization:** Bearer token; role must be `STUDENT`
+
+**Request**
+
+- query `page` (optional)
+- query `limit` (optional)
+- query `status` (optional; ALL | SUSPENDED | COMPLETED — filters by the student's own attempt status)
+- query `search` (optional)
+
+**Success response — HTTP 200 (PaginatedAssessmentsResponseDto)**
+
+```json
+{
+  "data": [
+    {
+      "id": "string",
+      "title": "string",
+      "visibility": "MINE | PUBLIC",
+      "generationType": "string",
+      "mode": "string",
+      "isTimed": "boolean",
+      "durationSeconds?": "number | null",
+      "questionCount": "number",
+      "createdAt": "ISO-8601 date-time",
+      "attemptStatus?": "string | null",
+      "score?": "number | null"
+    }
+  ],
+  "meta": {
+    "page": "number",
+    "limit": "number",
+    "total": "number",
+    "totalPages": "number"
+  }
+}
+```
+
+### `GET /api/v1/student/assessments/{id}`
+
+**Authorization:** Bearer token; role must be `STUDENT`
+
+**Request**
+
+- path `id` (required)
+
+**Success response — HTTP 200 (AssessmentDetailDto)**
+
+```json
+{
+  "id": "string",
+  "title": "string",
+  "visibility": "MINE | PUBLIC",
+  "generationType": "string",
+  "mode": "string",
+  "isTimed": "boolean",
+  "durationSeconds?": "number | null",
+  "questionCount": "number",
+  "createdAt": "ISO-8601 date-time",
+  "attemptStatus?": "string | null",
+  "score?": "number | null",
+  "scopes": [
+    {
+      "courseId?": "string",
+      "chapterId?": "string",
+      "lessonId?": "string",
+      "sectionId?": "string"
+    }
+  ]
+}
+```
+
+### `PATCH /api/v1/student/assessments/{id}`
+
+**Authorization:** Bearer token; role must be `STUDENT`
+
+**Request**
+
+- path `id` (required)
+
+```json
+{
+  "title": "string"
+}
+```
+
+**Success response — HTTP 200 (AssessmentDetailDto)**
+
+```json
+{
+  "id": "string",
+  "title": "string",
+  "visibility": "MINE | PUBLIC",
+  "generationType": "string",
+  "mode": "string",
+  "isTimed": "boolean",
+  "durationSeconds?": "number | null",
+  "questionCount": "number",
+  "createdAt": "ISO-8601 date-time",
+  "attemptStatus?": "string | null",
+  "score?": "number | null",
+  "scopes": [
+    {
+      "courseId?": "string",
+      "chapterId?": "string",
+      "lessonId?": "string",
+      "sectionId?": "string"
+    }
+  ]
+}
+```
+
+### `DELETE /api/v1/student/assessments/{id}`
+
+**Authorization:** Bearer token; role must be `STUDENT`
+
+**Request**
+
+- path `id` (required)
+
+**Success response — HTTP 200 (IdDeletedResponseDto)**
+
+```json
+{
+  "id": "string",
+  "deleted": "boolean"
+}
+```
+
+### `POST /api/v1/student/assessments/{id}/attempts/start`
+
+**Authorization:** Bearer token; role must be `STUDENT`
+
+**Request**
+
+- path `id` (required)
+
+No path, query, or header input beyond `id`.
+
+**Success response — HTTP 201 (AssessmentAttemptStateDto)**
+
+```json
+{
+  "attemptId": "string",
+  "status": "string",
+  "startedAt": "ISO-8601 date-time",
+  "expiresAt?": "ISO-8601 date-time | null",
+  "submittedAt?": "ISO-8601 date-time | null",
+  "score?": "number | null",
+  "totalQuestions": "number",
+  "mode": "string",
+  "questions": [
+    {
+      "id": "string",
+      "sortOrder": "number",
+      "type": "string",
+      "body": "string",
+      "options": [
+        {
+          "id": "string",
+          "body": "string",
+          "sortOrder": "number"
+        }
+      ],
+      "selectedOptionIds": ["string"],
+      "answered": "boolean",
+      "isCorrect?": "boolean | null",
+      "correctOptionIds?": "string[] | null",
+      "explanation?": "string | null"
+    }
+  ]
+}
+```
+
+### `GET /api/v1/student/assessments/{id}/attempts/current`
+
+**Authorization:** Bearer token; role must be `STUDENT`
+
+**Request**
+
+- path `id` (required)
+
+**Success response — HTTP 200 (AssessmentAttemptStateDto)**
+
+```json
+{
+  "attemptId": "string",
+  "status": "string",
+  "startedAt": "ISO-8601 date-time",
+  "expiresAt?": "ISO-8601 date-time | null",
+  "submittedAt?": "ISO-8601 date-time | null",
+  "score?": "number | null",
+  "totalQuestions": "number",
+  "mode": "string",
+  "questions": [
+    {
+      "id": "string",
+      "sortOrder": "number",
+      "type": "string",
+      "body": "string",
+      "options": [
+        {
+          "id": "string",
+          "body": "string",
+          "sortOrder": "number"
+        }
+      ],
+      "selectedOptionIds": ["string"],
+      "answered": "boolean",
+      "isCorrect?": "boolean | null",
+      "correctOptionIds?": "string[] | null",
+      "explanation?": "string | null"
+    }
+  ]
+}
+```
+
+### `POST /api/v1/student/assessments/{id}/attempts/current/answers/{questionId}`
+
+**Authorization:** Bearer token; role must be `STUDENT`
+
+**Request**
+
+- path `id` (required)
+- path `questionId` (required)
+
+```json
+{
+  "selectedOptionIds": ["string"]
+}
+```
+
+**Success response — HTTP 201**
+
+No response body.
+
+### `POST /api/v1/student/assessments/{id}/attempts/current/submit`
+
+**Authorization:** Bearer token; role must be `STUDENT`
+
+**Request**
+
+- path `id` (required)
+
+**Success response — HTTP 201**
+
+No response body.
+
+### `GET /api/v1/student/assessments/{id}/attempts/current/result`
+
+**Authorization:** Bearer token; role must be `STUDENT`
+
+**Request**
+
+- path `id` (required)
+
+**Success response — HTTP 200 (AssessmentResultDto)**
+
+```json
+{
+  "attemptId": "string",
+  "score": "number",
+  "totalQuestions": "number",
+  "submittedAt?": "ISO-8601 date-time | null",
+  "questions": "[[object Object]]"
+}
+```
+
+### `POST /api/v1/admin/assessments/standard`
+
+**Authorization:** Bearer token; role must be `ADMIN` or `SUPER_ADMIN`
+
+**Request**
+
+No path, query, or header input.
+
+```json
+{
+  "scopes": [
+    {
+      "courseId?": "string",
+      "chapterId?": "string",
+      "lessonId?": "string",
+      "sectionId?": "string"
+    }
+  ],
+  "questionCount": "number (1-50)",
+  "mode?": "TUTOR | EXAM (default EXAM)",
+  "isTimed?": "boolean (default false)",
+  "durationSeconds?": "number (required when isTimed is true)",
+  "title?": "string"
+}
+```
+
+**Success response — HTTP 201 (AdminAssessmentListItemDto)**
+
+```json
+{
+  "id": "string",
+  "title": "string",
+  "generationType": "string",
+  "mode": "string",
+  "isTimed": "boolean",
+  "durationSeconds?": "number | null",
+  "questionCount": "number",
+  "status": "string",
+  "createdAt": "ISO-8601 date-time",
+  "publishedAt?": "ISO-8601 date-time | null",
+  "archivedAt?": "ISO-8601 date-time | null"
+}
+```
+
+### `POST /api/v1/admin/assessments/custom`
+
+**Authorization:** Bearer token; role must be `ADMIN` or `SUPER_ADMIN`
+
+**Request**
+
+No path, query, or header input.
+
+```json
+{
+  "questionIds": ["string"],
+  "scopes": [
+    {
+      "courseId?": "string",
+      "chapterId?": "string",
+      "lessonId?": "string",
+      "sectionId?": "string"
+    }
+  ],
+  "mode?": "TUTOR | EXAM (default EXAM)",
+  "isTimed?": "boolean (default false)",
+  "durationSeconds?": "number (required when isTimed is true)",
+  "title?": "string"
+}
+```
+
+**Success response — HTTP 201 (AdminAssessmentListItemDto)**
+
+```json
+{
+  "id": "string",
+  "title": "string",
+  "generationType": "string",
+  "mode": "string",
+  "isTimed": "boolean",
+  "durationSeconds?": "number | null",
+  "questionCount": "number",
+  "status": "string",
+  "createdAt": "ISO-8601 date-time",
+  "publishedAt?": "ISO-8601 date-time | null",
+  "archivedAt?": "ISO-8601 date-time | null"
+}
+```
+
+### `GET /api/v1/admin/assessments`
+
+**Authorization:** Bearer token; role must be `ADMIN` or `SUPER_ADMIN`
+
+**Request**
+
+- query `page` (optional)
+- query `limit` (optional)
+- query `status` (optional; DRAFT | READY | ARCHIVED)
+- query `search` (optional)
+
+**Success response — HTTP 200 (PaginatedAdminAssessmentsResponseDto)**
+
+```json
+{
+  "data": [
+    {
+      "id": "string",
+      "title": "string",
+      "generationType": "string",
+      "mode": "string",
+      "isTimed": "boolean",
+      "durationSeconds?": "number | null",
+      "questionCount": "number",
+      "status": "string",
+      "createdAt": "ISO-8601 date-time",
+      "publishedAt?": "ISO-8601 date-time | null",
+      "archivedAt?": "ISO-8601 date-time | null"
+    }
+  ],
+  "meta": {
+    "page": "number",
+    "limit": "number",
+    "total": "number",
+    "totalPages": "number"
+  }
+}
+```
+
+### `GET /api/v1/admin/assessments/{id}`
+
+**Authorization:** Bearer token; role must be `ADMIN` or `SUPER_ADMIN`
+
+**Request**
+
+- path `id` (required)
+
+**Success response — HTTP 200 (AdminAssessmentListItemDto)**
+
+```json
+{
+  "id": "string",
+  "title": "string",
+  "generationType": "string",
+  "mode": "string",
+  "isTimed": "boolean",
+  "durationSeconds?": "number | null",
+  "questionCount": "number",
+  "status": "string",
+  "createdAt": "ISO-8601 date-time",
+  "publishedAt?": "ISO-8601 date-time | null",
+  "archivedAt?": "ISO-8601 date-time | null"
+}
+```
+
+### `PATCH /api/v1/admin/assessments/{id}`
+
+**Authorization:** Bearer token; role must be `ADMIN` or `SUPER_ADMIN`
+
+**Request**
+
+- path `id` (required)
+
+```json
+{
+  "title?": "string",
+  "mode?": "TUTOR | EXAM",
+  "isTimed?": "boolean",
+  "durationSeconds?": "number"
+}
+```
+
+**Success response — HTTP 200 (AdminAssessmentListItemDto)**
+
+```json
+{
+  "id": "string",
+  "title": "string",
+  "generationType": "string",
+  "mode": "string",
+  "isTimed": "boolean",
+  "durationSeconds?": "number | null",
+  "questionCount": "number",
+  "status": "string",
+  "createdAt": "ISO-8601 date-time",
+  "publishedAt?": "ISO-8601 date-time | null",
+  "archivedAt?": "ISO-8601 date-time | null"
+}
+```
+
+### `POST /api/v1/admin/assessments/{id}/publish`
+
+**Authorization:** Bearer token; role must be `ADMIN` or `SUPER_ADMIN`
+
+**Request**
+
+- path `id` (required)
+
+**Success response — HTTP 201 (AdminAssessmentListItemDto)**
+
+```json
+{
+  "id": "string",
+  "title": "string",
+  "generationType": "string",
+  "mode": "string",
+  "isTimed": "boolean",
+  "durationSeconds?": "number | null",
+  "questionCount": "number",
+  "status": "string",
+  "createdAt": "ISO-8601 date-time",
+  "publishedAt?": "ISO-8601 date-time | null",
+  "archivedAt?": "ISO-8601 date-time | null"
+}
+```
+
+### `POST /api/v1/admin/assessments/{id}/archive`
+
+**Authorization:** Bearer token; role must be `ADMIN` or `SUPER_ADMIN`
+
+**Request**
+
+- path `id` (required)
+
+**Success response — HTTP 201 (AdminAssessmentListItemDto)**
+
+```json
+{
+  "id": "string",
+  "title": "string",
+  "generationType": "string",
+  "mode": "string",
+  "isTimed": "boolean",
+  "durationSeconds?": "number | null",
+  "questionCount": "number",
+  "status": "string",
+  "createdAt": "ISO-8601 date-time",
+  "publishedAt?": "ISO-8601 date-time | null",
+  "archivedAt?": "ISO-8601 date-time | null"
+}
+```
+
+### `DELETE /api/v1/admin/assessments/{id}`
+
+**Authorization:** Bearer token; role must be `ADMIN` or `SUPER_ADMIN`
+
+**Request**
+
+- path `id` (required)
+
+**Success response — HTTP 200 (IdDeletedResponseDto)**
+
+```json
+{
+  "id": "string",
+  "deleted": "boolean"
+}
+```
+
 ## Authentication
 
 ### `POST /api/v1/auth/students/register`
