@@ -11,6 +11,14 @@ export class AssessmentScopeDto {
   @ApiPropertyOptional() @IsOptional() @IsString() sectionId?: string;
 }
 
+/** A persisted scope has exactly one target; the other hierarchy IDs are null. */
+export class AssessmentScopeResponseDto {
+  @ApiPropertyOptional({ type: String, nullable: true }) courseId!: string | null;
+  @ApiPropertyOptional({ type: String, nullable: true }) chapterId!: string | null;
+  @ApiPropertyOptional({ type: String, nullable: true }) lessonId!: string | null;
+  @ApiPropertyOptional({ type: String, nullable: true }) sectionId!: string | null;
+}
+
 export class GenerateStandardAssessmentDto {
   @ApiProperty({ type: [AssessmentScopeDto] }) @IsArray() @ArrayMinSize(1) @ValidateNested({ each: true }) @Type(() => AssessmentScopeDto) scopes!: AssessmentScopeDto[];
   @ApiProperty({ minimum: 1, maximum: 50 }) @Type(() => Number) @IsInt() @Min(1) @Max(50) questionCount!: number;
@@ -71,7 +79,7 @@ export class PaginatedAssessmentsResponseDto {
 }
 
 export class AssessmentDetailDto extends AssessmentListItemDto {
-  @ApiProperty({ type: [AssessmentScopeDto] }) scopes!: AssessmentScopeDto[];
+  @ApiProperty({ type: [AssessmentScopeResponseDto] }) scopes!: AssessmentScopeResponseDto[];
 }
 
 export class AssessmentAttemptQuestionDto {

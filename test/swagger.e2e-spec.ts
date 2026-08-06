@@ -54,6 +54,10 @@ describe('Swagger (e2e)', () => {
         .courseId,
     ).toMatchObject({ type: 'string', nullable: true });
     expect(
+      document.components.schemas.AssessmentScopeResponseDto.properties
+        .chapterId,
+    ).toMatchObject({ type: 'string', nullable: true });
+    expect(
       document.components.schemas.PartnerSummaryDto.properties.displayName,
     ).toMatchObject({ type: 'string', nullable: true });
     expect(

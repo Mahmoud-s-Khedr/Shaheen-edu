@@ -58,12 +58,24 @@ export const apiCoverageJourney: JourneyDefinition = {
         }), 200);
       }
       const reorder = async (path: string, parent?: Record<string, string>) => {
-        const query = parent ? `?${new URLSearchParams({ ...parent, limit: '100' })}` : '?limit=100';
-        const listed = await admin.request<any>('GET', `/admin/${path}${query}`);
-        expectStatus(listed, 200);
+        const items: any[] = [];
+        let page = 1;
+        let totalPages = 1;
+        do {
+          const query = new URLSearchParams({
+            ...parent,
+            page: String(page),
+            limit: '100',
+          });
+          const listed = await admin.request<any>('GET', `/admin/${path}?${query}`);
+          expectStatus(listed, 200);
+          items.push(...listed.body.data);
+          totalPages = listed.body.meta.totalPages;
+          page += 1;
+        } while (page <= totalPages);
         expectStatus(await admin.request('POST', `/admin/${path}/reorder`, {
           ...parent,
-          items: listed.body.data.map((item: any, index: number) => ({ id: item.id, sortOrder: index + 1 })),
+          items: items.map((item: any, index: number) => ({ id: item.id, sortOrder: index + 1 })),
         }), 201);
       };
       await reorder('academic-grades');
