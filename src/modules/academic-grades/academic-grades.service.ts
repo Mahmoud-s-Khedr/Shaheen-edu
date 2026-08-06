@@ -177,7 +177,9 @@ export class AcademicGradesService {
     this.assertActorRole(actor);
 
     const ids = dto.items.map((item) => item.id);
-    const siblings = await this.prisma.academicGrade.findMany();
+    const siblings = await this.prisma.academicGrade.findMany({
+      where: { status: { not: ContentStatus.ARCHIVED } },
+    });
     assertCompleteSequentialReorder(dto.items, siblings);
 
     const plan = computeTwoPhaseRenumber(dto.items);
