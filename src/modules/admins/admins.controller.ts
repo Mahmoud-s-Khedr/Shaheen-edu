@@ -26,6 +26,7 @@ import { ApiStandardErrors } from '../../common/decorators/api-standard-errors.d
 import {
   AdminSummaryDto,
   PaginatedAdminResponseDto,
+  PasswordResetResponseDto,
 } from '../../common/dto/api-response.dto';
 
 @ApiTags('admin/admins')
@@ -91,5 +92,13 @@ export class AdminsController {
   @ApiStandardErrors(401, 403, 404)
   reactivate(@CurrentUser() actor: RequestUser, @Param('id') id: string) {
     return this.adminsService.reactivate(actor, id);
+  }
+
+  @Post(':id/reset-password')
+  @ApiOperation({ summary: 'Reset an administrator password' })
+  @ApiCreatedResponse({ type: PasswordResetResponseDto })
+  @ApiStandardErrors(401, 403, 404, 409)
+  resetPassword(@CurrentUser() actor: RequestUser, @Param('id') id: string) {
+    return this.adminsService.resetPassword(actor, id);
   }
 }

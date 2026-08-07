@@ -99,6 +99,9 @@ export class AuthUserDto {
 
   @ApiProperty({ example: 'user@example.com' })
   loginIdentifier!: string;
+
+  @ApiPropertyOptional()
+  mustChangePassword?: boolean;
 }
 
 export class AuthTokenResponseDto {
@@ -165,6 +168,9 @@ export class ParentChildDto {
 
   @ApiProperty({ nullable: true })
   center!: string | null;
+
+  @ApiProperty({ enum: AccountStatus })
+  status!: AccountStatus;
 }
 
 export class PaginatedAdminResponseDto {
@@ -206,6 +212,62 @@ export class StudentProfileDto {
 
   @ApiProperty({ type: StudentProfileDetailsDto, nullable: true })
   studentProfile!: StudentProfileDetailsDto | null;
+}
+
+export class AdminStudentSummaryDto {
+  @ApiProperty()
+  id!: string;
+
+  @ApiProperty()
+  fullName!: string;
+
+  @ApiProperty()
+  phone!: string;
+
+  @ApiProperty({ enum: AccountStatus })
+  status!: AccountStatus;
+
+  @ApiProperty({ example: '1234' })
+  nationalIdLast4!: string;
+
+  @ApiProperty({ type: String, nullable: true })
+  academicGradeId!: string | null;
+
+  @ApiProperty({ type: LocalizedResponseTextDto, nullable: true })
+  academicGrade!: LocalizedResponseTextDto | null;
+
+  @ApiProperty({ type: ManagedGeographyReferenceDto, nullable: true })
+  governorate!: ManagedGeographyReferenceDto | null;
+
+  @ApiProperty({ type: ManagedGeographyReferenceDto, nullable: true })
+  center!: ManagedGeographyReferenceDto | null;
+
+  @ApiProperty({ type: String, format: 'date-time' })
+  createdAt!: Date;
+
+  @ApiProperty({ type: String, format: 'date-time', nullable: true })
+  lastLoginAt!: Date | null;
+}
+
+export class AdminStudentDetailDto extends AdminStudentSummaryDto {
+  @ApiProperty({ type: String, format: 'date-time', nullable: true })
+  deletedAt!: Date | null;
+}
+
+export class PaginatedAdminStudentResponseDto {
+  @ApiProperty({ type: [AdminStudentSummaryDto] })
+  data!: AdminStudentSummaryDto[];
+
+  @ApiProperty({ type: PaginationMetaDto })
+  meta!: PaginationMetaDto;
+}
+
+export class PasswordResetResponseDto {
+  @ApiProperty()
+  temporaryPassword!: string;
+
+  @ApiProperty({ type: String, format: 'date-time' })
+  passwordResetAt!: Date;
 }
 
 export class CurrentUserDto extends UserSummaryDto {}

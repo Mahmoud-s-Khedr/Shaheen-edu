@@ -42,5 +42,13 @@ export const studentJourney: JourneyDefinition = {
       const revoked = await clients.public.request<any>('GET', '/auth/me', undefined, { accessToken: second.body.accessToken }); expectStatus(revoked, 401);
       const login = await clients.student.request<any>('POST', '/auth/students/login', { phone, password: newPassword }); expectStatus(login, 201); clients.student.accessToken = login.body.accessToken; context.students[0].password = newPassword; context.students[0].accessToken = login.body.accessToken;
     });
+    await step('Completing an administrator-forced password reset', async () => {
+      const reset = await clients.admin.request<any>('POST', `/admin/students/${context.students[0].id}/reset-password`); expectStatus(reset, 200); assert(typeof reset.body.temporaryPassword === 'string', 'Reset must return a temporary password');
+      const revoked = await clients.public.request<any>('GET', '/auth/me', undefined, { accessToken: context.students[0].accessToken }); expectStatus(revoked, 401);
+      const temporaryLogin = await clients.student.request<any>('POST', '/auth/students/login', { phone, password: reset.body.temporaryPassword }); expectStatus(temporaryLogin, 201); assert(temporaryLogin.body.user.mustChangePassword === true, 'Temporary-password login must require a password change'); clients.student.accessToken = temporaryLogin.body.accessToken;
+      const blocked = await clients.student.request<any>('GET', '/students/me'); expectStatus(blocked, 403);
+      const finalPassword = factory.password('StudentReset'); const changed = await clients.student.request<any>('POST', '/auth/change-password', { oldPassword: reset.body.temporaryPassword, newPassword: finalPassword }); expectStatus(changed, 201);
+      const finalLogin = await clients.student.request<any>('POST', '/auth/students/login', { phone, password: finalPassword }); expectStatus(finalLogin, 201); assert(finalLogin.body.user.mustChangePassword === false, 'Password change must clear the forced-change flag'); clients.student.accessToken = finalLogin.body.accessToken; context.students[0].password = finalPassword; context.students[0].accessToken = finalLogin.body.accessToken;
+    });
   },
 };

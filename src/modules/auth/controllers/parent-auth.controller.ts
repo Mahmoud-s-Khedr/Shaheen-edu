@@ -2,6 +2,7 @@ import {
   Body,
   BadRequestException,
   Controller,
+  ForbiddenException,
   Get,
   Post,
   Query,
@@ -25,6 +26,7 @@ import { CurrentParentSession } from '../../../common/decorators/current-user.de
 import { PrismaService } from '../../../database/prisma.service';
 import { NationalIdService } from '../services/national-id.service';
 import { ParentSessionService } from '../services/parent-session.service';
+import { AccountStatus } from '../../../common/types/roles.enum';
 import { AuthRateLimitService } from '../services/auth-rate-limit.service';
 import { ParentLoginDto } from '../dto/login.dto';
 import { SelectChildDto } from '../dto/select-child.dto';
@@ -170,8 +172,13 @@ export class ParentAuthController {
         fullName: true,
         governorate: true,
         center: true,
+        user: { select: { status: true } },
       },
     });
-    return student;
+    if (!student || student.user.status !== AccountStatus.ACTIVE) {
+      throw new ForbiddenException('Selected child is unavailable');
+    }
+    const { user: _user, ...child } = student;
+    return { ...child, status: _user.status };
   }
 }

@@ -24,6 +24,14 @@ export const parentJourney: JourneyDefinition = {
       const second = await clients.parent.request<any>('POST', '/auth/parents/select-child', { studentUserId: childBId }); expectStatus(second, 201); clients.parent.accessToken = second.body.accessToken;
       const selectedB = await clients.parent.request<any>('GET', '/auth/parents/selected-child'); expectStatus(selectedB, 200); assert(selectedB.body.userId === childBId, 'Child B must replace active child'); context.parent.activeStudentId = selectedB.body.userId;
     });
+    await step('Revoking parent access when the selected child is suspended', async () => {
+      const suspended = await clients.admin.request<any>('POST', `/admin/students/${childBId}/suspend`); expectStatus(suspended, 200);
+      const selected = await clients.parent.request<any>('GET', '/auth/parents/selected-child'); expectStatus(selected, 401);
+      const login = await clients.parent.request<any>('POST', '/auth/parents/login', { nationalId: childA.nationalId, parentPhone }); expectStatus(login, 201); clients.parent.accessToken = login.body.accessToken;
+      const children = await clients.parent.request<any>('GET', '/auth/parents/children'); expectStatus(children, 200); assert(children.body.data.some((entry: any) => entry.userId === childBId && entry.status === 'SUSPENDED'), 'Parent must see the child as suspended');
+      const denied = await clients.parent.request<any>('POST', '/auth/parents/select-child', { studentUserId: childBId }); expectStatus(denied, 403);
+      const reactivated = await clients.admin.request<any>('POST', `/admin/students/${childBId}/reactivate`); expectStatus(reactivated, 200);
+    });
     await step('Rejecting unrelated child selection', async () => { const r = await clients.parent.request<any>('POST', '/auth/parents/select-child', { studentUserId: unrelatedId }); expectStatus(r, 403); });
   },
 };

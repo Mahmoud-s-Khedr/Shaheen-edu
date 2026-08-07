@@ -3,11 +3,13 @@ import {
   ExecutionContext,
   Injectable,
   UnauthorizedException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
 import jwt from 'jsonwebtoken';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
+import { PASSWORD_CHANGE_ALLOWED_KEY } from '../decorators/password-change-allowed.decorator';
 import { PrismaService } from '../../database/prisma.service';
 import { AccountStatus } from '../types/roles.enum';
 import type { UserAccessTokenPayload } from '../types/jwt-payload.types';
@@ -37,6 +39,10 @@ export class UserAuthGuard implements CanActivate {
     if (isPublic) {
       return true;
     }
+    const passwordChangeAllowed = this.reflector.getAllAndOverride<boolean>(
+      PASSWORD_CHANGE_ALLOWED_KEY,
+      [context.getHandler(), context.getClass()],
+    );
 
     const request = context.switchToHttp().getRequest<RequestWithUser>();
     const authHeader = request.headers.authorization;
@@ -63,7 +69,12 @@ export class UserAuthGuard implements CanActivate {
     const session = await this.prisma.authSession.findUnique({
       where: { id: payload.sid },
     });
-    if (!session || session.revoked || session.expiresAt < new Date()) {
+    if (
+      !session ||
+      session.userId !== payload.sub ||
+      session.revoked ||
+      session.expiresAt < new Date()
+    ) {
       throw new UnauthorizedException('Unauthorized');
     }
 
@@ -72,6 +83,9 @@ export class UserAuthGuard implements CanActivate {
     });
     if (!user || user.status !== AccountStatus.ACTIVE) {
       throw new UnauthorizedException('Unauthorized');
+    }
+    if (user.mustChangePassword && !passwordChangeAllowed) {
+      throw new ForbiddenException('Password change required');
     }
 
     request.user = { id: user.id, role: user.role, sessionId: session.id };

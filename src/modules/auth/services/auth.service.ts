@@ -29,6 +29,7 @@ export interface UserSummary {
   id: string;
   role: Role;
   loginIdentifier: string;
+  mustChangePassword: boolean;
 }
 
 export interface LoginResult {
@@ -42,6 +43,7 @@ function toSummary(user: User): UserSummary {
     id: user.id,
     role: user.role,
     loginIdentifier: user.loginIdentifier,
+    mustChangePassword: user.mustChangePassword,
   };
 }
 

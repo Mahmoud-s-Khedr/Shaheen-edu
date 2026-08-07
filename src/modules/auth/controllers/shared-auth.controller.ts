@@ -19,6 +19,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { Public } from '../../../common/decorators/public.decorator';
+import { PasswordChangeAllowed } from '../../../common/decorators/password-change-allowed.decorator';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { PrismaService } from '../../../database/prisma.service';
 import { SessionService } from '../services/session.service';
@@ -96,11 +97,13 @@ export class SharedAuthController {
         id: result.user.id,
         role: result.user.role,
         loginIdentifier: result.user.loginIdentifier,
+        mustChangePassword: result.user.mustChangePassword,
       },
     };
   }
 
   @Post('logout')
+  @PasswordChangeAllowed()
   @ApiOperation({
     summary: 'Log out of the current browser session',
     description:
@@ -130,6 +133,7 @@ export class SharedAuthController {
   }
 
   @Post('logout-all')
+  @PasswordChangeAllowed()
   @ApiOperation({
     summary: 'Log out of all user sessions',
     description:
@@ -157,6 +161,7 @@ export class SharedAuthController {
 
   @ApiBearerAuth()
   @Get('me')
+  @PasswordChangeAllowed()
   @ApiOperation({ summary: 'Get the authenticated user' })
   @ApiOkResponse({ type: CurrentUserDto })
   @ApiStandardErrors(401)
@@ -170,6 +175,7 @@ export class SharedAuthController {
         loginIdentifier: true,
         lastLoginAt: true,
         createdAt: true,
+        mustChangePassword: true,
       },
     });
     return dbUser;
@@ -177,6 +183,7 @@ export class SharedAuthController {
 
   @ApiBearerAuth()
   @Post('change-password')
+  @PasswordChangeAllowed()
   @ApiOperation({
     summary: 'Change the authenticated user password',
     description: 'Revokes all active sessions and clears the refresh cookie.',
@@ -212,7 +219,7 @@ export class SharedAuthController {
     const newPasswordHash = await this.passwordService.hash(dto.newPassword);
     await this.prisma.user.update({
       where: { id: user.id },
-      data: { passwordHash: newPasswordHash },
+      data: { passwordHash: newPasswordHash, mustChangePassword: false },
     });
 
     // Force re-login everywhere, same as logout-all.

@@ -11,6 +11,8 @@ import { NationalIdService } from './services/national-id.service';
 import { ParentSessionService } from './services/parent-session.service';
 import { AuthRateLimitService } from './services/auth-rate-limit.service';
 import { AuthService } from './services/auth.service';
+import { ParentAuthGuard } from '../../common/guards/parent-auth.guard';
+import { ParentSelectedChildGuard } from '../../common/guards/parent-selected-child.guard';
 
 @Module({
   controllers: [
@@ -28,6 +30,8 @@ import { AuthService } from './services/auth.service';
     ParentSessionService,
     AuthRateLimitService,
     AuthService,
+    ParentAuthGuard,
+    ParentSelectedChildGuard,
   ],
   exports: [
     PasswordService,

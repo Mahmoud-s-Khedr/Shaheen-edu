@@ -19,8 +19,15 @@ export class AuditService {
   ) {}
 
   async record(input: RecordAuditLogInput): Promise<void> {
+    await this.recordWithClient(this.prisma, input);
+  }
+
+  async recordWithClient(
+    client: Pick<PrismaService, 'adminAuditLog'> | Prisma.TransactionClient,
+    input: RecordAuditLogInput,
+  ): Promise<void> {
     const correlationId = this.cls.isActive() ? this.cls.getId() : undefined;
-    await this.prisma.adminAuditLog.create({
+    await client.adminAuditLog.create({
       data: {
         actorUserId: input.actorUserId,
         action: input.action,

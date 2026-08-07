@@ -4,6 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { randomBytes } from 'crypto';
 import { PrismaService } from '../../database/prisma.service';
 import { PasswordService } from '../auth/services/password.service';
 import { SessionService } from '../auth/services/session.service';
@@ -185,6 +186,34 @@ export class AdminsService {
     });
 
     return this.toSummary(updated);
+  }
+
+  async resetPassword(actor: RequestUser, targetId: string) {
+    this.assertActorIsSuperAdmin(actor);
+    const target = await this.getMutableTargetOrThrow(targetId);
+    if (target.status !== AccountStatus.ACTIVE) {
+      throw new ConflictException('Only active administrators can be reset');
+    }
+    const temporaryPassword = randomBytes(24).toString('base64url');
+    const passwordHash = await this.passwordService.hash(temporaryPassword);
+    const passwordResetAt = new Date();
+    await this.prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: targetId },
+        data: { passwordHash, mustChangePassword: true, passwordResetAt },
+      });
+      await tx.authSession.updateMany({
+        where: { userId: targetId, revoked: false },
+        data: { revoked: true, revokedAt: passwordResetAt },
+      });
+      await this.auditService.recordWithClient(tx, {
+        actorUserId: actor.id,
+        action: 'ADMIN_PASSWORD_RESET',
+        targetType: 'User',
+        targetId,
+      });
+    });
+    return { temporaryPassword, passwordResetAt };
   }
 
   private toSummary(user: {

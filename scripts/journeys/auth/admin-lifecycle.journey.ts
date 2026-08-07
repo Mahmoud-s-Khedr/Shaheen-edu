@@ -25,5 +25,14 @@ export const adminJourney: JourneyDefinition = {
       const reactivate = await clients.superAdmin.request<any>('POST', `/admin/admins/${context.admin.id}/reactivate`); expectStatus(reactivate, 201); assert(reactivate.body.status === 'ACTIVE', 'Admin must be active');
       const login = await clients.admin.request<any>('POST', '/auth/admins/login', { email: context.admin.email, password }); expectStatus(login, 201); clients.admin.accessToken = login.body.accessToken; context.admin.accessToken = login.body.accessToken;
     });
+    await step('Forcing an administrator password reset', async () => {
+      const denied = await clients.admin.request<any>('POST', `/admin/admins/${context.admin.id}/reset-password`); expectStatus(denied, 403);
+      const reset = await clients.superAdmin.request<any>('POST', `/admin/admins/${context.admin.id}/reset-password`); expectStatus(reset, 201); assert(typeof reset.body.temporaryPassword === 'string', 'Reset must return a temporary password');
+      const revoked = await clients.public.request<any>('GET', '/auth/me', undefined, { accessToken: context.admin.accessToken }); expectStatus(revoked, 401);
+      const temporaryLogin = await clients.admin.request<any>('POST', '/auth/admins/login', { email: context.admin.email, password: reset.body.temporaryPassword }); expectStatus(temporaryLogin, 201); assert(temporaryLogin.body.user.mustChangePassword === true, 'Temporary-password login must require a password change'); clients.admin.accessToken = temporaryLogin.body.accessToken;
+      const blocked = await clients.admin.request<any>('GET', '/admin/partners'); expectStatus(blocked, 403);
+      const finalPassword = factory.password('AdminReset'); const changed = await clients.admin.request<any>('POST', '/auth/change-password', { oldPassword: reset.body.temporaryPassword, newPassword: finalPassword }); expectStatus(changed, 201);
+      const finalLogin = await clients.admin.request<any>('POST', '/auth/admins/login', { email: context.admin.email, password: finalPassword }); expectStatus(finalLogin, 201); assert(finalLogin.body.user.mustChangePassword === false, 'Password change must clear the forced-change flag'); clients.admin.accessToken = finalLogin.body.accessToken; context.admin.password = finalPassword; context.admin.accessToken = finalLogin.body.accessToken;
+    });
   },
 };

@@ -103,7 +103,10 @@ export class SessionService {
         return { kind: 'unauthorized' as const };
       }
 
-      if (session.user.status !== AccountStatus.ACTIVE) {
+      if (
+        session.user.status !== AccountStatus.ACTIVE ||
+        session.user.mustChangePassword
+      ) {
         return { kind: 'unauthorized' as const };
       }
 

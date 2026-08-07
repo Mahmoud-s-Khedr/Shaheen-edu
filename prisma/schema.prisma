@@ -185,6 +185,13 @@ model User {
   status          AccountStatus @default(ACTIVE)
   loginIdentifier String        @unique
   passwordHash    String
+  mustChangePassword Boolean     @default(false)
+  passwordResetAt DateTime?
+  deletedAt       DateTime?
+  deletedById     String?
+  deletionReason  String?
+  deletedBy       User?         @relation("UserDeletedBy", fields: [deletedById], references: [id], onDelete: Restrict)
+  deletedUsers    User[]        @relation("UserDeletedBy")
   lastLoginAt     DateTime?
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
@@ -228,6 +235,7 @@ model User {
 
   @@index([role])
   @@index([role, createdAt, id])
+  @@index([deletedById])
 }
 
 model StudentProfile {

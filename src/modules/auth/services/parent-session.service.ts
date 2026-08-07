@@ -6,6 +6,7 @@ import {
 import { PrismaService } from '../../../database/prisma.service';
 import { TokenService } from './token.service';
 import type { ParentAccessSession } from '@prisma/client';
+import { AccountStatus } from '../../../common/types/roles.enum';
 import {
   toPaginationMeta,
   type PaginationQueryDto,
@@ -55,6 +56,7 @@ export class ParentSessionService {
           fullName: true,
           governorate: true,
           center: true,
+          user: { select: { status: true } },
         },
         orderBy: [{ createdAt: 'desc' }, { userId: 'desc' }],
         skip: (pagination.page - 1) * pagination.limit,
@@ -63,7 +65,7 @@ export class ParentSessionService {
       this.prisma.studentProfile.count({ where }),
     ]);
     return {
-      data: children,
+      data: children.map(({ user, ...child }) => ({ ...child, status: user.status })),
       meta: toPaginationMeta(pagination.page, pagination.limit, total),
     };
   }
@@ -79,12 +81,16 @@ export class ParentSessionService {
   }): Promise<{ accessToken: string }> {
     const student = await this.prisma.studentProfile.findUnique({
       where: { userId: params.studentUserId },
+      include: { user: { select: { status: true } } },
     });
     if (
       !student ||
       student.parentPhoneNormalized !== params.parentPhoneNormalized
     ) {
       throw new ForbiddenException('Student is not linked to this parent');
+    }
+    if (student.user.status !== AccountStatus.ACTIVE) {
+      throw new ForbiddenException('Selected child is unavailable');
     }
 
     const session = await this.prisma.parentAccessSession.findUnique({
