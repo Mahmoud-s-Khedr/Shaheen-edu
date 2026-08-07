@@ -4182,7 +4182,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PaginatedCourseResponseDto"
+                  "$ref": "#/components/schemas/PaginatedAdminCourseReadResponseDto"
                 }
               }
             }
@@ -4248,7 +4248,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/CourseSummaryDto"
+                  "$ref": "#/components/schemas/AdminCourseReadDto"
                 }
               }
             }
@@ -5035,7 +5035,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PaginatedChapterResponseDto"
+                  "$ref": "#/components/schemas/PaginatedAdminChapterReadResponseDto"
                 }
               }
             }
@@ -5101,7 +5101,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ChapterSummaryDto"
+                  "$ref": "#/components/schemas/AdminChapterReadDto"
                 }
               }
             }
@@ -16147,6 +16147,11 @@
             "type": "string",
             "nullable": true
           },
+          "hasChildren": {
+            "type": "boolean",
+            "example": true,
+            "description": "Whether this grade has visible subject children."
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time"
@@ -16173,6 +16178,7 @@
           "description",
           "sortOrder",
           "status",
+          "hasChildren",
           "createdAt",
           "updatedAt"
         ]
@@ -16329,6 +16335,11 @@
           },
           "academicGradeId": {
             "type": "string"
+          },
+          "hasChildren": {
+            "type": "boolean",
+            "example": true,
+            "description": "Whether this subject has visible course children."
           }
         },
         "required": [
@@ -16339,7 +16350,8 @@
           "status",
           "createdAt",
           "updatedAt",
-          "academicGradeId"
+          "academicGradeId",
+          "hasChildren"
         ]
       },
       "PaginatedSubjectResponseDto": {
@@ -16518,6 +16530,11 @@
           },
           "subjectId": {
             "type": "string"
+          },
+          "hasChildren": {
+            "type": "boolean",
+            "example": true,
+            "description": "Whether this course has visible chapter children."
           }
         },
         "required": [
@@ -16528,16 +16545,139 @@
           "status",
           "createdAt",
           "updatedAt",
-          "subjectId"
+          "subjectId",
+          "hasChildren"
         ]
       },
-      "PaginatedCourseResponseDto": {
+      "EffectivePricingResolvedFromDto": {
+        "type": "object",
+        "properties": {
+          "courseId": {
+            "type": "string"
+          },
+          "chapterId": {
+            "type": "string"
+          }
+        }
+      },
+      "EffectivePricingDto": {
+        "type": "object",
+        "properties": {
+          "isPurchasable": {
+            "type": "boolean",
+            "example": true
+          },
+          "priceMinor": {
+            "type": "number",
+            "nullable": true,
+            "example": 20000
+          },
+          "currency": {
+            "type": "string",
+            "nullable": true,
+            "example": "EGP"
+          },
+          "resolvedFrom": {
+            "$ref": "#/components/schemas/EffectivePricingResolvedFromDto"
+          }
+        },
+        "required": [
+          "isPurchasable",
+          "priceMinor",
+          "currency",
+          "resolvedFrom"
+        ]
+      },
+      "AdminCourseReadDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "sortOrder": {
+            "type": "number"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "DRAFT",
+              "PUBLISHED",
+              "ARCHIVED"
+            ]
+          },
+          "accessType": {
+            "type": "string",
+            "enum": [
+              "PUBLIC",
+              "FREE",
+              "PAID",
+              "INHERIT"
+            ]
+          },
+          "coverAssetId": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "publishedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "archivedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "subjectId": {
+            "type": "string"
+          },
+          "hasChildren": {
+            "type": "boolean",
+            "example": true,
+            "description": "Whether this course has visible chapter children."
+          },
+          "pricing": {
+            "$ref": "#/components/schemas/EffectivePricingDto"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "slug",
+          "sortOrder",
+          "status",
+          "createdAt",
+          "updatedAt",
+          "subjectId",
+          "hasChildren",
+          "pricing"
+        ]
+      },
+      "PaginatedAdminCourseReadResponseDto": {
         "type": "object",
         "properties": {
           "data": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/CourseSummaryDto"
+              "$ref": "#/components/schemas/AdminCourseReadDto"
             }
           },
           "meta": {
@@ -16715,6 +16855,11 @@
           },
           "courseId": {
             "type": "string"
+          },
+          "hasChildren": {
+            "type": "boolean",
+            "example": true,
+            "description": "Whether this chapter has visible lesson children."
           }
         },
         "required": [
@@ -16725,16 +16870,100 @@
           "status",
           "createdAt",
           "updatedAt",
-          "courseId"
+          "courseId",
+          "hasChildren"
         ]
       },
-      "PaginatedChapterResponseDto": {
+      "AdminChapterReadDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "sortOrder": {
+            "type": "number"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "DRAFT",
+              "PUBLISHED",
+              "ARCHIVED"
+            ]
+          },
+          "accessType": {
+            "type": "string",
+            "enum": [
+              "PUBLIC",
+              "FREE",
+              "PAID",
+              "INHERIT"
+            ]
+          },
+          "coverAssetId": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "publishedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "archivedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "courseId": {
+            "type": "string"
+          },
+          "hasChildren": {
+            "type": "boolean",
+            "example": true,
+            "description": "Whether this chapter has visible lesson children."
+          },
+          "pricing": {
+            "$ref": "#/components/schemas/EffectivePricingDto"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "slug",
+          "sortOrder",
+          "status",
+          "createdAt",
+          "updatedAt",
+          "courseId",
+          "hasChildren",
+          "pricing"
+        ]
+      },
+      "PaginatedAdminChapterReadResponseDto": {
         "type": "object",
         "properties": {
           "data": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/ChapterSummaryDto"
+              "$ref": "#/components/schemas/AdminChapterReadDto"
             }
           },
           "meta": {
@@ -16895,6 +17124,11 @@
           },
           "chapterId": {
             "type": "string"
+          },
+          "hasChildren": {
+            "type": "boolean",
+            "example": true,
+            "description": "Whether this lesson has visible section children."
           }
         },
         "required": [
@@ -16905,7 +17139,8 @@
           "status",
           "createdAt",
           "updatedAt",
-          "chapterId"
+          "chapterId",
+          "hasChildren"
         ]
       },
       "PaginatedLessonResponseDto": {

@@ -44,7 +44,10 @@ export class SubjectsService {
   }
 
   private async getOrThrow(id: string) {
-    const record = await this.prisma.subject.findUnique({ where: { id } });
+    const record = await this.prisma.subject.findUnique({
+      where: { id },
+      include: { _count: { select: { courses: { where: { status: { not: ContentStatus.ARCHIVED } } } } } },
+    });
     if (!record) {
       throw new NotFoundException('Subject not found');
     }
@@ -130,6 +133,7 @@ export class SubjectsService {
     const [items, total] = await this.prisma.$transaction([
       this.prisma.subject.findMany({
         where,
+        include: { _count: { select: { courses: { where: { status: { not: ContentStatus.ARCHIVED } } } } } },
         orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
         skip: (query.page - 1) * query.limit,
         take: query.limit,
@@ -440,6 +444,7 @@ export class SubjectsService {
     publishedAt: Date | null;
     archivedAt: Date | null;
     coverAssetId: string | null;
+    _count?: { courses: number };
   }) {
     return {
       id: record.id,
@@ -454,6 +459,7 @@ export class SubjectsService {
       publishedAt: record.publishedAt,
       archivedAt: record.archivedAt,
       coverAssetId: record.coverAssetId,
+      hasChildren: (record._count?.courses ?? 0) > 0,
     };
   }
 }

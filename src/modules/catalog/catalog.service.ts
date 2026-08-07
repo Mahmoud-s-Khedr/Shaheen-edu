@@ -20,6 +20,9 @@ const publicNode = (record: any) => ({
   sortOrder: record.sortOrder,
   coverAssetId: record.coverAssetId ?? null,
   ...(record.accessType ? { accessType: record.accessType } : {}),
+  ...(record._count
+    ? { hasChildren: (Object.values(record._count)[0] as number) > 0 }
+    : {}),
 });
 const publicItem = (placement: any) => ({
   id: placement.contentItem.id,
@@ -40,6 +43,7 @@ export class CatalogService {
     const [data, total] = await this.prisma.$transaction([
       this.prisma.subject.findMany({
         where,
+        include: { _count: { select: { courses: { where: { status: published } } } } },
         orderBy: order,
         skip: (query.page - 1) * query.limit,
         take: query.limit,
@@ -57,6 +61,7 @@ export class CatalogService {
     const [data, total] = await this.prisma.$transaction([
       this.prisma.course.findMany({
         where,
+        include: { _count: { select: { chapters: { where: { status: published } } } } },
         orderBy: order,
         skip: (query.page - 1) * query.limit,
         take: query.limit,
@@ -76,7 +81,15 @@ export class CatalogService {
         status: published,
         subject: { status: published, academicGrade: { status: published } },
       },
-      include: { subject: { include: { academicGrade: true } } },
+      include: {
+        _count: { select: { chapters: { where: { status: published } } } },
+        subject: {
+          include: {
+            _count: { select: { courses: { where: { status: published } } } },
+            academicGrade: { include: { _count: { select: { subjects: { where: { status: published } } } } } },
+          },
+        },
+      },
     });
     if (!record) throw new NotFoundException('Published course not found');
     return {
@@ -149,10 +162,12 @@ export class CatalogService {
         status: published,
         subject: { status: published, academicGrade: { status: published } },
       },
+      include: { _count: { select: { chapters: { where: { status: published } } } } },
     });
     if (!parent) throw new NotFoundException('Published course not found');
     const items = await this.prisma.chapter.findMany({
       where: { courseId, status: published, ...this.after(query.cursor) },
+      include: { _count: { select: { lessons: { where: { status: published } } } } },
       orderBy: order,
       take: query.limit + 1,
     });
@@ -171,10 +186,12 @@ export class CatalogService {
           subject: { status: published, academicGrade: { status: published } },
         },
       },
+      include: { _count: { select: { lessons: { where: { status: published } } } } },
     });
     if (!parent) throw new NotFoundException('Published chapter not found');
     const items = await this.prisma.lesson.findMany({
       where: { chapterId, status: published, ...this.after(query.cursor) },
+      include: { _count: { select: { sections: { where: { status: published } } } } },
       orderBy: order,
       take: query.limit + 1,
     });
@@ -199,6 +216,7 @@ export class CatalogService {
           },
         },
       },
+      include: { _count: { select: { sections: { where: { status: published } } } } },
     });
     if (!parent) throw new NotFoundException('Published lesson not found');
     const items = await this.prisma.section.findMany({
@@ -266,10 +284,17 @@ export class CatalogService {
         },
       },
     };
+    const childCounts: Record<string, any> = {
+      courses: { _count: { select: { chapters: { where: { status: published } } } } },
+      chapters: { _count: { select: { lessons: { where: { status: published } } } } },
+      lessons: { _count: { select: { sections: { where: { status: published } } } } },
+      sections: {},
+    };
     if (!models[resource])
       throw new BadRequestException('Unsupported catalog resource');
     const parent = await models[resource].findFirst({
       where: { id, status: published, ...ancestry[resource] },
+      include: childCounts[resource],
     });
     if (!parent)
       throw new NotFoundException('Published hierarchy record not found');

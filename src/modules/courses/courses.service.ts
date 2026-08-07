@@ -44,7 +44,10 @@ export class CoursesService {
   }
 
   private async getOrThrow(id: string) {
-    const record = await this.prisma.course.findUnique({ where: { id } });
+    const record = await this.prisma.course.findUnique({
+      where: { id },
+      include: { _count: { select: { chapters: { where: { status: { not: ContentStatus.ARCHIVED } } } } } },
+    });
     if (!record) {
       throw new NotFoundException('Course not found');
     }
@@ -125,6 +128,7 @@ export class CoursesService {
     const [items, total] = await this.prisma.$transaction([
       this.prisma.course.findMany({
         where,
+        include: { _count: { select: { chapters: { where: { status: { not: ContentStatus.ARCHIVED } } } } } },
         orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
         skip: (query.page - 1) * query.limit,
         take: query.limit,
@@ -429,6 +433,7 @@ export class CoursesService {
     archivedAt: Date | null;
     accessType: AccessType;
     coverAssetId: string | null;
+    _count?: { chapters: number };
   }) {
     return {
       id: record.id,
@@ -440,6 +445,7 @@ export class CoursesService {
       status: record.status,
       accessType: record.accessType,
       coverAssetId: record.coverAssetId,
+      hasChildren: (record._count?.chapters ?? 0) > 0,
       createdAt: record.createdAt,
       updatedAt: record.updatedAt,
       publishedAt: record.publishedAt,

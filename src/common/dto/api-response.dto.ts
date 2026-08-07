@@ -333,6 +333,9 @@ export class AcademicGradeSummaryDto {
   @ApiPropertyOptional({ type: String, nullable: true })
   coverAssetId?: string | null;
 
+  @ApiProperty({ example: true, description: 'Whether this grade has visible subject children.' })
+  hasChildren!: boolean;
+
   @ApiProperty({ type: String, format: 'date-time' })
   createdAt!: Date;
 
@@ -349,11 +352,17 @@ export class AcademicGradeSummaryDto {
 export class SubjectSummaryDto extends HierarchySummaryDto {
   @ApiProperty()
   academicGradeId!: string;
+
+  @ApiProperty({ example: true, description: 'Whether this subject has visible course children.' })
+  hasChildren!: boolean;
 }
 
 export class CourseSummaryDto extends HierarchySummaryDto {
   @ApiProperty()
   subjectId!: string;
+
+  @ApiProperty({ example: true, description: 'Whether this course has visible chapter children.' })
+  hasChildren!: boolean;
 }
 
 export class EffectivePricingResolvedFromDto {
@@ -387,6 +396,9 @@ export class AdminCourseReadDto extends CourseSummaryDto {
 export class ChapterSummaryDto extends HierarchySummaryDto {
   @ApiProperty()
   courseId!: string;
+
+  @ApiProperty({ example: true, description: 'Whether this chapter has visible lesson children.' })
+  hasChildren!: boolean;
 }
 
 /** Returned by the admin chapter GET endpoints. */
@@ -398,6 +410,9 @@ export class AdminChapterReadDto extends ChapterSummaryDto {
 export class LessonSummaryDto extends HierarchySummaryDto {
   @ApiProperty()
   chapterId!: string;
+
+  @ApiProperty({ example: true, description: 'Whether this lesson has visible section children.' })
+  hasChildren!: boolean;
 }
 
 export class SectionSummaryDto extends HierarchySummaryDto {

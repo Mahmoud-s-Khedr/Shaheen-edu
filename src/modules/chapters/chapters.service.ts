@@ -44,7 +44,10 @@ export class ChaptersService {
   }
 
   private async getOrThrow(id: string) {
-    const record = await this.prisma.chapter.findUnique({ where: { id } });
+    const record = await this.prisma.chapter.findUnique({
+      where: { id },
+      include: { _count: { select: { lessons: { where: { status: { not: ContentStatus.ARCHIVED } } } } } },
+    });
     if (!record) {
       throw new NotFoundException('Chapter not found');
     }
@@ -114,7 +117,7 @@ export class ChaptersService {
     this.assertActorRole(actor);
     const record = await this.prisma.chapter.findUnique({
       where: { id },
-      include: { course: true },
+      include: { course: true, _count: { select: { lessons: { where: { status: { not: ContentStatus.ARCHIVED } } } } } },
     });
     if (!record) {
       throw new NotFoundException('Chapter not found');
@@ -131,7 +134,7 @@ export class ChaptersService {
     const [items, total] = await this.prisma.$transaction([
       this.prisma.chapter.findMany({
         where,
-        include: { course: true },
+        include: { course: true, _count: { select: { lessons: { where: { status: { not: ContentStatus.ARCHIVED } } } } } },
         orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
         skip: (query.page - 1) * query.limit,
         take: query.limit,
@@ -431,6 +434,7 @@ export class ChaptersService {
     archivedAt: Date | null;
     accessType: AccessType;
     coverAssetId: string | null;
+    _count?: { lessons: number };
   }) {
     return {
       id: record.id,
@@ -442,6 +446,7 @@ export class ChaptersService {
       status: record.status,
       accessType: record.accessType,
       coverAssetId: record.coverAssetId,
+      hasChildren: (record._count?.lessons ?? 0) > 0,
       createdAt: record.createdAt,
       updatedAt: record.updatedAt,
       publishedAt: record.publishedAt,

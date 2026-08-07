@@ -99,4 +99,27 @@ describe('AcademicGradesService', () => {
       expect.objectContaining({ where: { id: 'g1' } }),
     );
   });
+
+  it('maps the non-archived subject relation count without extra child queries', async () => {
+    const { service, prisma } = buildService();
+    const grade = {
+      id: 'g1', titleAr: 'الصف العاشر', titleEn: 'Grade 10', slug: 'grade-10',
+      descriptionAr: null, descriptionEn: null, sortOrder: 1, status: 'DRAFT',
+      createdAt: new Date(), updatedAt: new Date(), publishedAt: null, archivedAt: null,
+      coverAssetId: null,
+    };
+    prisma.$transaction.mockResolvedValueOnce([[{ ...grade, _count: { subjects: 1 } }, { ...grade, _count: { subjects: 0 } }], 2]);
+
+    const result = await service.list(actor, { page: 1, limit: 20 });
+
+    expect(result.data.map((item) => item.hasChildren)).toEqual([true, false]);
+    expect(prisma.academicGrade.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        include: {
+          _count: { select: { subjects: { where: { status: { not: 'ARCHIVED' } } } } },
+        },
+      }),
+    );
+    expect(prisma.subject.count).not.toHaveBeenCalled();
+  });
 });

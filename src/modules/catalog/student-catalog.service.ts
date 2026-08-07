@@ -72,6 +72,7 @@ export class StudentCatalogService {
     const [data, total] = await this.prisma.$transaction([
       this.prisma.subject.findMany({
         where,
+        include: { _count: { select: { courses: { where: { status: published } } } } },
         orderBy: order,
         skip: (query.page - 1) * query.limit,
         take: query.limit,
@@ -92,6 +93,7 @@ export class StudentCatalogService {
     const grade = await this.gradeFor(studentUserId);
     const subject = await this.prisma.subject.findFirst({
       where: { id: subjectId, academicGradeId: grade.id, status: published },
+      include: { _count: { select: { courses: { where: { status: published } } } } },
     });
     if (!subject) throw new NotFoundException('Published subject not found');
     const grants = await this.activeGrants(studentUserId);
@@ -99,6 +101,7 @@ export class StudentCatalogService {
     const [data, total] = await this.prisma.$transaction([
       this.prisma.course.findMany({
         where,
+        include: { _count: { select: { chapters: { where: { status: published } } } } },
         orderBy: order,
         skip: (query.page - 1) * query.limit,
         take: query.limit,
@@ -384,7 +387,10 @@ export class StudentCatalogService {
           academicGrade: { status: published },
         },
       },
-      include: { subject: true },
+      include: {
+        _count: { select: { chapters: { where: { status: published } } } },
+        subject: { include: { _count: { select: { courses: { where: { status: published } } } } } },
+      },
     });
     if (!course) throw new NotFoundException('Published course not found');
     const grants = await this.activeGrants(studentUserId);
@@ -413,11 +419,13 @@ export class StudentCatalogService {
           academicGrade: { status: published },
         },
       },
+      include: { _count: { select: { chapters: { where: { status: published } } } } },
     });
     if (!course) throw new NotFoundException('Published course not found');
     const grants = await this.activeGrants(studentUserId);
     const rows = await this.prisma.chapter.findMany({
       where: { courseId, status: published, ...this.after(query.cursor) },
+      include: { _count: { select: { lessons: { where: { status: published } } } } },
       orderBy: order,
       take: query.limit + 1,
     });
@@ -463,12 +471,16 @@ export class StudentCatalogService {
           },
         },
       },
-      include: { course: true },
+      include: {
+        course: true,
+        _count: { select: { lessons: { where: { status: published } } } },
+      },
     });
     if (!chapter) throw new NotFoundException('Published chapter not found');
     const grants = await this.activeGrants(studentUserId);
     const rows = await this.prisma.lesson.findMany({
       where: { chapterId, status: published, ...this.after(query.cursor) },
+      include: { _count: { select: { sections: { where: { status: published } } } } },
       orderBy: order,
       take: query.limit + 1,
     });
@@ -513,7 +525,10 @@ export class StudentCatalogService {
           },
         },
       },
-      include: { chapter: { include: { course: true } } },
+      include: {
+        chapter: { include: { course: true } },
+        _count: { select: { sections: { where: { status: published } } } },
+      },
     });
     if (!lesson) throw new NotFoundException('Published lesson not found');
     const grants = await this.activeGrants(studentUserId);
@@ -558,7 +573,10 @@ export class StudentCatalogService {
       courses: {
         model: this.prisma.course,
         field: 'courseId',
-        include: { subject: true },
+        include: {
+          subject: true,
+          _count: { select: { chapters: { where: { status: published } } } },
+        },
         course: (x: any) => x,
         chapter: () => undefined,
         accesses: (x: any) => [x.accessType],
@@ -574,7 +592,10 @@ export class StudentCatalogService {
       chapters: {
         model: this.prisma.chapter,
         field: 'chapterId',
-        include: { course: true },
+        include: {
+          course: true,
+          _count: { select: { lessons: { where: { status: published } } } },
+        },
         course: (x: any) => x.course,
         chapter: (x: any) => x,
         accesses: (x: any) => [x.accessType, x.course.accessType],
@@ -593,7 +614,10 @@ export class StudentCatalogService {
       lessons: {
         model: this.prisma.lesson,
         field: 'lessonId',
-        include: { chapter: { include: { course: true } } },
+        include: {
+          chapter: { include: { course: true } },
+          _count: { select: { sections: { where: { status: published } } } },
+        },
         course: (x: any) => x.chapter.course,
         chapter: (x: any) => x.chapter,
         accesses: (x: any) => [
@@ -949,7 +973,13 @@ export class StudentCatalogService {
   private async gradeFor(studentUserId: string) {
     const profile = await this.prisma.studentProfile.findUnique({
       where: { userId: studentUserId },
-      include: { academicGrade: true },
+      include: {
+        academicGrade: {
+          include: {
+            _count: { select: { subjects: { where: { status: published } } } },
+          },
+        },
+      },
     });
     if (
       !profile?.academicGradeId ||
@@ -1163,6 +1193,9 @@ export class StudentCatalogService {
       description: record.description,
       sortOrder: record.sortOrder,
       coverAssetId: record.coverAssetId ?? null,
+      ...(record._count
+        ? { hasChildren: (Object.values(record._count)[0] as number) > 0 }
+        : {}),
     };
   }
   private gradeDto(grade: any) {
@@ -1173,6 +1206,7 @@ export class StudentCatalogService {
       description: { ar: grade.descriptionAr, en: grade.descriptionEn },
       sortOrder: grade.sortOrder,
       coverAssetId: grade.coverAssetId ?? null,
+      ...(grade._count ? { hasChildren: grade._count.subjects > 0 } : {}),
     };
   }
   private contentItem(item: any, sortOrder: number) {

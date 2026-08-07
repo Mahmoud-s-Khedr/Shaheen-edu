@@ -45,6 +45,7 @@ export class AcademicGradesService {
   private async getOrThrow(id: string) {
     const record = await this.prisma.academicGrade.findUnique({
       where: { id },
+      include: { _count: { select: { subjects: { where: { status: { not: ContentStatus.ARCHIVED } } } } } },
     });
     if (!record) {
       throw new NotFoundException('Academic grade not found');
@@ -102,6 +103,7 @@ export class AcademicGradesService {
     const [items, total] = await this.prisma.$transaction([
       this.prisma.academicGrade.findMany({
         where,
+        include: { _count: { select: { subjects: { where: { status: { not: ContentStatus.ARCHIVED } } } } } },
         orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
         skip: (query.page - 1) * query.limit,
         take: query.limit,
@@ -119,6 +121,7 @@ export class AcademicGradesService {
     const [items, total] = await this.prisma.$transaction([
       this.prisma.academicGrade.findMany({
         where,
+        include: { _count: { select: { subjects: { where: { status: ContentStatus.PUBLISHED } } } } },
         orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
         skip: (query.page - 1) * query.limit,
         take: query.limit,
@@ -327,6 +330,7 @@ export class AcademicGradesService {
     publishedAt: Date | null;
     archivedAt: Date | null;
     coverAssetId: string | null;
+    _count?: { subjects: number };
   }) {
     return {
       id: record.id,
@@ -340,6 +344,7 @@ export class AcademicGradesService {
       publishedAt: record.publishedAt,
       archivedAt: record.archivedAt,
       coverAssetId: record.coverAssetId,
+      hasChildren: (record._count?.subjects ?? 0) > 0,
     };
   }
 }

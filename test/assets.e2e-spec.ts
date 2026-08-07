@@ -88,6 +88,11 @@ describe('Assets (e2e)', () => {
     ).accessToken;
 
     const gradeId = (await seedPublishedAcademicGrade(app, 'assets-grade')).id;
+    const governorateId = (
+      await app.get(PrismaService).governorate.create({
+        data: { nameAr: 'القاهرة', nameEn: 'Cairo' },
+      })
+    ).id;
     studentToken = json(
       await app.inject({
         method: 'POST',
@@ -97,7 +102,7 @@ describe('Assets (e2e)', () => {
           nationalId: '29901010112345',
           phone: '01099990000',
           parentPhone: '01088880000',
-          governorate: 'Cairo',
+          governorateId,
           password: 'StudentP@ss1!',
           academicGradeId: gradeId,
         },
@@ -240,7 +245,7 @@ describe('Assets (e2e)', () => {
           method: 'POST',
           url: '/api/v1/admin/academic-grades',
           headers: admin(),
-          payload: { title: 'Delivery Grade' },
+          payload: { title: { ar: 'Delivery Grade', en: 'Delivery Grade' } },
         }),
       ).id;
       await app.inject({
@@ -383,7 +388,7 @@ describe('Assets (e2e)', () => {
           method: 'POST',
           url: '/api/v1/admin/academic-grades',
           headers: admin(),
-          payload: { title: 'Del Grade' },
+          payload: { title: { ar: 'Del Grade', en: 'Del Grade' } },
         }),
       ).id;
       await app.inject({
@@ -450,7 +455,7 @@ describe('Assets (e2e)', () => {
           method: 'POST',
           url: '/api/v1/admin/academic-grades',
           headers: admin(),
-          payload: { title: 'Rep Grade' },
+          payload: { title: { ar: 'Rep Grade', en: 'Rep Grade' } },
         }),
       ).id;
       await app.inject({
