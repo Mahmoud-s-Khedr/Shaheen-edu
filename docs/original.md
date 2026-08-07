@@ -2,7 +2,7 @@
 
 Source: [`docs/MohamedDiab-Req.pdf`](docs/MohamedDiab-Req.pdf) ("Sentivra - Mohamed Diab Req.").
 
-Last reviewed: 2026-08-06. This is a backend-only assessment of the code in
+Last reviewed: 2026-08-07. This is a backend-only assessment of the code in
 this repository. Frontend rendering, page composition, and client-side
 interactions are outside its scope. An API/data primitive counts as complete
 when it supplies the backend capability required by the original requirement.
@@ -33,6 +33,7 @@ the relevant delivered modules. Frontend-only work is not treated as a gap.
 | E-PARTNER   | Admin partner create/list/update/suspend/reactivate: [`admin-partners.controller.ts`](src/modules/partners/controllers/admin-partners.controller.ts#L28-L94).                                                                                                                                                                                                                                                                                                                                                                                           |
 | E-HIERARCHY | Admin CRUD and publishing modules for subjects, courses, chapters, lessons, and sections: [`app.module.ts`](src/app.module.ts#L45-L52), plus their controllers under [`src/modules`](src/modules).                                                                                                                                                                                                                                                                                                                                                      |
 | E-ASSESSMENT | Student- and admin-generated quizzes/exams, scope-based standard random sampling, admin hand-picked custom generation, and the full attempt lifecycle (start/resume, autosave, submit, result): [`assessments.controller.ts`](src/modules/assessments/assessments.controller.ts) and [`assessments.service.ts`](src/modules/assessments/assessments.service.ts); schema: [`schema.prisma`](prisma/schema.prisma) `Assessment`/`AssessmentScope`/`AssessmentQuestion`/`AssessmentQuestionOption`/`AssessmentAttempt`/`AssessmentAttemptAnswer`. |
+| E-STUDENT-ADMIN | Admin student directory/detail, filtering, suspension/reactivation, soft deletion, and forced password resets: [`students.controller.ts`](src/modules/students/students.controller.ts#L63-L130), [`students.service.ts`](src/modules/students/students.service.ts#L85-L277), and [`student-administration.e2e-spec.ts`](test/student-administration.e2e-spec.ts#L66-L183). |
 
 ## Recent delivery progress
 
@@ -51,6 +52,13 @@ Each child response uses `{ parent, data, pageInfo }`. Content results remain
 preview-only: protected bodies, storage keys, and asset URLs are not exposed.
 The former `GET /catalog/courses/:id/outline` and
 `GET /student/catalog/chapters/:id` routes have been replaced by these routes.
+
+Published hierarchy responses now include `hasChildren` for grades, subjects,
+courses, chapters, and lessons. It is calculated from visible children at the
+next level, so clients can reliably decide whether to offer expansion without
+making an extra request. Admin course and chapter list/detail responses also
+include resolved effective pricing: a chapter reports either its own price or
+the inherited course price and identifies the source record.
 
 ## Module 1 — Welcome section
 
@@ -152,7 +160,7 @@ The former `GET /catalog/courses/:id/outline` and
 
 | Status | Original requirement                                                                                                    | Current coverage / gap                                                                                                                                             |
 | ------ | ----------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| [ ]    | Total tests, completed tests, and suspended tests summary.                                                              | No generated-test model or status lifecycle.                                                                                                                       |
+| [-]    | Total tests, completed tests, and suspended tests summary.                                                              | Generated assessments and their `SUSPENDED`/`COMPLETED` attempt lifecycle are implemented, but there is no aggregate summary endpoint for these three totals. [E-ASSESSMENT] |
 | [ ]    | QBank usage donut chart and statistics (total/used/unused).                                                             | No eligible-bank usage aggregation.                                                                                                                                |
 | [-]    | Score section: total correct, incorrect, omitted.                                                                       | Direct attempts retain correct/incorrect values, but omitted answers are not represented and no server-side aggregate supplies all three totals. [E-LEARN, E-DATA] |
 | [ ]    | Answer-change analysis: correct→incorrect and incorrect→correct.                                                        | Answers are immutable direct-practice attempts; changes during a test are not recorded.                                                                            |
@@ -170,8 +178,8 @@ The former `GET /catalog/courses/:id/outline` and
 
 | Status | Original requirement                                                                                                                             | Current coverage / gap                                                                                                                                                                                                         |
 | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| [-]    | **Admin — user management**: view/search/filter students, parents, and companies; view full profiles.                                            | Admin and partner administration exists, with role-based authentication. No admin student/parent directory, search/filter API, or full-profile response exists. [E-PARTNER, E-AUTH]                                            |
-| [-]    | **Admin — student data**: personal data, payments, subscriptions, full performance dashboard.                                                    | Orders, entitlements, and basic student performance exist, but no consolidated admin student-data/performance response exists. [E-COMMERCE, E-DATA, E-LEARN]                                                                   |
+| [-]    | **Admin — user management**: view/search/filter students, parents, and companies; view full profiles.                                            | `GET /api/v1/admin/students` provides a safe, paginated student directory with search and grade/geography/status filters; `GET /api/v1/admin/students/:id` provides the corresponding student profile. Admin partner management also exists. There is still no admin parent directory or full company/profile reporting API. [E-STUDENT-ADMIN, E-PARTNER, E-AUTH] |
+| [-]    | **Admin — student data**: personal data, payments, subscriptions, full performance dashboard.                                                    | Admin student detail supplies safe personal/account data, and administrators can suspend, reactivate, soft-delete, or force a password reset. Orders, entitlements, and basic student performance exist separately, but no consolidated payments/subscriptions/full-performance response exists. [E-STUDENT-ADMIN, E-COMMERCE, E-DATA, E-LEARN] |
 | [ ]    | **Admin — parent management**: list registered parents and linked students.                                                                      | Parent sessions can list/select linked children for the parent; there is no registered-parent entity or admin parent-management API.                                                                                           |
 | [-]    | **Admin — companies/partners**: create/edit partner, profit percentage, student count, payments, revenue share.                                  | Admins can create, list, edit, suspend, and reactivate partner accounts. Publisher agreements/earnings models exist, but the requested partner statistics and payment/revenue reporting are not delivered. [E-PARTNER, E-DATA] |
 | [-]    | **Admin — content management**: CRUD subjects/chapters/lessons, lesson video uploads, PDF uploads to generate questions at all hierarchy levels. | Academic hierarchy CRUD/publishing, video assets, file assets, question banks, and questions are implemented. Automatic PDF-to-question generation is not. [E-HIERARCHY, E-VIDEO, E-QUESTION]                                  |
@@ -204,7 +212,9 @@ cover the original scope, the major remaining work is:
 2. Student analytics: QBank usage, omitted/answer-change tracking, grouped
    performance, result comparisons, trends, peer rankings, and Smart Score.
 3. Leaderboards, weekly reset/reward rules, and platform-wide aggregates.
-4. Remaining learner APIs: continue learning/resume state, hierarchy search,
-   and higher-level completion actions.
+4. Remaining learner APIs: higher-level completion actions and the analytics
+   endpoints described above. Continue-learning/resume state and hierarchy
+   search are implemented.
 5. Missing commercial/admin reporting: discounts/coupons, exports, revenue
-   reports, and the missing admin/parent/partner data APIs.
+   reports, and the missing admin parent/partner data APIs. Student directory,
+   account lifecycle, and password-reset administration are implemented.

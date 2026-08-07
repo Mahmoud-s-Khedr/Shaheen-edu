@@ -5,7 +5,7 @@
 > Implemented endpoints remain documented in
 > [api-reference-compact.md](api-reference-compact.md).
 
-## Implementation status (reviewed 2026-08-06)
+## Implementation status (reviewed 2026-08-07)
 
 - [x] Student registration and profile updates persist a published
       `academicGradeId`.
@@ -23,6 +23,12 @@
       admin-owned public quizzes/exams) exist, built from standard random
       sampling or admin hand-picked questions, with a full attempt lifecycle
       (start/resume, autosave, submit, result).
+- [x] Administrators can list and filter safe student account data, view a
+      student detail response, suspend/reactivate or soft-delete a student,
+      and issue a forced password reset that revokes existing sessions.
+- [x] Public and student hierarchy responses expose `hasChildren` for each
+      expandable level. Administrative course and chapter list/detail responses
+      expose the resolved effective price, including inherited course pricing.
 - [ ] AI-assisted question selection and the broader student analytics APIs in
       this roadmap remain not implemented.
 
@@ -61,9 +67,25 @@ to a subject, and a chapter belongs to a course.
 | Paid access      | [x]                                         | Course/chapter pricing, `StudentEntitlement`, carts, manual-payment orders, proof review, and payment-backed grants exist.                                                                                                                              | No refunds, payment expiry, or PSP integration.                                                   |
 | Questions        | [x] Authoring, direct practice, and assessments | Questions are linked to a course and may be placed at course/chapter/lesson/section level; eligible published questions can be delivered for direct practice with immutable answer-attempt history. Student- and admin-generated assessments freeze an immutable question/option snapshot with a full attempt lifecycle. | No AI-assisted selection, difficulty bands, marked/omitted-question filters, or assessment-history analytics. |
 | Content delivery | [x] Foundation, completion, and study state | An entitled student can fetch a content item and its protected assets, view completion/study state, record activity/resume position, and retrieve the next continue-learning item. Current-grade and accessible-library progress rollups are available. | Higher-level completion remains derived from content-item completion.                             |
+| Student administration | [x] Account support and lifecycle | `ADMIN`/`SUPER_ADMIN` can list/search/filter safe student accounts, view a safe detail response, suspend/reactivate, soft-delete with a reason, and issue a forced password reset. The reset revokes sessions and requires the student to choose a new password before accessing protected routes. | No consolidated admin view of a student's orders, entitlements, and performance; parent administration is also absent. |
 
 Question banks and sources are authoring/provenance metadata. They are not a
 student catalogue concept and must not be exposed in learner responses.
+
+## Implemented student account administration
+
+These support endpoints are restricted to `ADMIN` and `SUPER_ADMIN`, except
+that administrator-password resets remain restricted to `SUPER_ADMIN`.
+
+| Status | Endpoint | Purpose |
+| ------ | -------- | ------- |
+| [x] | `GET /api/v1/admin/students` | Paginated safe student directory with search plus grade, governorate, center, and status filters. |
+| [x] | `GET /api/v1/admin/students/:id` | Safe account/profile detail; full National ID and password data are never returned. |
+| [x] | `POST /api/v1/admin/students/:id/suspend` | Suspend the account and revoke its student and selected-parent sessions. |
+| [x] | `POST /api/v1/admin/students/:id/reactivate` | Reactivate a suspended student. |
+| [x] | `DELETE /api/v1/admin/students/:id` | Soft-delete an active or suspended student with a required deletion reason and revoke sessions. |
+| [x] | `POST /api/v1/admin/students/:id/reset-password` | Return a temporary password, revoke sessions, and force a password change at next login. |
+| [x] | `POST /api/v1/admin/admins/:id/reset-password` | Super-admin-only administrator password reset with the same forced-change/session-revocation behavior. |
 
 ## API design: two catalogue views
 
@@ -94,6 +116,10 @@ Completed equivalents:
 The existing `GET /api/v1/catalog/subjects?academicGradeId=` and
 `GET /api/v1/catalog/courses?subjectId=` can remain. The nested routes above make the
 hierarchy discoverable without the frontend constructing filters itself.
+
+Every expandable grade, subject, course, chapter, and lesson response includes
+`hasChildren`, calculated only from visible children. This lets a client show
+an expand affordance without speculative child-list calls.
 
 ### B. Student catalogue — current grade and personal access state
 
@@ -135,6 +161,12 @@ forcing the frontend to infer it from many fields:
 covered by a course entitlement is `ENTITLED`; it should never be offered for
 sale again. A course page may show a purchasable chapter only when the student
 does not already own the whole course or that chapter.
+
+Administrative `GET /api/v1/admin/courses` / `:id` and
+`GET /api/v1/admin/chapters` / `:id` responses include a resolved `pricing`
+object. For chapters this distinguishes a local override from inherited course
+pricing through `resolvedFrom`, so staff UIs do not need to reproduce the
+inheritance rule.
 
 ## Purchase model: courses and chapters
 
