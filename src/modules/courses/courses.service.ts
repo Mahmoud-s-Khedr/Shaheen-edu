@@ -113,7 +113,7 @@ export class CoursesService {
 
   async getById(actor: RequestUser, id: string) {
     this.assertActorRole(actor);
-    return this.toSummary(await this.getOrThrow(id));
+    return this.toReadSummary(await this.getOrThrow(id));
   }
 
   async list(actor: RequestUser, query: QueryCourseDto) {
@@ -132,7 +132,7 @@ export class CoursesService {
       this.prisma.course.count({ where }),
     ]);
     return {
-      data: items.map((item) => this.toSummary(item)),
+      data: items.map((item) => this.toReadSummary(item)),
       meta: toPaginationMeta(query.page, query.limit, total),
     };
   }
@@ -444,6 +444,35 @@ export class CoursesService {
       updatedAt: record.updatedAt,
       publishedAt: record.publishedAt,
       archivedAt: record.archivedAt,
+    };
+  }
+
+  private toReadSummary(record: {
+    id: string;
+    subjectId: string;
+    title: string;
+    slug: string;
+    description: string | null;
+    sortOrder: number;
+    status: ContentStatus;
+    createdAt: Date;
+    updatedAt: Date;
+    publishedAt: Date | null;
+    archivedAt: Date | null;
+    accessType: AccessType;
+    coverAssetId: string | null;
+    isPurchasable: boolean;
+    priceMinor: number | null;
+    currency: string | null;
+  }) {
+    return {
+      ...this.toSummary(record),
+      pricing: {
+        isPurchasable: record.isPurchasable,
+        priceMinor: record.isPurchasable ? record.priceMinor : null,
+        currency: record.isPurchasable ? record.currency : null,
+        resolvedFrom: { courseId: record.id },
+      },
     };
   }
 }

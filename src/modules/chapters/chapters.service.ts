@@ -112,7 +112,14 @@ export class ChaptersService {
 
   async getById(actor: RequestUser, id: string) {
     this.assertActorRole(actor);
-    return this.toSummary(await this.getOrThrow(id));
+    const record = await this.prisma.chapter.findUnique({
+      where: { id },
+      include: { course: true },
+    });
+    if (!record) {
+      throw new NotFoundException('Chapter not found');
+    }
+    return this.toReadSummary(record);
   }
 
   async list(actor: RequestUser, query: QueryChapterDto) {
@@ -124,6 +131,7 @@ export class ChaptersService {
     const [items, total] = await this.prisma.$transaction([
       this.prisma.chapter.findMany({
         where,
+        include: { course: true },
         orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
         skip: (query.page - 1) * query.limit,
         take: query.limit,
@@ -131,7 +139,7 @@ export class ChaptersService {
       this.prisma.chapter.count({ where }),
     ]);
     return {
-      data: items.map((item) => this.toSummary(item)),
+      data: items.map((item) => this.toReadSummary(item)),
       meta: toPaginationMeta(query.page, query.limit, total),
     };
   }
@@ -438,6 +446,45 @@ export class ChaptersService {
       updatedAt: record.updatedAt,
       publishedAt: record.publishedAt,
       archivedAt: record.archivedAt,
+    };
+  }
+
+  private toReadSummary(record: {
+    id: string;
+    courseId: string;
+    title: string;
+    slug: string;
+    description: string | null;
+    sortOrder: number;
+    status: ContentStatus;
+    createdAt: Date;
+    updatedAt: Date;
+    publishedAt: Date | null;
+    archivedAt: Date | null;
+    accessType: AccessType;
+    coverAssetId: string | null;
+    isPurchasable: boolean | null;
+    priceMinor: number | null;
+    currency: string | null;
+    course: {
+      id: string;
+      isPurchasable: boolean;
+      priceMinor: number | null;
+      currency: string | null;
+    };
+  }) {
+    const source = record.isPurchasable === null ? record.course : record;
+    return {
+      ...this.toSummary(record),
+      pricing: {
+        isPurchasable: source.isPurchasable,
+        priceMinor: source.isPurchasable ? source.priceMinor : null,
+        currency: source.isPurchasable ? source.currency : null,
+        resolvedFrom:
+          record.isPurchasable === null
+            ? { courseId: record.course.id }
+            : { chapterId: record.id },
+      },
     };
   }
 }

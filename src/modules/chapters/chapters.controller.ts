@@ -30,8 +30,9 @@ import { UpdateAccessTypeDto } from '../../common/dto/update-access-type.dto';
 import type { RequestUser } from '../../common/types/request-with-user.types';
 import { ApiStandardErrors } from '../../common/decorators/api-standard-errors.decorator';
 import {
+  AdminChapterReadDto,
   ChapterSummaryDto,
-  PaginatedChapterResponseDto,
+  PaginatedAdminChapterReadResponseDto,
 } from '../../common/dto/api-response.dto';
 
 @ApiTags('admin/chapters')
@@ -56,7 +57,7 @@ export class ChaptersController {
     description:
       'Returns chapters ordered by sortOrder using offset pagination.',
   })
-  @ApiOkResponse({ type: PaginatedChapterResponseDto })
+  @ApiOkResponse({ type: PaginatedAdminChapterReadResponseDto })
   @ApiStandardErrors(400, 401, 403)
   list(@CurrentUser() actor: RequestUser, @Query() query: QueryChapterDto) {
     return this.chaptersService.list(actor, query);
@@ -64,7 +65,7 @@ export class ChaptersController {
 
   @Get(':id')
   @ApiOperation({ summary: 'Get a chapter by ID' })
-  @ApiOkResponse({ type: ChapterSummaryDto })
+  @ApiOkResponse({ type: AdminChapterReadDto })
   @ApiStandardErrors(401, 403, 404)
   getById(@CurrentUser() actor: RequestUser, @Param('id') id: string) {
     return this.chaptersService.getById(actor, id);

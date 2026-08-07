@@ -30,8 +30,9 @@ import { UpdateAccessTypeDto } from '../../common/dto/update-access-type.dto';
 import type { RequestUser } from '../../common/types/request-with-user.types';
 import { ApiStandardErrors } from '../../common/decorators/api-standard-errors.decorator';
 import {
+  AdminCourseReadDto,
   CourseSummaryDto,
-  PaginatedCourseResponseDto,
+  PaginatedAdminCourseReadResponseDto,
 } from '../../common/dto/api-response.dto';
 
 @ApiTags('admin/courses')
@@ -56,7 +57,7 @@ export class CoursesController {
     description:
       'Returns courses ordered by sortOrder using offset pagination.',
   })
-  @ApiOkResponse({ type: PaginatedCourseResponseDto })
+  @ApiOkResponse({ type: PaginatedAdminCourseReadResponseDto })
   @ApiStandardErrors(400, 401, 403)
   list(@CurrentUser() actor: RequestUser, @Query() query: QueryCourseDto) {
     return this.coursesService.list(actor, query);
@@ -64,7 +65,7 @@ export class CoursesController {
 
   @Get(':id')
   @ApiOperation({ summary: 'Get a course by ID' })
-  @ApiOkResponse({ type: CourseSummaryDto })
+  @ApiOkResponse({ type: AdminCourseReadDto })
   @ApiStandardErrors(401, 403, 404)
   getById(@CurrentUser() actor: RequestUser, @Param('id') id: string) {
     return this.coursesService.getById(actor, id);

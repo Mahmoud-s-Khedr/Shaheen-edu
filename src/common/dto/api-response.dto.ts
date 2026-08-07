@@ -356,9 +356,43 @@ export class CourseSummaryDto extends HierarchySummaryDto {
   subjectId!: string;
 }
 
+export class EffectivePricingResolvedFromDto {
+  @ApiPropertyOptional({ type: String })
+  courseId?: string;
+
+  @ApiPropertyOptional({ type: String })
+  chapterId?: string;
+}
+
+export class EffectivePricingDto {
+  @ApiProperty({ example: true })
+  isPurchasable!: boolean;
+
+  @ApiProperty({ type: Number, nullable: true, example: 20000 })
+  priceMinor!: number | null;
+
+  @ApiProperty({ type: String, nullable: true, example: 'EGP' })
+  currency!: string | null;
+
+  @ApiProperty({ type: EffectivePricingResolvedFromDto })
+  resolvedFrom!: EffectivePricingResolvedFromDto;
+}
+
+/** Returned by the admin course GET endpoints. */
+export class AdminCourseReadDto extends CourseSummaryDto {
+  @ApiProperty({ type: EffectivePricingDto })
+  pricing!: EffectivePricingDto;
+}
+
 export class ChapterSummaryDto extends HierarchySummaryDto {
   @ApiProperty()
   courseId!: string;
+}
+
+/** Returned by the admin chapter GET endpoints. */
+export class AdminChapterReadDto extends ChapterSummaryDto {
+  @ApiProperty({ type: EffectivePricingDto })
+  pricing!: EffectivePricingDto;
 }
 
 export class LessonSummaryDto extends HierarchySummaryDto {
@@ -395,9 +429,25 @@ export class PaginatedCourseResponseDto {
   meta!: PaginationMetaDto;
 }
 
+export class PaginatedAdminCourseReadResponseDto {
+  @ApiProperty({ type: [AdminCourseReadDto] })
+  data!: AdminCourseReadDto[];
+
+  @ApiProperty({ type: PaginationMetaDto })
+  meta!: PaginationMetaDto;
+}
+
 export class PaginatedChapterResponseDto {
   @ApiProperty({ type: [ChapterSummaryDto] })
   data!: ChapterSummaryDto[];
+
+  @ApiProperty({ type: PaginationMetaDto })
+  meta!: PaginationMetaDto;
+}
+
+export class PaginatedAdminChapterReadResponseDto {
+  @ApiProperty({ type: [AdminChapterReadDto] })
+  data!: AdminChapterReadDto[];
 
   @ApiProperty({ type: PaginationMetaDto })
   meta!: PaginationMetaDto;

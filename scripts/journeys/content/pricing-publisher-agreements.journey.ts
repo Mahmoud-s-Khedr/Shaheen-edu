@@ -9,6 +9,7 @@ export const pricingPublisherAgreementsJourney: JourneyDefinition = {
   dependsOn: ['CONTENT-001', 'AUTH-003'],
   async run({ clients, context, step }) {
     const admin = clients.admin;
+    const subjectId = String(context.academic.subjectId);
     const courseId = String(context.academic.courseId);
     const chapterId = String(context.academic.chapterId);
     const lessonId = String(context.academic.lessonId);
@@ -24,9 +25,34 @@ export const pricingPublisherAgreementsJourney: JourneyDefinition = {
       const inherited = await admin.request<any>('GET', `/admin/pricing/effective?lessonId=${lessonId}`);
       expectStatus(inherited, 200);
       assert(inherited.body.priceMinor === 20_000 && inherited.body.resolvedFrom.courseId === courseId, 'Lesson must inherit its course pricing');
+
+      const courseDetail = await admin.request<any>('GET', `/admin/courses/${courseId}`);
+      const courseList = await admin.request<any>('GET', `/admin/courses?subjectId=${subjectId}`);
+      expectStatus(courseDetail, 200);
+      expectStatus(courseList, 200);
+      const listedCourse = courseList.body.data.find((course: any) => course.id === courseId);
+      assert(courseDetail.body.pricing?.isPurchasable === true && courseDetail.body.pricing.priceMinor === 20_000 && courseDetail.body.pricing.currency === 'EGP' && courseDetail.body.pricing.resolvedFrom.courseId === courseId, 'Course detail must expose its effective pricing');
+      assert(listedCourse?.pricing?.isPurchasable === true && listedCourse.pricing.priceMinor === 20_000 && listedCourse.pricing.currency === 'EGP' && listedCourse.pricing.resolvedFrom.courseId === courseId, 'Course list must expose its effective pricing');
+
+      const chapterDetail = await admin.request<any>('GET', `/admin/chapters/${chapterId}`);
+      const chapterList = await admin.request<any>('GET', `/admin/chapters?courseId=${courseId}`);
+      expectStatus(chapterDetail, 200);
+      expectStatus(chapterList, 200);
+      const listedChapter = chapterList.body.data.find((chapter: any) => chapter.id === chapterId);
+      assert(chapterDetail.body.pricing?.isPurchasable === true && chapterDetail.body.pricing.priceMinor === 20_000 && chapterDetail.body.pricing.currency === 'EGP' && chapterDetail.body.pricing.resolvedFrom.courseId === courseId, 'Chapter detail must expose inherited course pricing');
+      assert(listedChapter?.pricing?.isPurchasable === true && listedChapter.pricing.priceMinor === 20_000 && listedChapter.pricing.currency === 'EGP' && listedChapter.pricing.resolvedFrom.courseId === courseId, 'Chapter list must expose inherited course pricing');
+
       const override = await admin.request<any>('POST', `/admin/pricing/chapter/${chapterId}`, { isPurchasable: false });
       expectStatus(override, 201);
       assert(override.body.isPurchasable === false && override.body.resolvedFrom.chapterId === chapterId, 'Chapter override must supersede course pricing');
+
+      const overriddenDetail = await admin.request<any>('GET', `/admin/chapters/${chapterId}`);
+      const overriddenList = await admin.request<any>('GET', `/admin/chapters?courseId=${courseId}`);
+      expectStatus(overriddenDetail, 200);
+      expectStatus(overriddenList, 200);
+      const listedOverride = overriddenList.body.data.find((chapter: any) => chapter.id === chapterId);
+      assert(overriddenDetail.body.pricing?.isPurchasable === false && overriddenDetail.body.pricing.priceMinor === null && overriddenDetail.body.pricing.currency === null && overriddenDetail.body.pricing.resolvedFrom.chapterId === chapterId, 'Chapter detail must expose its non-purchasable override');
+      assert(listedOverride?.pricing?.isPurchasable === false && listedOverride.pricing.priceMinor === null && listedOverride.pricing.currency === null && listedOverride.pricing.resolvedFrom.chapterId === chapterId, 'Chapter list must expose its non-purchasable override');
     });
 
     await step('Activating course and chapter publisher agreements with chapter precedence', async () => {
