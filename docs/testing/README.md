@@ -6,8 +6,8 @@ Use `pnpm journey:list` to inspect IDs, individual `journey:*` scripts for focus
 
 ## Full local API acceptance
 
-`pnpm api:contract:check` verifies that the 183-operation OpenAPI inventory in
-`docs-json.json` is identical to the inventory in `docs/api-reference.md`.
+`pnpm api:contract:check` verifies that the 262-operation OpenAPI inventory in
+`docs-json.json` is identical to the inventory in `docs/api-reference-detailed.md`.
 
 The full suite treats an operation as covered only when a real application
 request reaches it. Cleanup traffic is deliberately excluded from coverage.

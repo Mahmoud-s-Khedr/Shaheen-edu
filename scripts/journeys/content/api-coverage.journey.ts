@@ -38,10 +38,37 @@ export const apiCoverageJourney: JourneyDefinition = {
       'AUTH-005 must provide a second registered student for entitlement coverage',
     );
 
-    await step('Listing administrators and partners created by earlier journeys', async () => {
+    await step('Listing administrators, partners, and students created by earlier journeys', async () => {
       expectStatus(await clients.superAdmin.request('GET', '/admin/admins'), 200);
       expectStatus(await admin.request('GET', '/admin/partners'), 200);
       expectStatus(await admin.request('GET', `/admin/partners/${context.partner.id}`), 200);
+      expectStatus(await admin.request('GET', '/admin/students'), 200);
+      expectStatus(await admin.request('GET', `/admin/students/${catalogStudent.id}`), 200);
+    });
+
+    await step('Soft-deleting a disposable student account', async () => {
+      const disposableStudent = await clients.public.request<any>(
+        'POST',
+        '/auth/students/register',
+        {
+          fullName: factory.title('Disposable coverage student'),
+          nationalId: factory.nationalId(),
+          phone: `+20${factory.phone().slice(1)}`,
+          parentPhone: factory.phone(),
+          governorateId: String(context.academic.governorateId),
+          academicGradeId: grade,
+          password: factory.password('DisposableCoverage'),
+        },
+      );
+      expectStatus(disposableStudent, 201);
+      context.created.students.push(disposableStudent.body.user.id);
+      const deleted = await admin.request<any>(
+        'DELETE',
+        `/admin/students/${disposableStudent.body.user.id}`,
+        { deletionReason: 'Disposable API acceptance coverage account' },
+      );
+      expectStatus(deleted, 200);
+      assert(deleted.body.deleted === true, 'Student deletion must be confirmed');
     });
 
     await step('Listing, reading, updating, and reordering every hierarchy level', async () => {

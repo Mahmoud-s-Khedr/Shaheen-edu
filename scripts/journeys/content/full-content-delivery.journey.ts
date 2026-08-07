@@ -4,7 +4,10 @@ import { assert, expectStatus, expectString } from '../lib/assertions.js';
 import { fetchDeliveryUrl } from '../lib/delivery.js';
 import type { JourneyDefinition } from '../lib/types.js';
 
-const testPdf = resolve(process.cwd(), 'test-files', '0-387-28132-0.pdf');
+// Keep the acceptance fixture below the documented 25 MiB default asset limit.
+// This journey verifies authorization, delivery, and access control—not the
+// deployment-specific maximum upload size.
+const testPdf = resolve(process.cwd(), 'test-files', '1-84628-843-6.pdf');
 
 /**
  * CONTENT-003 — End-to-end content delivery across Phases 1-4.

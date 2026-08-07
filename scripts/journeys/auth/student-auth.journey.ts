@@ -11,7 +11,14 @@ export const studentJourney: JourneyDefinition = {
       const created = await clients.admin.request<any>('POST', '/admin/academic-grades', { title: factory.localizedTitle('Registration grade'), slug: factory.slug('registration-grade') }); expectStatus(created, 201);
       const beforePublish = await clients.public.request<any>('GET', '/academic-grades'); expectStatus(beforePublish, 200); assert(!beforePublish.body.data.some((grade: any) => grade.id === created.body.id), 'Draft grades must not be public');
       const published = await clients.admin.request<any>('POST', `/admin/academic-grades/${created.body.id}/publish`, { version: created.body.version }); expectStatus(published, 201);
-      const grades = await clients.public.request<any>('GET', '/academic-grades?limit=100'); expectStatus(grades, 200); const selected = grades.body.data.find((grade: any) => grade.id === created.body.id); assert(selected?.status === 'PUBLISHED', 'Published grade must be selectable'); academicGradeId = selected.id; context.academic.gradeId = academicGradeId; context.academic.governorateId = governorateId; context.created.grades.push(academicGradeId);
+      let selected: any;
+      for (let page = 1; !selected; page += 1) {
+        const grades = await clients.public.request<any>('GET', `/academic-grades?limit=100&page=${page}`);
+        expectStatus(grades, 200);
+        selected = grades.body.data.find((grade: any) => grade.id === created.body.id);
+        if (page >= grades.body.meta.totalPages) break;
+      }
+      assert(selected?.status === 'PUBLISHED', 'Published grade must be selectable'); academicGradeId = selected.id; context.academic.gradeId = academicGradeId; context.academic.governorateId = governorateId; context.created.grades.push(academicGradeId);
     });
     const payload = { fullName: factory.title('Student'), nationalId, phone: `+20${phone.slice(1)}`, parentPhone, governorateId, academicGradeId, password };
     await step('Registering a normalized student account', async () => {

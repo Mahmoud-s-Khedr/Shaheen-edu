@@ -5927,6 +5927,133 @@ No path, query, or header input.
 }
 ```
 
+## Student administration
+
+### `POST /api/v1/admin/admins/{id}/reset-password`
+
+**Authorization:** Bearer token; role must be `SUPER_ADMIN`
+
+**Request**
+
+- path `id` (required)
+
+**Success response — HTTP 201 (PasswordResetResponseDto)**
+
+```json
+{
+  "temporaryPassword": "string",
+  "passwordResetAt": "ISO-8601 date-time"
+}
+```
+
+### `GET /api/v1/admin/students`
+
+**Authorization:** Bearer token; role must be `ADMIN` or `SUPER_ADMIN`
+
+**Request**
+
+- query `page`, `limit`, `search`, `status` (`ACTIVE | SUSPENDED | DISABLED`), `governorateId`, `centerId`, and `academicGradeId` (all optional)
+
+**Success response — HTTP 200 (PaginatedAdminStudentResponseDto)**
+
+```json
+{
+  "data": ["AdminStudentSummaryDto"],
+  "meta": "PaginationMetaDto"
+}
+```
+
+### `GET /api/v1/admin/students/{id}`
+
+**Authorization:** Bearer token; role must be `ADMIN` or `SUPER_ADMIN`
+
+**Request**
+
+- path `id` (required)
+
+**Success response — HTTP 200 (AdminStudentDetailDto)**
+
+```json
+{
+  "id": "string",
+  "fullName": "string",
+  "phone": "string",
+  "status": "ACTIVE | SUSPENDED | DISABLED",
+  "nationalIdLast4": "string",
+  "academicGradeId": "string | null",
+  "academicGrade": "{ ar, en } | null",
+  "governorate": "{ id, name } | null",
+  "center": "{ id, name, governorateId } | null",
+  "createdAt": "ISO-8601 date-time",
+  "lastLoginAt": "ISO-8601 date-time | null",
+  "deletedAt": "ISO-8601 date-time | null"
+}
+```
+
+### `POST /api/v1/admin/students/{id}/suspend`
+
+**Authorization:** Bearer token; role must be `ADMIN` or `SUPER_ADMIN`
+
+**Request**
+
+- path `id` (required)
+
+**Success response — HTTP 200 (AdminStudentSummaryDto)**
+
+Returns the student summary with `status` set to `SUSPENDED`.
+
+### `POST /api/v1/admin/students/{id}/reactivate`
+
+**Authorization:** Bearer token; role must be `ADMIN` or `SUPER_ADMIN`
+
+**Request**
+
+- path `id` (required)
+
+**Success response — HTTP 200 (AdminStudentSummaryDto)**
+
+Returns the reactivated student summary.
+
+### `POST /api/v1/admin/students/{id}/reset-password`
+
+**Authorization:** Bearer token; role must be `ADMIN` or `SUPER_ADMIN`
+
+**Request**
+
+- path `id` (required)
+
+**Success response — HTTP 200 (PasswordResetResponseDto)**
+
+```json
+{
+  "temporaryPassword": "string",
+  "passwordResetAt": "ISO-8601 date-time"
+}
+```
+
+### `DELETE /api/v1/admin/students/{id}`
+
+**Authorization:** Bearer token; role must be `ADMIN` or `SUPER_ADMIN`
+
+**Request**
+
+- path `id` (required)
+
+```json
+{
+  "deletionReason": "string (1-2000 characters)"
+}
+```
+
+**Success response — HTTP 200**
+
+```json
+{
+  "id": "string",
+  "deleted": true
+}
+```
+
 ## Geography
 
 ### `GET /api/v1/geography/governorates`
