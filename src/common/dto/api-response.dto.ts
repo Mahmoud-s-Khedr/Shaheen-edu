@@ -7,6 +7,8 @@ import {
   ContentItemType,
   AccessType,
   AssetKind,
+  AssetStatus,
+  VideoProcessingStatus,
 } from '../types/roles.enum';
 
 /** Localized values returned by persisted resources; migrated records may not have English yet. */
@@ -536,6 +538,9 @@ export class ContentItemSummaryDto {
   @ApiPropertyOptional({ type: String, nullable: true })
   primaryAssetId!: string | null;
 
+  @ApiPropertyOptional({ type: () => ContentPrimaryAssetSummaryDto, nullable: true })
+  primaryAsset!: ContentPrimaryAssetSummaryDto | null;
+
   @ApiProperty({ type: ContentPlacementSummaryDto })
   placement!: ContentPlacementSummaryDto;
 
@@ -551,6 +556,48 @@ export class ContentItemSummaryDto {
   @ApiPropertyOptional({ type: String, format: 'date-time', nullable: true })
   archivedAt!: Date | null;
 
+}
+
+export class ContentPrimaryAssetSummaryDto {
+  @ApiProperty()
+  id!: string;
+
+  @ApiProperty({ enum: AssetKind })
+  kind!: AssetKind;
+
+  @ApiProperty({ enum: AssetStatus })
+  status!: AssetStatus;
+
+  @ApiPropertyOptional({ enum: VideoProcessingStatus, nullable: true })
+  processingStatus!: VideoProcessingStatus | null;
+
+  @ApiPropertyOptional({ type: Number, nullable: true })
+  processingProgress!: number | null;
+}
+
+export class ContentPrimaryAssetVideoDto {
+  @ApiProperty({ enum: VideoProcessingStatus })
+  processingStatus!: VideoProcessingStatus;
+
+  @ApiProperty()
+  processingProgress!: number;
+
+  @ApiProperty()
+  attempt!: number;
+
+  @ApiPropertyOptional({ type: String, format: 'date-time', nullable: true })
+  readyAt!: Date | null;
+
+  @ApiPropertyOptional({ type: String, format: 'date-time', nullable: true })
+  failedAt!: Date | null;
+}
+
+export class ContentPrimaryAssetDetailDto extends ContentPrimaryAssetSummaryDto {
+  @ApiProperty()
+  filename!: string;
+
+  @ApiPropertyOptional({ type: () => ContentPrimaryAssetVideoDto, nullable: true })
+  video!: ContentPrimaryAssetVideoDto | null;
 }
 
 export class ContentAttachmentDto {
@@ -575,6 +622,9 @@ export class ContentAttachmentDto {
 
 /** Full admin read shape; list and mutation responses remain summaries. */
 export class ContentItemDetailDto extends ContentItemSummaryDto {
+  @ApiPropertyOptional({ type: () => ContentPrimaryAssetDetailDto, nullable: true })
+  declare primaryAsset: ContentPrimaryAssetDetailDto | null;
+
   @ApiProperty({ type: [ContentAttachmentDto] })
   attachments!: ContentAttachmentDto[];
 }

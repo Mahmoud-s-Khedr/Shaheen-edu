@@ -229,7 +229,7 @@ describe('Video assets (e2e)', () => {
       expect(second?.clientUploadCompletedAt).toEqual(first?.clientUploadCompletedAt);
     });
 
-    it('blocks attaching the video to content while it is not ready', async () => {
+    it('allows attaching an in-flight video and reports its state', async () => {
       // Build and publish the delivery hierarchy up front.
       const gradeId = json(
         await app.inject({
@@ -286,7 +286,74 @@ describe('Video assets (e2e)', () => {
         headers: admin(),
         payload: { assetId },
       });
-      expect(attach.statusCode).toBe(409);
+      expect(attach.statusCode).toBe(201);
+      expect(json(attach).primaryAsset).toMatchObject({
+        id: assetId,
+        kind: 'VIDEO',
+        status: 'UPLOADED_AWAITING_PROCESSING',
+        processingStatus: 'UPLOADING',
+        processingProgress: 0,
+      });
+
+      const detail = await app.inject({
+        method: 'GET',
+        url: `/api/v1/admin/content-items/${contentId}`,
+        headers: admin(),
+      });
+      expect(detail.statusCode).toBe(200);
+      expect(json(detail).primaryAsset).toMatchObject({
+        id: assetId,
+        filename: 'video',
+        video: {
+          processingStatus: 'UPLOADING',
+          processingProgress: 0,
+          attempt: 1,
+          readyAt: null,
+          failedAt: null,
+        },
+      });
+
+      const list = await app.inject({
+        method: 'GET',
+        url: `/api/v1/admin/content-items?courseId=${courseId}`,
+        headers: admin(),
+      });
+      expect(list.statusCode).toBe(200);
+      expect(json(list).data).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            id: contentId,
+            primaryAsset: expect.objectContaining({
+              id: assetId,
+              status: 'UPLOADED_AWAITING_PROCESSING',
+              processingStatus: 'UPLOADING',
+              processingProgress: 0,
+            }),
+          }),
+        ]),
+      );
+
+      const publish = await app.inject({
+        method: 'POST',
+        url: `/api/v1/admin/content-items/${contentId}/publish`,
+        headers: admin(),
+      });
+      expect(publish.statusCode).toBe(409);
+      expect(json(publish)).toMatchObject({
+        code: 'VIDEO_NOT_READY',
+        message: {
+          en: 'Video is not ready for publication',
+          ar: 'الفيديو غير جاهز للنشر',
+        },
+        meta: {
+          assetId,
+          assetStatus: 'UPLOADED_AWAITING_PROCESSING',
+          processingStatus: 'UPLOADING',
+          processingProgress: 0,
+          readyAt: null,
+          failedAt: null,
+        },
+      });
     });
 
     it('marks the video ready on a signed processing-complete webhook', async () => {

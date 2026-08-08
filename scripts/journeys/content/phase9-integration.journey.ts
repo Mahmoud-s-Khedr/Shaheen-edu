@@ -158,6 +158,30 @@ export const phase9IntegrationJourney: JourneyDefinition = {
         });
         expectStatus(video, 201);
         videoAssetId = video.body.id;
+        const videoItem = await admin.request<any>(
+          'POST',
+          '/admin/content-items',
+          {
+            type: 'VIDEO',
+            title: factory.title('Phase 9 video lesson'),
+            placement: { chapterId },
+          },
+        );
+        expectStatus(videoItem, 201);
+        videoContentId = videoItem.body.id;
+        const linked = await admin.request<any>(
+          'POST',
+          `/admin/content-items/${videoContentId}/primary-asset`,
+          { assetId: videoAssetId },
+        );
+        expectStatus(linked, 201);
+        assert(linked.body.primaryAsset?.id === videoAssetId && linked.body.primaryAsset?.status === 'PENDING_UPLOAD', 'Video content must link before upload completes');
+        const unreadyPublish = await admin.request<any>(
+          'POST',
+          `/admin/content-items/${videoContentId}/publish`,
+        );
+        expectStatus(unreadyPublish, 409);
+        assert(unreadyPublish.body.code === 'VIDEO_NOT_READY' && unreadyPublish.body.meta?.assetId === videoAssetId && unreadyPublish.body.meta?.assetStatus === 'PENDING_UPLOAD' && unreadyPublish.body.meta?.processingStatus === 'CREATED', 'Unready video publication must return actionable processing metadata');
         const authorization = await admin.request<any>(
           'POST',
           `/admin/video-assets/${videoAssetId}/upload-authorization`,
@@ -220,25 +244,6 @@ export const phase9IntegrationJourney: JourneyDefinition = {
         );
         expectStatus(adminPreview, 200);
         expectString(adminPreview.body.embedUrl, 'admin video preview URL');
-        const videoItem = await admin.request<any>(
-          'POST',
-          '/admin/content-items',
-          {
-            type: 'VIDEO',
-            title: factory.title('Phase 9 video lesson'),
-            placement: { chapterId },
-          },
-        );
-        expectStatus(videoItem, 201);
-        videoContentId = videoItem.body.id;
-        expectStatus(
-          await admin.request<any>(
-            'POST',
-            `/admin/content-items/${videoContentId}/primary-asset`,
-            { assetId: videoAssetId },
-          ),
-          201,
-        );
         expectStatus(
           await admin.request<any>(
             'POST',

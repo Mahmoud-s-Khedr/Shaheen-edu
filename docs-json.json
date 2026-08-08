@@ -17476,6 +17476,59 @@
           "placement"
         ]
       },
+      "ContentPrimaryAssetSummaryDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "COVER_IMAGE",
+              "IMAGE",
+              "PAYMENT_PROOF",
+              "PDF",
+              "DOCUMENT",
+              "DOWNLOADABLE_FILE",
+              "VIDEO"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING_UPLOAD",
+              "UPLOADING",
+              "UPLOADED_AWAITING_PROCESSING",
+              "PROCESSING",
+              "READY",
+              "FAILED",
+              "ARCHIVED"
+            ]
+          },
+          "processingStatus": {
+            "type": "string",
+            "enum": [
+              "CREATED",
+              "UPLOADING",
+              "QUEUED",
+              "PROCESSING",
+              "READY",
+              "FAILED"
+            ],
+            "nullable": true
+          },
+          "processingProgress": {
+            "type": "number",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "status"
+        ]
+      },
       "ContentPlacementSummaryDto": {
         "type": "object",
         "properties": {
@@ -17565,6 +17618,15 @@
             "type": "string",
             "nullable": true
           },
+          "primaryAsset": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ContentPrimaryAssetSummaryDto"
+              }
+            ]
+          },
           "placement": {
             "$ref": "#/components/schemas/ContentPlacementSummaryDto"
           },
@@ -17614,6 +17676,109 @@
         "required": [
           "data",
           "meta"
+        ]
+      },
+      "ContentPrimaryAssetVideoDto": {
+        "type": "object",
+        "properties": {
+          "processingStatus": {
+            "type": "string",
+            "enum": [
+              "CREATED",
+              "UPLOADING",
+              "QUEUED",
+              "PROCESSING",
+              "READY",
+              "FAILED"
+            ]
+          },
+          "processingProgress": {
+            "type": "number"
+          },
+          "attempt": {
+            "type": "number"
+          },
+          "readyAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "failedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": [
+          "processingStatus",
+          "processingProgress",
+          "attempt"
+        ]
+      },
+      "ContentPrimaryAssetDetailDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "COVER_IMAGE",
+              "IMAGE",
+              "PAYMENT_PROOF",
+              "PDF",
+              "DOCUMENT",
+              "DOWNLOADABLE_FILE",
+              "VIDEO"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING_UPLOAD",
+              "UPLOADING",
+              "UPLOADED_AWAITING_PROCESSING",
+              "PROCESSING",
+              "READY",
+              "FAILED",
+              "ARCHIVED"
+            ]
+          },
+          "processingStatus": {
+            "type": "string",
+            "enum": [
+              "CREATED",
+              "UPLOADING",
+              "QUEUED",
+              "PROCESSING",
+              "READY",
+              "FAILED"
+            ],
+            "nullable": true
+          },
+          "processingProgress": {
+            "type": "number",
+            "nullable": true
+          },
+          "filename": {
+            "type": "string"
+          },
+          "video": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ContentPrimaryAssetVideoDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "status",
+          "filename"
         ]
       },
       "ContentAttachmentDto": {
@@ -17713,6 +17878,15 @@
           "primaryAssetId": {
             "type": "string",
             "nullable": true
+          },
+          "primaryAsset": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ContentPrimaryAssetDetailDto"
+              }
+            ]
           },
           "placement": {
             "$ref": "#/components/schemas/ContentPlacementSummaryDto"

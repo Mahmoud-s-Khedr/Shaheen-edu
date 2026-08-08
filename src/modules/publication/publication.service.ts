@@ -1,6 +1,7 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { AssetKind, AssetStatus, ContentItemType, ContentStatus, VideoProcessingStatus } from '../../common/types/roles.enum';
 import { PrismaService } from '../../database/prisma.service';
+import { AppException } from '../../common/exceptions/app.exception';
 
 export type PublishableResource = 'academicGrade' | 'subject' | 'course' | 'chapter' | 'lesson' | 'section' | 'contentItem';
 
@@ -103,14 +104,36 @@ export class PublicationService {
     }
     const expectedKind = assetKindForType[item.type as ContentItemType];
     if (!expectedKind) return;
-    if (!item.primaryAssetId) throw new ConflictException('Asset-backed content requires a primary asset before publication');
+    if (!item.primaryAssetId) {
+      if (item.type === ContentItemType.VIDEO) throw this.videoNotReady(null);
+      throw new ConflictException('Asset-backed content requires a primary asset before publication');
+    }
     const asset = await tx.asset.findUnique({ where: { id: item.primaryAssetId }, include: { video: true } });
+    if (item.type === ContentItemType.VIDEO && (!asset || asset.kind !== AssetKind.VIDEO || asset.status !== AssetStatus.READY || asset.video?.processingStatus !== VideoProcessingStatus.READY)) {
+      throw this.videoNotReady(asset);
+    }
     if (!asset || asset.status !== AssetStatus.READY || asset.kind !== expectedKind) {
       throw new ConflictException('Content requires a ready, compatible primary asset');
     }
     if (item.type === ContentItemType.VIDEO && asset.video?.processingStatus !== VideoProcessingStatus.READY) {
       throw new ConflictException('Video processing must complete before publication');
     }
+  }
+
+  private videoNotReady(asset: any): AppException {
+    return new AppException(
+      'Video is not ready for publication',
+      409,
+      'VIDEO_NOT_READY',
+      {
+        assetId: asset?.id ?? null,
+        assetStatus: asset?.status ?? null,
+        processingStatus: asset?.video?.processingStatus ?? null,
+        processingProgress: asset?.video?.processingProgress ?? null,
+        readyAt: asset?.readyAt ?? null,
+        failedAt: asset?.failedAt ?? null,
+      },
+    );
   }
 
   private async assertAncestry(resource: PublishableResource, record: any, tx: any) {

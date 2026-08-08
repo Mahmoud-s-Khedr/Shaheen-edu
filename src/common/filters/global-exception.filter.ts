@@ -17,6 +17,7 @@ interface ErrorResponseShape {
   message: LocalizedMessage;
   error: LocalizedMessage;
   details?: ValidationDetail[];
+  meta?: Record<string, unknown>;
   correlationId: string;
 }
 
@@ -37,6 +38,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     let message = 'Internal server error';
     let explicitCode: string | undefined;
     let details: ValidationDetail[] | undefined;
+    let meta: Record<string, unknown> | undefined;
 
     if (exception instanceof HttpException) {
       statusCode = exception.getStatus();
@@ -50,6 +52,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
         details = bodyObj.details as ValidationDetail[] | undefined;
       }
       if ('code' in exception) explicitCode = String((exception as { code?: unknown }).code ?? '');
+      if ('meta' in exception) meta = (exception as { meta?: Record<string, unknown> }).meta;
     } else if (exception instanceof Error) {
       this.logger.error(exception.message, exception.stack);
     }
@@ -65,6 +68,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       message: localizedMessage(message, statusCode),
       error: localizedError(statusCode),
       ...(details?.length ? { details } : {}),
+      ...(meta ? { meta } : {}),
       correlationId,
     };
 

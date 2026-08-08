@@ -26,6 +26,7 @@ const translations: Record<string, string> = {
   'Content item not found': 'عنصر المحتوى غير موجود', 'Partner not found': 'الشريك غير موجود',
   'Question not found': 'السؤال غير موجود', 'Question source not found': 'مصدر السؤال غير موجود',
   'Question bank not found': 'بنك الأسئلة غير موجود', 'Email already in use': 'البريد الإلكتروني مستخدم بالفعل',
+  'Video is not ready for publication': 'الفيديو غير جاهز للنشر',
   'Phone number already registered': 'رقم الهاتف مسجل بالفعل', 'National ID already registered': 'الرقم القومي مسجل بالفعل',
   'Slug already in use': 'المعرّف المختصر مستخدم بالفعل', 'Record is already archived': 'السجل مؤرشف بالفعل',
 };

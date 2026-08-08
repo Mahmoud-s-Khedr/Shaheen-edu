@@ -74,11 +74,19 @@ export const fullDeliveryJourney: JourneyDefinition = {
       expectString(authz.body.signature, 'tus signature'); assert(/^[0-9a-f]{64}$/.test(authz.body.signature), 'Signature must be a SHA-256 hex digest'); expectString(authz.body.videoId, 'bunny video id');
     });
 
-    await step('Phase 4: an unready video cannot back publishable content, and retry is guarded', async () => {
+    await step('Phase 4: an in-flight video can be linked, but cannot be published', async () => {
       const item = await admin.request<any>('POST', '/admin/content-items', { type: 'VIDEO', title: factory.title('Video content'), placement: { courseId } }); expectStatus(item, 201); context.created.contentItems.push(item.body.id);
-      const attach = await admin.request<any>('POST', `/admin/content-items/${item.body.id}/primary-asset`, { assetId: videoAssetId }); expectStatus(attach, 409);
+      const attach = await admin.request<any>('POST', `/admin/content-items/${item.body.id}/primary-asset`, { assetId: videoAssetId }); expectStatus(attach, 201);
+      assert(attach.body.primaryAsset?.id === videoAssetId && attach.body.primaryAsset?.status === 'PENDING_UPLOAD', 'Primary-asset link must return the pending video state');
+      const detail = await admin.request<any>('GET', `/admin/content-items/${item.body.id}`); expectStatus(detail, 200);
+      assert(detail.body.primaryAsset?.video?.processingStatus === 'CREATED' && detail.body.primaryAsset?.video?.attempt === 1, 'Content detail must expose the linked video processing state');
+      const list = await admin.request<any>('GET', `/admin/content-items?courseId=${courseId}`); expectStatus(list, 200);
+      const listed = list.body.data.find((entry: any) => entry.id === item.body.id);
+      assert(listed?.primaryAsset?.id === videoAssetId && listed.primaryAsset?.processingStatus === 'CREATED', 'Content list must expose lightweight primary-asset processing state');
+      const publish = await admin.request<any>('POST', `/admin/content-items/${item.body.id}/publish`); expectStatus(publish, 409);
+      assert(publish.body.code === 'VIDEO_NOT_READY' && publish.body.meta?.assetId === videoAssetId && publish.body.meta?.assetStatus === 'PENDING_UPLOAD' && publish.body.meta?.processingStatus === 'CREATED', 'Unready video publication must return VIDEO_NOT_READY state metadata');
       const retry = await admin.request<any>('POST', `/admin/video-assets/${videoAssetId}/retry`); expectStatus(retry, 409);
-      const archive = await admin.request<any>('POST', `/admin/video-assets/${videoAssetId}/archive`); expectStatus(archive, 201);
+      const archive = await admin.request<any>('POST', `/admin/video-assets/${videoAssetId}/archive`); expectStatus(archive, 409);
     });
 
     await step('Access control: partners and anonymous callers are denied protected operations', async () => {

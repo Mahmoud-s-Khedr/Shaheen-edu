@@ -15,6 +15,7 @@ import {
 import { toPaginationMeta } from '../../common/dto/pagination-query.dto';
 import {
   AccessType,
+  AssetStatus,
   ContentItemType,
   ContentStatus,
   Role,
@@ -160,7 +161,7 @@ export class ContentItemsService {
   private async getOrThrow(id: string) {
     const item = await this.prisma.contentItem.findUnique({
       where: { id },
-      include: { placement: true },
+      include: { placement: true, primaryAsset: { include: { video: true } } },
     });
     if (!item || !item.placement)
       throw new NotFoundException('Content item not found');
@@ -174,6 +175,7 @@ export class ContentItemsService {
       where: { id },
       include: {
         placement: true,
+        primaryAsset: { include: { video: true } },
         assetReferences: {
           orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
           include: {
@@ -315,7 +317,7 @@ export class ContentItemsService {
     const [items, total] = await this.prisma.$transaction([
       this.prisma.contentItem.findMany({
         where,
-        include: { placement: true },
+        include: { placement: true, primaryAsset: { include: { video: true } } },
         orderBy: [{ placement: { sortOrder: 'asc' } }, { id: 'asc' }],
         skip: (query.page - 1) * query.limit,
         take: query.limit,
@@ -566,7 +568,9 @@ export class ContentItemsService {
   async setPrimaryAsset(actor: RequestUser, id: string, assetId: string) {
     this.assertActorRole(actor);
     const item = await this.getOrThrow(id);
-    const asset = await this.assets.getReady(assetId);
+    const asset = await this.assets.getReadyOrAny(assetId);
+    if (asset.status === AssetStatus.ARCHIVED)
+      throw new ConflictException('Archived assets cannot be linked');
     this.assets.assertCompatible(asset, item.type);
     const previousAssetId = item.primaryAssetId;
     await this.prisma.contentItem.update({ where: { id }, data: { primaryAssetId: assetId, updatedById: actor.id } });
@@ -597,9 +601,18 @@ export class ContentItemsService {
     await this.auditService.record({ actorUserId: actor.id, action: 'CONTENT_ATTACHMENTS_REORDERED', targetType: 'ContentItem', targetId: id, metadata: { assetIds } });
   }
 
-  private toSummary(
-    item: Awaited<ReturnType<ContentItemsService['getOrThrow']>>,
-  ) {
+  private primaryAssetSummary(asset: any) {
+    if (!asset) return null;
+    return {
+      id: asset.id,
+      kind: asset.kind,
+      status: asset.status,
+      processingStatus: asset.video?.processingStatus ?? null,
+      processingProgress: asset.video?.processingProgress ?? null,
+    };
+  }
+
+  private toSummary(item: any) {
     const { placement } = item;
     return {
       id: item.id,
@@ -624,6 +637,7 @@ export class ContentItemsService {
       publishedAt: item.publishedAt,
       archivedAt: item.archivedAt,
       primaryAssetId: item.primaryAssetId,
+      primaryAsset: this.primaryAssetSummary(item.primaryAsset),
     };
   }
 
@@ -632,6 +646,25 @@ export class ContentItemsService {
   ) {
     return {
       ...this.toSummary(item),
+      primaryAsset: item.primaryAsset
+        ? {
+            id: item.primaryAsset.id,
+            kind: item.primaryAsset.kind,
+            status: item.primaryAsset.status,
+            filename: item.primaryAsset.filename,
+            processingStatus: item.primaryAsset.video?.processingStatus ?? null,
+            processingProgress: item.primaryAsset.video?.processingProgress ?? null,
+            video: item.primaryAsset.video
+              ? {
+                  processingStatus: item.primaryAsset.video.processingStatus,
+                  processingProgress: item.primaryAsset.video.processingProgress,
+                  attempt: item.primaryAsset.video.attempt,
+                  readyAt: item.primaryAsset.readyAt,
+                  failedAt: item.primaryAsset.failedAt,
+                }
+              : null,
+          }
+        : null,
       attachments: item.assetReferences.map((reference) => ({
         ...reference.asset,
         sortOrder: reference.sortOrder,
