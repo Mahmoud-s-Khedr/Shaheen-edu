@@ -77,14 +77,14 @@ export const fullDeliveryJourney: JourneyDefinition = {
     await step('Phase 4: an in-flight video can be linked, but cannot be published', async () => {
       const item = await admin.request<any>('POST', '/admin/content-items', { type: 'VIDEO', title: factory.title('Video content'), placement: { courseId } }); expectStatus(item, 201); context.created.contentItems.push(item.body.id);
       const attach = await admin.request<any>('POST', `/admin/content-items/${item.body.id}/primary-asset`, { assetId: videoAssetId }); expectStatus(attach, 201);
-      assert(attach.body.primaryAsset?.id === videoAssetId && attach.body.primaryAsset?.status === 'PENDING_UPLOAD', 'Primary-asset link must return the pending video state');
+      assert(attach.body.primaryAsset?.id === videoAssetId && attach.body.primaryAsset?.status === 'UPLOADING', 'Primary-asset link must return the in-flight video state');
       const detail = await admin.request<any>('GET', `/admin/content-items/${item.body.id}`); expectStatus(detail, 200);
-      assert(detail.body.primaryAsset?.video?.processingStatus === 'CREATED' && detail.body.primaryAsset?.video?.attempt === 1, 'Content detail must expose the linked video processing state');
+      assert(detail.body.primaryAsset?.video?.processingStatus === 'UPLOADING' && detail.body.primaryAsset?.video?.attempt === 1, 'Content detail must expose the linked video processing state');
       const list = await admin.request<any>('GET', `/admin/content-items?courseId=${courseId}`); expectStatus(list, 200);
       const listed = list.body.data.find((entry: any) => entry.id === item.body.id);
-      assert(listed?.primaryAsset?.id === videoAssetId && listed.primaryAsset?.processingStatus === 'CREATED', 'Content list must expose lightweight primary-asset processing state');
+      assert(listed?.primaryAsset?.id === videoAssetId && listed.primaryAsset?.processingStatus === 'UPLOADING', 'Content list must expose lightweight primary-asset processing state');
       const publish = await admin.request<any>('POST', `/admin/content-items/${item.body.id}/publish`); expectStatus(publish, 409);
-      assert(publish.body.code === 'VIDEO_NOT_READY' && publish.body.meta?.assetId === videoAssetId && publish.body.meta?.assetStatus === 'PENDING_UPLOAD' && publish.body.meta?.processingStatus === 'CREATED', 'Unready video publication must return VIDEO_NOT_READY state metadata');
+      assert(publish.body.code === 'VIDEO_NOT_READY' && publish.body.meta?.assetId === videoAssetId && publish.body.meta?.assetStatus === 'UPLOADING' && publish.body.meta?.processingStatus === 'UPLOADING', 'Unready video publication must return VIDEO_NOT_READY state metadata');
       const retry = await admin.request<any>('POST', `/admin/video-assets/${videoAssetId}/retry`); expectStatus(retry, 409);
       const archive = await admin.request<any>('POST', `/admin/video-assets/${videoAssetId}/archive`); expectStatus(archive, 409);
     });

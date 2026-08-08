@@ -244,6 +244,52 @@ describe('VideosService', () => {
     });
   });
 
+  describe('archive', () => {
+    it('archives an unreferenced video and records an audit event', async () => {
+      const { service, prisma, audit, assets } = buildService();
+      prisma.asset.findUnique.mockResolvedValue({
+        id: 'asset-1',
+        status: AssetStatus.UPLOADING,
+        video: { bunnyVideoId: 'bunny-1' },
+      });
+      prisma.asset.update.mockResolvedValue({
+        id: 'asset-1',
+        status: AssetStatus.ARCHIVED,
+        video: { bunnyVideoId: 'bunny-1' },
+      });
+
+      await expect(service.archive(admin, 'asset-1')).resolves.toMatchObject({
+        id: 'asset-1',
+        status: AssetStatus.ARCHIVED,
+      });
+      expect(assets.isReferenced).toHaveBeenCalledWith('asset-1');
+      expect(prisma.asset.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'asset-1' },
+          data: expect.objectContaining({ status: AssetStatus.ARCHIVED }),
+        }),
+      );
+      expect(audit.record).toHaveBeenCalledWith(
+        expect.objectContaining({ action: 'VIDEO_ASSET_ARCHIVED' }),
+      );
+    });
+
+    it('refuses to archive a referenced video without changing its state', async () => {
+      const { service, prisma, audit, assets } = buildService();
+      prisma.asset.findUnique.mockResolvedValue({
+        id: 'asset-1',
+        video: { bunnyVideoId: 'bunny-1' },
+      });
+      assets.isReferenced.mockResolvedValue(true);
+
+      await expect(service.archive(admin, 'asset-1')).rejects.toBeInstanceOf(
+        ConflictException,
+      );
+      expect(prisma.asset.update).not.toHaveBeenCalled();
+      expect(audit.record).not.toHaveBeenCalled();
+    });
+  });
+
   describe('create', () => {
     it('creates a Bunny video and a PENDING_UPLOAD asset, then audits', async () => {
       const { service, prisma, audit } = buildService();

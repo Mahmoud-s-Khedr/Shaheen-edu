@@ -4296,6 +4296,10 @@ Returns the video asset summary, including
 }
 ```
 
+**Conflict response — HTTP 409**
+
+Returned when the video asset is still referenced by content or another supported asset relation. Detach or replace every reference before archiving it.
+
 ### `POST /api/v1/integrations/bunny-stream/webhook`
 
 **Authorization:** Signed Bunny webhook (not bearer authentication)

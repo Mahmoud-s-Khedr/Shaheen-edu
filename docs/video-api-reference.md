@@ -207,7 +207,7 @@ Authorization: Bearer <admin-access-token>
 
 ## `POST /api/v1/admin/video-assets/{id}/archive` — archive an asset
 
-Archives an asset instead of deleting it. This is appropriate when it should no longer be used but its record should remain available.
+Archives an unreferenced asset instead of deleting it. This is appropriate when it should no longer be used but its record should remain available.
 
 **Request**
 
@@ -238,6 +238,10 @@ Authorization: Bearer <admin-access-token>
   }
 }
 ```
+
+**Conflict response — `409 Conflict`**
+
+Returned when the video asset is still referenced by content or another supported asset relation. Detach or replace every reference before archiving it.
 
 ## `DELETE /api/v1/admin/video-assets/{id}` — delete an unreferenced asset
 

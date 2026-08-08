@@ -11,8 +11,14 @@ import {
   UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiCreatedResponse,
+  ApiOperation,
+  ApiTags,
+} from '@nestjs/swagger';
 import { Public } from '../../common/decorators/public.decorator';
+import { ApiStandardErrors } from '../../common/decorators/api-standard-errors.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -61,6 +67,8 @@ export class VideosController {
   }
   @Post(':id/archive')
   @ApiOperation({ summary: 'Archive a video asset' })
+  @ApiCreatedResponse()
+  @ApiStandardErrors(401, 403, 404, 409)
   archive(@CurrentUser() actor: RequestUser, @Param('id') id: string) {
     return this.videos.archive(actor, id);
   }

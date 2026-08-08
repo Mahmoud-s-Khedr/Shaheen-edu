@@ -210,6 +210,8 @@ export class VideosService {
   async archive(actor: RequestUser, assetId: string) {
     this.assertAdmin(actor);
     const asset = await this.getWithVideo(assetId);
+    if (await this.assets.isReferenced(assetId))
+      throw new ConflictException('Referenced video assets cannot be archived');
     const updated = await this.prisma.asset.update({
       where: { id: asset.id },
       data: { status: AssetStatus.ARCHIVED, archivedAt: new Date() },
