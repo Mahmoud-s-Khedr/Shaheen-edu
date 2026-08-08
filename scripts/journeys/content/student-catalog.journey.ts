@@ -106,6 +106,7 @@ export const studentCatalogJourney: JourneyDefinition = {
         type: 'TEXT',
         title: factory.title('Entitled chapter content'),
         textBody: 'Protected catalogue content',
+        accessType: 'PUBLIC',
         placement: { chapterId: entitledChapterId },
       });
       contentItemId = item.id;
@@ -284,10 +285,11 @@ export const studentCatalogJourney: JourneyDefinition = {
             chapter.body.data?.some(
               (item: any) =>
                 item.id === contentItemId &&
+                item.accessType === 'PUBLIC' &&
                 item.access?.state === 'ENTITLED' &&
                 item.isLocked === false,
             ),
-          'An entitled chapter must unlock its published content previews',
+          'An entitled chapter must unlock content while preserving its stored access type',
         );
       },
     );

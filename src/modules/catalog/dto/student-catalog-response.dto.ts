@@ -18,11 +18,27 @@ export class LocalizedTextDto {
   en!: string;
 }
 
+/**
+ * An academic-grade description always has both locale keys, whose values may
+ * be absent.
+ */
+export class LocalizedDescriptionDto {
+  @ApiProperty({ type: String, nullable: true, example: 'وصف اختياري' })
+  ar!: string | null;
+
+  @ApiProperty({ type: String, nullable: true, example: 'Optional description' })
+  en!: string | null;
+}
+
 export class CursorPageInfoDto {
   @ApiProperty({ example: true })
   hasNextPage!: boolean;
 
-  @ApiProperty({ nullable: true, example: 'eyJzb3J0T3JkZXIiOjJ9' })
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    example: 'eyJzb3J0T3JkZXIiOjJ9',
+  })
   nextCursor!: string | null;
 }
 
@@ -36,13 +52,13 @@ export class CatalogNodeDto {
   @ApiProperty()
   slug!: string;
 
-  @ApiProperty({ nullable: true })
+  @ApiProperty({ type: String, nullable: true })
   description!: string | null;
 
   @ApiProperty()
   sortOrder!: number;
 
-  @ApiProperty({ nullable: true })
+  @ApiProperty({ type: String, nullable: true })
   coverAssetId!: string | null;
 
   @ApiPropertyOptional({ description: 'Present when child counts were requested.' })
@@ -62,13 +78,13 @@ export class AcademicGradeNodeDto {
   @ApiProperty()
   slug!: string;
 
-  @ApiProperty({ type: LocalizedTextDto, nullable: true })
-  description!: LocalizedTextDto | null;
+  @ApiProperty({ type: LocalizedDescriptionDto })
+  description!: LocalizedDescriptionDto;
 
   @ApiProperty()
   sortOrder!: number;
 
-  @ApiProperty({ nullable: true })
+  @ApiProperty({ type: String, nullable: true })
   coverAssetId!: string | null;
 }
 
@@ -120,10 +136,10 @@ export class CatalogContentItemDto {
   @ApiProperty()
   title!: string;
 
-  @ApiProperty({ nullable: true })
+  @ApiProperty({ type: String, nullable: true })
   description!: string | null;
 
-  @ApiProperty({ nullable: true })
+  @ApiProperty({ type: Number, nullable: true })
   estimatedDuration!: number | null;
 
   @ApiProperty({ example: 'FREE' })
@@ -154,7 +170,7 @@ export class StudentCatalogSearchHitDto {
   @ApiProperty()
   title!: string;
 
-  @ApiProperty({ nullable: true })
+  @ApiProperty({ type: String, nullable: true })
   description!: string | null;
 }
 
@@ -223,7 +239,7 @@ export class StudentEntitlementDto {
   @ApiProperty({ enum: ['COURSE', 'CHAPTER'] })
   targetType!: string;
 
-  @ApiProperty({ nullable: true })
+  @ApiProperty({ type: String, nullable: true })
   targetId!: string | null;
 
   @ApiProperty({ example: 'ACTIVE' })
@@ -232,7 +248,7 @@ export class StudentEntitlementDto {
   @ApiProperty()
   startsAt!: Date;
 
-  @ApiProperty({ nullable: true })
+  @ApiProperty({ type: String, format: 'date-time', nullable: true })
   expiresAt!: Date | null;
 }
 

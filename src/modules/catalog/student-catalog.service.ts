@@ -1299,6 +1299,7 @@ export class StudentCatalogService {
       title: item.title,
       description: item.description,
       estimatedDuration: item.estimatedDuration,
+      accessType: item.accessType,
       sortOrder,
     };
   }

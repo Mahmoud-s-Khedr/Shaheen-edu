@@ -18810,6 +18810,25 @@
           "studentUserId"
         ]
       },
+      "LocalizedDescriptionDto": {
+        "type": "object",
+        "properties": {
+          "ar": {
+            "type": "string",
+            "nullable": true,
+            "example": "وصف اختياري"
+          },
+          "en": {
+            "type": "string",
+            "nullable": true,
+            "example": "Optional description"
+          }
+        },
+        "required": [
+          "ar",
+          "en"
+        ]
+      },
       "AcademicGradeNodeDto": {
         "type": "object",
         "properties": {
@@ -18823,19 +18842,13 @@
             "type": "string"
           },
           "description": {
-            "nullable": true,
-            "type": "object",
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/LocalizedTextDto"
-              }
-            ]
+            "$ref": "#/components/schemas/LocalizedDescriptionDto"
           },
           "sortOrder": {
             "type": "number"
           },
           "coverAssetId": {
-            "type": "object",
+            "type": "string",
             "nullable": true
           }
         },
@@ -18895,14 +18908,14 @@
             "type": "string"
           },
           "description": {
-            "type": "object",
+            "type": "string",
             "nullable": true
           },
           "sortOrder": {
             "type": "number"
           },
           "coverAssetId": {
-            "type": "object",
+            "type": "string",
             "nullable": true
           },
           "hasChildren": {
@@ -18959,7 +18972,7 @@
             "type": "string"
           },
           "description": {
-            "type": "object",
+            "type": "string",
             "nullable": true
           }
         },
@@ -18978,7 +18991,7 @@
             "example": true
           },
           "nextCursor": {
-            "type": "object",
+            "type": "string",
             "nullable": true,
             "example": "eyJzb3J0T3JkZXIiOjJ9"
           }
@@ -19046,11 +19059,11 @@
             "type": "string"
           },
           "description": {
-            "type": "object",
+            "type": "string",
             "nullable": true
           },
           "estimatedDuration": {
-            "type": "object",
+            "type": "number",
             "nullable": true
           },
           "accessType": {
@@ -19220,7 +19233,7 @@
             ]
           },
           "targetId": {
-            "type": "object",
+            "type": "string",
             "nullable": true
           },
           "status": {
@@ -19232,7 +19245,8 @@
             "type": "string"
           },
           "expiresAt": {
-            "type": "object",
+            "type": "string",
+            "format": "date-time",
             "nullable": true
           }
         },

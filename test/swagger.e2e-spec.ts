@@ -50,6 +50,34 @@ describe('Swagger (e2e)', () => {
       nullable: true,
     });
     expect(
+      document.components.schemas.LocalizedDescriptionDto.properties,
+    ).toEqual(
+      expect.objectContaining({
+        ar: expect.objectContaining({ type: 'string', nullable: true }),
+        en: expect.objectContaining({ type: 'string', nullable: true }),
+      }),
+    );
+    expect(
+      document.components.schemas.CatalogNodeDto.properties.description,
+    ).toMatchObject({ type: 'string', nullable: true });
+    expect(
+      document.components.schemas.CatalogNodeDto.properties.coverAssetId,
+    ).toMatchObject({ type: 'string', nullable: true });
+    expect(
+      document.components.schemas.CatalogContentItemDto.properties
+        .estimatedDuration,
+    ).toMatchObject({ type: 'number', nullable: true });
+    expect(
+      document.components.schemas.StudentEntitlementDto.properties.targetId,
+    ).toMatchObject({ type: 'string', nullable: true });
+    expect(
+      document.components.schemas.StudentEntitlementDto.properties.expiresAt,
+    ).toMatchObject({
+      type: 'string',
+      format: 'date-time',
+      nullable: true,
+    });
+    expect(
       document.components.schemas.ContentPlacementSummaryDto.properties
         .courseId,
     ).toMatchObject({ type: 'string', nullable: true });
