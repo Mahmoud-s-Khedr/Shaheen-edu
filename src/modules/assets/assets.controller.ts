@@ -1,6 +1,7 @@
 import { BadRequestException, Body, Controller, Delete, Get, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { AssetKind, Role } from '../../common/types/roles.enum';
@@ -29,7 +30,7 @@ export class AssetsController {
   }
   @Post(':id/complete') @ApiOperation({ summary: 'Verify a direct Bunny upload and mark its asset ready' })
   complete(@CurrentUser() actor: RequestUser, @Param('id') id: string) { return this.assets.completeUpload(actor, id); }
-  @Get() @ApiOperation({ summary: 'List assets' }) list(@CurrentUser() actor: RequestUser) { return this.assets.list(actor); }
+  @Get() @ApiOperation({ summary: 'List assets' }) list(@CurrentUser() actor: RequestUser, @Query() query: PaginationQueryDto) { return this.assets.list(actor, query); }
   @Get(':id') @ApiOperation({ summary: 'Get an asset by ID' }) get(@CurrentUser() actor: RequestUser, @Param('id') id: string) { return this.assets.get(actor, id); }
   @Get(':id/access') @ApiOperation({ summary: 'Get a short-lived preview URL for an admin asset' }) access(@CurrentUser() actor: RequestUser, @Param('id') id: string) { return this.assets.adminAccess(actor, id); }
   @Post(':id/archive') @ApiOperation({ summary: 'Archive an asset' }) archive(@CurrentUser() actor: RequestUser, @Param('id') id: string) { return this.assets.archive(actor, id); }

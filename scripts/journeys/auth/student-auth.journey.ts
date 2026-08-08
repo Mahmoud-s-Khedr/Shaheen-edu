@@ -26,7 +26,7 @@ export const studentJourney: JourneyDefinition = {
       clients.student.accessToken = r.body.accessToken; context.students.push({ id: r.body.user.id, phone, password, nationalId, parentPhone, accessToken: r.body.accessToken }); context.created.students.push(r.body.user.id);
     });
     await step('Rejecting missing grade, duplicate phone and National ID', async () => {
-      const missingGradePayload = { fullName: payload.fullName, nationalId: payload.nationalId, phone: payload.phone, parentPhone: payload.parentPhone, governorate: payload.governorate, center: payload.center, password: payload.password };
+      const missingGradePayload = { fullName: payload.fullName, nationalId: payload.nationalId, phone: payload.phone, parentPhone: payload.parentPhone, governorateId: payload.governorateId, password: payload.password };
       const missingGrade = await clients.public.request<any>('POST', '/auth/students/register', missingGradePayload); expectStatus(missingGrade, 400);
       const duplicatePhone = await clients.public.request<any>('POST', '/auth/students/register', { ...payload, nationalId: factory.nationalId(), phone }); expectStatus(duplicatePhone, 409);
       const duplicateId = await clients.public.request<any>('POST', '/auth/students/register', { ...payload, nationalId, phone: factory.phone() }); expectStatus(duplicateId, 409);

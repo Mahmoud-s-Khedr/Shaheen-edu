@@ -19,7 +19,8 @@ import type { QueryAdminStudentsDto } from './dto/query-admin-students.dto';
 import type { DeleteStudentDto } from './dto/delete-student.dto';
 import type { RequestUser } from '../../common/types/request-with-user.types';
 import { toPaginationMeta } from '../../common/dto/pagination-query.dto';
-import type { Prisma } from '@prisma/client';
+import { arabicMatch, paginateArabicSearch, resolveSearchQuery, sqlAnd } from '../../common/search/arabic-search';
+import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class StudentsService {
@@ -91,23 +92,36 @@ export class StudentsService {
         ...(query.academicGradeId ? { academicGradeId: query.academicGradeId } : {}),
       },
     };
-    if (query.search?.trim()) {
-      const search = query.search.trim();
-      where.OR = [
-        { loginIdentifier: { contains: search, mode: 'insensitive' } },
-        { studentProfile: { fullName: { contains: search, mode: 'insensitive' } } },
-      ];
-    }
-    const [students, total] = await this.prisma.$transaction([
-      this.prisma.user.findMany({
-        where,
-        select: this.adminStudentSelect,
-        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-        skip: (query.page - 1) * query.limit,
-        take: query.limit,
-      }),
-      this.prisma.user.count({ where }),
-    ]);
+    const search = resolveSearchQuery(query);
+    const { data: students, total } = await paginateArabicSearch({
+      prisma: this.prisma,
+      delegate: this.prisma.user,
+      target: 'user',
+      q: search,
+      scope: {
+        where: sqlAnd(
+          Prisma.sql`t.role = ${Role.STUDENT}::"Role"`,
+          query.status
+            ? Prisma.sql`t.status = ${query.status}::"AccountStatus"`
+            : Prisma.sql`t.status <> ${AccountStatus.DISABLED}::"AccountStatus"`,
+          query.governorateId ? Prisma.sql`sp."governorateId" = ${query.governorateId}` : undefined,
+          query.centerId ? Prisma.sql`sp."centerId" = ${query.centerId}` : undefined,
+          query.academicGradeId ? Prisma.sql`sp."academicGradeId" = ${query.academicGradeId}` : undefined,
+        ),
+        join: Prisma.sql`JOIN "StudentProfile" sp ON sp."userId" = t.id`,
+        // The student's name lives on the profile, so a hit there is OR-ed with
+        // the login-identifier match on the user row.
+        alsoMatches: search
+          ? arabicMatch('studentProfile', search, 'sp')
+          : undefined,
+      },
+      orderBySql: Prisma.sql`t."createdAt" DESC, t.id DESC`,
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      where,
+      args: { select: this.adminStudentSelect },
+      page: query.page,
+      limit: query.limit,
+    });
     return {
       data: students.map((student) => this.toAdminStudent(student)),
       meta: toPaginationMeta(query.page, query.limit, total),

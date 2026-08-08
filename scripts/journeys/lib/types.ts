@@ -61,6 +61,7 @@ export interface JourneyResult {
   correlationIds: string[];
   created: Record<string, string[]>;
   error?: unknown;
+  skippedReason?: string;
 }
 
 export interface JourneyDefinition {
@@ -68,6 +69,8 @@ export interface JourneyDefinition {
   name: string;
   category: 'infrastructure' | 'auth' | 'content';
   dependsOn?: string[];
+  /** Requires real Bunny Storage or Stream services and is not safe locally. */
+  requiresBunny?: boolean;
   run: (runtime: JourneyRuntime) => Promise<void>;
 }
 

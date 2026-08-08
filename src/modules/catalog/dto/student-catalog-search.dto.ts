@@ -1,5 +1,5 @@
-import { Transform } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Transform } from 'class-transformer';
 import { IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 import { CursorPaginationQueryDto } from '../../../common/dto/cursor-pagination-query.dto';
 
@@ -8,9 +8,7 @@ export class StudentCatalogSearchDto extends CursorPaginationQueryDto {
   @IsString()
   subjectId!: string;
 
-  @ApiProperty({
-    description: 'Case-insensitive title or description search text.',
-  })
+  @ApiProperty({ description: 'Arabic-aware catalog search text.' })
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   @IsString()
   @MinLength(1)

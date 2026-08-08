@@ -14,6 +14,7 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Role } from '../../common/types/roles.enum';
 import type { RequestUser } from '../../common/types/request-with-user.types';
+import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
 import {
   AgreementTargetDto,
   CreateEarningsStatementDto,
@@ -21,6 +22,7 @@ import {
   EndPublisherAgreementDto,
   SetPricingDto,
   UpdatePublisherAgreementDto,
+  PublisherAgreementsQueryDto,
 } from './dto/publisher-agreements.dto';
 import { PublisherAgreementsService } from './publisher-agreements.service';
 
@@ -62,9 +64,9 @@ export class PublisherAgreementsController {
   }
   @Get() @ApiOperation({ summary: 'List publisher agreements' }) list(
     @CurrentUser() actor: RequestUser,
-    @Query('history') history?: string,
+    @Query() query: PublisherAgreementsQueryDto,
   ) {
-    return this.service.list(actor, history === 'true');
+    return this.service.list(actor, query);
   }
   @Get('effective')
   @ApiOperation({ summary: 'Resolve the effective publisher agreement' })
@@ -85,8 +87,8 @@ export class PublisherAgreementsController {
   }
   @Get('earnings-statements')
   @ApiOperation({ summary: 'List publisher earnings statements' })
-  statements(@CurrentUser() actor: RequestUser) {
-    return this.service.listStatements(actor);
+  statements(@CurrentUser() actor: RequestUser, @Query() query: PaginationQueryDto) {
+    return this.service.listStatements(actor, query);
   }
 }
 

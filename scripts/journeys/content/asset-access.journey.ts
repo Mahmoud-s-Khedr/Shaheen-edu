@@ -12,6 +12,7 @@ export const assetAccessJourney: JourneyDefinition = {
   name: 'Asset preview, cover visibility, and archived student retention',
   category: 'content',
   dependsOn: ['CONTENT-007'],
+  requiresBunny: true,
   async run({ clients, context, factory, step }) {
     const admin = clients.admin;
     const student = context.students[0];

@@ -21,7 +21,7 @@ const testPdf = resolve(process.cwd(), 'test-files', '1-84628-843-6.pdf');
  * frontend integrates against.
  */
 export const fullDeliveryJourney: JourneyDefinition = {
-  id: 'CONTENT-003', name: 'End-to-end content delivery (Phases 1-4)', category: 'content', dependsOn: ['CONTENT-001', 'AUTH-003'],
+  id: 'CONTENT-003', name: 'End-to-end content delivery (Phases 1-4)', category: 'content', dependsOn: ['CONTENT-001', 'AUTH-003'], requiresBunny: true,
   async run({ clients, context, factory, step }) {
     const admin = clients.admin; const courseId = String(context.academic.courseId); const gradeId = String(context.academic.gradeId);
     const pdfBytes = await readFile(testPdf); const filePrefix = `delivery-${factory.runId}`;

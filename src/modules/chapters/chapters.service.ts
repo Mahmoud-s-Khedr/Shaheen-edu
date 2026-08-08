@@ -18,6 +18,8 @@ import {
 import type { CreateChapterDto } from './dto/create-chapter.dto';
 import type { UpdateChapterDto } from './dto/update-chapter.dto';
 import type { QueryChapterDto } from './dto/query-chapter.dto';
+import { paginateArabicSearch, sqlAnd } from '../../common/search/arabic-search';
+import { contentStatusScope } from '../../common/search/content-scope';
 import type { ReorderChapterDto } from './dto/reorder-chapter.dto';
 import type { MoveChapterDto } from './dto/move-chapter.dto';
 import { PublicationService } from '../publication/publication.service';
@@ -131,18 +133,26 @@ export class ChaptersService {
       courseId: query.courseId,
       status: query.status ?? { not: ContentStatus.ARCHIVED },
     };
-    const [items, total] = await this.prisma.$transaction([
-      this.prisma.chapter.findMany({
-        where,
-        include: { course: true, _count: { select: { lessons: { where: { status: { not: ContentStatus.ARCHIVED } } } } } },
-        orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
-        skip: (query.page - 1) * query.limit,
-        take: query.limit,
-      }),
-      this.prisma.chapter.count({ where }),
-    ]);
+    const { data, total } = await paginateArabicSearch({
+      prisma: this.prisma,
+      delegate: this.prisma.chapter,
+      target: 'chapter',
+      q: query.q,
+      scope: {
+        where: sqlAnd(
+          contentStatusScope(query.status),
+          query.courseId ? Prisma.sql`t."courseId" = ${query.courseId}` : undefined,
+        ),
+      },
+      orderBySql: Prisma.sql`t."sortOrder" ASC, t.id ASC`,
+      orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
+      where,
+      args: { include: { course: true, _count: { select: { lessons: { where: { status: { not: ContentStatus.ARCHIVED } } } } } } },
+      page: query.page,
+      limit: query.limit,
+    });
     return {
-      data: items.map((item) => this.toReadSummary(item)),
+      data: data.map((item) => this.toReadSummary(item)),
       meta: toPaginationMeta(query.page, query.limit, total),
     };
   }

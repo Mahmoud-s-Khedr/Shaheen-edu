@@ -1,7 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { ArrayMaxSize, ArrayMinSize, IsArray, IsBoolean, IsEnum, IsInt, IsOptional, IsString, Max, MaxLength, Min, MinLength, ValidateNested } from 'class-validator';
-import { PaginationQueryDto } from '../../../common/dto/pagination-query.dto';
+import { SearchPaginationQueryDto } from '../../../common/dto/pagination-query.dto';
 import { AssessmentMode, AssessmentStatus } from '../../../common/types/roles.enum';
 
 export class AssessmentScopeDto {
@@ -46,12 +46,12 @@ export class UpdateAdminAssessmentDto {
   @ApiPropertyOptional() @IsOptional() @Type(() => Number) @IsInt() @Min(30) durationSeconds?: number;
 }
 
-export class QueryAssessmentDto extends PaginationQueryDto {
+export class QueryAssessmentDto extends SearchPaginationQueryDto {
   @ApiPropertyOptional({ enum: ['ALL', 'SUSPENDED', 'COMPLETED'], description: "Filters by the student's own attempt status" }) @IsOptional() @IsString() status?: 'ALL' | 'SUSPENDED' | 'COMPLETED';
   @ApiPropertyOptional() @IsOptional() @IsString() search?: string;
 }
 
-export class QueryAdminAssessmentDto extends PaginationQueryDto {
+export class QueryAdminAssessmentDto extends SearchPaginationQueryDto {
   @ApiPropertyOptional({ enum: AssessmentStatus }) @IsOptional() @IsEnum(AssessmentStatus) status?: AssessmentStatus;
   @ApiPropertyOptional() @IsOptional() @IsString() search?: string;
 }

@@ -21,7 +21,7 @@ import { AdminsService } from './admins.service';
 import { CreateAdminDto } from './dto/create-admin.dto';
 import { UpdateAdminDto } from './dto/update-admin.dto';
 import type { RequestUser } from '../../common/types/request-with-user.types';
-import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
+import { SearchPaginationQueryDto } from '../../common/dto/pagination-query.dto';
 import { ApiStandardErrors } from '../../common/decorators/api-standard-errors.decorator';
 import {
   AdminSummaryDto,
@@ -53,7 +53,7 @@ export class AdminsController {
   @ApiStandardErrors(400, 401, 403)
   list(
     @CurrentUser() actor: RequestUser,
-    @Query() pagination: PaginationQueryDto,
+    @Query() pagination: SearchPaginationQueryDto,
   ) {
     return this.adminsService.list(actor, pagination);
   }

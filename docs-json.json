@@ -900,6 +900,17 @@
               "default": 20,
               "type": "number"
             }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Case-insensitive text search.",
+            "schema": {
+              "minLength": 1,
+              "maxLength": 120,
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -1424,6 +1435,17 @@
               "maximum": 100,
               "default": 20,
               "type": "number"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Case-insensitive text search.",
+            "schema": {
+              "minLength": 1,
+              "maxLength": 120,
+              "type": "string"
             }
           }
         ],
@@ -1976,6 +1998,17 @@
               "maximum": 100,
               "default": 20,
               "type": "number"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Case-insensitive text search.",
+            "schema": {
+              "minLength": 1,
+              "maxLength": 120,
+              "type": "string"
             }
           },
           {
@@ -2570,6 +2603,17 @@
               "maximum": 100,
               "default": 20,
               "type": "number"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Case-insensitive text search.",
+            "schema": {
+              "minLength": 1,
+              "maxLength": 120,
+              "type": "string"
             }
           },
           {
@@ -3196,6 +3240,17 @@
               "default": 20,
               "type": "number"
             }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Case-insensitive text search.",
+            "schema": {
+              "minLength": 1,
+              "maxLength": 120,
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -3337,6 +3392,17 @@
               "maximum": 100,
               "default": 20,
               "type": "number"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Case-insensitive text search.",
+            "schema": {
+              "minLength": 1,
+              "maxLength": 120,
+              "type": "string"
             }
           },
           {
@@ -4151,6 +4217,17 @@
               "maximum": 100,
               "default": 20,
               "type": "number"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Case-insensitive text search.",
+            "schema": {
+              "minLength": 1,
+              "maxLength": 120,
+              "type": "string"
             }
           },
           {
@@ -5007,6 +5084,17 @@
             }
           },
           {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Case-insensitive text search.",
+            "schema": {
+              "minLength": 1,
+              "maxLength": 120,
+              "type": "string"
+            }
+          },
+          {
             "name": "courseId",
             "required": false,
             "in": "query",
@@ -5857,6 +5945,17 @@
               "maximum": 100,
               "default": 20,
               "type": "number"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Case-insensitive text search.",
+            "schema": {
+              "minLength": 1,
+              "maxLength": 120,
+              "type": "string"
             }
           },
           {
@@ -6713,6 +6812,17 @@
             }
           },
           {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Case-insensitive text search.",
+            "schema": {
+              "minLength": 1,
+              "maxLength": 120,
+              "type": "string"
+            }
+          },
+          {
             "name": "lessonId",
             "required": false,
             "in": "query",
@@ -7565,6 +7675,17 @@
             }
           },
           {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Case-insensitive text search.",
+            "schema": {
+              "minLength": 1,
+              "maxLength": 120,
+              "type": "string"
+            }
+          },
+          {
             "name": "status",
             "required": false,
             "in": "query",
@@ -8205,7 +8326,31 @@
     "/api/v1/admin/assets": {
       "get": {
         "operationId": "AssetsController_list_v1",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "One-based page number.",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Maximum records to return per page.",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": ""
@@ -8478,8 +8623,31 @@
         "operationId": "EntitlementsController_list_v1",
         "parameters": [
           {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "One-based page number.",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Maximum records to return per page.",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
             "name": "studentUserId",
-            "required": true,
+            "required": false,
             "in": "query",
             "schema": {
               "type": "string"
@@ -9011,6 +9179,17 @@
             }
           },
           {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Case-insensitive text search.",
+            "schema": {
+              "minLength": 1,
+              "maxLength": 120,
+              "type": "string"
+            }
+          },
+          {
             "name": "academicGradeId",
             "required": false,
             "in": "query",
@@ -9061,6 +9240,17 @@
               "maximum": 100,
               "default": 20,
               "type": "number"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Case-insensitive text search.",
+            "schema": {
+              "minLength": 1,
+              "maxLength": 120,
+              "type": "string"
             }
           },
           {
@@ -9149,6 +9339,17 @@
               "default": 20,
               "type": "number"
             }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Case-insensitive text search. Search cursors are bound to this query.",
+            "schema": {
+              "minLength": 1,
+              "maxLength": 120,
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -9198,6 +9399,17 @@
               "default": 20,
               "type": "number"
             }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Case-insensitive text search. Search cursors are bound to this query.",
+            "schema": {
+              "minLength": 1,
+              "maxLength": 120,
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -9246,6 +9458,17 @@
               "maximum": 100,
               "default": 20,
               "type": "number"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Case-insensitive text search. Search cursors are bound to this query.",
+            "schema": {
+              "minLength": 1,
+              "maxLength": 120,
+              "type": "string"
             }
           }
         ],
@@ -9304,6 +9527,17 @@
               "default": 20,
               "type": "number"
             }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Case-insensitive text search. Search cursors are bound to this query.",
+            "schema": {
+              "minLength": 1,
+              "maxLength": 120,
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -9328,7 +9562,14 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudentCatalogSummaryResponseDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -9368,11 +9609,29 @@
               "default": 20,
               "type": "number"
             }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Case-insensitive text search.",
+            "schema": {
+              "minLength": 1,
+              "maxLength": 120,
+              "type": "string"
+            }
           }
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedCatalogNodeResponseDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -9420,11 +9679,29 @@
               "default": 20,
               "type": "number"
             }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Case-insensitive text search.",
+            "schema": {
+              "minLength": 1,
+              "maxLength": 120,
+              "type": "string"
+            }
           }
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedCatalogNodeResponseDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -9474,7 +9751,7 @@
             "name": "q",
             "required": true,
             "in": "query",
-            "description": "Case-insensitive title or description search text.",
+            "description": "Arabic-aware catalog search text.",
             "schema": {
               "type": "string"
             }
@@ -9492,7 +9769,14 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudentCatalogSearchResponseDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -9521,7 +9805,14 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogNodeDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -9566,11 +9857,29 @@
               "default": 20,
               "type": "number"
             }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Case-insensitive text search. Search cursors are bound to this query.",
+            "schema": {
+              "minLength": 1,
+              "maxLength": 120,
+              "type": "string"
+            }
           }
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CursorCatalogNodeResponseDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -9615,11 +9924,29 @@
               "default": 20,
               "type": "number"
             }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Case-insensitive text search. Search cursors are bound to this query.",
+            "schema": {
+              "minLength": 1,
+              "maxLength": 120,
+              "type": "string"
+            }
           }
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CursorCatalogNodeResponseDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -9664,11 +9991,29 @@
               "default": 20,
               "type": "number"
             }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Case-insensitive text search. Search cursors are bound to this query.",
+            "schema": {
+              "minLength": 1,
+              "maxLength": 120,
+              "type": "string"
+            }
           }
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CursorCatalogNodeResponseDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -9721,11 +10066,29 @@
               "default": 20,
               "type": "number"
             }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Case-insensitive text search. Search cursors are bound to this query.",
+            "schema": {
+              "minLength": 1,
+              "maxLength": 120,
+              "type": "string"
+            }
           }
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CursorCatalogContentItemResponseDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -9742,10 +10105,52 @@
     "/api/v1/student/library": {
       "get": {
         "operationId": "StudentCatalogController_library_v1",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "One-based page number.",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Maximum records to return per page.",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Case-insensitive text search.",
+            "schema": {
+              "minLength": 1,
+              "maxLength": 120,
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedStudentLibraryResponseDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -9785,11 +10190,29 @@
               "default": 20,
               "type": "number"
             }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Case-insensitive text search.",
+            "schema": {
+              "minLength": 1,
+              "maxLength": 120,
+              "type": "string"
+            }
           }
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedMySubjectsResponseDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -9833,7 +10256,14 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedStudentEntitlementResponseDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -9880,11 +10310,40 @@
         "operationId": "PublisherAgreementsController_list_v1",
         "parameters": [
           {
-            "name": "history",
-            "required": true,
+            "name": "page",
+            "required": false,
             "in": "query",
+            "description": "One-based page number.",
             "schema": {
-              "type": "string"
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Maximum records to return per page.",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "history",
+            "required": false,
+            "in": "query",
+            "description": "Include ended agreements.",
+            "schema": {
+              "default": false,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Object"
+                }
+              ]
             }
           }
         ],
@@ -10101,7 +10560,31 @@
       },
       "get": {
         "operationId": "PublisherAgreementsController_statements_v1",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "One-based page number.",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Maximum records to return per page.",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": ""
@@ -10339,6 +10822,17 @@
               "maximum": 100,
               "default": 20,
               "type": "number"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Case-insensitive text search.",
+            "schema": {
+              "minLength": 1,
+              "maxLength": 120,
+              "type": "string"
             }
           },
           {
@@ -10622,6 +11116,17 @@
             }
           },
           {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Case-insensitive text search.",
+            "schema": {
+              "minLength": 1,
+              "maxLength": 120,
+              "type": "string"
+            }
+          },
+          {
             "name": "status",
             "required": false,
             "in": "query",
@@ -10884,6 +11389,17 @@
               "maximum": 100,
               "default": 20,
               "type": "number"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Case-insensitive text search.",
+            "schema": {
+              "minLength": 1,
+              "maxLength": 120,
+              "type": "string"
             }
           },
           {
@@ -11535,10 +12051,52 @@
     "/api/v1/admin/geography/governorates": {
       "get": {
         "operationId": "GeographyController_list_v1",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "One-based page number.",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Maximum governorates per page. Defaults high enough to return every governorate.",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 100,
+              "type": "number"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Case-insensitive text search.",
+            "schema": {
+              "minLength": 1,
+              "maxLength": 120,
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedGovernorateResponseDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -11680,10 +12238,52 @@
     "/api/v1/geography/governorates": {
       "get": {
         "operationId": "PublicGeographyController_list_v1",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "One-based page number.",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Maximum governorates per page. Defaults high enough to return every governorate.",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 100,
+              "type": "number"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Case-insensitive text search.",
+            "schema": {
+              "minLength": 1,
+              "maxLength": 120,
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedGovernorateResponseDto"
+                }
+              }
+            }
           }
         },
         "summary": "List governorates and centers for student registration",
@@ -11695,14 +12295,59 @@
     "/api/v1/student/manual-payment-methods": {
       "get": {
         "operationId": "CommerceController_methods_v1",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "One-based page number.",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Maximum records to return per page.",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Case-insensitive text search.",
+            "schema": {
+              "minLength": 1,
+              "maxLength": 120,
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ManualPaymentMethodsResponseDto"
+                  "$ref": "#/components/schemas/PaginatedManualPaymentMethodsResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
                 }
               }
             }
@@ -12727,14 +13372,59 @@
     "/api/v1/admin/manual-payment-methods": {
       "get": {
         "operationId": "ManualPaymentAdminController_methods_v1",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "One-based page number.",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Maximum records to return per page.",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Case-insensitive text search.",
+            "schema": {
+              "minLength": 1,
+              "maxLength": 120,
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ManualPaymentMethodsResponseDto"
+                  "$ref": "#/components/schemas/PaginatedManualPaymentMethodsResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
                 }
               }
             }
@@ -13851,6 +14541,17 @@
             }
           },
           {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Case-insensitive text search.",
+            "schema": {
+              "minLength": 1,
+              "maxLength": 120,
+              "type": "string"
+            }
+          },
+          {
             "name": "status",
             "required": false,
             "in": "query",
@@ -14663,6 +15364,17 @@
               "maximum": 100,
               "default": 20,
               "type": "number"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Case-insensitive text search.",
+            "schema": {
+              "minLength": 1,
+              "maxLength": 120,
+              "type": "string"
             }
           },
           {
@@ -18098,6 +18810,459 @@
           "studentUserId"
         ]
       },
+      "AcademicGradeNodeDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "$ref": "#/components/schemas/LocalizedTextDto"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "description": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/LocalizedTextDto"
+              }
+            ]
+          },
+          "sortOrder": {
+            "type": "number"
+          },
+          "coverAssetId": {
+            "type": "object",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "slug",
+          "description",
+          "sortOrder",
+          "coverAssetId"
+        ]
+      },
+      "StudentCatalogSummaryCountsDto": {
+        "type": "object",
+        "properties": {
+          "subjects": {
+            "type": "number"
+          },
+          "courses": {
+            "type": "number"
+          },
+          "chapters": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "subjects",
+          "courses",
+          "chapters"
+        ]
+      },
+      "StudentCatalogSummaryResponseDto": {
+        "type": "object",
+        "properties": {
+          "academicGrade": {
+            "$ref": "#/components/schemas/AcademicGradeNodeDto"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/StudentCatalogSummaryCountsDto"
+          }
+        },
+        "required": [
+          "academicGrade",
+          "summary"
+        ]
+      },
+      "CatalogNodeDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "description": {
+            "type": "object",
+            "nullable": true
+          },
+          "sortOrder": {
+            "type": "number"
+          },
+          "coverAssetId": {
+            "type": "object",
+            "nullable": true
+          },
+          "hasChildren": {
+            "type": "boolean",
+            "description": "Present when child counts were requested."
+          },
+          "access": {
+            "type": "object",
+            "description": "Resolved access for the requesting student."
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "slug",
+          "description",
+          "sortOrder",
+          "coverAssetId"
+        ]
+      },
+      "PaginatedCatalogNodeResponseDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CatalogNodeDto"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/PaginationMetaDto"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ]
+      },
+      "StudentCatalogSearchHitDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "CHAPTER",
+              "LESSON",
+              "SECTION"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "object",
+            "nullable": true
+          }
+        },
+        "required": [
+          "type",
+          "id",
+          "title",
+          "description"
+        ]
+      },
+      "CursorPageInfoDto": {
+        "type": "object",
+        "properties": {
+          "hasNextPage": {
+            "type": "boolean",
+            "example": true
+          },
+          "nextCursor": {
+            "type": "object",
+            "nullable": true,
+            "example": "eyJzb3J0T3JkZXIiOjJ9"
+          }
+        },
+        "required": [
+          "hasNextPage",
+          "nextCursor"
+        ]
+      },
+      "StudentCatalogSearchResponseDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StudentCatalogSearchHitDto"
+            }
+          },
+          "pageInfo": {
+            "$ref": "#/components/schemas/CursorPageInfoDto"
+          }
+        },
+        "required": [
+          "data",
+          "pageInfo"
+        ]
+      },
+      "CursorCatalogNodeResponseDto": {
+        "type": "object",
+        "properties": {
+          "parent": {
+            "description": "The parent the page was requested under.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CatalogNodeDto"
+              }
+            ]
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CatalogNodeDto"
+            }
+          },
+          "pageInfo": {
+            "$ref": "#/components/schemas/CursorPageInfoDto"
+          }
+        },
+        "required": [
+          "data",
+          "pageInfo"
+        ]
+      },
+      "CatalogContentItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "example": "TEXT"
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "object",
+            "nullable": true
+          },
+          "estimatedDuration": {
+            "type": "object",
+            "nullable": true
+          },
+          "accessType": {
+            "type": "string",
+            "example": "FREE"
+          },
+          "sortOrder": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "title",
+          "description",
+          "estimatedDuration",
+          "accessType",
+          "sortOrder"
+        ]
+      },
+      "CursorCatalogContentItemResponseDto": {
+        "type": "object",
+        "properties": {
+          "parent": {
+            "$ref": "#/components/schemas/CatalogNodeDto"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CatalogContentItemDto"
+            }
+          },
+          "pageInfo": {
+            "$ref": "#/components/schemas/CursorPageInfoDto"
+          }
+        },
+        "required": [
+          "data",
+          "pageInfo"
+        ]
+      },
+      "StudentLibraryItemDto": {
+        "type": "object",
+        "properties": {
+          "entitlementId": {
+            "type": "string"
+          },
+          "archivedAccessSnapshotId": {
+            "type": "string",
+            "description": "Set on rows retained after the content was archived."
+          },
+          "targetType": {
+            "type": "string",
+            "enum": [
+              "COURSE",
+              "CHAPTER",
+              "ACADEMIC_GRADE",
+              "SUBJECT",
+              "LESSON",
+              "SECTION"
+            ]
+          },
+          "target": {
+            "$ref": "#/components/schemas/CatalogNodeDto"
+          },
+          "course": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CatalogNodeDto"
+              }
+            ]
+          },
+          "subject": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CatalogNodeDto"
+              }
+            ]
+          },
+          "academicGrade": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AcademicGradeNodeDto"
+              }
+            ]
+          },
+          "retainedAccess": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "targetType",
+          "target",
+          "course",
+          "subject",
+          "academicGrade"
+        ]
+      },
+      "PaginatedStudentLibraryResponseDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StudentLibraryItemDto"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/PaginationMetaDto"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ]
+      },
+      "MySubjectDto": {
+        "type": "object",
+        "properties": {
+          "subject": {
+            "$ref": "#/components/schemas/CatalogNodeDto"
+          },
+          "progress": {
+            "type": "object",
+            "description": "Completed / total content items for the student."
+          }
+        },
+        "required": [
+          "subject"
+        ]
+      },
+      "PaginatedMySubjectsResponseDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MySubjectDto"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/PaginationMetaDto"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ]
+      },
+      "StudentEntitlementDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "targetType": {
+            "type": "string",
+            "enum": [
+              "COURSE",
+              "CHAPTER"
+            ]
+          },
+          "targetId": {
+            "type": "object",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "example": "ACTIVE"
+          },
+          "startsAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": "object",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "targetType",
+          "targetId",
+          "status",
+          "startsAt",
+          "expiresAt"
+        ]
+      },
+      "PaginatedStudentEntitlementResponseDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StudentEntitlementDto"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/PaginationMetaDto"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ]
+      },
       "CreatePublisherAgreementDto": {
         "type": "object",
         "properties": {
@@ -18188,6 +19353,10 @@
             "description": "Defaults to the current time when omitted."
           }
         }
+      },
+      "Object": {
+        "type": "object",
+        "properties": {}
       },
       "CreateEarningsStatementDto": {
         "type": "object",
@@ -18513,6 +19682,82 @@
           "timestampSeconds"
         ]
       },
+      "LocalizedNameDto": {
+        "type": "object",
+        "properties": {
+          "ar": {
+            "type": "string",
+            "example": "القاهرة"
+          },
+          "en": {
+            "type": "string",
+            "example": "Cairo"
+          }
+        },
+        "required": [
+          "ar",
+          "en"
+        ]
+      },
+      "CenterDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "governorateId": {
+            "type": "string"
+          },
+          "name": {
+            "$ref": "#/components/schemas/LocalizedNameDto"
+          }
+        },
+        "required": [
+          "id",
+          "governorateId",
+          "name"
+        ]
+      },
+      "GovernorateDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "$ref": "#/components/schemas/LocalizedNameDto"
+          },
+          "centers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CenterDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "centers"
+        ]
+      },
+      "PaginatedGovernorateResponseDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GovernorateDto"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/PaginationMetaDto"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ]
+      },
       "GeographyNameDto": {
         "type": "object",
         "properties": {
@@ -18586,7 +19831,7 @@
           "instructionsEn"
         ]
       },
-      "ManualPaymentMethodsResponseDto": {
+      "PaginatedManualPaymentMethodsResponseDto": {
         "type": "object",
         "properties": {
           "data": {
@@ -18594,10 +19839,20 @@
             "items": {
               "$ref": "#/components/schemas/ManualPaymentMethodDto"
             }
+          },
+          "meta": {
+            "type": "object",
+            "example": {
+              "page": 1,
+              "limit": 20,
+              "total": 1,
+              "totalPages": 1
+            }
           }
         },
         "required": [
-          "data"
+          "data",
+          "meta"
         ]
       },
       "MoneyDto": {
@@ -19161,6 +20416,20 @@
         },
         "required": [
           "methodIds"
+        ]
+      },
+      "ManualPaymentMethodsResponseDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ManualPaymentMethodDto"
+            }
+          }
+        },
+        "required": [
+          "data"
         ]
       },
       "PaymentSubmissionAdminDto": {

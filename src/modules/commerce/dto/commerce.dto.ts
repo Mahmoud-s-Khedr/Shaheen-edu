@@ -56,6 +56,11 @@ export class ManualPaymentMethodsResponseDto {
   @ApiProperty({ type: [ManualPaymentMethodDto] }) data!: ManualPaymentMethodDto[];
 }
 
+export class PaginatedManualPaymentMethodsResponseDto {
+  @ApiProperty({ type: [ManualPaymentMethodDto] }) data!: ManualPaymentMethodDto[];
+  @ApiProperty({ example: { page: 1, limit: 20, total: 1, totalPages: 1 } }) meta!: { page: number; limit: number; total: number; totalPages: number };
+}
+
 export class CartItemDto {
   @ApiProperty({ example: 'cart-item-id' }) id!: string;
   @ApiProperty({ enum: CommerceTargetType, example: CommerceTargetType.COURSE }) targetType!: CommerceTargetType;

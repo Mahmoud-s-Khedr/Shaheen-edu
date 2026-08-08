@@ -12,6 +12,14 @@ import {
   Role,
 } from '../../common/types/roles.enum';
 import { toPaginationMeta } from '../../common/dto/pagination-query.dto';
+import {
+  orderByIds,
+  paginateArabicSearch,
+  resolveSearchQuery,
+  searchArabicOffsetPage,
+  sqlAnd,
+  type ArabicSearchScope,
+} from '../../common/search/arabic-search';
 import type { RequestUser } from '../../common/types/request-with-user.types';
 import { PrismaService } from '../../database/prisma.service';
 import { AuditService } from '../audit/audit.service';
@@ -36,6 +44,8 @@ const scopeInclude = {
   lesson: { include: { chapter: { include: { course: { include: { subject: true } } } } } },
   section: { include: { lesson: { include: { chapter: { include: { course: { include: { subject: true } } } } } } } },
 };
+
+const ASSESSMENT_SEARCH_BATCH_SIZE = 500;
 
 @Injectable()
 export class AssessmentsService {
@@ -303,18 +313,83 @@ export class AssessmentsService {
     return true;
   }
 
+  /**
+   * Hydrates every SQL-matched assessment in bounded batches. Student-facing
+   * visibility is decided in application code, so stopping after one SQL page
+   * would make both the result set and its pagination total incomplete.
+   */
+  private async searchedAssessments(
+    query: string,
+    scope: ArabicSearchScope,
+    args?: Record<string, unknown>,
+  ): Promise<any[]> {
+    const first = await searchArabicOffsetPage(this.prisma, 'assessment', query, {
+      scope,
+      orderBy: Prisma.sql`t."createdAt" DESC, t.id DESC`,
+      page: 1,
+      limit: ASSESSMENT_SEARCH_BATCH_SIZE,
+    });
+    if (!first.ids.length) return [];
+
+    const pages = [first];
+    const pageCount = Math.ceil(first.total / ASSESSMENT_SEARCH_BATCH_SIZE);
+    for (let page = 2; page <= pageCount; page++) {
+      pages.push(
+        await searchArabicOffsetPage(this.prisma, 'assessment', query, {
+          scope,
+          orderBy: Prisma.sql`t."createdAt" DESC, t.id DESC`,
+          page,
+          limit: ASSESSMENT_SEARCH_BATCH_SIZE,
+        }),
+      );
+    }
+
+    const records: any[] = [];
+    for (const matched of pages) {
+      const rows = await this.prisma.assessment.findMany({
+        ...args,
+        where: { id: { in: matched.ids } },
+      });
+      records.push(...orderByIds(rows, matched.ids));
+    }
+    return records;
+  }
+
   async list(studentId: string, query: QueryAssessmentDto) {
     const gradeId = await this.prisma.studentProfile.findUnique({ where: { userId: studentId }, select: { academicGradeId: true } }).then((x) => x?.academicGradeId ?? null);
-    const search = query.search?.trim() ? { title: { contains: query.search.trim(), mode: 'insensitive' as const } } : {};
-    const own = await this.prisma.assessment.findMany({
-      where: { ownerType: AssessmentOwnerType.STUDENT, studentUserId: studentId, status: { not: AssessmentStatus.ARCHIVED }, ...search },
-      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-    });
-    const adminCandidates = await this.prisma.assessment.findMany({
-      where: { ownerType: AssessmentOwnerType.ADMIN, status: AssessmentStatus.READY, ...search },
-      include: { scopes: { include: scopeInclude } },
-      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-    });
+    const searchQuery = resolveSearchQuery(query);
+    const own = searchQuery
+      ? await this.searchedAssessments(searchQuery, {
+          where: Prisma.sql`
+            t."ownerType" = ${AssessmentOwnerType.STUDENT}::"AssessmentOwnerType"
+            AND t."studentUserId" = ${studentId}
+            AND t.status <> 'ARCHIVED'::"AssessmentStatus"
+          `,
+        })
+      : await this.prisma.assessment.findMany({
+          where: {
+            ownerType: AssessmentOwnerType.STUDENT,
+            studentUserId: studentId,
+            status: { not: AssessmentStatus.ARCHIVED },
+          },
+          orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        });
+    const adminCandidates = searchQuery
+      ? await this.searchedAssessments(
+          searchQuery,
+          {
+            where: Prisma.sql`
+              t."ownerType" = ${AssessmentOwnerType.ADMIN}::"AssessmentOwnerType"
+              AND t.status = ${AssessmentStatus.READY}::"AssessmentStatus"
+            `,
+          },
+          { include: { scopes: { include: scopeInclude } } },
+        )
+      : await this.prisma.assessment.findMany({
+          where: { ownerType: AssessmentOwnerType.ADMIN, status: AssessmentStatus.READY },
+          include: { scopes: { include: scopeInclude } },
+          orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        });
     const visibility = await Promise.all(adminCandidates.map((assessment) => this.assessmentVisible(studentId, gradeId, assessment.scopes)));
     const visiblePublic = adminCandidates.filter((_, index) => visibility[index]);
     const ids = [...own.map((x) => x.id), ...visiblePublic.map((x) => x.id)];
@@ -642,13 +717,26 @@ export class AssessmentsService {
 
   async listAdmin(actor: RequestUser, query: QueryAdminAssessmentDto) {
     this.assertAdmin(actor);
-    const search = query.search?.trim() ? { title: { contains: query.search.trim(), mode: 'insensitive' as const } } : {};
-    const where = { ownerType: AssessmentOwnerType.ADMIN, status: query.status, ...search };
-    const [data, total] = await this.prisma.$transaction([
-      this.prisma.assessment.findMany({ where, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], skip: (query.page - 1) * query.limit, take: query.limit }),
-      this.prisma.assessment.count({ where }),
-    ]);
-    return { data: data.map((x) => this.adminListItemDto(x)), meta: toPaginationMeta(query.page, query.limit, total) };
+    const searchQuery = resolveSearchQuery(query);
+    const where = { ownerType: AssessmentOwnerType.ADMIN, status: query.status };
+    const { data, total } = await paginateArabicSearch({
+      prisma: this.prisma,
+      delegate: this.prisma.assessment,
+      target: 'assessment',
+      q: searchQuery,
+      scope: {
+        where: sqlAnd(
+          Prisma.sql`t."ownerType" = ${AssessmentOwnerType.ADMIN}::"AssessmentOwnerType"`,
+          query.status ? Prisma.sql`t.status = ${query.status}::"AssessmentStatus"` : undefined,
+        ),
+      },
+      orderBySql: Prisma.sql`t."createdAt" DESC, t.id DESC`,
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      where,
+      page: query.page,
+      limit: query.limit,
+    });
+    return { data: data.map((x: any) => this.adminListItemDto(x)), meta: toPaginationMeta(query.page, query.limit, total) };
   }
 
   private adminListItemDto(assessment: any) {

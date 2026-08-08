@@ -1,7 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { ArrayMinSize, IsArray, IsBoolean, IsEnum, IsInt, IsOptional, IsString, MaxLength, Min, MinLength, ValidateNested } from 'class-validator';
-import { PaginationQueryDto } from '../../../common/dto/pagination-query.dto';
+import { SearchPaginationQueryDto } from '../../../common/dto/pagination-query.dto';
 import { ContentStatus, QuestionSourceType, QuestionStatus, QuestionType } from '../../../common/types/roles.enum';
 import { LocalizedOptionalTextDto, LocalizedTextDto } from '../../../common/dto/localized-text.dto';
 
@@ -46,10 +46,10 @@ export class ReorderQuestionOptionsDto { @ApiProperty({ type: [String] }) @IsStr
 export class ReorderQuestionAssetsDto { @ApiProperty({ type: [String] }) @IsString({ each: true }) assetIds!: string[]; }
 export class SetQuestionVideoLinkDto { @ApiProperty() @IsString() videoAssetId!: string; @ApiProperty() @Type(() => Number) @IsInt() @Min(0) timestampSeconds!: number; }
 export class RejectQuestionDto { @ApiProperty() @IsString() @MinLength(1) @MaxLength(2000) reviewNote!: string; }
-export class QueryQuestionDto extends PaginationQueryDto {
+export class QueryQuestionDto extends SearchPaginationQueryDto {
   @ApiPropertyOptional({ enum: QuestionStatus }) @IsOptional() @IsEnum(QuestionStatus) status?: QuestionStatus;
   @ApiPropertyOptional() @IsOptional() @IsString() bankId?: string; @ApiPropertyOptional() @IsOptional() @IsString() sourceId?: string; @ApiPropertyOptional() @IsOptional() @IsString() chapterId?: string; @ApiPropertyOptional() @IsOptional() @IsString() lessonId?: string; @ApiPropertyOptional() @IsOptional() @IsString() sectionId?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() courseId?: string; @ApiPropertyOptional() @IsOptional() @IsString() subjectId?: string; @ApiPropertyOptional() @IsOptional() @IsString() academicGradeId?: string;
 }
-export class QueryQuestionSourceDto extends PaginationQueryDto { @ApiPropertyOptional({ enum: ContentStatus }) @IsOptional() @IsEnum(ContentStatus) status?: ContentStatus; @ApiPropertyOptional({ enum: QuestionSourceType }) @IsOptional() @IsEnum(QuestionSourceType) type?: QuestionSourceType; }
-export class QueryQuestionBankDto extends PaginationQueryDto { @ApiPropertyOptional({ enum: ContentStatus }) @IsOptional() @IsEnum(ContentStatus) status?: ContentStatus; }
+export class QueryQuestionSourceDto extends SearchPaginationQueryDto { @ApiPropertyOptional({ enum: ContentStatus }) @IsOptional() @IsEnum(ContentStatus) status?: ContentStatus; @ApiPropertyOptional({ enum: QuestionSourceType }) @IsOptional() @IsEnum(QuestionSourceType) type?: QuestionSourceType; }
+export class QueryQuestionBankDto extends SearchPaginationQueryDto { @ApiPropertyOptional({ enum: ContentStatus }) @IsOptional() @IsEnum(ContentStatus) status?: ContentStatus; }

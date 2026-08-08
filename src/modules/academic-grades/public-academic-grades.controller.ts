@@ -3,7 +3,7 @@ import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Public } from '../../common/decorators/public.decorator';
 import { ApiStandardErrors } from '../../common/decorators/api-standard-errors.decorator';
 import { PaginatedAcademicGradeResponseDto } from '../../common/dto/api-response.dto';
-import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
+import { SearchPaginationQueryDto } from '../../common/dto/pagination-query.dto';
 import { AcademicGradesService } from './academic-grades.service';
 
 @ApiTags('academic-grades')
@@ -19,7 +19,7 @@ export class PublicAcademicGradesController {
   })
   @ApiOkResponse({ type: PaginatedAcademicGradeResponseDto })
   @ApiStandardErrors(400)
-  list(@Query() query: PaginationQueryDto) {
+  list(@Query() query: SearchPaginationQueryDto) {
     return this.academicGradesService.listPublished(query);
   }
 }

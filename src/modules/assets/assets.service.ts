@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'node:crypto';
 import { AssetKind, AssetStatus, ContentItemType, ContentStatus, Role } from '../../common/types/roles.enum';
 import type { RequestUser } from '../../common/types/request-with-user.types';
+import { toPaginationMeta, type PaginationQueryDto } from '../../common/dto/pagination-query.dto';
 import type { AppConfig } from '../../config/configuration';
 import { PrismaService } from '../../database/prisma.service';
 import { AuditService } from '../audit/audit.service';
@@ -80,7 +81,7 @@ export class AssetsService {
   }
 
   async get(actor: RequestUser, id: string) { this.assertAdmin(actor); const asset = await this.getReadyOrAny(id); if (asset.kind === AssetKind.PAYMENT_PROOF) throw new NotFoundException('Asset not found'); return this.summary(asset); }
-  async list(actor: RequestUser) { this.assertAdmin(actor); return { data: (await this.prisma.asset.findMany({ where: { kind: { not: AssetKind.PAYMENT_PROOF } }, orderBy: { createdAt: 'desc' }, take: 100 })).map((x) => this.summary(x)) }; }
+  async list(actor: RequestUser, query: PaginationQueryDto) { this.assertAdmin(actor); const where = { kind: { not: AssetKind.PAYMENT_PROOF } }; const [data, total] = await this.prisma.$transaction([this.prisma.asset.findMany({ where, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], skip: (query.page - 1) * query.limit, take: query.limit }), this.prisma.asset.count({ where })]); return { data: data.map((x) => this.summary(x)), meta: toPaginationMeta(query.page, query.limit, total) }; }
   async archive(actor: RequestUser, id: string) { this.assertAdmin(actor); const asset = await this.getReadyOrAny(id); if (asset.kind === AssetKind.PAYMENT_PROOF) throw new NotFoundException('Asset not found'); const used = await this.isReferenced(id); if (used) throw new ConflictException('Referenced assets cannot be archived'); if (asset.storageKey) await this.storage.delete(asset.storageKey); const updated = await this.prisma.asset.update({ where: { id }, data: { status: AssetStatus.ARCHIVED, archivedAt: new Date() } }); await this.audit.record({ actorUserId: actor.id, action: 'ASSET_ARCHIVED', targetType: 'Asset', targetId: id }); return this.summary(updated); }
   async delete(actor: RequestUser, id: string) { this.assertAdmin(actor); const asset = await this.prisma.asset.findUnique({ where: { id }, include: { video: true } }); if (!asset || asset.kind === AssetKind.PAYMENT_PROOF) throw new NotFoundException('Asset not found'); if (asset.video) throw new BadRequestException('Use the video asset endpoints to manage video assets'); if (await this.isReferenced(id)) throw new ConflictException('Referenced assets cannot be deleted'); if (asset.storageKey) await this.storage.delete(asset.storageKey); await this.prisma.asset.delete({ where: { id } }); await this.audit.record({ actorUserId: actor.id, action: 'ASSET_DELETED', targetType: 'Asset', targetId: id }); return { id, deleted: true }; }
   /** Archives an asset displaced by a replacement, but only once nothing else references it. */

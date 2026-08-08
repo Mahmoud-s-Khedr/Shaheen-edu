@@ -9,7 +9,7 @@ async function main(): Promise<void> {
   if (!selection) usage();
   const verbose = flags.includes('--verbose') || process.env.JOURNEY_VERBOSE === 'true'; const quiet = flags.includes('--quiet'); const json = flags.includes('--json'); const retain = flags.includes('--retain-created-data');
   if (verbose && quiet) throw new Error('--verbose and --quiet cannot be combined');
-  if (selection === 'list') { for (const journey of journeys) console.log(`${journey.id}\t${journey.category}\t${journey.name}`); return; }
+  if (selection === 'list') { for (const journey of journeys) console.log(`${journey.id}\t${journey.category}\t${journey.requiresBunny ? 'bunny\t' : ''}${journey.name}`); return; }
   const environment = loadEnvironment();
   console.log(`Journey target: ${environment.baseUrl} (${environment.target})`);
   if (retain) console.log('Created data will be retained (the default; account cleanup APIs are not available).');
@@ -19,8 +19,8 @@ async function main(): Promise<void> {
   const started = performance.now(); let results;
   try { results = await runner.execute(selected); }
   catch { results = await runner.execute([]); process.exitCode = 1; }
-  const duration = performance.now() - started; const passed = results.filter((result) => result.status === 'passed').length; const failed = results.filter((result) => result.status === 'failed').length;
-  console.log(`Journey run: ${runner.getContext().runId}\nTarget: ${environment.baseUrl}\nPassed: ${passed}\nFailed: ${failed}\nSkipped: 0\nDuration: ${(duration / 1000).toFixed(2)} seconds`);
+  const duration = performance.now() - started; const passed = results.filter((result) => result.status === 'passed').length; const failed = results.filter((result) => result.status === 'failed').length; const skipped = results.filter((result) => result.status === 'skipped').length;
+  console.log(`Journey run: ${runner.getContext().runId}\nTarget: ${environment.baseUrl}\nPassed: ${passed}\nFailed: ${failed}\nSkipped: ${skipped}\nDuration: ${(duration / 1000).toFixed(2)} seconds`);
   if (json) console.log(`JSON report: ${await runner.writeReport(results)}`);
   if (failed) process.exitCode = 1;
 }

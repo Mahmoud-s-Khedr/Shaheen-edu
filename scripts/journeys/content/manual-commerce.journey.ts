@@ -5,7 +5,7 @@ import type { JourneyDefinition } from '../lib/types.js';
 
 /** CONTENT-012 — Manual payment checkout, rejection, replacement proof, and approval. */
 export const manualCommerceJourney: JourneyDefinition = {
-  id: 'CONTENT-012', name: 'Manual course and chapter payments', category: 'content', dependsOn: ['CONTENT-009'],
+  id: 'CONTENT-012', name: 'Manual course and chapter payments', category: 'content', dependsOn: ['CONTENT-009'], requiresBunny: true,
   async run({ clients, context, factory, step }) {
     const admin = clients.admin;
     let studentToken = ''; let courseId = ''; let chapterId = ''; let orderId = ''; let methodId = '';
@@ -20,9 +20,10 @@ export const manualCommerceJourney: JourneyDefinition = {
       expectStatus(await admin.request<any>('POST', `/admin/pricing/chapter/${chapterId}`, { isPurchasable: true, priceMinor: 10_000, currency: 'EGP' }), 201);
     });
     await step('Managing payment methods and a cancellable course order', async () => {
-      const listed = await admin.request<any>('GET', '/admin/manual-payment-methods'); expectStatus(listed, 200); assert(listed.body.data.some((x: any) => x.id === methodId), 'Created payment method must be listed for admins');
+      const listed = await admin.request<any>('GET', `/admin/manual-payment-methods?limit=1&q=${encodeURIComponent('تحويل')}`); expectStatus(listed, 200); assert(listed.body.data.some((x: any) => x.id === methodId) && listed.body.meta.total >= 1, 'Created payment method must be searchable and paginated for admins');
       const updated = await admin.request<any>('PATCH', `/admin/manual-payment-methods/${methodId}`, { titleEn: 'Bank transfer' }); expectStatus(updated, 200); assert(updated.body.titleEn === 'Bank transfer', 'Payment method update must persist');
-      expectStatus(await admin.request<any>('POST', '/admin/manual-payment-methods/reorder', { methodIds: listed.body.data.map((x: any) => x.id) }), 201);
+      const allMethods = await admin.request<any>('GET', '/admin/manual-payment-methods?limit=100'); expectStatus(allMethods, 200);
+      expectStatus(await admin.request<any>('POST', '/admin/manual-payment-methods/reorder', { methodIds: allMethods.body.data.map((x: any) => x.id) }), 201);
       const emptyCart = await student<any>('GET', '/student/cart'); expectStatus(emptyCart, 200); assert(emptyCart.body.data.length === 0, 'New student cart must be empty');
       const courseItem = await student<any>('POST', '/student/cart/items', { targetType: 'COURSE', targetId: courseId }); expectStatus(courseItem, 201);
       expectStatus(await student<any>('DELETE', `/student/cart/items/${courseItem.body.id}`), 200);
@@ -31,7 +32,7 @@ export const manualCommerceJourney: JourneyDefinition = {
       const cancelled = await student<any>('POST', `/student/orders/${cancelledCheckout.body.id}/cancel`); expectStatus(cancelled, 201); assert(cancelled.body.status === 'CANCELLED', 'Order cancellation must persist');
     });
     await step('Checking out and ensuring receipt review is required for access', async () => {
-      const methods = await student<any>('GET', '/student/manual-payment-methods'); expectStatus(methods, 200); assert(methods.body.data.some((x: any) => x.id === methodId), 'Student must see active payment method');
+      const methods = await student<any>('GET', `/student/manual-payment-methods?q=${encodeURIComponent('تحويل')}`); expectStatus(methods, 200); assert(methods.body.data.some((x: any) => x.id === methodId) && methods.body.meta.total >= 1, 'Student must see searchable active payment methods');
       expectStatus(await student<any>('POST', '/student/cart/items', { targetType: 'CHAPTER', targetId: chapterId }), 201);
       const checkout = await student<any>('POST', '/student/checkout', { manualPaymentMethodId: methodId }, { 'idempotency-key': factory.slug('checkout') }); expectStatus(checkout, 201); orderId = checkout.body.id;
       const orders = await student<any>('GET', '/student/orders'); expectStatus(orders, 200); assert(orders.body.data.some((x: any) => x.id === orderId), 'Checkout must appear in order history');

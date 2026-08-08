@@ -108,7 +108,11 @@ describe('AcademicGradesService', () => {
       createdAt: new Date(), updatedAt: new Date(), publishedAt: null, archivedAt: null,
       coverAssetId: null,
     };
-    prisma.$transaction.mockResolvedValueOnce([[{ ...grade, _count: { subjects: 1 } }, { ...grade, _count: { subjects: 0 } }], 2]);
+    prisma.academicGrade.findMany.mockResolvedValueOnce([
+      { ...grade, _count: { subjects: 1 } },
+      { ...grade, _count: { subjects: 0 } },
+    ]);
+    prisma.academicGrade.count.mockResolvedValueOnce(2);
 
     const result = await service.list(actor, { page: 1, limit: 20 });
 

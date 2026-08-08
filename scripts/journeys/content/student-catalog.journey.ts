@@ -306,6 +306,10 @@ export const studentCatalogJourney: JourneyDefinition = {
           ),
           'The library must include the active chapter entitlement and hierarchy',
         );
+        assert(library.body.meta?.page === 1 && library.body.meta?.total >= 1, 'Student library must return pagination metadata');
+        const searchedLibrary = await studentRequest<any>('GET', `/student/library?q=${encodeURIComponent('Entitled')}`);
+        expectStatus(searchedLibrary, 200);
+        assert(searchedLibrary.body.data?.some((item: any) => item.target?.id === entitledChapterId), 'Student library q search must match owned hierarchy content');
 
         const entitlements = await studentRequest<any>(
           'GET',

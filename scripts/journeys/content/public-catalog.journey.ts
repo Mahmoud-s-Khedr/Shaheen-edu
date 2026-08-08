@@ -42,7 +42,7 @@ export const publicCatalogJourney: JourneyDefinition = {
 
         const subjects = await clients.public.request<any>(
           'GET',
-          `/catalog/subjects?academicGradeId=${gradeId}`,
+          `/catalog/subjects?academicGradeId=${gradeId}&q=${encodeURIComponent('Subject')}`,
         );
         expectStatus(subjects, 200);
         assert(
@@ -87,6 +87,15 @@ export const publicCatalogJourney: JourneyDefinition = {
           `/admin/content-items/${paidContentId}/publish`,
         );
         expectStatus(publishItem, 201);
+        const secondItem = await admin.request<any>('POST', '/admin/content-items', {
+          type: 'TEXT',
+          title: factory.title('Catalog second lesson'),
+          textBody: 'Second catalog preview item.',
+          placement: { courseId: paidCourseId },
+        });
+        expectStatus(secondItem, 201);
+        context.created.contentItems.push(secondItem.body.id);
+        expectStatus(await admin.request<any>('POST', `/admin/content-items/${secondItem.body.id}/publish`), 201);
       },
     );
 
@@ -102,6 +111,9 @@ export const publicCatalogJourney: JourneyDefinition = {
           courses.body.data.some((course: any) => course.id === paidCourseId),
           'Filtered catalog courses must include the paid course',
         );
+        const searchedCourses = await clients.public.request<any>('GET', `/catalog/courses?subjectId=${subjectId}&q=${encodeURIComponent('Catalog paid')}`);
+        expectStatus(searchedCourses, 200);
+        assert(searchedCourses.body.data.some((course: any) => course.id === paidCourseId) && searchedCourses.body.meta.total >= 1, 'Catalog q search must return matching courses with pagination metadata');
 
         const course = await clients.public.request<any>(
           'GET',
@@ -129,6 +141,13 @@ export const publicCatalogJourney: JourneyDefinition = {
             !serialized.includes('storageKey'),
           'Catalog previews must exclude protected payloads and storage internals',
         );
+        const firstPage = await clients.public.request<any>('GET', `/catalog/courses/${paidCourseId}/content-items?limit=1&q=${encodeURIComponent('Catalog')}`);
+        expectStatus(firstPage, 200);
+        assert(firstPage.body.pageInfo?.nextCursor, 'Search cursor pagination must return a cursor when more matches exist');
+        const mismatchedCursor = await clients.public.request<any>('GET', `/catalog/courses/${paidCourseId}/content-items?limit=1&q=${encodeURIComponent('Other')}&cursor=${encodeURIComponent(firstPage.body.pageInfo.nextCursor)}`);
+        expectStatus(mismatchedCursor, 400);
+        const punctuationOnly = await clients.public.request<any>('GET', `/catalog/courses?subjectId=${subjectId}&q=${encodeURIComponent('!!!')}`);
+        expectStatus(punctuationOnly, 400);
       },
     );
 

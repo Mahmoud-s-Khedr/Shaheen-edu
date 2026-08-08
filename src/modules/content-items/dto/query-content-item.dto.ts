@@ -1,13 +1,13 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsEnum, IsOptional, IsString } from 'class-validator';
-import { PaginationQueryDto } from '../../../common/dto/pagination-query.dto';
+import { SearchPaginationQueryDto } from '../../../common/dto/pagination-query.dto';
 import {
   AccessType,
   ContentItemType,
   ContentStatus,
 } from '../../../common/types/roles.enum';
 
-export class QueryContentItemDto extends PaginationQueryDto {
+export class QueryContentItemDto extends SearchPaginationQueryDto {
   @ApiPropertyOptional({ enum: ContentStatus })
   @IsOptional()
   @IsEnum(ContentStatus)

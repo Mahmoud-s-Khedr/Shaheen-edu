@@ -99,6 +99,29 @@ export class JourneyRunner {
     if (!journey) throw new Error(`Unknown journey: ${id}`);
     for (const dependency of journey.dependsOn ?? [])
       await this.executeOne(dependency);
+    const skippedDependency = (journey.dependsOn ?? [])
+      .map((dependency) => this.completed.get(dependency))
+      .find((result) => result?.status === 'skipped');
+    const skipReason = journey.requiresBunny && this.environment.target === 'local'
+      ? 'Requires Bunny Storage or Stream; skipped for JOURNEY_TARGET=local'
+      : skippedDependency
+        ? `Dependency ${skippedDependency.id} was skipped`
+        : undefined;
+    if (skipReason) {
+      const result: JourneyResult = {
+        id: journey.id,
+        name: journey.name,
+        status: 'skipped',
+        durationMs: 0,
+        correlationIds: [],
+        created: structuredClone(this.context.created),
+        skippedReason: skipReason,
+      };
+      this.completed.set(id, result);
+      if (!this.options.quiet)
+        console.log(`[${journey.id}] Skipped: ${skipReason}`);
+      return;
+    }
     const started = performance.now();
     const correlationIds: string[] = [];
     let currentStep = '';

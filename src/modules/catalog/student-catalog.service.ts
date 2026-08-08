@@ -13,11 +13,15 @@ import {
 import {
   toPaginationMeta,
   type PaginationQueryDto,
+  type SearchPaginationQueryDto,
 } from '../../common/dto/pagination-query.dto';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
-import { CursorPaginationQueryDto } from '../../common/dto/cursor-pagination-query.dto';
+import { SearchCursorPaginationQueryDto } from '../../common/dto/cursor-pagination-query.dto';
 import { StudentCatalogSearchDto } from './dto/student-catalog-search.dto';
+import { likePattern, normalizeArabic, paginateArabicSearch, searchArabicIds, searchNeedle, sqlAnd } from '../../common/search/arabic-search';
+import { publishedScope, sortOrderSql } from '../../common/search/content-scope';
+import { nodeMatches } from '../../common/search/node-match';
 
 const published = ContentStatus.PUBLISHED;
 const order = [{ sortOrder: 'asc' as const }, { id: 'asc' as const }];
@@ -66,19 +70,22 @@ export class StudentCatalogService {
     };
   }
 
-  async subjects(studentUserId: string, query: PaginationQueryDto) {
+  async subjects(studentUserId: string, query: SearchPaginationQueryDto) {
     const grade = await this.gradeFor(studentUserId);
     const where = { academicGradeId: grade.id, status: published };
-    const [data, total] = await this.prisma.$transaction([
-      this.prisma.subject.findMany({
-        where,
-        include: { _count: { select: { courses: { where: { status: published } } } } },
-        orderBy: order,
-        skip: (query.page - 1) * query.limit,
-        take: query.limit,
-      }),
-      this.prisma.subject.count({ where }),
-    ]);
+    const { data, total } = await paginateArabicSearch({
+      prisma: this.prisma,
+      delegate: this.prisma.subject,
+      target: 'subject',
+      q: query.q,
+      scope: { where: sqlAnd(publishedScope, Prisma.sql`t."academicGradeId" = ${grade.id}`) },
+      orderBySql: sortOrderSql,
+      orderBy: order,
+      where,
+      args: { include: { _count: { select: { courses: { where: { status: published } } } } } },
+      page: query.page,
+      limit: query.limit,
+    });
     return {
       data: data.map((subject) => this.node(subject)),
       meta: toPaginationMeta(query.page, query.limit, total),
@@ -88,7 +95,7 @@ export class StudentCatalogService {
   async courses(
     studentUserId: string,
     subjectId: string,
-    query: PaginationQueryDto,
+    query: SearchPaginationQueryDto,
   ) {
     const grade = await this.gradeFor(studentUserId);
     const subject = await this.prisma.subject.findFirst({
@@ -98,16 +105,19 @@ export class StudentCatalogService {
     if (!subject) throw new NotFoundException('Published subject not found');
     const grants = await this.activeGrants(studentUserId);
     const where = { subjectId, status: published };
-    const [data, total] = await this.prisma.$transaction([
-      this.prisma.course.findMany({
-        where,
-        include: { _count: { select: { chapters: { where: { status: published } } } } },
-        orderBy: order,
-        skip: (query.page - 1) * query.limit,
-        take: query.limit,
-      }),
-      this.prisma.course.count({ where }),
-    ]);
+    const { data, total } = await paginateArabicSearch({
+      prisma: this.prisma,
+      delegate: this.prisma.course,
+      target: 'course',
+      q: query.q,
+      scope: { where: sqlAnd(publishedScope, Prisma.sql`t."subjectId" = ${subjectId}`) },
+      orderBySql: sortOrderSql,
+      orderBy: order,
+      where,
+      args: { include: { _count: { select: { chapters: { where: { status: published } } } } } },
+      page: query.page,
+      limit: query.limit,
+    });
     return {
       data: data.map((course) =>
         this.withAccess(
@@ -136,8 +146,10 @@ export class StudentCatalogService {
     });
     if (!subject) throw new NotFoundException('Published subject not found');
     const types = this.searchTypes(query.types);
-    const cursor = this.searchCursor(query.cursor);
-    const pattern = `%${query.q.replace(/[\\%_]/g, '\\$&')}%`;
+    const searchQuery = searchNeedle(query.q)!;
+    const cursor = this.searchCursor(query.cursor, searchQuery);
+    const normalizedQuery = normalizeArabic(searchQuery);
+    const pattern = likePattern(searchQuery);
     const searches: Prisma.Sql[] = [];
     if (types.includes('CHAPTER'))
       searches.push(Prisma.sql`
@@ -148,7 +160,11 @@ export class StudentCatalogService {
         JOIN "Course" c ON c.id = h."courseId"
         WHERE h.status = ${published}::"ContentStatus" AND c.status = ${published}::"ContentStatus"
           AND c."subjectId" = ${subject.id}
-          AND (h.title ILIKE ${pattern} ESCAPE E'\\\\' OR h.description ILIKE ${pattern} ESCAPE E'\\\\')
+          AND (
+            arabic_normalize(coalesce(h.title, '') || ' ' || coalesce(h.slug, '') || ' ' || coalesce(h.description, '')) LIKE ${pattern} ESCAPE E'\\\\'
+            OR to_tsvector('simple', arabic_normalize(coalesce(h.title, '') || ' ' || coalesce(h.slug, '') || ' ' || coalesce(h.description, ''))) @@ plainto_tsquery('simple', ${normalizedQuery})
+            OR (length(${normalizedQuery}) >= 3 AND similarity(arabic_normalize(coalesce(h.title, '') || ' ' || coalesce(h.slug, '') || ' ' || coalesce(h.description, '')), ${normalizedQuery}) >= 0.35)
+          )
       `);
     if (types.includes('LESSON'))
       searches.push(Prisma.sql`
@@ -160,7 +176,11 @@ export class StudentCatalogService {
         JOIN "Course" c ON c.id = h."courseId"
         WHERE l.status = ${published}::"ContentStatus" AND h.status = ${published}::"ContentStatus" AND c.status = ${published}::"ContentStatus"
           AND c."subjectId" = ${subject.id}
-          AND (l.title ILIKE ${pattern} ESCAPE E'\\\\' OR l.description ILIKE ${pattern} ESCAPE E'\\\\')
+          AND (
+            arabic_normalize(coalesce(l.title, '') || ' ' || coalesce(l.slug, '') || ' ' || coalesce(l.description, '')) LIKE ${pattern} ESCAPE E'\\\\'
+            OR to_tsvector('simple', arabic_normalize(coalesce(l.title, '') || ' ' || coalesce(l.slug, '') || ' ' || coalesce(l.description, ''))) @@ plainto_tsquery('simple', ${normalizedQuery})
+            OR (length(${normalizedQuery}) >= 3 AND similarity(arabic_normalize(coalesce(l.title, '') || ' ' || coalesce(l.slug, '') || ' ' || coalesce(l.description, '')), ${normalizedQuery}) >= 0.35)
+          )
       `);
     if (types.includes('SECTION'))
       searches.push(Prisma.sql`
@@ -174,7 +194,11 @@ export class StudentCatalogService {
         WHERE x.status = ${published}::"ContentStatus" AND l.status = ${published}::"ContentStatus"
           AND h.status = ${published}::"ContentStatus" AND c.status = ${published}::"ContentStatus"
           AND c."subjectId" = ${subject.id}
-          AND (x.title ILIKE ${pattern} ESCAPE E'\\\\' OR x.description ILIKE ${pattern} ESCAPE E'\\\\')
+          AND (
+            arabic_normalize(coalesce(x.title, '') || ' ' || coalesce(x.slug, '') || ' ' || coalesce(x.description, '')) LIKE ${pattern} ESCAPE E'\\\\'
+            OR to_tsvector('simple', arabic_normalize(coalesce(x.title, '') || ' ' || coalesce(x.slug, '') || ' ' || coalesce(x.description, ''))) @@ plainto_tsquery('simple', ${normalizedQuery})
+            OR (length(${normalizedQuery}) >= 3 AND similarity(arabic_normalize(coalesce(x.title, '') || ' ' || coalesce(x.slug, '') || ' ' || coalesce(x.description, '')), ${normalizedQuery}) >= 0.35)
+          )
       `);
     const rows = await this.prisma.$queryRaw<
       Array<{
@@ -237,7 +261,7 @@ export class StudentCatalogService {
         hasNextPage: rows.length > query.limit,
         nextCursor:
           rows.length > query.limit && last
-            ? Buffer.from(JSON.stringify({ key: [last.course_order, last.chapter_order, last.lesson_order, last.section_order, last.type_order, last.id] })).toString(
+            ? Buffer.from(JSON.stringify({ key: [last.course_order, last.chapter_order, last.lesson_order, last.section_order, last.type_order, last.id], q: normalizeArabic(searchQuery) })).toString(
                 'base64url',
               )
             : null,
@@ -245,7 +269,10 @@ export class StudentCatalogService {
     };
   }
 
-  async mySubjects(studentUserId: string, query: PaginationQueryDto) {
+  async mySubjects(studentUserId: string, query: SearchPaginationQueryDto) {
+    // Rejects a query that normalizes to nothing (e.g. "!!!") instead of
+    // matching everything, matching subjects() and the catalogue endpoints.
+    searchNeedle(query.q);
     const entitlements = await this.prisma.studentEntitlement.findMany({
       where: this.activeGrantWhere(studentUserId),
       include: {
@@ -277,7 +304,9 @@ export class StudentCatalogService {
       group.entitlements.push(entitlement);
       grouped.set(subject.id, group);
     }
-    const subjectPage = [...grouped.values()]
+    const matchingSubjects = [...grouped.values()]
+      .filter(({ subject }) => this.nodeMatches(subject, query.q));
+    const subjectPage = matchingSubjects
       .sort(
         (a, b) =>
           a.subject.sortOrder - b.subject.sortOrder ||
@@ -371,7 +400,7 @@ export class StudentCatalogService {
     });
     return {
       data: rows,
-      meta: toPaginationMeta(query.page, query.limit, grouped.size),
+      meta: toPaginationMeta(query.page, query.limit, matchingSubjects.length),
     };
   }
 
@@ -406,7 +435,7 @@ export class StudentCatalogService {
   async chapters(
     studentUserId: string,
     courseId: string,
-    query: CursorPaginationQueryDto,
+    query: SearchCursorPaginationQueryDto,
   ) {
     const grade = await this.gradeFor(studentUserId);
     const course = await this.prisma.course.findFirst({
@@ -423,8 +452,11 @@ export class StudentCatalogService {
     });
     if (!course) throw new NotFoundException('Published course not found');
     const grants = await this.activeGrants(studentUserId);
+    const ids = await searchArabicIds(this.prisma, 'chapter', query.q, {
+      where: Prisma.sql`t."courseId" = ${courseId} AND ${publishedScope}`,
+    });
     const rows = await this.prisma.chapter.findMany({
-      where: { courseId, status: published, ...this.after(query.cursor) },
+      where: { courseId, status: published, ...(ids ? { id: { in: ids } } : {}), ...this.after(query.cursor, query.q) },
       include: { _count: { select: { lessons: { where: { status: published } } } } },
       orderBy: order,
       take: query.limit + 1,
@@ -447,7 +479,7 @@ export class StudentCatalogService {
             ),
           ),
         ),
-        query.limit,
+        query.limit, query.q,
       ),
     };
   }
@@ -455,7 +487,7 @@ export class StudentCatalogService {
   async lessons(
     studentUserId: string,
     chapterId: string,
-    query: CursorPaginationQueryDto,
+    query: SearchCursorPaginationQueryDto,
   ) {
     const grade = await this.gradeFor(studentUserId);
     const chapter = await this.prisma.chapter.findFirst({
@@ -478,8 +510,11 @@ export class StudentCatalogService {
     });
     if (!chapter) throw new NotFoundException('Published chapter not found');
     const grants = await this.activeGrants(studentUserId);
+    const ids = await searchArabicIds(this.prisma, 'lesson', query.q, {
+      where: Prisma.sql`t."chapterId" = ${chapterId} AND ${publishedScope}`,
+    });
     const rows = await this.prisma.lesson.findMany({
-      where: { chapterId, status: published, ...this.after(query.cursor) },
+      where: { chapterId, status: published, ...(ids ? { id: { in: ids } } : {}), ...this.after(query.cursor, query.q) },
       include: { _count: { select: { sections: { where: { status: published } } } } },
       orderBy: order,
       take: query.limit + 1,
@@ -498,7 +533,7 @@ export class StudentCatalogService {
         rows.map((lesson) =>
           this.withAccess(this.node(lesson), access(lesson)),
         ),
-        query.limit,
+        query.limit, query.q,
       ),
     };
   }
@@ -506,7 +541,7 @@ export class StudentCatalogService {
   async sections(
     studentUserId: string,
     lessonId: string,
-    query: CursorPaginationQueryDto,
+    query: SearchCursorPaginationQueryDto,
   ) {
     const grade = await this.gradeFor(studentUserId);
     const lesson = await this.prisma.lesson.findFirst({
@@ -533,8 +568,11 @@ export class StudentCatalogService {
     if (!lesson) throw new NotFoundException('Published lesson not found');
     const grants = await this.activeGrants(studentUserId);
     const chapter = lesson.chapter;
+    const ids = await searchArabicIds(this.prisma, 'section', query.q, {
+      where: Prisma.sql`t."lessonId" = ${lessonId} AND ${publishedScope}`,
+    });
     const rows = await this.prisma.section.findMany({
-      where: { lessonId, status: published, ...this.after(query.cursor) },
+      where: { lessonId, status: published, ...(ids ? { id: { in: ids } } : {}), ...this.after(query.cursor, query.q) },
       orderBy: order,
       take: query.limit + 1,
     });
@@ -557,7 +595,7 @@ export class StudentCatalogService {
         rows.map((section) =>
           this.withAccess(this.node(section), access(section)),
         ),
-        query.limit,
+        query.limit, query.q,
       ),
     };
   }
@@ -566,7 +604,7 @@ export class StudentCatalogService {
     studentUserId: string,
     resource: string,
     id: string,
-    query: CursorPaginationQueryDto,
+    query: SearchCursorPaginationQueryDto,
   ) {
     const grade = await this.gradeFor(studentUserId);
     const configs: Record<string, any> = {
@@ -685,11 +723,18 @@ export class StudentCatalogService {
     const grants = await this.activeGrants(studentUserId);
     const course = config.course(parent);
     const chapter = config.chapter(parent);
+    const ids = await searchArabicIds(this.prisma, 'contentItem', query.q, {
+      join: Prisma.sql`JOIN "ContentPlacement" p ON p."contentItemId" = t.id`,
+      where: Prisma.sql`${Prisma.raw(`p."${config.field}"`)} = ${id} AND ${publishedScope}`,
+    });
     const rows = await this.prisma.contentPlacement.findMany({
       where: {
         [config.field]: id,
-        contentItem: { status: published },
-        ...this.after(query.cursor),
+        contentItem: {
+          status: published,
+          ...(ids ? { id: { in: ids } } : {}),
+        },
+        ...this.after(query.cursor, query.q),
       },
       include: { contentItem: true },
       orderBy: order,
@@ -715,11 +760,14 @@ export class StudentCatalogService {
       );
     return {
       parent: this.withAccess(this.node(parent), parentAccess),
-      ...this.placementPage(rows, query.limit, render),
+      ...this.placementPage(rows, query.limit, render, query.q),
     };
   }
 
-  async library(studentUserId: string) {
+  async library(studentUserId: string, query: SearchPaginationQueryDto) {
+    // Rejects a query that normalizes to nothing (e.g. "!!!") instead of
+    // matching everything, matching subjects() and the catalogue endpoints.
+    searchNeedle(query.q);
     const records = await this.prisma.studentEntitlement.findMany({
       where: this.activeGrantWhere(studentUserId),
       include: {
@@ -762,7 +810,12 @@ export class StudentCatalogService {
         },
       ];
     });
-    return { data: [...data, ...(await this.archivedLibrary(studentUserId))] };
+    const combined = [...data, ...(await this.archivedLibrary(studentUserId))]
+      .filter((item) => this.libraryMatches(item, query.q));
+    return {
+      data: combined.slice((query.page - 1) * query.limit, query.page * query.limit),
+      meta: toPaginationMeta(query.page, query.limit, combined.length),
+    };
   }
 
   private async archivedLibrary(studentUserId: string) {
@@ -772,12 +825,27 @@ export class StudentCatalogService {
       where: { studentUserId, revokedAt: null },
       orderBy: [{ archivedAt: 'desc' }, { id: 'desc' }],
     });
+    // One query per resource type rather than one (deeply nested) query per
+    // snapshot: a student with a dozen archived grants was issuing a dozen
+    // sequential round-trips, each joining up to four levels of ancestry.
+    const byType = new Map<string, string[]>();
+    for (const snapshot of snapshots) {
+      const ids = byType.get(snapshot.resourceType) ?? [];
+      ids.push(snapshot.resourceId);
+      byType.set(snapshot.resourceType, ids);
+    }
+    const records = new Map<string, any>();
+    await Promise.all(
+      [...byType].map(async ([type, ids]) => {
+        for (const record of await this.archivedRecords(type, ids)) {
+          records.set(`${type}:${record.id}`, record);
+        }
+      }),
+    );
+
     const rows: any[] = [];
     for (const snapshot of snapshots) {
-      const record = await this.archivedRecord(
-        snapshot.resourceType,
-        snapshot.resourceId,
-      );
+      const record = records.get(`${snapshot.resourceType}:${snapshot.resourceId}`);
       if (!record) continue;
       const path = this.archivedPath(snapshot.resourceType, record);
       rows.push({
@@ -794,22 +862,24 @@ export class StudentCatalogService {
     return rows;
   }
 
-  private async archivedRecord(type: string, id: string): Promise<any> {
+  /** Loads archived ancestry for many snapshots of one resource type at once. */
+  private async archivedRecords(type: string, ids: string[]): Promise<any[]> {
+    const where = { id: { in: ids } };
     if (type === 'ACADEMIC_GRADE')
-      return this.prisma.academicGrade.findUnique({ where: { id } });
+      return this.prisma.academicGrade.findMany({ where });
     if (type === 'SUBJECT')
-      return this.prisma.subject.findUnique({
-        where: { id },
+      return this.prisma.subject.findMany({
+        where,
         include: { academicGrade: true },
       });
     if (type === 'COURSE')
-      return this.prisma.course.findUnique({
-        where: { id },
+      return this.prisma.course.findMany({
+        where,
         include: { subject: { include: { academicGrade: true } } },
       });
     if (type === 'CHAPTER')
-      return this.prisma.chapter.findUnique({
-        where: { id },
+      return this.prisma.chapter.findMany({
+        where,
         include: {
           course: {
             include: { subject: { include: { academicGrade: true } } },
@@ -817,8 +887,8 @@ export class StudentCatalogService {
         },
       });
     if (type === 'LESSON')
-      return this.prisma.lesson.findUnique({
-        where: { id },
+      return this.prisma.lesson.findMany({
+        where,
         include: {
           chapter: {
             include: {
@@ -830,8 +900,8 @@ export class StudentCatalogService {
         },
       });
     if (type === 'SECTION')
-      return this.prisma.section.findUnique({
-        where: { id },
+      return this.prisma.section.findMany({
+        where,
         include: {
           lesson: {
             include: {
@@ -846,7 +916,7 @@ export class StudentCatalogService {
           },
         },
       });
-    return null;
+    return [];
   }
 
   private archivedPath(type: string, record: any) {
@@ -910,19 +980,30 @@ export class StudentCatalogService {
     };
   }
 
-  private cursor(cursor?: string) {
+  private cursor(cursor?: string, q?: string) {
     if (!cursor) return undefined;
     try {
       const value = JSON.parse(Buffer.from(cursor, 'base64url').toString());
-      if (!Number.isInteger(value.sortOrder) || typeof value.id !== 'string')
+      if (!Number.isInteger(value.sortOrder) || typeof value.id !== 'string' || (value.q ?? '') !== normalizeArabic(q ?? ''))
         throw new Error();
       return value as { sortOrder: number; id: string };
     } catch {
       throw new BadRequestException('Invalid cursor');
     }
   }
-  private after(cursor?: string) {
-    const value = this.cursor(cursor);
+
+  private nodeMatches(node: any, q?: string) {
+    return nodeMatches(node, q);
+  }
+
+  private libraryMatches(item: any, q?: string) {
+    if (!q) return true;
+    return [item.target, item.course, item.subject, item.academicGrade]
+      .filter(Boolean)
+      .some((node) => this.nodeMatches(node, q));
+  }
+  private after(cursor?: string, q?: string) {
+    const value = this.cursor(cursor, q);
     return value
       ? {
           OR: [
@@ -932,7 +1013,7 @@ export class StudentCatalogService {
         }
       : {};
   }
-  private page(items: any[], limit: number) {
+  private page(items: any[], limit: number, q?: string) {
     const hasNextPage = items.length > limit;
     const data = items.slice(0, limit);
     const last = data.at(-1);
@@ -943,7 +1024,7 @@ export class StudentCatalogService {
         nextCursor:
           hasNextPage && last
             ? Buffer.from(
-                JSON.stringify({ sortOrder: last.sortOrder, id: last.id }),
+                JSON.stringify({ sortOrder: last.sortOrder, id: last.id, q: normalizeArabic(q ?? '') }),
               ).toString('base64url')
             : null,
       },
@@ -953,6 +1034,7 @@ export class StudentCatalogService {
     items: any[],
     limit: number,
     render: (placement: any) => any,
+    q?: string,
   ) {
     const rows = items.slice(0, limit);
     const last = rows.at(-1);
@@ -963,7 +1045,7 @@ export class StudentCatalogService {
         nextCursor:
           items.length > limit && last
             ? Buffer.from(
-                JSON.stringify({ sortOrder: last.sortOrder, id: last.id }),
+                JSON.stringify({ sortOrder: last.sortOrder, id: last.id, q: normalizeArabic(q ?? '') }),
               ).toString('base64url')
             : null,
       },
@@ -1059,7 +1141,7 @@ export class StudentCatalogService {
     };
   }
 
-  private searchCursor(cursor?: string) {
+  private searchCursor(cursor?: string, q?: string) {
     if (!cursor) return null;
     try {
       const value = JSON.parse(Buffer.from(cursor, 'base64url').toString());
@@ -1067,7 +1149,8 @@ export class StudentCatalogService {
         !Array.isArray(value.key) ||
         value.key.length !== 6 ||
         !value.key.slice(0, 5).every(Number.isInteger) ||
-        typeof value.key[5] !== 'string'
+        typeof value.key[5] !== 'string' ||
+        value.q !== normalizeArabic(q ?? '')
       )
         throw new Error();
       return value.key as [number, number, number, number, number, string];

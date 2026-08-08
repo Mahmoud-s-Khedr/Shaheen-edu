@@ -86,9 +86,9 @@ export const questionBankAuthoringJourney: JourneyDefinition = {
       const archived = await admin.request<any>('POST', `/admin/questions/${questionId}/archive`);
       expectStatus(archived, 201);
       assert(archived.body.status === 'ARCHIVED', 'Question must archive');
-      const listed = await admin.request<any>('GET', `/admin/questions?chapterId=${chapterId}`);
+      const listed = await admin.request<any>('GET', `/admin/questions?chapterId=${chapterId}&q=${encodeURIComponent('revised')}`);
       expectStatus(listed, 200);
-      assert(!listed.body.data.some((question: any) => question.id === questionId), 'Archived questions must be hidden from normal lists');
+      assert(!listed.body.data.some((question: any) => question.id === questionId) && listed.body.meta.total >= 0, 'Archived questions must be hidden from searchable paginated lists');
     });
   },
 };

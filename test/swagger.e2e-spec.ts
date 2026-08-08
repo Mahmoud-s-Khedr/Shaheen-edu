@@ -96,8 +96,12 @@ describe('Swagger (e2e)', () => {
       expect.arrayContaining([
         expect.objectContaining({ name: 'page', in: 'query' }),
         expect.objectContaining({ name: 'limit', in: 'query' }),
+        expect.objectContaining({ name: 'q', in: 'query' }),
         expect.objectContaining({ name: 'subjectId', in: 'query' }),
       ]),
+    );
+    expect(document.paths['/api/v1/admin/assets'].get.parameters).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ name: 'q', in: 'query' })]),
     );
 
     expect(document.paths['/api/v1/student/my-subjects'].get.summary).toBe(
@@ -112,6 +116,41 @@ describe('Swagger (e2e)', () => {
         expect.objectContaining({ name: 'types', in: 'query' }),
       ]),
     );
+    // `q` is mandatory here: the handler dereferences it directly, so an
+    // optional `q` inherited from the shared cursor DTO would 500 rather than
+    // 400. See src/common/dto/cursor-pagination-query.dto.ts.
+    expect(
+      document.paths['/api/v1/student/catalog/search'].get.parameters.find(
+        (parameter: { name: string }) => parameter.name === 'q',
+      ),
+    ).toMatchObject({ required: true });
+
+    // Every StudentCatalogController operation documents a real response
+    // schema. Other student controllers still have gaps; this guard covers the
+    // surface that has been documented so it cannot silently regress.
+    const studentCatalogPaths = Object.entries(
+      document.paths as Record<string, Record<string, any>>,
+    ).filter(
+      ([path]) =>
+        path.startsWith('/api/v1/student/catalog') ||
+        ['/api/v1/student/library', '/api/v1/student/my-subjects', '/api/v1/student/entitlements'].includes(path),
+    );
+    expect(studentCatalogPaths).not.toHaveLength(0);
+    const undocumentedCatalogOps = studentCatalogPaths.flatMap(([path, operations]) =>
+      Object.entries(operations)
+        .filter(([method]) => method === 'get')
+        .filter(([, operation]) => {
+          const ok = operation.responses['200'] ?? operation.responses['201'];
+          return !ok?.content?.['application/json']?.schema?.$ref;
+        })
+        .map(([method]) => `${method.toUpperCase()} ${path}`),
+    );
+    expect(undocumentedCatalogOps).toEqual([]);
+
+    expect(
+      document.paths['/api/v1/geography/governorates'].get.responses['200']
+        .content['application/json'].schema,
+    ).toMatchObject({ $ref: '#/components/schemas/PaginatedGovernorateResponseDto' });
     expect(
       document.paths['/api/v1/student/content-items/{id}/study-state'].put
         .requestBody.content['application/json'].schema,
@@ -143,7 +182,7 @@ describe('Swagger (e2e)', () => {
     expect(
       paymentMethods.responses[200].content['application/json'].schema,
     ).toMatchObject({
-      $ref: '#/components/schemas/ManualPaymentMethodsResponseDto',
+      $ref: '#/components/schemas/PaginatedManualPaymentMethodsResponseDto',
     });
 
     const updatePaymentMethod =

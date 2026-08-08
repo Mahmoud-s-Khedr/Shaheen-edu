@@ -24,6 +24,8 @@ import type { RequestUser } from '../../common/types/request-with-user.types';
 import type { CreateContentItemDto } from './dto/create-content-item.dto';
 import type { UpdateContentItemDto } from './dto/update-content-item.dto';
 import type { QueryContentItemDto } from './dto/query-content-item.dto';
+import { paginateArabicSearch, sqlAnd } from '../../common/search/arabic-search';
+import { contentStatusScope } from '../../common/search/content-scope';
 import type { MoveContentItemDto } from './dto/move-content-item.dto';
 import type { ReorderContentItemDto } from './dto/reorder-content-item.dto';
 import type { ContentPlacementTargetDto } from './dto/content-placement-target.dto';
@@ -314,16 +316,41 @@ export class ContentItemsService {
       accessType: query.accessType,
       placement: { is: placementWhere },
     };
-    const [items, total] = await this.prisma.$transaction([
-      this.prisma.contentItem.findMany({
-        where,
-        include: { placement: true, primaryAsset: { include: { video: true } } },
-        orderBy: [{ placement: { sortOrder: 'asc' } }, { id: 'asc' }],
-        skip: (query.page - 1) * query.limit,
-        take: query.limit,
-      }),
-      this.prisma.contentItem.count({ where }),
-    ]);
+    // ContentPlacement is 1:1 with ContentItem, so the join cannot multiply
+    // rows; it mirrors `placement: { is: ... }` and supplies the sort column.
+    const placementColumn = query.courseId
+      ? 'courseId'
+      : query.chapterId
+        ? 'chapterId'
+        : query.lessonId
+          ? 'lessonId'
+          : query.sectionId
+            ? 'sectionId'
+            : undefined;
+    const placementId = query.courseId ?? query.chapterId ?? query.lessonId ?? query.sectionId;
+    const { data: items, total } = await paginateArabicSearch({
+      prisma: this.prisma,
+      delegate: this.prisma.contentItem,
+      target: 'contentItem',
+      q: query.q,
+      scope: {
+        join: Prisma.sql`JOIN "ContentPlacement" p ON p."contentItemId" = t.id`,
+        where: sqlAnd(
+          contentStatusScope(query.status),
+          query.type ? Prisma.sql`t.type = ${query.type}::"ContentItemType"` : undefined,
+          query.accessType ? Prisma.sql`t."accessType" = ${query.accessType}::"AccessType"` : undefined,
+          placementColumn && placementId
+            ? Prisma.sql`${Prisma.raw(`p."${placementColumn}"`)} = ${placementId}`
+            : undefined,
+        ),
+      },
+      orderBySql: Prisma.sql`p."sortOrder" ASC, t.id ASC`,
+      orderBy: [{ placement: { sortOrder: 'asc' } }, { id: 'asc' }],
+      where,
+      args: { include: { placement: true, primaryAsset: { include: { video: true } } } },
+      page: query.page,
+      limit: query.limit,
+    });
     return {
       data: items.map((item) =>
         this.toSummary(

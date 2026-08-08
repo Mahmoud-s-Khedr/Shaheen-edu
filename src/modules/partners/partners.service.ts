@@ -1,8 +1,10 @@
+import { Prisma } from '@prisma/client';
 import {
   ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { arabicMatch, paginateArabicSearch } from '../../common/search/arabic-search';
 import { PrismaService } from '../../database/prisma.service';
 import { PasswordService } from '../auth/services/password.service';
 import { SessionService } from '../auth/services/session.service';
@@ -13,7 +15,7 @@ import type { UpdatePartnerDto } from './dto/update-partner.dto';
 import type { RequestUser } from '../../common/types/request-with-user.types';
 import {
   toPaginationMeta,
-  type PaginationQueryDto,
+  type SearchPaginationQueryDto,
 } from '../../common/dto/pagination-query.dto';
 
 /**
@@ -74,18 +76,30 @@ export class PartnersService {
     return this.getById(user.id);
   }
 
-  async list(pagination: PaginationQueryDto) {
+  async list(pagination: SearchPaginationQueryDto) {
     const where = { role: Role.PARTNER };
-    const [partners, total] = await this.prisma.$transaction([
-      this.prisma.user.findMany({
-        where,
-        include: { partnerProfile: true },
-        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-        skip: (pagination.page - 1) * pagination.limit,
-        take: pagination.limit,
-      }),
-      this.prisma.user.count({ where }),
-    ]);
+    const { data: partners, total } = await paginateArabicSearch({
+      prisma: this.prisma,
+      delegate: this.prisma.user,
+      target: 'user',
+      q: pagination.q,
+      scope: {
+        where: Prisma.sql`t.role = ${Role.PARTNER}::"Role"`,
+        // The display and legal names live on the profile, so a hit there is
+        // OR-ed with the login-identifier match on the user row itself.
+        alsoMatches: Prisma.sql`EXISTS (
+          SELECT 1 FROM "PartnerProfile" pp
+          WHERE pp."userId" = t.id
+            AND ${arabicMatch('partnerProfile', pagination.q ?? '', 'pp')}
+        )`,
+      },
+      orderBySql: Prisma.sql`t."createdAt" DESC, t.id DESC`,
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      where,
+      args: { include: { partnerProfile: true } },
+      page: pagination.page,
+      limit: pagination.limit,
+    });
     return {
       data: partners.map((partner) => this.toSummary(partner)),
       meta: toPaginationMeta(pagination.page, pagination.limit, total),

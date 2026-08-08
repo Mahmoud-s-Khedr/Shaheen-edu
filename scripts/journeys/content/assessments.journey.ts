@@ -284,10 +284,10 @@ export const assessmentsJourney: JourneyDefinition = {
           },
         );
         expectStatus(standard, 201);
-        const adminList = await admin.request<any>('GET', '/admin/assessments');
+        const adminList = await admin.request<any>('GET', '/admin/assessments?search=Disposable');
         expectStatus(adminList, 200);
         assert(
-          adminList.body.data.some((item: any) => item.id === standard.body.id),
+          adminList.body.data.some((item: any) => item.id === standard.body.id) && adminList.body.meta.total >= 1,
           'Admin assessment lists must include draft assessments',
         );
         const adminDetail = await admin.request<any>(

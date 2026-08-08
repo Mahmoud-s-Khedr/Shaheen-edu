@@ -19,8 +19,10 @@ import type { CreateAcademicGradeDto } from './dto/create-academic-grade.dto';
 import type { UpdateAcademicGradeDto } from './dto/update-academic-grade.dto';
 import type { QueryAcademicGradeDto } from './dto/query-academic-grade.dto';
 import type { ReorderAcademicGradeDto } from './dto/reorder-academic-grade.dto';
-import type { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
+import type { SearchPaginationQueryDto } from '../../common/dto/pagination-query.dto';
 import { PublicationService } from '../publication/publication.service';
+import { paginateArabicSearch } from '../../common/search/arabic-search';
+import { contentStatusScope, publishedScope } from '../../common/search/content-scope';
 
 /**
  * NOTE: this level models only the DRAFT/PUBLISHED/ARCHIVED lifecycle and the
@@ -100,34 +102,40 @@ export class AcademicGradesService {
   async list(actor: RequestUser, query: QueryAcademicGradeDto) {
     this.assertActorRole(actor);
     const where = { status: query.status ?? { not: ContentStatus.ARCHIVED } };
-    const [items, total] = await this.prisma.$transaction([
-      this.prisma.academicGrade.findMany({
-        where,
-        include: { _count: { select: { subjects: { where: { status: { not: ContentStatus.ARCHIVED } } } } } },
-        orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
-        skip: (query.page - 1) * query.limit,
-        take: query.limit,
-      }),
-      this.prisma.academicGrade.count({ where }),
-    ]);
+    const { data: items, total } = await paginateArabicSearch({
+      prisma: this.prisma,
+      delegate: this.prisma.academicGrade,
+      target: 'academicGrade',
+      q: query.q,
+      scope: { where: contentStatusScope(query.status) },
+      orderBySql: Prisma.sql`t."sortOrder" ASC, t.id ASC`,
+      orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
+      where,
+      args: { include: { _count: { select: { subjects: { where: { status: { not: ContentStatus.ARCHIVED } } } } } } },
+      page: query.page,
+      limit: query.limit,
+    });
     return {
       data: items.map((item) => this.toSummary(item)),
       meta: toPaginationMeta(query.page, query.limit, total),
     };
   }
 
-  async listPublished(query: PaginationQueryDto) {
+  async listPublished(query: SearchPaginationQueryDto) {
     const where = { status: ContentStatus.PUBLISHED };
-    const [items, total] = await this.prisma.$transaction([
-      this.prisma.academicGrade.findMany({
-        where,
-        include: { _count: { select: { subjects: { where: { status: ContentStatus.PUBLISHED } } } } },
-        orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
-        skip: (query.page - 1) * query.limit,
-        take: query.limit,
-      }),
-      this.prisma.academicGrade.count({ where }),
-    ]);
+    const { data: items, total } = await paginateArabicSearch({
+      prisma: this.prisma,
+      delegate: this.prisma.academicGrade,
+      target: 'academicGrade',
+      q: query.q,
+      scope: { where: publishedScope },
+      orderBySql: Prisma.sql`t."sortOrder" ASC, t.id ASC`,
+      orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
+      where,
+      args: { include: { _count: { select: { subjects: { where: { status: ContentStatus.PUBLISHED } } } } } },
+      page: query.page,
+      limit: query.limit,
+    });
     return {
       data: items.map((item) => this.toSummary(item)),
       meta: toPaginationMeta(query.page, query.limit, total),

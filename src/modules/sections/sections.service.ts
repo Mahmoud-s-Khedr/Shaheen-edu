@@ -18,6 +18,8 @@ import {
 import type { CreateSectionDto } from './dto/create-section.dto';
 import type { UpdateSectionDto } from './dto/update-section.dto';
 import type { QuerySectionDto } from './dto/query-section.dto';
+import { paginateArabicSearch, sqlAnd } from '../../common/search/arabic-search';
+import { contentStatusScope } from '../../common/search/content-scope';
 import type { ReorderSectionDto } from './dto/reorder-section.dto';
 import type { MoveSectionDto } from './dto/move-section.dto';
 import { PublicationService } from '../publication/publication.service';
@@ -124,15 +126,23 @@ export class SectionsService {
       lessonId: query.lessonId,
       status: query.status ?? { not: ContentStatus.ARCHIVED },
     };
-    const [items, total] = await this.prisma.$transaction([
-      this.prisma.section.findMany({
-        where,
-        orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
-        skip: (query.page - 1) * query.limit,
-        take: query.limit,
-      }),
-      this.prisma.section.count({ where }),
-    ]);
+    const { data: items, total } = await paginateArabicSearch({
+      prisma: this.prisma,
+      delegate: this.prisma.section,
+      target: 'section',
+      q: query.q,
+      scope: {
+        where: sqlAnd(
+          contentStatusScope(query.status),
+          query.lessonId ? Prisma.sql`t."lessonId" = ${query.lessonId}` : undefined,
+        ),
+      },
+      orderBySql: Prisma.sql`t."sortOrder" ASC, t.id ASC`,
+      orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
+      where,
+      page: query.page,
+      limit: query.limit,
+    });
     return {
       data: items.map((item) => this.toSummary(item)),
       meta: toPaginationMeta(query.page, query.limit, total),

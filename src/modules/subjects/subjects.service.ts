@@ -18,6 +18,8 @@ import {
 import type { CreateSubjectDto } from './dto/create-subject.dto';
 import type { UpdateSubjectDto } from './dto/update-subject.dto';
 import type { QuerySubjectDto } from './dto/query-subject.dto';
+import { paginateArabicSearch, sqlAnd } from '../../common/search/arabic-search';
+import { contentStatusScope } from '../../common/search/content-scope';
 import type { ReorderSubjectDto } from './dto/reorder-subject.dto';
 import type { MoveSubjectDto } from './dto/move-subject.dto';
 import { PublicationService } from '../publication/publication.service';
@@ -130,16 +132,24 @@ export class SubjectsService {
       academicGradeId: query.academicGradeId,
       status: query.status ?? { not: ContentStatus.ARCHIVED },
     };
-    const [items, total] = await this.prisma.$transaction([
-      this.prisma.subject.findMany({
-        where,
-        include: { _count: { select: { courses: { where: { status: { not: ContentStatus.ARCHIVED } } } } } },
-        orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
-        skip: (query.page - 1) * query.limit,
-        take: query.limit,
-      }),
-      this.prisma.subject.count({ where }),
-    ]);
+    const { data: items, total } = await paginateArabicSearch({
+      prisma: this.prisma,
+      delegate: this.prisma.subject,
+      target: 'subject',
+      q: query.q,
+      scope: {
+        where: sqlAnd(
+          contentStatusScope(query.status),
+          query.academicGradeId ? Prisma.sql`t."academicGradeId" = ${query.academicGradeId}` : undefined,
+        ),
+      },
+      orderBySql: Prisma.sql`t."sortOrder" ASC, t.id ASC`,
+      orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
+      where,
+      args: { include: { _count: { select: { courses: { where: { status: { not: ContentStatus.ARCHIVED } } } } } } },
+      page: query.page,
+      limit: query.limit,
+    });
     return {
       data: items.map((item) => this.toSummary(item)),
       meta: toPaginationMeta(query.page, query.limit, total),

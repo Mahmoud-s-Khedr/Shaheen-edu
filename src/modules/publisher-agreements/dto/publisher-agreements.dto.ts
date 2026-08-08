@@ -1,6 +1,15 @@
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import { IsBoolean, IsDate, IsInt, IsOptional, IsString, Max, Min, ValidateIf } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { PaginationQueryDto } from '../../../common/dto/pagination-query.dto';
+
+export class PublisherAgreementsQueryDto extends PaginationQueryDto {
+  @ApiPropertyOptional({ default: false, description: 'Include ended agreements.' })
+  @IsOptional()
+  @Transform(({ value }) => value === true || value === 'true')
+  @IsBoolean()
+  history = false;
+}
 
 export class AgreementTargetDto {
   @ApiPropertyOptional({ example: 'course-id', description: 'Provide exactly one target ID.' }) @IsOptional() @IsString() courseId?: string;

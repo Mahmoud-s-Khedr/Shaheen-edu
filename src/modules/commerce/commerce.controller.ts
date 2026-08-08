@@ -2,20 +2,20 @@ import { BadRequestException, Body, Controller, Delete, Get, Headers, Param, Pat
 import { ApiBearerAuth, ApiBody, ApiConsumes, ApiCreatedResponse, ApiHeader, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
-import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
+import { PaginationQueryDto, SearchPaginationQueryDto } from '../../common/dto/pagination-query.dto';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Role } from '../../common/types/roles.enum';
 import type { RequestUser } from '../../common/types/request-with-user.types';
 import { CartTargetDto, CheckoutDto, CreatePaymentMethodDto, PaymentSubmissionQueryDto, RejectPaymentDto, ReorderPaymentMethodsDto, SubmitPaymentProofDto, UpdatePaymentMethodDto } from './dto/commerce.dto';
 import { CommerceService } from './commerce.service';
 import { ApiStandardErrors } from '../../common/decorators/api-standard-errors.decorator';
-import { CartResponseDto, CartItemDto, IdDeletedResponseDto, IdStatusResponseDto, ManualPaymentMethodDto, ManualPaymentMethodsResponseDto, OrderDto, PaginatedOrdersResponseDto, PaginatedPaymentSubmissionsResponseDto, PaymentProofUploadAuthorizationResponseDto, PaymentSubmissionDetailDto } from './dto/commerce.dto';
+import { CartResponseDto, CartItemDto, IdDeletedResponseDto, IdStatusResponseDto, ManualPaymentMethodDto, ManualPaymentMethodsResponseDto, OrderDto, PaginatedManualPaymentMethodsResponseDto, PaginatedOrdersResponseDto, PaginatedPaymentSubmissionsResponseDto, PaymentProofUploadAuthorizationResponseDto, PaymentSubmissionDetailDto } from './dto/commerce.dto';
 
 @ApiTags('student/commerce') @ApiBearerAuth() @UseGuards(RolesGuard) @Roles(Role.STUDENT)
 @Controller({ path: 'student', version: '1' })
 export class CommerceController {
   constructor(private readonly commerce: CommerceService) {}
-  @Get('manual-payment-methods') @ApiOperation({ summary: 'List active manual payment methods' }) @ApiOkResponse({ type: ManualPaymentMethodsResponseDto }) @ApiStandardErrors(401, 403) methods() { return this.commerce.methods(); }
+  @Get('manual-payment-methods') @ApiOperation({ summary: 'List active manual payment methods' }) @ApiOkResponse({ type: PaginatedManualPaymentMethodsResponseDto }) @ApiStandardErrors(400, 401, 403) methods(@Query() query: SearchPaginationQueryDto) { return this.commerce.methods(query); }
   @Get('cart') @ApiOperation({ summary: 'Get the current student cart' }) @ApiOkResponse({ type: CartResponseDto }) @ApiStandardErrors(401, 403) cart(@CurrentUser() user: RequestUser) { return this.commerce.cart(user.id); }
   @Post('cart/items') @ApiOperation({ summary: 'Add a purchasable target to the cart' }) @ApiCreatedResponse({ type: CartItemDto }) @ApiStandardErrors(400, 401, 403, 404, 409) add(@CurrentUser() user: RequestUser, @Body() dto: CartTargetDto) { return this.commerce.addCartItem(user.id, dto); }
   @Delete('cart/items/:id') @ApiOperation({ summary: 'Remove an item from the cart' }) @ApiOkResponse({ type: IdDeletedResponseDto }) @ApiStandardErrors(401, 403, 404) remove(@CurrentUser() user: RequestUser, @Param('id') id: string) { return this.commerce.removeCartItem(user.id, id); }
@@ -47,7 +47,7 @@ export class CommerceController {
 @Controller({ path: 'admin', version: '1' })
 export class ManualPaymentAdminController {
   constructor(private readonly commerce: CommerceService) {}
-  @Get('manual-payment-methods') @ApiOperation({ summary: 'List all manual payment methods' }) @ApiOkResponse({ type: ManualPaymentMethodsResponseDto }) @ApiStandardErrors(401, 403) methods(@CurrentUser() user: RequestUser) { return this.commerce.methodsAdmin(user); }
+  @Get('manual-payment-methods') @ApiOperation({ summary: 'List all manual payment methods' }) @ApiOkResponse({ type: PaginatedManualPaymentMethodsResponseDto }) @ApiStandardErrors(400, 401, 403) methods(@CurrentUser() user: RequestUser, @Query() query: SearchPaginationQueryDto) { return this.commerce.methodsAdmin(user, query); }
   @Post('manual-payment-methods') @ApiOperation({ summary: 'Create a manual payment method' }) @ApiCreatedResponse({ type: ManualPaymentMethodDto }) @ApiStandardErrors(400, 401, 403) createMethod(@CurrentUser() user: RequestUser, @Body() dto: CreatePaymentMethodDto) { return this.commerce.createMethod(user, dto); }
   @Patch('manual-payment-methods/:id') @ApiOperation({ summary: 'Update a manual payment method' }) @ApiOkResponse({ type: ManualPaymentMethodDto }) @ApiStandardErrors(400, 401, 403, 404) updateMethod(@CurrentUser() user: RequestUser, @Param('id') id: string, @Body() dto: UpdatePaymentMethodDto) { return this.commerce.updateMethod(user, id, dto); }
   @Post('manual-payment-methods/reorder') @ApiOperation({ summary: 'Reorder manual payment methods' }) @ApiCreatedResponse({ type: ManualPaymentMethodsResponseDto }) @ApiStandardErrors(400, 401, 403) reorder(@CurrentUser() user: RequestUser, @Body() dto: ReorderPaymentMethodsDto) { return this.commerce.reorderMethods(user, dto.methodIds); }

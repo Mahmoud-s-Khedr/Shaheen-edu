@@ -6066,12 +6066,19 @@ Returns the reactivated student summary.
 
 **Request**
 
-No path, query, or header input.
+Optional query: `q` (Arabic-aware search over governorate and center names),
+`page` (default `1`), `limit` (default `100`, max `200` — high enough to return
+every governorate in a single page for the registration dropdown).
 
 **Success response — HTTP 200**
 
 Returns the governorates and centers available for student registration, using
-the localized `name` shape (`{ "ar": "string", "en": "string | null" }`).
+the localized `name` shape (`{ "ar": "string", "en": "string | null" }`), wrapped
+in the standard offset-pagination envelope.
+
+```json
+{ "data": ["{id, name, centers:[{id, name, governorateId}]}"], "meta": { "page": 1, "limit": 100, "total": 27, "totalPages": 1 } }
+```
 
 ### `GET /api/v1/admin/geography/governorates`
 
@@ -6079,12 +6086,12 @@ the localized `name` shape (`{ "ar": "string", "en": "string | null" }`).
 
 **Request**
 
-No path, query, or header input.
+Optional query: `q`, `page` (default `1`), `limit` (default `100`, max `200`).
 
 **Success response — HTTP 200**
 
 ```json
-["{id, name, centers:[{id, name, governorateId}]}"]
+{ "data": ["{id, name, centers:[{id, name, governorateId}]}"], "meta": { "page": 1, "limit": 100, "total": 27, "totalPages": 1 } }
 ```
 
 ### `POST /api/v1/admin/geography/governorates`

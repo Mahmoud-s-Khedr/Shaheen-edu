@@ -1,6 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
-import { IsInt, Max, Min } from 'class-validator';
+import { Transform, Type } from 'class-transformer';
+import { IsInt, IsOptional, IsString, Max, MaxLength, Min, MinLength } from 'class-validator';
 
 /** Shared offset pagination contract for collection endpoints. */
 export class PaginationQueryDto {
@@ -27,6 +27,21 @@ export class PaginationQueryDto {
   @Min(1)
   @Max(100)
   limit = 20;
+}
+
+/** Offset pagination with optional case-insensitive text filtering. */
+export class SearchPaginationQueryDto extends PaginationQueryDto {
+  @ApiPropertyOptional({
+    description: 'Case-insensitive text search.',
+    minLength: 1,
+    maxLength: 120,
+  })
+  @IsOptional()
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  @IsString()
+  @MinLength(1)
+  @MaxLength(120)
+  q?: string;
 }
 
 export interface PaginationMeta {

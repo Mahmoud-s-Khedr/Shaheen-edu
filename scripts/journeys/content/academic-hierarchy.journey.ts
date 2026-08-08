@@ -16,6 +16,18 @@ export const hierarchyJourney: JourneyDefinition = {
       assert(subject.academicGradeId === grade.id && course.subjectId === subject.id && chapter.courseId === course.id && lesson.chapterId === chapter.id && section.lessonId === lesson.id, 'Hierarchy parent IDs must match');
       Object.assign(context.academic, { gradeId: grade.id, subjectId: subject.id, courseId: course.id, chapterId: chapter.id, lessonId: lesson.id, sectionId: section.id }); for (const [kind, item] of Object.entries({ grades: grade, subjects: subject, courses: course, chapters: chapter, lessons: lesson, sections: section })) context.created[kind].push((item as any).id);
     });
+    await step('Searching hierarchy lists with normalized Arabic text and pagination metadata', async () => {
+      const searchGrade = await create('/admin/academic-grades', { title: factory.localizedTitle('Search grade'), slug: factory.slug('search-grade') });
+      context.created.grades.push(searchGrade.id);
+      const searchable = await create('/admin/subjects', { title: `إسلاميات-${factory.runId}`, slug: factory.slug('arabic-subject'), academicGradeId: searchGrade.id });
+      context.created.subjects.push(searchable.id);
+      const subjects = await admin.request<any>('GET', `/admin/subjects?academicGradeId=${searchGrade.id}&q=${encodeURIComponent(`اسلاميات-${factory.runId}`)}&page=1&limit=1`);
+      expectStatus(subjects, 200);
+      assert(subjects.body.data.some((item: any) => item.id === searchable.id), 'Arabic-normalized search must find the matching subject');
+      assert(subjects.body.meta.page === 1 && subjects.body.meta.limit === 1 && subjects.body.meta.total >= 1, 'Search lists must return pagination metadata');
+      const punctuationOnly = await admin.request<any>('GET', `/admin/subjects?q=${encodeURIComponent('!!!')}`);
+      expectStatus(punctuationOnly, 400);
+    });
     await step('Reading, updating, and rejecting invalid hierarchy parent', async () => {
       const read = await admin.request<any>('GET', `/admin/sections/${section.id}`); expectStatus(read, 200); assert(read.body.lessonId === lesson.id, 'Section read must retain parent');
       const newTitle = factory.title('Updated lesson');

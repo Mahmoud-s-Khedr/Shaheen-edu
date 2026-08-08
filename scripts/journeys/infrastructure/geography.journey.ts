@@ -18,7 +18,7 @@ export const geographyJourney: JourneyDefinition = {
           'POST',
           '/admin/geography/governorates',
           {
-            ar: factory.title('Governorate'),
+            ar: `إدارة-${factory.runId}`,
             en: factory.title('Governorate'),
           },
         );
@@ -28,7 +28,7 @@ export const geographyJourney: JourneyDefinition = {
           'POST',
           `/admin/geography/governorates/${governorateId}/centers`,
           {
-            ar: factory.title('Center'),
+            ar: `إسلاميات-${factory.runId}`,
             en: factory.title('Center'),
           },
         );
@@ -36,30 +36,32 @@ export const geographyJourney: JourneyDefinition = {
         centerId = center.body.id;
         const list = await admin.request<any>(
           'GET',
-          '/admin/geography/governorates',
+          `/admin/geography/governorates?q=${encodeURIComponent('ادارة')}`,
         );
         expectStatus(list, 200);
         assert(
-          list.body.some(
+          list.body.data.some(
             (item: any) =>
               item.id === governorateId &&
               item.centers.some((child: any) => child.id === centerId),
           ),
           'Created geography must be listed with its center',
         );
+        assert(list.body.meta.total >= 1, 'Managed geography list must include pagination metadata');
         const publicList = await clients.public.request<any>(
           'GET',
-          '/geography/governorates',
+          `/geography/governorates?q=${encodeURIComponent('اسلام')}`,
         );
         expectStatus(publicList, 200);
         assert(
-          publicList.body.some(
+          publicList.body.data.some(
             (item: any) =>
               item.id === governorateId &&
               item.centers.some((child: any) => child.id === centerId),
           ),
           'Public geography must list the created governorate and center',
         );
+        assert(publicList.body.meta.total >= 1, 'Public geography list must include pagination metadata');
       },
     );
     await step('Deleting the unreferenced center and governorate', async () => {

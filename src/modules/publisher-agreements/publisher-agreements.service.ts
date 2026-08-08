@@ -3,7 +3,8 @@ import { PartnerType, PublisherAgreementStatus, Role } from '../../common/types/
 import { PrismaService } from '../../database/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import type { RequestUser } from '../../common/types/request-with-user.types';
-import type { CreateEarningsStatementDto, CreatePublisherAgreementDto, EndPublisherAgreementDto, SetPricingDto, UpdatePublisherAgreementDto } from './dto/publisher-agreements.dto';
+import { toPaginationMeta, type PaginationQueryDto } from '../../common/dto/pagination-query.dto';
+import type { CreateEarningsStatementDto, CreatePublisherAgreementDto, EndPublisherAgreementDto, PublisherAgreementsQueryDto, SetPricingDto, UpdatePublisherAgreementDto } from './dto/publisher-agreements.dto';
 
 type Target = { courseId?: string; chapterId?: string; lessonId?: string };
 
@@ -57,7 +58,7 @@ export class PublisherAgreementsService {
     this.assertAdmin(actor); const agreement = await this.getOrThrow(id); if (agreement.status !== PublisherAgreementStatus.ACTIVE) throw new ConflictException('Only active agreements can be ended'); const endsAt = dto.endsAt ?? new Date(); this.assertDates(agreement.startsAt, endsAt);
     const updated = await this.prisma.publisherAgreement.update({ where: { id }, data: { status: PublisherAgreementStatus.ENDED, endsAt } }); await this.audit.record({ actorUserId: actor.id, action: 'PUBLISHER_AGREEMENT_ENDED', targetType: 'PublisherAgreement', targetId: id }); return updated;
   }
-  async list(actor: RequestUser, history = false) { this.assertAdmin(actor); return this.prisma.publisherAgreement.findMany({ where: history ? {} : { status: { not: PublisherAgreementStatus.ENDED } }, include: { publisher: true }, orderBy: [{ startsAt: 'desc' }, { id: 'desc' }] }); }
+  async list(actor: RequestUser, query: PublisherAgreementsQueryDto) { this.assertAdmin(actor); const where = query.history ? {} : { status: { not: PublisherAgreementStatus.ENDED } }; const [data, total] = await this.prisma.$transaction([this.prisma.publisherAgreement.findMany({ where, include: { publisher: true }, orderBy: [{ startsAt: 'desc' }, { id: 'desc' }], skip: (query.page - 1) * query.limit, take: query.limit }), this.prisma.publisherAgreement.count({ where })]); return { data, meta: toPaginationMeta(query.page, query.limit, total) }; }
   async getOrThrow(id: string) { const agreement = await this.prisma.publisherAgreement.findUnique({ where: { id } }); if (!agreement) throw new NotFoundException('Publisher agreement not found'); return agreement; }
 
   private async hierarchyTarget(target: Target): Promise<Target[]> {
@@ -86,5 +87,5 @@ export class PublisherAgreementsService {
     const publisherEarningsMinor = Math.floor((dto.grossRevenueMinor * agreement.revenueShareBps) / 10_000);
     const statement = await this.prisma.publisherEarningsStatement.create({ data: { ...dto, agreementId: agreement.id, revenueShareBps: agreement.revenueShareBps, publisherEarningsMinor, createdById: actor.id } }); await this.audit.record({ actorUserId: actor.id, action: 'PUBLISHER_EARNINGS_STATEMENT_CREATED', targetType: 'PublisherEarningsStatement', targetId: statement.id, metadata: { agreementId: agreement.id } }); return statement;
   }
-  async listStatements(actor: RequestUser) { this.assertAdmin(actor); return this.prisma.publisherEarningsStatement.findMany({ include: { agreement: { include: { publisher: true } } }, orderBy: { createdAt: 'desc' } }); }
+  async listStatements(actor: RequestUser, query: PaginationQueryDto) { this.assertAdmin(actor); const [data, total] = await this.prisma.$transaction([this.prisma.publisherEarningsStatement.findMany({ include: { agreement: { include: { publisher: true } } }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], skip: (query.page - 1) * query.limit, take: query.limit }), this.prisma.publisherEarningsStatement.count()]); return { data, meta: toPaginationMeta(query.page, query.limit, total) }; }
 }

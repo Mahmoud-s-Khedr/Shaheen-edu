@@ -76,7 +76,10 @@ export const pricingPublisherAgreementsJourney: JourneyDefinition = {
       assert(statement.body.publisherEarningsMinor === 2_000 && statement.body.revenueShareBps === 2_500, 'Earnings statement must calculate the chapter publisher share');
       const history = await admin.request<any>('GET', '/admin/publisher-agreements?history=true');
       expectStatus(history, 200);
-      assert(history.body.some((agreement: any) => agreement.id === courseAgreementId), 'Agreement history must retain the course agreement');
+      assert(history.body.data.some((agreement: any) => agreement.id === courseAgreementId) && history.body.meta.total >= 1, 'Agreement history must retain the course agreement and pagination metadata');
+      const statements = await admin.request<any>('GET', '/admin/publisher-agreements/earnings-statements?limit=1');
+      expectStatus(statements, 200);
+      assert(statements.body.data.length >= 1 && statements.body.meta.limit === 1, 'Earnings statements must be paginated');
     });
   },
 };

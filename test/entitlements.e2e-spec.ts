@@ -249,6 +249,7 @@ describe('Entitlements and student delivery (e2e)', () => {
     };
     chapterAId = await createChapter('Paid Chapter A');
     const chapterBId = await createChapter('Paid Chapter B');
+    await createChapter('إسلاميات 100%_');
     paidChapterAItemId = await createPublishedItem('Chapter A item', {
       chapterId: chapterAId,
     });
@@ -425,6 +426,37 @@ describe('Entitlements and student delivery (e2e)', () => {
       expect(next.statusCode).toBe(200);
       expect(json(next).data).toHaveLength(1);
       expect(json(next).data[0].id).not.toBe(json(chapters).data[0].id);
+      const searchedChapters = await app.inject({
+        method: 'GET',
+        url: `/api/v1/catalog/courses/${paidCourseId}/chapters?limit=1&q=Paid`,
+      });
+      expect(searchedChapters.statusCode).toBe(200);
+      const searchedNext = await app.inject({
+        method: 'GET',
+        url: `/api/v1/catalog/courses/${paidCourseId}/chapters?limit=1&q=Paid&cursor=${encodeURIComponent(json(searchedChapters).pageInfo.nextCursor)}`,
+      });
+      expect(searchedNext.statusCode).toBe(200);
+      expect(json(searchedNext).data).toEqual([
+        expect.objectContaining({ title: 'Paid Chapter B' }),
+      ]);
+      const mismatchedSearchCursor = await app.inject({
+        method: 'GET',
+        url: `/api/v1/catalog/courses/${paidCourseId}/chapters?limit=1&q=Other&cursor=${encodeURIComponent(json(searchedChapters).pageInfo.nextCursor)}`,
+      });
+      expect(mismatchedSearchCursor.statusCode).toBe(400);
+      const normalizedArabic = await app.inject({
+        method: 'GET',
+        url: `/api/v1/catalog/courses/${paidCourseId}/chapters?q=${encodeURIComponent('اسلام')}`,
+      });
+      expect(normalizedArabic.statusCode).toBe(200);
+      expect(json(normalizedArabic).data).toEqual(
+        expect.arrayContaining([expect.objectContaining({ title: 'إسلاميات 100%_' })]),
+      );
+      const literalWildcard = await app.inject({
+        method: 'GET',
+        url: `/api/v1/catalog/courses/${paidCourseId}/chapters?q=${encodeURIComponent('%')}`,
+      });
+      expect(literalWildcard.statusCode).toBe(400);
       const anonymous = await app.inject({
         method: 'GET',
         url: `/api/v1/catalog/chapters/${chapterAId}/content-items?limit=1`,
@@ -827,6 +859,12 @@ describe('Entitlements and student delivery (e2e)', () => {
         headers: bearer(students.searcher.token),
       });
       expect(invalidType.statusCode).toBe(400);
+      const punctuationOnlyQuery = await app.inject({
+        method: 'GET',
+        url: `/api/v1/student/catalog/search?subjectId=${catalogSubjectId}&q=${encodeURIComponent('!!!')}`,
+        headers: bearer(students.searcher.token),
+      });
+      expect(punctuationOnlyQuery.statusCode).toBe(400);
     });
   });
 
@@ -1045,8 +1083,11 @@ describe('Entitlements and student delivery (e2e)', () => {
       });
       expect(response.statusCode).toBe(200);
       const body = json(response);
-      expect(body).toHaveLength(1);
-      expect(body[0]).toMatchObject({
+      expect(body).toMatchObject({
+        meta: { page: 1, limit: 20, total: 1, totalPages: 1 },
+      });
+      expect(body.data).toHaveLength(1);
+      expect(body.data[0]).toMatchObject({
         studentUserId: students.entitled.id,
         courseId: paidCourseId,
         status: 'ACTIVE',

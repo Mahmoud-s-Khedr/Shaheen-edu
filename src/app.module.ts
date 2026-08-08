@@ -6,6 +6,7 @@ import { randomUUID } from 'crypto';
 import { ConfigModule } from './config/config.module';
 import { LoggerModule } from './common/logging/logger.module';
 import { DatabaseModule } from './database/database.module';
+import { SearchModule } from './common/search/search.module';
 import { RedisModule } from './redis/redis.module';
 import { HealthModule } from './health/health.module';
 import { AuthModule } from './modules/auth/auth.module';
@@ -53,6 +54,7 @@ import type { IncomingMessage } from 'http';
       throttlers: [{ ttl: 60_000, limit: 30 }],
     }),
     DatabaseModule,
+    SearchModule,
     RedisModule,
     HealthModule,
     AuthModule,

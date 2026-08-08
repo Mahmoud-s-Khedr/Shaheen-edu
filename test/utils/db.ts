@@ -18,9 +18,22 @@ export async function cleanDatabase(
   await prisma.parentAccessSession.deleteMany();
   await prisma.contentPlacement.deleteMany();
   await prisma.contentItem.deleteMany();
-  // Entitlements hold restrictive FKs to Course and Chapter, so they must go
-  // before the hierarchy rows below.
+  // Snapshots hold restrictive FKs to StudentProfile and StudentEntitlement, so
+  // they must go before both.
+  await prisma.archivedAccessSnapshot.deleteMany();
+  // Entitlements hold restrictive FKs to Course, Chapter, and OrderItem, so they
+  // must go before the hierarchy rows below and before the commerce rows.
   await prisma.studentEntitlement.deleteMany();
+  // Commerce rows hold restrictive FKs to Course/Chapter (cart and order items),
+  // Asset (payment proofs), StudentProfile (orders), and User (payment methods),
+  // so the whole chain must go before all four.
+  await prisma.manualPaymentSubmission.deleteMany();
+  await prisma.orderItem.deleteMany();
+  await prisma.order.deleteMany();
+  await prisma.commerceIdempotencyKey.deleteMany();
+  await prisma.cartItem.deleteMany();
+  await prisma.cart.deleteMany();
+  await prisma.manualPaymentMethod.deleteMany();
   await prisma.publisherEarningsStatement.deleteMany();
   await prisma.publisherAgreement.deleteMany();
   // Assessment cascades to its scopes/snapshot/attempts, but AssessmentScope
@@ -41,6 +54,9 @@ export async function cleanDatabase(
   // Must run before academicGrade.deleteMany() due to the FK.
   await prisma.studentProfile.deleteMany();
   await prisma.academicGrade.deleteMany();
+  // StudentProfile holds restrictive FKs to both, and Center to Governorate.
+  await prisma.center.deleteMany();
+  await prisma.governorate.deleteMany();
   // Assets and their references are gated behind restrictive FKs (uploadedById ->
   // User, coverAssetId/primaryAssetId -> Asset), so they must be cleared after the
   // hierarchy/content rows above and before User below.

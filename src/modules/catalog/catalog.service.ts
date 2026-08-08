@@ -3,12 +3,15 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { ContentStatus } from '../../common/types/roles.enum';
 import { toPaginationMeta } from '../../common/dto/pagination-query.dto';
 import { PrismaService } from '../../database/prisma.service';
 import { CatalogCoursesQueryDto } from './dto/catalog-courses-query.dto';
 import { CatalogSubjectsQueryDto } from './dto/catalog-subjects-query.dto';
-import { CursorPaginationQueryDto } from '../../common/dto/cursor-pagination-query.dto';
+import { SearchCursorPaginationQueryDto } from '../../common/dto/cursor-pagination-query.dto';
+import { normalizeArabic, paginateArabicSearch, searchArabicIds, sqlAnd } from '../../common/search/arabic-search';
+import { publishedScope, sortOrderSql } from '../../common/search/content-scope';
 
 const published = ContentStatus.PUBLISHED;
 const order = [{ sortOrder: 'asc' as const }, { id: 'asc' as const }];
@@ -40,16 +43,24 @@ export class CatalogService {
 
   async subjects(query: CatalogSubjectsQueryDto) {
     const where = { status: published, academicGradeId: query.academicGradeId };
-    const [data, total] = await this.prisma.$transaction([
-      this.prisma.subject.findMany({
-        where,
-        include: { _count: { select: { courses: { where: { status: published } } } } },
-        orderBy: order,
-        skip: (query.page - 1) * query.limit,
-        take: query.limit,
-      }),
-      this.prisma.subject.count({ where }),
-    ]);
+    const { data, total } = await paginateArabicSearch({
+      prisma: this.prisma,
+      delegate: this.prisma.subject,
+      target: 'subject',
+      q: query.q,
+      scope: {
+        where: sqlAnd(
+          publishedScope,
+          query.academicGradeId ? Prisma.sql`t."academicGradeId" = ${query.academicGradeId}` : undefined,
+        ),
+      },
+      orderBySql: sortOrderSql,
+      orderBy: order,
+      where,
+      args: { include: { _count: { select: { courses: { where: { status: published } } } } } },
+      page: query.page,
+      limit: query.limit,
+    });
     return {
       data: data.map((record) => publicNode(record)),
       meta: toPaginationMeta(query.page, query.limit, total),
@@ -58,16 +69,24 @@ export class CatalogService {
 
   async courses(query: CatalogCoursesQueryDto) {
     const where = { status: published, subjectId: query.subjectId };
-    const [data, total] = await this.prisma.$transaction([
-      this.prisma.course.findMany({
-        where,
-        include: { _count: { select: { chapters: { where: { status: published } } } } },
-        orderBy: order,
-        skip: (query.page - 1) * query.limit,
-        take: query.limit,
-      }),
-      this.prisma.course.count({ where }),
-    ]);
+    const { data, total } = await paginateArabicSearch({
+      prisma: this.prisma,
+      delegate: this.prisma.course,
+      target: 'course',
+      q: query.q,
+      scope: {
+        where: sqlAnd(
+          publishedScope,
+          query.subjectId ? Prisma.sql`t."subjectId" = ${query.subjectId}` : undefined,
+        ),
+      },
+      orderBySql: sortOrderSql,
+      orderBy: order,
+      where,
+      args: { include: { _count: { select: { chapters: { where: { status: published } } } } } },
+      page: query.page,
+      limit: query.limit,
+    });
     return {
       data: data.map((record) => publicNode(record)),
       meta: toPaginationMeta(query.page, query.limit, total),
@@ -99,18 +118,18 @@ export class CatalogService {
     };
   }
 
-  private cursor(cursor?: string) {
+  private cursor(cursor?: string, q?: string) {
     if (!cursor) return undefined;
     try {
       const value = JSON.parse(Buffer.from(cursor, 'base64url').toString());
-      if (!Number.isInteger(value.sortOrder) || typeof value.id !== 'string')
+      if (!Number.isInteger(value.sortOrder) || typeof value.id !== 'string' || (value.q ?? '') !== normalizeArabic(q ?? ''))
         throw new Error();
       return value as { sortOrder: number; id: string };
     } catch {
       throw new BadRequestException('Invalid cursor');
     }
   }
-  private page(items: any[], limit: number) {
+  private page(items: any[], limit: number, q?: string) {
     const hasNextPage = items.length > limit;
     const data = items.slice(0, limit);
     const last = data.at(-1);
@@ -121,13 +140,13 @@ export class CatalogService {
         nextCursor:
           hasNextPage && last
             ? Buffer.from(
-                JSON.stringify({ sortOrder: last.sortOrder, id: last.id }),
+                JSON.stringify({ sortOrder: last.sortOrder, id: last.id, q: normalizeArabic(q ?? '') }),
               ).toString('base64url')
             : null,
       },
     };
   }
-  private placementPage(items: any[], limit: number) {
+  private placementPage(items: any[], limit: number, q?: string) {
     const rows = items.slice(0, limit);
     const last = rows.at(-1);
     return {
@@ -137,14 +156,14 @@ export class CatalogService {
         nextCursor:
           items.length > limit && last
             ? Buffer.from(
-                JSON.stringify({ sortOrder: last.sortOrder, id: last.id }),
+                JSON.stringify({ sortOrder: last.sortOrder, id: last.id, q: normalizeArabic(q ?? '') }),
               ).toString('base64url')
             : null,
       },
     };
   }
-  private after(cursor?: string) {
-    const value = this.cursor(cursor);
+  private after(cursor?: string, q?: string) {
+    const value = this.cursor(cursor, q);
     return value
       ? {
           OR: [
@@ -155,7 +174,7 @@ export class CatalogService {
       : {};
   }
 
-  async chapters(courseId: string, query: CursorPaginationQueryDto) {
+  async chapters(courseId: string, query: SearchCursorPaginationQueryDto) {
     const parent = await this.prisma.course.findFirst({
       where: {
         id: courseId,
@@ -165,18 +184,21 @@ export class CatalogService {
       include: { _count: { select: { chapters: { where: { status: published } } } } },
     });
     if (!parent) throw new NotFoundException('Published course not found');
+    const ids = await searchArabicIds(this.prisma, 'chapter', query.q, {
+      where: Prisma.sql`t."courseId" = ${courseId} AND ${publishedScope}`,
+    });
     const items = await this.prisma.chapter.findMany({
-      where: { courseId, status: published, ...this.after(query.cursor) },
+      where: { courseId, status: published, ...(ids ? { id: { in: ids } } : {}), ...this.after(query.cursor, query.q) },
       include: { _count: { select: { lessons: { where: { status: published } } } } },
       orderBy: order,
       take: query.limit + 1,
     });
     return {
       parent: publicNode(parent),
-      ...this.page(items.map(publicNode), query.limit),
+      ...this.page(items.map(publicNode), query.limit, query.q),
     };
   }
-  async lessons(chapterId: string, query: CursorPaginationQueryDto) {
+  async lessons(chapterId: string, query: SearchCursorPaginationQueryDto) {
     const parent = await this.prisma.chapter.findFirst({
       where: {
         id: chapterId,
@@ -189,18 +211,21 @@ export class CatalogService {
       include: { _count: { select: { lessons: { where: { status: published } } } } },
     });
     if (!parent) throw new NotFoundException('Published chapter not found');
+    const ids = await searchArabicIds(this.prisma, 'lesson', query.q, {
+      where: Prisma.sql`t."chapterId" = ${chapterId} AND ${publishedScope}`,
+    });
     const items = await this.prisma.lesson.findMany({
-      where: { chapterId, status: published, ...this.after(query.cursor) },
+      where: { chapterId, status: published, ...(ids ? { id: { in: ids } } : {}), ...this.after(query.cursor, query.q) },
       include: { _count: { select: { sections: { where: { status: published } } } } },
       orderBy: order,
       take: query.limit + 1,
     });
     return {
       parent: publicNode(parent),
-      ...this.page(items.map(publicNode), query.limit),
+      ...this.page(items.map(publicNode), query.limit, query.q),
     };
   }
-  async sections(lessonId: string, query: CursorPaginationQueryDto) {
+  async sections(lessonId: string, query: SearchCursorPaginationQueryDto) {
     const parent = await this.prisma.lesson.findFirst({
       where: {
         id: lessonId,
@@ -219,20 +244,23 @@ export class CatalogService {
       include: { _count: { select: { sections: { where: { status: published } } } } },
     });
     if (!parent) throw new NotFoundException('Published lesson not found');
+    const ids = await searchArabicIds(this.prisma, 'section', query.q, {
+      where: Prisma.sql`t."lessonId" = ${lessonId} AND ${publishedScope}`,
+    });
     const items = await this.prisma.section.findMany({
-      where: { lessonId, status: published, ...this.after(query.cursor) },
+      where: { lessonId, status: published, ...(ids ? { id: { in: ids } } : {}), ...this.after(query.cursor, query.q) },
       orderBy: order,
       take: query.limit + 1,
     });
     return {
       parent: publicNode(parent),
-      ...this.page(items.map(publicNode), query.limit),
+      ...this.page(items.map(publicNode), query.limit, query.q),
     };
   }
   async contentItems(
     resource: string,
     id: string,
-    query: CursorPaginationQueryDto,
+    query: SearchCursorPaginationQueryDto,
   ) {
     const models: Record<string, any> = {
       courses: this.prisma.course,
@@ -298,11 +326,18 @@ export class CatalogService {
     });
     if (!parent)
       throw new NotFoundException('Published hierarchy record not found');
+    const ids = await searchArabicIds(this.prisma, 'contentItem', query.q, {
+      join: Prisma.sql`JOIN "ContentPlacement" p ON p."contentItemId" = t.id`,
+      where: Prisma.sql`${Prisma.raw(`p."${field[resource]}"`)} = ${id} AND ${publishedScope}`,
+    });
     const items = await this.prisma.contentPlacement.findMany({
       where: {
         [field[resource]]: id,
-        contentItem: { status: published },
-        ...this.after(query.cursor),
+        contentItem: {
+          status: published,
+          ...(ids ? { id: { in: ids } } : {}),
+        },
+        ...this.after(query.cursor, query.q),
       },
       include: { contentItem: true },
       orderBy: order,
@@ -310,7 +345,7 @@ export class CatalogService {
     });
     return {
       parent: publicNode(parent),
-      ...this.placementPage(items, query.limit),
+      ...this.placementPage(items, query.limit, query.q),
     };
   }
 }

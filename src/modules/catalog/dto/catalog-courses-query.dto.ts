@@ -1,8 +1,8 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsOptional, IsString } from 'class-validator';
-import { PaginationQueryDto } from '../../../common/dto/pagination-query.dto';
+import { SearchPaginationQueryDto } from '../../../common/dto/pagination-query.dto';
 
-export class CatalogCoursesQueryDto extends PaginationQueryDto {
+export class CatalogCoursesQueryDto extends SearchPaginationQueryDto {
   @ApiPropertyOptional({ description: 'Restrict results to one subject.' })
   @IsOptional()
   @IsString()

@@ -7,6 +7,7 @@ export const partnerJourney: JourneyDefinition = {
     const email = factory.email('partner'); const password = factory.password('Partner');
     await step('Creating content-publisher partner', async () => {
       const r = await clients.admin.request<any>('POST', '/admin/partners', { email, password, partnerType: 'CONTENT_PUBLISHER', displayName: factory.title('Partner'), phone: factory.phone() }); expectStatus(r, 201); assert(r.body.partnerType === 'CONTENT_PUBLISHER', 'Partner type must persist'); context.partner = { id: r.body.id, email, password }; context.created.partners.push(r.body.id);
+      const listed = await clients.admin.request<any>('GET', `/admin/partners?q=${encodeURIComponent('partner')}&limit=1`); expectStatus(listed, 200); assert(listed.body.data.some((partner: any) => partner.id === r.body.id) && listed.body.meta.total >= 1, 'Partner lists must support q search and pagination metadata');
     });
     await step('Updating, logging in, and reading partner profile', async () => {
       const update = await clients.admin.request<any>('PATCH', `/admin/partners/${context.partner.id}`, { displayName: factory.title('Updated partner') }); expectStatus(update, 200);

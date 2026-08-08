@@ -12,6 +12,7 @@ export const apiCoverageJourney: JourneyDefinition = {
   name: 'Exhaustive administration endpoint variants',
   category: 'content',
   dependsOn: ['CONTENT-007'],
+  requiresBunny: true,
   async run({ clients, context, environment, factory, step }) {
     const admin = clients.admin;
     const create = async (path: string, body: unknown) => {

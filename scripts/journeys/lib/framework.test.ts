@@ -130,3 +130,29 @@ test('runner executes dependencies in order and writes a report', async () => {
   ];
   const runner = new JourneyRunner(loadEnvironment(), definitions, { verbose: false, quiet: true }); const results = await runner.execute([definitions[1]]); assert.deepEqual(order, ['A', 'B']); assert.equal(results.every((result) => result.status === 'passed'), true); assert.match(await runner.writeReport(results), /reports\/journeys/);
 });
+
+test('runner skips Bunny journeys locally and skips their dependents without executing either', async () => {
+  env({ JOURNEY_TARGET: 'local' }); const order: string[] = [];
+  const definitions: JourneyDefinition[] = [
+    { id: 'A', name: 'A', category: 'auth', run: async () => { order.push('A'); } },
+    { id: 'B', name: 'B', category: 'content', dependsOn: ['A'], requiresBunny: true, run: async () => { order.push('B'); } },
+    { id: 'C', name: 'C', category: 'content', dependsOn: ['B'], run: async () => { order.push('C'); } },
+  ];
+  const runner = new JourneyRunner(loadEnvironment(), definitions, { verbose: false, quiet: true });
+  const results = await runner.execute([definitions[2]]);
+  assert.deepEqual(order, ['A']);
+  assert.deepEqual(results.map((result) => result.status), ['passed', 'skipped', 'skipped']);
+  assert.match(results[1].skippedReason ?? '', /Bunny/);
+  assert.match(results[2].skippedReason ?? '', /Dependency B/);
+});
+
+test('runner executes Bunny journeys on staging targets', async () => {
+  env({ JOURNEY_TARGET: 'staging', JOURNEY_BASE_URL: 'http://127.0.0.1:3000' }); const order: string[] = [];
+  const definitions: JourneyDefinition[] = [
+    { id: 'B', name: 'B', category: 'content', requiresBunny: true, run: async () => { order.push('B'); } },
+  ];
+  const runner = new JourneyRunner(loadEnvironment(), definitions, { verbose: false, quiet: true });
+  const results = await runner.execute(definitions);
+  assert.deepEqual(order, ['B']);
+  assert.equal(results[0].status, 'passed');
+});

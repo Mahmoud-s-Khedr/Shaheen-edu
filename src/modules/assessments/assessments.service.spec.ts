@@ -25,6 +25,7 @@ describe('AssessmentsService', () => {
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       assessmentAttemptAnswer: { findMany: jest.fn().mockResolvedValue([]), upsert: jest.fn() },
+      $queryRaw: jest.fn(),
       $transaction: jest.fn(async (arg: any) => (Array.isArray(arg) ? Promise.all(arg) : arg(prisma))),
     };
     const audit = { record: jest.fn().mockResolvedValue(undefined) };
@@ -179,6 +180,26 @@ describe('AssessmentsService', () => {
           chapterScope('chB', { status: ContentStatus.DRAFT }),
         ]),
       ).resolves.toBe(false);
+    });
+  });
+
+  describe('searchedAssessments', () => {
+    it('hydrates every SQL search page instead of truncating after the first batch', async () => {
+      const { service, prisma } = build();
+      const ids = Array.from({ length: 501 }, (_, index) => `assessment-${index + 1}`);
+      prisma.$queryRaw
+        .mockResolvedValueOnce(ids.slice(0, 500).map((id) => ({ id, total: BigInt(501) })))
+        .mockResolvedValueOnce([{ id: ids[500], total: BigInt(501) }]);
+      prisma.assessment.findMany.mockImplementation(async ({ where }: any) =>
+        [...where.id.in].reverse().map((id: string) => ({ id })),
+      );
+
+      const assessments = await (service as any).searchedAssessments('math', {});
+
+      expect(prisma.$queryRaw).toHaveBeenCalledTimes(2);
+      expect(prisma.assessment.findMany).toHaveBeenCalledTimes(2);
+      expect(assessments).toHaveLength(501);
+      expect(assessments.at(-1)).toEqual({ id: 'assessment-501' });
     });
   });
 

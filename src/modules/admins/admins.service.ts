@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import {
   ConflictException,
   ForbiddenException,
@@ -5,6 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { randomBytes } from 'crypto';
+import { paginateArabicSearch } from '../../common/search/arabic-search';
 import { PrismaService } from '../../database/prisma.service';
 import { PasswordService } from '../auth/services/password.service';
 import { SessionService } from '../auth/services/session.service';
@@ -15,7 +17,7 @@ import type { UpdateAdminDto } from './dto/update-admin.dto';
 import type { RequestUser } from '../../common/types/request-with-user.types';
 import {
   toPaginationMeta,
-  type PaginationQueryDto,
+  type SearchPaginationQueryDto,
 } from '../../common/dto/pagination-query.dto';
 
 /**
@@ -92,18 +94,21 @@ export class AdminsService {
     return this.toSummary(created);
   }
 
-  async list(actor: RequestUser, pagination: PaginationQueryDto) {
+  async list(actor: RequestUser, pagination: SearchPaginationQueryDto) {
     this.assertActorIsSuperAdmin(actor);
     const where = { role: Role.ADMIN };
-    const [admins, total] = await this.prisma.$transaction([
-      this.prisma.user.findMany({
-        where,
-        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-        skip: (pagination.page - 1) * pagination.limit,
-        take: pagination.limit,
-      }),
-      this.prisma.user.count({ where }),
-    ]);
+    const { data: admins, total } = await paginateArabicSearch({
+      prisma: this.prisma,
+      delegate: this.prisma.user,
+      target: 'user',
+      q: pagination.q,
+      scope: { where: Prisma.sql`t.role = ${Role.ADMIN}::"Role"` },
+      orderBySql: Prisma.sql`t."createdAt" DESC, t.id DESC`,
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      where,
+      page: pagination.page,
+      limit: pagination.limit,
+    });
     return {
       data: admins.map((admin) => this.toSummary(admin)),
       meta: toPaginationMeta(pagination.page, pagination.limit, total),

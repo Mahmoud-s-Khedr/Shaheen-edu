@@ -11,6 +11,7 @@ export const adminJourney: JourneyDefinition = {
     await step('Reading and updating administrator', async () => {
       const get = await clients.superAdmin.request<any>('GET', `/admin/admins/${context.admin.id}`); expectStatus(get, 200); assert(get.body.id === context.admin.id, 'Read admin must match created ID');
       const newEmail = factory.email('admin-updated'); const update = await clients.superAdmin.request<any>('PATCH', `/admin/admins/${context.admin.id}`, { email: newEmail }); expectStatus(update, 200); assert(update.body.loginIdentifier === newEmail, 'Email update must persist'); context.admin.email = newEmail;
+      const listed = await clients.superAdmin.request<any>('GET', `/admin/admins?q=${encodeURIComponent('admin-updated')}&limit=1`); expectStatus(listed, 200); assert(listed.body.data.some((admin: any) => admin.id === context.admin.id) && listed.body.meta.total >= 1, 'Administrator lists must support q search and pagination metadata');
     });
     await step('Logging in and rejecting admin creation by normal admin', async () => {
       const login = await clients.admin.request<any>('POST', '/auth/admins/login', { email: context.admin.email, password }); expectStatus(login, 201); assert(login.body.user.role === 'ADMIN', 'Login role must be ADMIN'); clients.admin.accessToken = login.body.accessToken; context.admin.accessToken = login.body.accessToken;

@@ -66,6 +66,7 @@ export const phase9IntegrationJourney: JourneyDefinition = {
   name: 'Phase 9 live Bunny integration and hardening',
   category: 'content',
   dependsOn: ['CONTENT-001', 'AUTH-003', 'AUTH-004'],
+  requiresBunny: true,
   async run({ clients, context, environment, factory, step }) {
     const admin = clients.admin;
     const courseId = String(context.academic.courseId);

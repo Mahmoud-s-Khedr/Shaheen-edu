@@ -3,6 +3,7 @@ import { PrismaService } from '../../database/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { EntitlementSource, EntitlementStatus, Role } from '../../common/types/roles.enum';
 import type { RequestUser } from '../../common/types/request-with-user.types';
+import { toPaginationMeta, type PaginationQueryDto } from '../../common/dto/pagination-query.dto';
 import type { GrantEntitlementDto } from './dto/grant-entitlement.dto';
 
 @Injectable()
@@ -44,8 +45,13 @@ export class EntitlementsService {
     return updated;
   }
 
-  async list(actor: RequestUser, studentUserId?: string) {
+  async list(actor: RequestUser, studentUserId: string | undefined, query: PaginationQueryDto) {
     this.assertAdmin(actor);
-    return this.prisma.studentEntitlement.findMany({ where: { studentUserId }, orderBy: { createdAt: 'desc' } });
+    const where = { studentUserId };
+    const [data, total] = await this.prisma.$transaction([
+      this.prisma.studentEntitlement.findMany({ where, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], skip: (query.page - 1) * query.limit, take: query.limit }),
+      this.prisma.studentEntitlement.count({ where }),
+    ]);
+    return { data, meta: toPaginationMeta(query.page, query.limit, total) };
   }
 }
