@@ -35,15 +35,89 @@ export const envValidationSchema = Joi.object({
   BUNNY_STORAGE_PULL_ZONE_URL: Joi.string().uri().required(),
   BUNNY_STORAGE_TOKEN_KEY: Joi.string().min(16).required(),
   ASSET_URL_TTL_SECONDS: Joi.number().integer().min(30).default(300),
-  ASSET_UPLOAD_TTL_SECONDS: Joi.number().integer().min(60).max(3600).default(900),
+  ASSET_UPLOAD_TTL_SECONDS: Joi.number()
+    .integer()
+    .min(60)
+    .max(3600)
+    .default(900),
   ASSET_IMAGE_MAX_BYTES: Joi.number().integer().positive().default(10485760),
   ASSET_DOCUMENT_MAX_BYTES: Joi.number().integer().positive().default(26214400),
-  ASSET_DOWNLOAD_MAX_BYTES: Joi.number().integer().positive().default(104857600),
+  ASSET_DOWNLOAD_MAX_BYTES: Joi.number()
+    .integer()
+    .positive()
+    .default(104857600),
 
   BUNNY_STREAM_LIBRARY_ID: Joi.string().required(),
   BUNNY_STREAM_API_KEY: Joi.string().required(),
   BUNNY_STREAM_READ_ONLY_KEY: Joi.string().required(),
   BUNNY_STREAM_PLAYER_TOKEN_KEY: Joi.string().required(),
-  BUNNY_STREAM_UPLOAD_TTL_SECONDS: Joi.number().integer().min(60).default(10800),
-  BUNNY_STREAM_PLAYBACK_TTL_SECONDS: Joi.number().integer().min(30).default(300),
+  BUNNY_STREAM_UPLOAD_TTL_SECONDS: Joi.number()
+    .integer()
+    .min(60)
+    .default(10800),
+  BUNNY_STREAM_PLAYBACK_TTL_SECONDS: Joi.number()
+    .integer()
+    .min(30)
+    .default(300),
+
+  RATE_LIMIT_GLOBAL_LIMIT: Joi.number().integer().positive().default(30),
+  RATE_LIMIT_GLOBAL_WINDOW_SECONDS: Joi.number()
+    .integer()
+    .positive()
+    .default(60),
+  RATE_LIMIT_AUTH_ROUTE_LIMIT: Joi.number().integer().positive().default(10),
+  RATE_LIMIT_AUTH_ROUTE_WINDOW_SECONDS: Joi.number()
+    .integer()
+    .positive()
+    .default(60),
+  RATE_LIMIT_STUDENT_LOGIN_MAX_ATTEMPTS: Joi.number()
+    .integer()
+    .positive()
+    .default(5),
+  RATE_LIMIT_STUDENT_LOGIN_WINDOW_SECONDS: Joi.number()
+    .integer()
+    .positive()
+    .default(900),
+  RATE_LIMIT_ADMIN_LOGIN_MAX_ATTEMPTS: Joi.number()
+    .integer()
+    .positive()
+    .default(5),
+  RATE_LIMIT_ADMIN_LOGIN_WINDOW_SECONDS: Joi.number()
+    .integer()
+    .positive()
+    .default(900),
+  RATE_LIMIT_PARTNER_LOGIN_MAX_ATTEMPTS: Joi.number()
+    .integer()
+    .positive()
+    .default(5),
+  RATE_LIMIT_PARTNER_LOGIN_WINDOW_SECONDS: Joi.number()
+    .integer()
+    .positive()
+    .default(900),
+  RATE_LIMIT_PARENT_LOGIN_MAX_ATTEMPTS: Joi.number()
+    .integer()
+    .positive()
+    .default(3),
+  RATE_LIMIT_PARENT_LOGIN_WINDOW_SECONDS: Joi.number()
+    .integer()
+    .positive()
+    .default(1800),
+  RATE_LIMIT_REFRESH_MAX_ATTEMPTS: Joi.number()
+    .integer()
+    .positive()
+    .default(20),
+  RATE_LIMIT_REFRESH_WINDOW_SECONDS: Joi.number()
+    .integer()
+    .positive()
+    .default(900),
+  RATE_LIMIT_PASSWORD_CHANGE_MAX_ATTEMPTS: Joi.number()
+    .integer()
+    .positive()
+    .default(5),
+  RATE_LIMIT_PASSWORD_CHANGE_WINDOW_SECONDS: Joi.number()
+    .integer()
+    .positive()
+    .default(900),
+  RATE_LIMIT_IP_MAX_ATTEMPTS: Joi.number().integer().positive().default(20),
+  RATE_LIMIT_IP_WINDOW_SECONDS: Joi.number().integer().positive().default(900),
 });

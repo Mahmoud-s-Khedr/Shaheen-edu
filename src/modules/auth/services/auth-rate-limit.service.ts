@@ -2,6 +2,8 @@ import { Injectable } from '@nestjs/common';
 import * as crypto from 'crypto';
 import { RedisService } from '../../../redis/redis.service';
 import { RateLimitException } from '../../../common/exceptions/rate-limit.exception';
+import { ConfigService } from '@nestjs/config';
+import type { AppConfig } from '../../../config/configuration';
 
 export type RateLimitPurpose =
   | 'student-login'
@@ -21,17 +23,6 @@ interface Threshold {
   windowSeconds: number;
 }
 
-const IDENTIFIER_THRESHOLDS: Record<RateLimitPurpose, Threshold> = {
-  'student-login': { maxAttempts: 5, windowSeconds: 900 },
-  'admin-login': { maxAttempts: 5, windowSeconds: 900 },
-  'partner-login': { maxAttempts: 5, windowSeconds: 900 },
-  'parent-login': { maxAttempts: 3, windowSeconds: 1800 },
-  refresh: { maxAttempts: 20, windowSeconds: 900 },
-  'password-change': { maxAttempts: 5, windowSeconds: 900 },
-};
-
-const IP_THRESHOLD: Threshold = { maxAttempts: 20, windowSeconds: 900 };
-
 /**
  * Redis-backed fixed-window counter used for the security-critical
  * failed-login lockout/backoff logic (separate from the generic
@@ -41,7 +32,10 @@ const IP_THRESHOLD: Threshold = { maxAttempts: 20, windowSeconds: 900 };
  */
 @Injectable()
 export class AuthRateLimitService {
-  constructor(private readonly redisService: RedisService) {}
+  constructor(
+    private readonly redisService: RedisService,
+    private readonly configService: ConfigService<AppConfig, true>,
+  ) {}
 
   static hashIdentifier(loginIdentifier: string): string {
     return crypto.createHash('sha256').update(loginIdentifier).digest('hex');
@@ -62,7 +56,7 @@ export class AuthRateLimitService {
     hashedIdentifier: string,
     ip: string | undefined,
   ): Promise<void> {
-    const identifierThreshold = IDENTIFIER_THRESHOLDS[purpose];
+    const identifierThreshold = this.identifierThreshold(purpose);
     await this.checkAndIncrement(
       `ratelimit:login:${purpose}:${hashedIdentifier}`,
       identifierThreshold,
@@ -70,7 +64,7 @@ export class AuthRateLimitService {
     if (ip) {
       await this.checkAndIncrement(
         `ratelimit:login:${purpose}:ip:${ip}`,
-        IP_THRESHOLD,
+        this.ipThreshold(),
       );
     }
   }
@@ -86,7 +80,7 @@ export class AuthRateLimitService {
     ip: string | undefined,
   ): Promise<void> {
     const identifierKey = this.identifierKey(purpose, hashedIdentifier);
-    const identifierThreshold = IDENTIFIER_THRESHOLDS[purpose];
+    const identifierThreshold = this.identifierThreshold(purpose);
     const currentCount = Number(
       (await this.redisService.client.get(identifierKey)) ?? 0,
     );
@@ -100,7 +94,7 @@ export class AuthRateLimitService {
     if (ip) {
       await this.checkAndIncrement(
         `ratelimit:login:${purpose}:ip:${ip}`,
-        IP_THRESHOLD,
+        this.ipThreshold(),
       );
     }
   }
@@ -111,7 +105,7 @@ export class AuthRateLimitService {
   ): Promise<void> {
     await this.checkAndIncrement(
       this.identifierKey(purpose, hashedIdentifier),
-      IDENTIFIER_THRESHOLDS[purpose],
+      this.identifierThreshold(purpose),
     );
   }
 
@@ -126,6 +120,25 @@ export class AuthRateLimitService {
 
   private identifierKey(purpose: RateLimitPurpose, hashedIdentifier: string) {
     return `ratelimit:login:${purpose}:${hashedIdentifier}`;
+  }
+
+  private identifierThreshold(purpose: RateLimitPurpose): Threshold {
+    const identifier = this.configService.get('rateLimit', {
+      infer: true,
+    }).identifier;
+    const thresholds: Record<RateLimitPurpose, Threshold> = {
+      'student-login': identifier.studentLogin,
+      'admin-login': identifier.adminLogin,
+      'partner-login': identifier.partnerLogin,
+      'parent-login': identifier.parentLogin,
+      refresh: identifier.refresh,
+      'password-change': identifier.passwordChange,
+    };
+    return thresholds[purpose];
+  }
+
+  private ipThreshold(): Threshold {
+    return this.configService.get('rateLimit', { infer: true }).ip;
   }
 
   private async checkAndIncrement(

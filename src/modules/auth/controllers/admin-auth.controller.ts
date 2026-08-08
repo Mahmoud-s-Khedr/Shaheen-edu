@@ -1,5 +1,4 @@
 import { Body, Controller, Post, Req, Res } from '@nestjs/common';
-import { Throttle } from '@nestjs/throttler';
 import { ApiCreatedResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { ConfigService } from '@nestjs/config';
@@ -11,6 +10,7 @@ import { setRefreshCookie } from '../utils/refresh-cookie.util';
 import type { AppConfig } from '../../../config/configuration';
 import { ApiStandardErrors } from '../../../common/decorators/api-standard-errors.decorator';
 import { AuthTokenResponseDto } from '../../../common/dto/api-response.dto';
+import { AuthRouteThrottle } from '../../../common/decorators/auth-route-throttle.decorator';
 
 @ApiTags('auth/admins')
 @Controller({ path: 'auth/admins', version: '1' })
@@ -21,7 +21,7 @@ export class AdminAuthController {
   ) {}
 
   @Public()
-  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @AuthRouteThrottle()
   @Post('login')
   @ApiOperation({
     summary: 'Log in as an administrator',

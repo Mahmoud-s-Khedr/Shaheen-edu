@@ -24,9 +24,44 @@ export interface AppConfig {
     email: string;
     password: string;
   };
-  storage: { endpoint: string; bucket: string; accessKeyId: string; secretAccessKey: string; pullZoneUrl: string; tokenKey: string; urlTtlSeconds: number; uploadTtlSeconds: number; imageMaxBytes: number; documentMaxBytes: number; downloadMaxBytes: number };
-  stream: { libraryId: string; apiKey: string; readOnlyKey: string; playerTokenKey: string; uploadTtlSeconds: number; playbackTtlSeconds: number };
+  storage: {
+    endpoint: string;
+    bucket: string;
+    accessKeyId: string;
+    secretAccessKey: string;
+    pullZoneUrl: string;
+    tokenKey: string;
+    urlTtlSeconds: number;
+    uploadTtlSeconds: number;
+    imageMaxBytes: number;
+    documentMaxBytes: number;
+    downloadMaxBytes: number;
+  };
+  stream: {
+    libraryId: string;
+    apiKey: string;
+    readOnlyKey: string;
+    playerTokenKey: string;
+    uploadTtlSeconds: number;
+    playbackTtlSeconds: number;
+  };
+  rateLimit: {
+    global: { limit: number; windowSeconds: number };
+    authRoute: { limit: number; windowSeconds: number };
+    identifier: {
+      studentLogin: { maxAttempts: number; windowSeconds: number };
+      adminLogin: { maxAttempts: number; windowSeconds: number };
+      partnerLogin: { maxAttempts: number; windowSeconds: number };
+      parentLogin: { maxAttempts: number; windowSeconds: number };
+      refresh: { maxAttempts: number; windowSeconds: number };
+      passwordChange: { maxAttempts: number; windowSeconds: number };
+    };
+    ip: { maxAttempts: number; windowSeconds: number };
+  };
 }
+
+const envInteger = (name: string, fallback: number): number =>
+  parseInt(process.env[name] ?? String(fallback), 10);
 
 export default (): AppConfig => ({
   nodeEnv: process.env.NODE_ENV ?? 'development',
@@ -37,7 +72,8 @@ export default (): AppConfig => ({
     .map((origin) => origin.trim())
     .filter(Boolean),
   cookieSecure: (process.env.COOKIE_SECURE ?? 'true') === 'true',
-  cookieSameSite: (process.env.COOKIE_SAME_SITE ?? 'lax') as AppConfig['cookieSameSite'],
+  cookieSameSite: (process.env.COOKIE_SAME_SITE ??
+    'lax') as AppConfig['cookieSameSite'],
   cookieSecret: process.env.COOKIE_SECRET ?? '',
   databaseUrl: process.env.DATABASE_URL ?? '',
   redisUrl: process.env.REDIS_URL ?? '',
@@ -64,10 +100,94 @@ export default (): AppConfig => ({
     password: process.env.SUPER_ADMIN_PASSWORD ?? '',
   },
   storage: {
-    endpoint: process.env.BUNNY_STORAGE_S3_ENDPOINT ?? '', bucket: process.env.BUNNY_STORAGE_BUCKET ?? '', accessKeyId: process.env.BUNNY_STORAGE_ACCESS_KEY_ID ?? '', secretAccessKey: process.env.BUNNY_STORAGE_SECRET_ACCESS_KEY ?? '', pullZoneUrl: process.env.BUNNY_STORAGE_PULL_ZONE_URL ?? '', tokenKey: process.env.BUNNY_STORAGE_TOKEN_KEY ?? '',
-    urlTtlSeconds: parseInt(process.env.ASSET_URL_TTL_SECONDS ?? '300', 10), uploadTtlSeconds: parseInt(process.env.ASSET_UPLOAD_TTL_SECONDS ?? '900', 10), imageMaxBytes: parseInt(process.env.ASSET_IMAGE_MAX_BYTES ?? '10485760', 10), documentMaxBytes: parseInt(process.env.ASSET_DOCUMENT_MAX_BYTES ?? '26214400', 10), downloadMaxBytes: parseInt(process.env.ASSET_DOWNLOAD_MAX_BYTES ?? '104857600', 10),
+    endpoint: process.env.BUNNY_STORAGE_S3_ENDPOINT ?? '',
+    bucket: process.env.BUNNY_STORAGE_BUCKET ?? '',
+    accessKeyId: process.env.BUNNY_STORAGE_ACCESS_KEY_ID ?? '',
+    secretAccessKey: process.env.BUNNY_STORAGE_SECRET_ACCESS_KEY ?? '',
+    pullZoneUrl: process.env.BUNNY_STORAGE_PULL_ZONE_URL ?? '',
+    tokenKey: process.env.BUNNY_STORAGE_TOKEN_KEY ?? '',
+    urlTtlSeconds: parseInt(process.env.ASSET_URL_TTL_SECONDS ?? '300', 10),
+    uploadTtlSeconds: parseInt(
+      process.env.ASSET_UPLOAD_TTL_SECONDS ?? '900',
+      10,
+    ),
+    imageMaxBytes: parseInt(
+      process.env.ASSET_IMAGE_MAX_BYTES ?? '10485760',
+      10,
+    ),
+    documentMaxBytes: parseInt(
+      process.env.ASSET_DOCUMENT_MAX_BYTES ?? '26214400',
+      10,
+    ),
+    downloadMaxBytes: parseInt(
+      process.env.ASSET_DOWNLOAD_MAX_BYTES ?? '104857600',
+      10,
+    ),
   },
   stream: {
-    libraryId: process.env.BUNNY_STREAM_LIBRARY_ID ?? '', apiKey: process.env.BUNNY_STREAM_API_KEY ?? '', readOnlyKey: process.env.BUNNY_STREAM_READ_ONLY_KEY ?? '', playerTokenKey: process.env.BUNNY_STREAM_PLAYER_TOKEN_KEY ?? '', uploadTtlSeconds: parseInt(process.env.BUNNY_STREAM_UPLOAD_TTL_SECONDS ?? '10800', 10), playbackTtlSeconds: parseInt(process.env.BUNNY_STREAM_PLAYBACK_TTL_SECONDS ?? '300', 10),
+    libraryId: process.env.BUNNY_STREAM_LIBRARY_ID ?? '',
+    apiKey: process.env.BUNNY_STREAM_API_KEY ?? '',
+    readOnlyKey: process.env.BUNNY_STREAM_READ_ONLY_KEY ?? '',
+    playerTokenKey: process.env.BUNNY_STREAM_PLAYER_TOKEN_KEY ?? '',
+    uploadTtlSeconds: parseInt(
+      process.env.BUNNY_STREAM_UPLOAD_TTL_SECONDS ?? '10800',
+      10,
+    ),
+    playbackTtlSeconds: parseInt(
+      process.env.BUNNY_STREAM_PLAYBACK_TTL_SECONDS ?? '300',
+      10,
+    ),
+  },
+  rateLimit: {
+    global: {
+      limit: envInteger('RATE_LIMIT_GLOBAL_LIMIT', 30),
+      windowSeconds: envInteger('RATE_LIMIT_GLOBAL_WINDOW_SECONDS', 60),
+    },
+    authRoute: {
+      limit: envInteger('RATE_LIMIT_AUTH_ROUTE_LIMIT', 10),
+      windowSeconds: envInteger('RATE_LIMIT_AUTH_ROUTE_WINDOW_SECONDS', 60),
+    },
+    identifier: {
+      studentLogin: {
+        maxAttempts: envInteger('RATE_LIMIT_STUDENT_LOGIN_MAX_ATTEMPTS', 5),
+        windowSeconds: envInteger(
+          'RATE_LIMIT_STUDENT_LOGIN_WINDOW_SECONDS',
+          900,
+        ),
+      },
+      adminLogin: {
+        maxAttempts: envInteger('RATE_LIMIT_ADMIN_LOGIN_MAX_ATTEMPTS', 5),
+        windowSeconds: envInteger('RATE_LIMIT_ADMIN_LOGIN_WINDOW_SECONDS', 900),
+      },
+      partnerLogin: {
+        maxAttempts: envInteger('RATE_LIMIT_PARTNER_LOGIN_MAX_ATTEMPTS', 5),
+        windowSeconds: envInteger(
+          'RATE_LIMIT_PARTNER_LOGIN_WINDOW_SECONDS',
+          900,
+        ),
+      },
+      parentLogin: {
+        maxAttempts: envInteger('RATE_LIMIT_PARENT_LOGIN_MAX_ATTEMPTS', 3),
+        windowSeconds: envInteger(
+          'RATE_LIMIT_PARENT_LOGIN_WINDOW_SECONDS',
+          1800,
+        ),
+      },
+      refresh: {
+        maxAttempts: envInteger('RATE_LIMIT_REFRESH_MAX_ATTEMPTS', 20),
+        windowSeconds: envInteger('RATE_LIMIT_REFRESH_WINDOW_SECONDS', 900),
+      },
+      passwordChange: {
+        maxAttempts: envInteger('RATE_LIMIT_PASSWORD_CHANGE_MAX_ATTEMPTS', 5),
+        windowSeconds: envInteger(
+          'RATE_LIMIT_PASSWORD_CHANGE_WINDOW_SECONDS',
+          900,
+        ),
+      },
+    },
+    ip: {
+      maxAttempts: envInteger('RATE_LIMIT_IP_MAX_ATTEMPTS', 20),
+      windowSeconds: envInteger('RATE_LIMIT_IP_WINDOW_SECONDS', 900),
+    },
   },
 });

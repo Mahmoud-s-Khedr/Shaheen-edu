@@ -67,6 +67,7 @@ See `.env.example` for a fully worked, non-secret example set. Summary:
 | `JWT_ACCESS_SECRET` / `JWT_ACCESS_TTL_SECONDS`               | User access token (15 min default)                                |
 | `JWT_REFRESH_TTL_SECONDS`                                    | Opaque refresh token TTL (30 days default)                        |
 | `JWT_PARENT_ACCESS_SECRET` / `JWT_PARENT_ACCESS_TTL_SECONDS` | Parent access token (30 min default)                              |
+| `RATE_LIMIT_*`                                                | Global, auth-route, identifier, and IP rate-limit thresholds       |
 | `NATIONAL_ID_HMAC_SECRET`                                    | HMAC key for the deterministic National ID lookup hash            |
 | `NATIONAL_ID_ENCRYPTION_KEY`                                 | Key material for AES-256-GCM National ID encryption               |
 | `NATIONAL_ID_KEY_VERSION`                                    | Recorded alongside encrypted National IDs for future key rotation |
@@ -150,8 +151,8 @@ forbidNonWhitelisted:true})`) so a student can never smuggle in
 - **Egyptian National ID checksum is validated structurally only** (length,
   digit-only, century marker in `{2,3}`, valid month/day) — the final
   checksum digit is _not_ verified. This is a documented v1 shortcut.
-- Rate-limit thresholds (`AuthRateLimitService`) are illustrative,
-  env-independent constants in code, not yet exposed as configuration.
+- Rate-limit thresholds are configurable with the `RATE_LIMIT_*` variables in
+  `.env.example`; changes take effect after restarting the API.
 - `AccountStatus.DISABLED` exists in the Prisma enum but has no toggle
   endpoint yet (only `ACTIVE`/`SUSPENDED` are reachable via the admin API).
 - Admin `PATCH /api/v1/admin/admins/:id` only updates `loginIdentifier`

@@ -4,6 +4,8 @@ import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { ClsModule } from 'nestjs-cls';
 import { randomUUID } from 'crypto';
 import { ConfigModule } from './config/config.module';
+import { ConfigService } from '@nestjs/config';
+import type { AppConfig } from './config/configuration';
 import { LoggerModule } from './common/logging/logger.module';
 import { DatabaseModule } from './database/database.module';
 import { SearchModule } from './common/search/search.module';
@@ -50,8 +52,20 @@ import type { IncomingMessage } from 'http';
           randomUUID(),
       },
     }),
-    ThrottlerModule.forRoot({
-      throttlers: [{ ttl: 60_000, limit: 30 }],
+    ThrottlerModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService<AppConfig, true>) => {
+        const rateLimit = configService.get('rateLimit', { infer: true });
+        return {
+          throttlers: [
+            {
+              ttl: rateLimit.global.windowSeconds * 1000,
+              limit: rateLimit.global.limit,
+            },
+          ],
+        };
+      },
     }),
     DatabaseModule,
     SearchModule,

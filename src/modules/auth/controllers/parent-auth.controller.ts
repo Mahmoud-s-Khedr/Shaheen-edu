@@ -10,7 +10,6 @@ import {
   UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
-import { Throttle } from '@nestjs/throttler';
 import {
   ApiBearerAuth,
   ApiCreatedResponse,
@@ -36,6 +35,7 @@ import {
 } from '../../../common/utils/phone.util';
 import type { RequestParentSession } from '../../../common/types/request-with-user.types';
 import { PaginationQueryDto } from '../../../common/dto/pagination-query.dto';
+import { AuthRouteThrottle } from '../../../common/decorators/auth-route-throttle.decorator';
 import { ApiStandardErrors } from '../../../common/decorators/api-standard-errors.decorator';
 import {
   PaginatedParentChildResponseDto,
@@ -59,7 +59,7 @@ export class ParentAuthController {
   ) {}
 
   @Public()
-  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @AuthRouteThrottle()
   @Post('login')
   @ApiOperation({ summary: 'Log in as a parent' })
   @ApiCreatedResponse({ type: ParentAccessTokenResponseDto })

@@ -29,11 +29,29 @@ class InMemoryRedis {
 }
 
 describe('AuthRateLimitService', () => {
-  const identifier = AuthRateLimitService.hashIdentifier('student@example.test');
+  const identifier = AuthRateLimitService.hashIdentifier(
+    'student@example.test',
+  );
+  const config = {
+    get: () => ({
+      identifier: {
+        studentLogin: { maxAttempts: 5, windowSeconds: 900 },
+        adminLogin: { maxAttempts: 5, windowSeconds: 900 },
+        partnerLogin: { maxAttempts: 5, windowSeconds: 900 },
+        parentLogin: { maxAttempts: 3, windowSeconds: 1800 },
+        refresh: { maxAttempts: 20, windowSeconds: 900 },
+        passwordChange: { maxAttempts: 5, windowSeconds: 900 },
+      },
+      ip: { maxAttempts: 20, windowSeconds: 900 },
+    }),
+  };
 
   it('locks an identifier only after failed login attempts and clears it on success', async () => {
     const client = new InMemoryRedis();
-    const service = new AuthRateLimitService({ client } as never);
+    const service = new AuthRateLimitService(
+      { client } as never,
+      config as never,
+    );
 
     for (let attempt = 0; attempt < 5; attempt += 1) {
       await service.assertLoginAllowed('student-login', identifier, undefined);
