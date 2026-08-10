@@ -27,4 +27,6 @@ export {
   AssessmentMode,
   AssessmentStatus,
   AssessmentAttemptStatus,
+  AssessmentQuestionOutcome,
+  QuestionDifficultyBand,
 } from '@prisma/client';

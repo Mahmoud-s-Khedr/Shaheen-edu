@@ -10,7 +10,10 @@ export const assessmentsJourney: JourneyDefinition = {
   async run({ clients, context, factory, step }) {
     const admin = clients.admin;
     let gradeId = '';
+    let subjectId = '';
     let courseId = '';
+    let questionBankId = '';
+    let questionSourceId = '';
     let questionIds: string[] = [];
     let student1Token = '';
     let student2Token = '';
@@ -49,6 +52,7 @@ export const assessmentsJourney: JourneyDefinition = {
           slug: factory.slug('assessments-subject'),
           academicGradeId: gradeId,
         });
+        subjectId = subject.id;
         context.created.subjects.push(subject.id);
         const course = await create('/admin/courses', {
           title: factory.title('Assessments course'),
@@ -69,10 +73,13 @@ export const assessmentsJourney: JourneyDefinition = {
           type: 'PLATFORM',
           title: factory.localizedTitle('Assessments source'),
         });
+        questionSourceId = source.id;
         context.created.questionSources.push(source.id);
         const bank = await create('/admin/question-banks', {
+          subjectId,
           title: factory.title('Assessments bank'),
         });
+        questionBankId = bank.id;
         context.created.questionBanks.push(bank.id);
         await publish('question-banks/sources', source.id);
         await publish('question-banks', bank.id);
@@ -141,18 +148,28 @@ export const assessmentsJourney: JourneyDefinition = {
     });
 
     await step(
-      'Letting a student generate a private standard assessment',
+      'Discovering a bank and generating a filtered private standard assessment',
       async () => {
+        const banks = await student<any>(student1Token, 'GET', `/student/assessments/question-banks?subjectId=${subjectId}`);
+        expectStatus(banks, 200);
+        assert(banks.body.data.some((item: any) => item.id === questionBankId && item.availableQuestionCount === 3), 'A student must discover only an accessible bank with its available count');
+        const sources = await student<any>(student1Token, 'GET', `/student/assessments/question-sources?questionBankId=${questionBankId}`);
+        expectStatus(sources, 200);
+        assert(sources.body.data.some((item: any) => item.id === questionSourceId && item.type === 'PLATFORM'), 'A bank source list must be learner-safe and accessible');
+        expectStatus(await student<any>(student1Token, 'POST', `/student/assessments/question-marks/${questionIds[0]}`), 201);
+        const marks = await student<any>(student1Token, 'GET', '/student/assessments/question-marks');
+        expectStatus(marks, 200);
+        assert(marks.body.data.some((item: any) => item.questionId === questionIds[0] && item.bank.id === questionBankId), 'A student must be able to retrieve their accessible marked-question list');
         const generated = await student<any>(
           student1Token,
           'POST',
           '/student/assessments',
-          { scopes: [{ courseId }], questionCount: 2, mode: 'EXAM' },
+          { questionBankId, courseIds: [courseId], sourceIds: [questionSourceId], questionCount: 2, mode: 'EXAM' },
         );
         expectStatus(generated, 201);
         assert(
           generated.body.questionCount === 2 &&
-            generated.body.visibility === 'MINE',
+            generated.body.visibility === 'MINE' && generated.body.questionBankId === questionBankId,
           'A generated assessment must reflect the requested question count and be owned by the requester',
         );
         studentAssessmentId = generated.body.id;
@@ -267,6 +284,7 @@ export const assessmentsJourney: JourneyDefinition = {
             typeof result.body.questions[0].explanation === 'string',
           'The result must include the full explanation review after submission',
         );
+        assert(result.body.questions.some((question: any) => question.outcome === 'OMITTED') && result.body.questions.some((question: any) => question.outcome === 'CORRECT'), 'Assessment results must explicitly distinguish correct and omitted outcomes');
       },
     );
 

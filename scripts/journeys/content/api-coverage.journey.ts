@@ -200,7 +200,7 @@ export const apiCoverageJourney: JourneyDefinition = {
 
     await step('Covering question-bank source, bank, question, option, asset, and video-link endpoints', async () => {
       const source = await create('/admin/question-banks/sources', { type: 'PLATFORM', title: factory.localizedTitle('Coverage source') });
-      const bank = await create('/admin/question-banks', { title: factory.title('Coverage bank') });
+      const bank = await create('/admin/question-banks', { subjectId: subject, title: factory.title('Coverage bank') });
       expectStatus(await admin.request('GET', '/admin/question-banks/sources'), 200);
       expectStatus(await admin.request('GET', `/admin/question-banks/sources/${source.id}`), 200);
       expectStatus(await admin.request('PATCH', `/admin/question-banks/sources/${source.id}`, { title: factory.localizedTitle('Updated coverage source') }), 200);
@@ -234,7 +234,7 @@ export const apiCoverageJourney: JourneyDefinition = {
         expectStatus(await admin.request('DELETE', `/admin/questions/${question.id}/options/${option.id}`), 200);
       expectStatus(await admin.request('DELETE', `/admin/questions/${question.id}`), 200);
       const deleteSource = await create('/admin/question-banks/sources', { type: 'PLATFORM', title: factory.localizedTitle('Delete source') });
-      const deleteBank = await create('/admin/question-banks', { title: factory.title('Delete bank') });
+      const deleteBank = await create('/admin/question-banks', { subjectId: subject, title: factory.title('Delete bank') });
       expectStatus(await admin.request('DELETE', `/admin/question-banks/sources/${deleteSource.id}`), 200);
       expectStatus(await admin.request('DELETE', `/admin/question-banks/${deleteBank.id}`), 200);
     });

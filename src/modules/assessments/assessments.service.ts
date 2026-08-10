@@ -2,12 +2,14 @@ import { BadRequestException, ConflictException, ForbiddenException, Injectable,
 import { Prisma } from '@prisma/client';
 import {
   AssessmentAttemptStatus,
+  AssessmentQuestionOutcome,
   AssessmentGenerationType,
   AssessmentMode,
   AssessmentOwnerType,
   AssessmentStatus,
   ContentStatus,
   QuestionStatus,
+  QuestionDifficultyBand,
   QuestionType,
   Role,
 } from '../../common/types/roles.enum';
@@ -24,6 +26,7 @@ import type { RequestUser } from '../../common/types/request-with-user.types';
 import { PrismaService } from '../../database/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { ContentAccessPolicyService } from '../entitlements/content-access-policy.service';
+import { QuestionCommunityStatsService } from '../question-banks/question-community-stats.service';
 import type {
   AssessmentScopeDto,
   AutosaveAnswerDto,
@@ -53,6 +56,7 @@ export class AssessmentsService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly access: ContentAccessPolicyService,
+    private readonly communityStats: QuestionCommunityStatsService,
   ) {}
 
   private assertAdmin(actor: RequestUser) {
@@ -89,6 +93,30 @@ export class AssessmentsService {
     if (field === 'chapterId') return this.prisma.chapter.findUnique({ where: { id }, select: { id: true, status: true } });
     if (field === 'lessonId') return this.prisma.lesson.findUnique({ where: { id }, select: { id: true, status: true } });
     return this.prisma.section.findUnique({ where: { id }, select: { id: true, status: true } });
+  }
+
+  private async studentScopes(dto: GenerateStandardAssessmentDto, subjectId: string) {
+    const grouped: AssessmentScopeDto[] = [
+      ...(dto.courseIds ?? []).map((courseId) => ({ courseId })),
+      ...(dto.chapterIds ?? []).map((chapterId) => ({ chapterId })),
+      ...(dto.lessonIds ?? []).map((lessonId) => ({ lessonId })),
+      ...(dto.sectionIds ?? []).map((sectionId) => ({ sectionId })),
+    ];
+    const requested = grouped.length ? grouped : dto.scopes ?? [];
+    if (!requested.length) throw new BadRequestException('Select at least one course, chapter, lesson, or section');
+    const scopes = await this.resolveScopes(requested);
+    for (const scope of scopes) {
+      const node: any = scope.courseId
+        ? await this.prisma.course.findUnique({ where: { id: scope.courseId }, select: { subjectId: true } })
+        : scope.chapterId
+          ? await this.prisma.chapter.findUnique({ where: { id: scope.chapterId }, select: { course: { select: { subjectId: true } } } })
+          : scope.lessonId
+            ? await this.prisma.lesson.findUnique({ where: { id: scope.lessonId }, select: { chapter: { select: { course: { select: { subjectId: true } } } } } })
+            : await this.prisma.section.findUnique({ where: { id: scope.sectionId! }, select: { lesson: { select: { chapter: { select: { course: { select: { subjectId: true } } } } } } } });
+      const nodeSubjectId = node?.subjectId ?? node?.course?.subjectId ?? node?.chapter?.course?.subjectId ?? node?.lesson?.chapter?.course?.subjectId;
+      if (nodeSubjectId !== subjectId) throw new BadRequestException('All selected scopes must belong to the question bank subject');
+    }
+    return scopes;
   }
 
   private placementInScope(placement: any, scope: ScopeRow) {
@@ -146,12 +174,15 @@ export class AssessmentsService {
    * When `studentIdForEntitlement` is set, also requires the requesting student's
    * own entitlement on each matched placement and their own grade to match
    * (mirrors LearningService.practiceQuestions). Admin generation omits both. */
-  private async eligibleQuestions(scopes: ScopeRow[], studentIdForEntitlement?: string, gradeId?: string) {
+  private async eligibleQuestions(scopes: ScopeRow[], studentIdForEntitlement?: string, gradeId?: string, filters?: { bankId?: string; sourceIds?: string[]; sourceTypes?: any[]; difficultyBands?: QuestionDifficultyBand[]; markedOnly?: boolean; questionStatuses?: string[] }) {
     const questions = await this.prisma.question.findMany({
       where: {
         status: QuestionStatus.PUBLISHED,
+        ...(filters?.bankId ? { bankId: filters.bankId } : {}),
+        ...(filters?.sourceIds?.length ? { sourceId: { in: filters.sourceIds } } : {}),
+        ...(filters?.difficultyBands?.length ? { communityStats: { difficultyBand: { in: filters.difficultyBands } } } : {}),
         bank: { status: ContentStatus.PUBLISHED },
-        source: { status: ContentStatus.PUBLISHED },
+        source: { status: ContentStatus.PUBLISHED, ...(filters?.sourceTypes?.length ? { type: { in: filters.sourceTypes } } : {}) },
         course: {
           status: ContentStatus.PUBLISHED,
           subject: {
@@ -163,6 +194,7 @@ export class AssessmentsService {
       },
       include: {
         options: { orderBy: { sortOrder: 'asc' } },
+        communityStats: true,
         placements: { include: this.questionPlacementInclude() },
       },
       orderBy: [{ publishedAt: 'asc' }, { id: 'asc' }],
@@ -170,13 +202,30 @@ export class AssessmentsService {
     const eligible: any[] = [];
     for (const question of questions) {
       const matching = question.placements
-        .filter((p: any) => scopes.some((s) => this.placementInScope(p, s)))
+        .filter((p: any) => !scopes.length || scopes.some((s) => this.placementInScope(p, s)))
         .filter((p: any) => this.placementPublished(this.placementNodes(p)));
       if (!matching.length) continue;
       if (studentIdForEntitlement && !(await this.questionAccessible(studentIdForEntitlement, matching))) continue;
       eligible.push(question);
     }
-    return eligible;
+    if (!studentIdForEntitlement || (!filters?.markedOnly && !filters?.questionStatuses?.length)) return eligible;
+    const marks = filters?.markedOnly ? new Set((await this.prisma.studentQuestionMark.findMany({ where: { studentUserId: studentIdForEntitlement, questionId: { in: eligible.map((q) => q.id) } }, select: { questionId: true } })).map((x) => x.questionId)) : null;
+    const status = await this.studentQuestionStatuses(studentIdForEntitlement, eligible.map((q) => q.id));
+    return eligible.filter((question) => {
+      if (marks && !marks.has(question.id)) return false;
+      const selected = (filters?.questionStatuses ?? []).filter((x) => x !== 'ALL');
+      const current = status.get(question.id);
+      return !selected.length || selected.includes(current ?? 'UNUSED') || (selected.includes('USED') && Boolean(current));
+    });
+  }
+
+  private async studentQuestionStatuses(studentId: string, questionIds: string[]) {
+    const state = new Map<string, { status: string; at: Date }>();
+    const direct = await this.prisma.studentQuestionAttempt.findMany({ where: { studentUserId: studentId, questionId: { in: questionIds } }, select: { questionId: true, isCorrect: true, submittedAt: true }, orderBy: { submittedAt: 'asc' } });
+    for (const row of direct) state.set(row.questionId, { status: row.isCorrect ? 'CORRECT' : 'INCORRECT', at: row.submittedAt });
+    const assessment = await this.prisma.assessmentAttemptAnswer.findMany({ where: { attempt: { studentUserId: studentId, status: AssessmentAttemptStatus.COMPLETED }, assessmentQuestion: { sourceQuestionId: { in: questionIds } }, outcome: { not: null } }, select: { outcome: true, updatedAt: true, assessmentQuestion: { select: { sourceQuestionId: true } } } });
+    for (const row of assessment) { const id = row.assessmentQuestion.sourceQuestionId; const old = state.get(id); if (!old || row.updatedAt > old.at) state.set(id, { status: row.outcome!, at: row.updatedAt }); }
+    return new Map([...state].map(([id, value]) => [id, value.status]));
   }
 
   private shuffle<T>(items: T[]): T[] {
@@ -202,6 +251,8 @@ export class AssessmentsService {
       status: AssessmentStatus;
       scopes: ScopeRow[];
       questions: any[];
+      questionBankId?: string;
+      generationFilters?: object;
     },
   ) {
     const assessment = await tx.assessment.create({
@@ -216,6 +267,8 @@ export class AssessmentsService {
         durationSeconds: params.durationSeconds,
         questionCount: params.questions.length,
         status: params.status,
+        questionBankId: params.questionBankId,
+        generationFilters: params.generationFilters,
         publishedAt: params.status === AssessmentStatus.READY ? new Date() : null,
         scopes: { create: params.scopes },
       },
@@ -248,8 +301,22 @@ export class AssessmentsService {
   async generateStandard(studentId: string, dto: GenerateStandardAssessmentDto) {
     const gradeId = await this.studentGrade(studentId);
     if (dto.isTimed && !dto.durationSeconds) throw new BadRequestException('durationSeconds is required when isTimed is true');
-    const scopes = await this.resolveScopes(dto.scopes);
-    const eligible = await this.eligibleQuestions(scopes, studentId, gradeId);
+    // Keep already-created clients working while they migrate to bank-aware generation.
+    // New clients must send questionBankId; this compatibility path is deliberately
+    // limited to the pre-existing scope-only behaviour.
+    if (!dto.questionBankId) {
+      if (!dto.scopes?.length) throw new BadRequestException('questionBankId is required');
+      const scopes = await this.resolveScopes(dto.scopes);
+      const eligible = await this.eligibleQuestions(scopes, studentId, gradeId);
+      if (eligible.length < dto.questionCount) throw new BadRequestException('Not enough eligible questions in the selected scope');
+      const mode = dto.mode ?? AssessmentMode.EXAM;
+      const assessment = await this.prisma.$transaction((tx) => this.freezeSnapshot(tx, { ownerType: AssessmentOwnerType.STUDENT, studentUserId: studentId, title: dto.title?.trim() || this.defaultTitle(mode), generationType: AssessmentGenerationType.STANDARD, mode, isTimed: dto.isTimed ?? false, durationSeconds: dto.durationSeconds, status: AssessmentStatus.READY, scopes, questions: this.shuffle(eligible).slice(0, dto.questionCount) }));
+      return this.get(studentId, assessment.id);
+    }
+    const bank = await this.prisma.questionBank.findFirst({ where: { id: dto.questionBankId, status: ContentStatus.PUBLISHED, subject: { status: ContentStatus.PUBLISHED, academicGradeId: gradeId, academicGrade: { status: ContentStatus.PUBLISHED } } } });
+    if (!bank?.subjectId) throw new NotFoundException('Question bank is not accessible');
+    const scopes = await this.studentScopes(dto, bank.subjectId);
+    const eligible = await this.eligibleQuestions(scopes, studentId, gradeId, dto);
     if (eligible.length < dto.questionCount) throw new BadRequestException('Not enough eligible questions in the selected scope');
     const selected = this.shuffle(eligible).slice(0, dto.questionCount);
     const mode = dto.mode ?? AssessmentMode.EXAM;
@@ -263,11 +330,78 @@ export class AssessmentsService {
         isTimed: dto.isTimed ?? false,
         durationSeconds: dto.durationSeconds,
         status: AssessmentStatus.READY,
+        questionBankId: bank.id,
+        generationFilters: { sourceIds: dto.sourceIds ?? [], sourceTypes: dto.sourceTypes ?? [], difficultyBands: dto.difficultyBands ?? [], questionStatuses: dto.questionStatuses ?? [], markedOnly: dto.markedOnly ?? false },
         scopes,
         questions: selected,
       }),
     );
     return this.get(studentId, assessment.id);
+  }
+
+  async listStudentQuestionBanks(studentId: string, subjectId?: string) {
+    const gradeId = await this.studentGrade(studentId);
+    const questions = await this.eligibleQuestions([], studentId, gradeId);
+    const counts = new Map<string, number>();
+    for (const question of questions) counts.set(question.bankId, (counts.get(question.bankId) ?? 0) + 1);
+    const banks = await this.prisma.questionBank.findMany({ where: { id: { in: [...counts.keys()] }, status: ContentStatus.PUBLISHED, ...(subjectId ? { subjectId } : {}) }, include: { subject: { select: { id: true, title: true } } }, orderBy: { title: 'asc' } });
+    return { data: banks.map((bank) => ({ id: bank.id, title: bank.title, subject: bank.subject, availableQuestionCount: counts.get(bank.id) ?? 0 })) };
+  }
+
+  async listStudentQuestionSources(studentId: string, bankId: string) {
+    const gradeId = await this.studentGrade(studentId);
+    const bank = await this.prisma.questionBank.findFirst({ where: { id: bankId, status: ContentStatus.PUBLISHED, subject: { academicGradeId: gradeId, status: ContentStatus.PUBLISHED } } });
+    if (!bank) throw new NotFoundException('Question bank is not accessible');
+    const questions = await this.eligibleQuestions([], studentId, gradeId, { bankId });
+    const counts = new Map<string, number>();
+    for (const question of questions) counts.set(question.sourceId, (counts.get(question.sourceId) ?? 0) + 1);
+    const sources = await this.prisma.questionSource.findMany({ where: { id: { in: [...counts.keys()] } }, orderBy: { titleAr: 'asc' } });
+    return { data: sources.map((source) => ({ id: source.id, title: { ar: source.titleAr, en: source.titleEn }, type: source.type, availableQuestionCount: counts.get(source.id) ?? 0 })) };
+  }
+
+  async markQuestion(studentId: string, questionId: string) {
+    const gradeId = await this.studentGrade(studentId);
+    const accessible = await this.eligibleQuestions([], studentId, gradeId);
+    if (!accessible.some((question) => question.id === questionId)) throw new NotFoundException('Question is not accessible');
+    await this.prisma.studentQuestionMark.upsert({ where: { studentUserId_questionId: { studentUserId: studentId, questionId } }, create: { studentUserId: studentId, questionId }, update: {} });
+    return { questionId, marked: true };
+  }
+
+  async listMarkedQuestions(studentId: string) {
+    const gradeId = await this.studentGrade(studentId);
+    const accessible = new Set((await this.eligibleQuestions([], studentId, gradeId)).map((question) => question.id));
+    const marks = await this.prisma.studentQuestionMark.findMany({
+      where: { studentUserId: studentId },
+      include: {
+        question: {
+          select: {
+            id: true,
+            bankId: true,
+            sourceId: true,
+            communityStats: { select: { difficultyBand: true } },
+            bank: { select: { id: true, title: true, subject: { select: { id: true, title: true } } } },
+            source: { select: { id: true, type: true, titleAr: true, titleEn: true } },
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    return {
+      data: marks
+        .filter((mark) => accessible.has(mark.questionId))
+        .map((mark) => ({
+          questionId: mark.questionId,
+          markedAt: mark.createdAt,
+          bank: mark.question.bank,
+          source: { id: mark.question.source.id, type: mark.question.source.type, title: { ar: mark.question.source.titleAr, en: mark.question.source.titleEn } },
+          difficultyBand: mark.question.communityStats?.difficultyBand ?? QuestionDifficultyBand.D,
+        })),
+    };
+  }
+
+  async unmarkQuestion(studentId: string, questionId: string) {
+    await this.prisma.studentQuestionMark.deleteMany({ where: { studentUserId: studentId, questionId } });
+    return { questionId, marked: false };
   }
 
   // --- Student: list/get ----------------------------------------------
@@ -432,6 +566,8 @@ export class AssessmentsService {
     const attempt = await this.prisma.assessmentAttempt.findUnique({ where: { assessmentId_studentUserId: { assessmentId: id, studentUserId: studentId } } });
     return {
       ...this.listItemDto(assessment, visibility, attempt),
+      questionBankId: assessment.questionBankId,
+      generationFilters: assessment.generationFilters,
       scopes: assessment.scopes.map((s: any) => ({ courseId: s.courseId, chapterId: s.chapterId, lessonId: s.lessonId, sectionId: s.sectionId })),
     };
   }
@@ -522,8 +658,22 @@ export class AssessmentsService {
         data: { status: AssessmentAttemptStatus.COMPLETED, submittedAt: new Date() },
       });
       if (gate.count === 0) return tx.assessmentAttempt.findUniqueOrThrow({ where: { id: attemptId } });
+      const attempt = await tx.assessmentAttempt.findUniqueOrThrow({ where: { id: attemptId } });
+      if (!attempt) {
+        const answers = await tx.assessmentAttemptAnswer.findMany({ where: { attemptId } });
+        return tx.assessmentAttempt.update({ where: { id: attemptId }, data: { score: answers.filter((a) => a.isCorrect).length } });
+      }
+      const questions = await tx.assessmentQuestion.findMany({ where: { assessmentId: attempt.assessmentId }, select: { id: true, sourceQuestionId: true } });
       const answers = await tx.assessmentAttemptAnswer.findMany({ where: { attemptId } });
-      const score = answers.filter((a) => a.isCorrect).length;
+      const byQuestion = new Map(answers.map((answer) => [answer.assessmentQuestionId, answer]));
+      for (const question of questions) {
+        const answer = byQuestion.get(question.id);
+        const outcome = !answer?.selectedOptionIds.length ? AssessmentQuestionOutcome.OMITTED : answer.isCorrect ? AssessmentQuestionOutcome.CORRECT : AssessmentQuestionOutcome.INCORRECT;
+        if (answer) await tx.assessmentAttemptAnswer.update({ where: { id: answer.id }, data: { outcome } });
+        else await tx.assessmentAttemptAnswer.create({ data: { attemptId, assessmentQuestionId: question.id, selectedOptionIds: [], isCorrect: false, outcome } });
+        if (outcome !== AssessmentQuestionOutcome.OMITTED) await this.communityStats.recordResponse(tx, question.sourceQuestionId, outcome === AssessmentQuestionOutcome.CORRECT);
+      }
+      const score = answers.filter((a) => a.isCorrect && a.selectedOptionIds.length).length;
       return tx.assessmentAttempt.update({ where: { id: attemptId }, data: { score } });
     });
   }
@@ -561,6 +711,7 @@ export class AssessmentsService {
           selectedOptionIds: answer?.selectedOptionIds ?? [],
           answered: Boolean(answer && answer.selectedOptionIds.length),
           isCorrect: showAnswer ? (answer?.isCorrect ?? false) : null,
+          outcome: revealAnswers ? (answer?.outcome ?? AssessmentQuestionOutcome.OMITTED) : null,
           correctOptionIds: showAnswer ? q.options.filter((o) => o.isCorrect).map((o) => o.id) : null,
           explanation: showAnswer ? q.explanation : null,
         };
@@ -638,6 +789,7 @@ export class AssessmentsService {
           selectedOptionIds: answer?.selectedOptionIds ?? [],
           isCorrect: answer?.isCorrect ?? false,
           answered: Boolean(answer && answer.selectedOptionIds.length),
+          outcome: answer?.outcome ?? AssessmentQuestionOutcome.OMITTED,
         };
       }),
     };
@@ -652,6 +804,7 @@ export class AssessmentsService {
   async createStandard(actor: RequestUser, dto: GenerateStandardAssessmentDto) {
     this.assertAdmin(actor);
     if (dto.isTimed && !dto.durationSeconds) throw new BadRequestException('durationSeconds is required when isTimed is true');
+    if (!dto.scopes?.length) throw new BadRequestException('scopes is required');
     const scopes = await this.resolveScopes(dto.scopes);
     const eligible = await this.eligibleQuestions(scopes);
     if (eligible.length < dto.questionCount) throw new BadRequestException('Not enough eligible questions in the selected scope');

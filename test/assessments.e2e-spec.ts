@@ -4,6 +4,7 @@ import { createTestApp } from './utils/create-test-app';
 import { cleanDatabase, flushTestRedis, seedPublishedAcademicGrade, seedSuperAdmin } from './utils/db';
 import { PrismaService } from '../src/database/prisma.service';
 import { AccessType, ContentStatus, QuestionSourceType, QuestionStatus, QuestionType } from '../src/common/types/roles.enum';
+import { QuestionCommunityStatsService } from '../src/modules/question-banks/question-community-stats.service';
 
 const superAdminEmail = 'assessments-admin@example.com';
 const superAdminPassword = 'SuperAdminP@ss1!';
@@ -34,6 +35,9 @@ describe('Assessments (e2e)', () => {
   let student1: { accessToken: string; userId: string };
   let student2: { accessToken: string; userId: string };
   let courseId: string;
+  let subjectId: string;
+  let questionBankId: string;
+  let sourceId: string;
   let questionIds: string[];
 
   beforeAll(async () => {
@@ -55,13 +59,16 @@ describe('Assessments (e2e)', () => {
     const subject = await prisma.subject.create({
       data: { academicGradeId: gradeId, title: 'Assessments Subject', slug: 'assessments-subject', sortOrder: 1, status: ContentStatus.PUBLISHED, publishedAt: now, createdById: admin.id, updatedById: admin.id },
     });
+    subjectId = subject.id;
     const course = await prisma.course.create({
       data: { subjectId: subject.id, title: 'Assessments Course', slug: 'assessments-course', sortOrder: 1, status: ContentStatus.PUBLISHED, publishedAt: now, accessType: AccessType.PUBLIC, createdById: admin.id, updatedById: admin.id },
     });
     courseId = course.id;
 
-    const bank = await prisma.questionBank.create({ data: { title: 'Assessments Bank', status: ContentStatus.PUBLISHED, publishedAt: now, createdById: admin.id, updatedById: admin.id } });
+    const bank = await prisma.questionBank.create({ data: { subjectId, title: 'Assessments Bank', status: ContentStatus.PUBLISHED, publishedAt: now, createdById: admin.id, updatedById: admin.id } });
+    questionBankId = bank.id;
     const source = await prisma.questionSource.create({ data: { type: QuestionSourceType.PLATFORM, titleAr: 'منصة', status: ContentStatus.PUBLISHED, publishedAt: now, createdById: admin.id, updatedById: admin.id } });
+    sourceId = source.id;
 
     const created: string[] = [];
     for (let i = 1; i <= 3; i++) {
@@ -99,12 +106,13 @@ describe('Assessments (e2e)', () => {
       method: 'POST',
       url: '/api/v1/student/assessments',
       headers: { authorization: `Bearer ${student1.accessToken}` },
-      payload: { scopes: [{ courseId }], questionCount: 2, mode: 'EXAM' },
+      payload: { questionBankId, courseIds: [courseId], sourceIds: [sourceId], questionCount: 2, mode: 'EXAM' },
     });
     expect(response.statusCode).toBe(201);
     const body = JSON.parse(response.body);
     expect(body.questionCount).toBe(2);
     expect(body.visibility).toBe('MINE');
+    expect(body.questionBankId).toBe(questionBankId);
     studentAssessmentId = body.id;
   });
 
@@ -113,7 +121,7 @@ describe('Assessments (e2e)', () => {
       method: 'POST',
       url: '/api/v1/student/assessments',
       headers: { authorization: `Bearer ${student1.accessToken}` },
-      payload: { scopes: [{ courseId }], questionCount: 50 },
+      payload: { questionBankId, courseIds: [courseId], questionCount: 50 },
     });
     expect(response.statusCode).toBe(400);
   });
@@ -163,10 +171,40 @@ describe('Assessments (e2e)', () => {
     const resultBody = JSON.parse(result.body);
     expect(resultBody.totalQuestions).toBe(2);
     expect(resultBody.questions[0].explanation).toBeDefined();
+    expect(resultBody.questions).toEqual(expect.arrayContaining([expect.objectContaining({ outcome: 'CORRECT' }), expect.objectContaining({ outcome: 'OMITTED' })]));
+    expect((await prisma.questionCommunityStat.aggregate({ where: { questionId: { in: questionIds } }, _sum: { totalResponses: true, correctResponses: true } }))._sum).toEqual({ totalResponses: 1, correctResponses: 1 });
 
     const resubmit = await app.inject({ method: 'POST', url: `/api/v1/student/assessments/${studentAssessmentId}/attempts/current/submit`, headers: { authorization: `Bearer ${student1.accessToken}` } });
     expect(resubmit.statusCode).toBe(201);
     expect(JSON.parse(resubmit.body).score).toBe(JSON.parse(submit.body).score);
+  });
+
+  it('discovers accessible bank/sources and applies a private mark filter', async () => {
+    const banks = await app.inject({ method: 'GET', url: `/api/v1/student/assessments/question-banks?subjectId=${subjectId}`, headers: { authorization: `Bearer ${student1.accessToken}` } });
+    expect(banks.statusCode).toBe(200);
+    expect(JSON.parse(banks.body).data).toEqual(expect.arrayContaining([expect.objectContaining({ id: questionBankId, availableQuestionCount: 3 })]));
+    const sources = await app.inject({ method: 'GET', url: `/api/v1/student/assessments/question-sources?questionBankId=${questionBankId}`, headers: { authorization: `Bearer ${student1.accessToken}` } });
+    expect(sources.statusCode).toBe(200);
+    expect(JSON.parse(sources.body).data).toEqual(expect.arrayContaining([expect.objectContaining({ id: sourceId, type: 'PLATFORM' })]));
+    const mark = await app.inject({ method: 'POST', url: `/api/v1/student/assessments/question-marks/${questionIds[0]}`, headers: { authorization: `Bearer ${student1.accessToken}` } });
+    expect(mark.statusCode).toBe(201);
+    const marks = await app.inject({ method: 'GET', url: '/api/v1/student/assessments/question-marks', headers: { authorization: `Bearer ${student1.accessToken}` } });
+    expect(marks.statusCode).toBe(200);
+    expect(JSON.parse(marks.body).data).toEqual(expect.arrayContaining([expect.objectContaining({ questionId: questionIds[0], bank: expect.objectContaining({ id: questionBankId }) })]));
+    const generated = await app.inject({ method: 'POST', url: '/api/v1/student/assessments', headers: { authorization: `Bearer ${student1.accessToken}` }, payload: { questionBankId, courseIds: [courseId], markedOnly: true, questionCount: 1 } });
+    expect(generated.statusCode).toBe(201);
+    const unmark = await app.inject({ method: 'DELETE', url: `/api/v1/student/assessments/question-marks/${questionIds[0]}`, headers: { authorization: `Bearer ${student1.accessToken}` } });
+    expect(unmark.statusCode).toBe(200);
+  });
+
+  it('atomically aggregates concurrent community responses', async () => {
+    const stats = app.get(QuestionCommunityStatsService);
+    const questionId = questionIds[2];
+    await prisma.questionCommunityStat.deleteMany({ where: { questionId } });
+    await Promise.all(Array.from({ length: 10 }, (_, index) => prisma.$transaction((tx) => stats.recordResponse(tx, questionId, index < 6))));
+    const aggregate = await prisma.questionCommunityStat.findUniqueOrThrow({ where: { questionId } });
+    expect(aggregate).toMatchObject({ totalResponses: 10, correctResponses: 6, incorrectResponses: 4, difficultyBand: 'D' });
+    expect(aggregate.incorrectRate).toBeCloseTo(40);
   });
 
   it('lets the owner rename and then delete their assessment', async () => {
@@ -399,7 +437,7 @@ describe('Assessments (e2e)', () => {
       chapterAId = chapterA.id;
       chapterBId = chapterB.id;
 
-      const bank = await prisma.questionBank.create({ data: { title: 'Multi-Scope Bank', status: ContentStatus.PUBLISHED, publishedAt: now, createdById: admin.id, updatedById: admin.id } });
+      const bank = await prisma.questionBank.create({ data: { subjectId: subject.id, title: 'Multi-Scope Bank', status: ContentStatus.PUBLISHED, publishedAt: now, createdById: admin.id, updatedById: admin.id } });
       const source = await prisma.questionSource.create({ data: { type: QuestionSourceType.PLATFORM, titleAr: 'منصة 2', status: ContentStatus.PUBLISHED, publishedAt: now, createdById: admin.id, updatedById: admin.id } });
 
       const questionA = await prisma.question.create({

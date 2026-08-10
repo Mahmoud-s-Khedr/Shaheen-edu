@@ -32,6 +32,21 @@ export class AssessmentsController {
   @Post() @ApiOperation({ summary: 'Generate a standard (random-sample) quiz/exam from a chosen scope' }) @ApiCreatedResponse({ type: AssessmentDetailDto }) @ApiStandardErrors(400, 401, 403, 404)
   generate(@CurrentUser() user: RequestUser, @Body() dto: GenerateStandardAssessmentDto) { return this.assessments.generateStandard(user.id, dto); }
 
+  @Get('question-banks') @ApiOperation({ summary: 'List accessible question banks, optionally within one subject' }) @ApiStandardErrors(401, 403)
+  questionBanks(@CurrentUser() user: RequestUser, @Query('subjectId') subjectId?: string) { return this.assessments.listStudentQuestionBanks(user.id, subjectId); }
+
+  @Get('question-sources') @ApiOperation({ summary: 'List accessible sources in a selected question bank' }) @ApiStandardErrors(401, 403, 404)
+  questionSources(@CurrentUser() user: RequestUser, @Query('questionBankId') questionBankId: string) { return this.assessments.listStudentQuestionSources(user.id, questionBankId); }
+
+  @Post('question-marks/:questionId') @ApiOperation({ summary: 'Mark an accessible question' }) @ApiStandardErrors(401, 403, 404)
+  markQuestion(@CurrentUser() user: RequestUser, @Param('questionId') questionId: string) { return this.assessments.markQuestion(user.id, questionId); }
+
+  @Get('question-marks') @ApiOperation({ summary: 'List the current student’s accessible marked questions' }) @ApiStandardErrors(401, 403)
+  questionMarks(@CurrentUser() user: RequestUser) { return this.assessments.listMarkedQuestions(user.id); }
+
+  @Delete('question-marks/:questionId') @ApiOperation({ summary: 'Remove a question mark' }) @ApiStandardErrors(401, 403)
+  unmarkQuestion(@CurrentUser() user: RequestUser, @Param('questionId') questionId: string) { return this.assessments.unmarkQuestion(user.id, questionId); }
+
   @Get() @ApiOperation({ summary: 'List own and publicly visible assessments' }) @ApiOkResponse({ type: PaginatedAssessmentsResponseDto }) @ApiStandardErrors(401, 403)
   list(@CurrentUser() user: RequestUser, @Query() query: QueryAssessmentDto) { return this.assessments.list(user.id, query); }
 

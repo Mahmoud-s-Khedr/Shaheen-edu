@@ -11,6 +11,7 @@ export const questionBankAuthoringJourney: JourneyDefinition = {
     const admin = clients.admin;
     const chapterId = String(context.academic.chapterId);
     const courseId = String(context.academic.courseId);
+    const subjectId = String(context.academic.subjectId);
     const publisherUserId = String(context.partner.id);
     let sourceId = '';
     let bankId = '';
@@ -31,7 +32,7 @@ export const questionBankAuthoringJourney: JourneyDefinition = {
       assert(source.body.publisherUserId === publisherUserId, 'Source must retain its supplying publisher');
 
       const bank = await admin.request<any>('POST', '/admin/question-banks', {
-        title: factory.title('Question bank'), description: 'Synthetic authoring bank',
+        subjectId, title: factory.title('Question bank'), description: 'Synthetic authoring bank',
       });
       expectStatus(bank, 201);
       bankId = bank.body.id;

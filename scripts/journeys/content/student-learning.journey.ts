@@ -114,6 +114,7 @@ export const studentLearningJourney: JourneyDefinition = {
         });
         context.created.questionSources.push(source.id);
         const bank = await create('/admin/question-banks', {
+          subjectId,
           title: factory.title('Learning bank'),
         });
         context.created.questionBanks.push(bank.id);

@@ -15,6 +15,7 @@ import { PrismaService } from '../../database/prisma.service';
 import { ContentAccessPolicyService } from '../entitlements/content-access-policy.service';
 import { AssetsService } from '../assets/assets.service';
 import { VideosService } from '../videos/videos.service';
+import { QuestionCommunityStatsService } from '../question-banks/question-community-stats.service';
 import type {
   PracticeScopeQueryDto,
   UpdateContentStudyStateDto,
@@ -29,6 +30,7 @@ export class LearningService {
     private readonly access: ContentAccessPolicyService,
     private readonly assets: AssetsService,
     private readonly videos: VideosService,
+    private readonly communityStats: QuestionCommunityStatsService,
   ) {}
 
   async completeContent(studentId: string, contentItemId: string) {
@@ -620,7 +622,7 @@ export class LearningService {
         const count = await tx.studentQuestionAttempt.count({
           where: { studentUserId: studentId, questionId },
         });
-        return tx.studentQuestionAttempt.create({
+        const created = await tx.studentQuestionAttempt.create({
           data: {
             studentUserId: studentId,
             questionId,
@@ -630,6 +632,8 @@ export class LearningService {
           },
           include: { answers: true },
         });
+        await this.communityStats.recordResponse(tx, questionId, isCorrect);
+        return created;
       },
       { isolationLevel: 'Serializable' },
     );

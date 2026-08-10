@@ -17,8 +17,8 @@ export class UpdateQuestionSourceDto {
   @ApiPropertyOptional({ type: LocalizedOptionalTextDto, nullable: true }) @IsOptional() @ValidateNested() @Type(() => LocalizedOptionalTextDto) note?: LocalizedOptionalTextDto | null;
   @ApiPropertyOptional({ nullable: true }) @IsOptional() @IsString() publisherUserId?: string | null;
 }
-export class CreateQuestionBankDto { @ApiProperty() @IsString() @MinLength(1) @MaxLength(200) title!: string; @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(2000) description?: string; }
-export class UpdateQuestionBankDto { @ApiPropertyOptional() @IsOptional() @IsString() @MinLength(1) @MaxLength(200) title?: string; @ApiPropertyOptional({ nullable: true }) @IsOptional() @IsString() @MaxLength(2000) description?: string | null; }
+export class CreateQuestionBankDto { @ApiProperty() @IsString() subjectId!: string; @ApiProperty() @IsString() @MinLength(1) @MaxLength(200) title!: string; @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(2000) description?: string; }
+export class UpdateQuestionBankDto { @ApiPropertyOptional() @IsOptional() @IsString() subjectId?: string; @ApiPropertyOptional() @IsOptional() @IsString() @MinLength(1) @MaxLength(200) title?: string; @ApiPropertyOptional({ nullable: true }) @IsOptional() @IsString() @MaxLength(2000) description?: string | null; }
 export class QuestionPlacementDto {
   @ApiPropertyOptional() @IsOptional() @IsString() courseId?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() chapterId?: string;

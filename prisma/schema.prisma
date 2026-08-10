@@ -179,22 +179,36 @@ enum AssessmentAttemptStatus {
   COMPLETED
 }
 
+enum AssessmentQuestionOutcome {
+  CORRECT
+  INCORRECT
+  OMITTED
+}
+
+enum QuestionDifficultyBand {
+  A_PLUS
+  A
+  B
+  C
+  D
+}
+
 model User {
-  id              String        @id @default(cuid())
-  role            Role
-  status          AccountStatus @default(ACTIVE)
-  loginIdentifier String        @unique
-  passwordHash    String
-  mustChangePassword Boolean     @default(false)
-  passwordResetAt DateTime?
-  deletedAt       DateTime?
-  deletedById     String?
-  deletionReason  String?
-  deletedBy       User?         @relation("UserDeletedBy", fields: [deletedById], references: [id], onDelete: Restrict)
-  deletedUsers    User[]        @relation("UserDeletedBy")
-  lastLoginAt     DateTime?
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  id                 String        @id @default(cuid())
+  role               Role
+  status             AccountStatus @default(ACTIVE)
+  loginIdentifier    String        @unique
+  passwordHash       String
+  mustChangePassword Boolean       @default(false)
+  passwordResetAt    DateTime?
+  deletedAt          DateTime?
+  deletedById        String?
+  deletionReason     String?
+  deletedBy          User?         @relation("UserDeletedBy", fields: [deletedById], references: [id], onDelete: Restrict)
+  deletedUsers       User[]        @relation("UserDeletedBy")
+  lastLoginAt        DateTime?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
 
   studentProfile                   StudentProfile?
   partnerProfile                   PartnerProfile?
@@ -242,6 +256,7 @@ model StudentProfile {
   userId                  String                     @id
   user                    User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
   archivedAccessSnapshots ArchivedAccessSnapshot[]
+  questionMarks           StudentQuestionMark[]
   fullName                String
   nationalIdHash          String                     @unique
   nationalIdEncrypted     String?
@@ -392,9 +407,10 @@ model Subject {
   createdBy User @relation("SubjectCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
   updatedBy User @relation("SubjectUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
 
-  courses      Course[]
-  coverAsset   Asset?   @relation("SubjectCover", fields: [coverAssetId], references: [id], onDelete: Restrict)
-  coverAssetId String?
+  courses       Course[]
+  questionBanks QuestionBank[]
+  coverAsset    Asset?         @relation("SubjectCover", fields: [coverAssetId], references: [id], onDelete: Restrict)
+  coverAssetId  String?
 
   @@unique([academicGradeId, slug])
   @@unique([academicGradeId, sortOrder])
@@ -680,6 +696,10 @@ model QuestionSource {
 
 model QuestionBank {
   id          String        @id @default(cuid())
+  /// Nullable only during the legacy-bank remediation rollout. New banks always
+  /// receive a subject through the application API.
+  subjectId   String?
+  subject     Subject?      @relation(fields: [subjectId], references: [id], onDelete: Restrict)
   title       String
   description String?
   status      ContentStatus @default(DRAFT)
@@ -692,8 +712,10 @@ model QuestionBank {
   createdBy   User          @relation("QuestionBankCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
   updatedBy   User          @relation("QuestionBankUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
   questions   Question[]
+  assessments Assessment[]
 
   @@index([status, createdAt, id])
+  @@index([subjectId, status])
 }
 
 model Question {
@@ -725,6 +747,8 @@ model Question {
   videoLink       QuestionVideoLink?
   placements      QuestionPlacement[]
   studentAttempts StudentQuestionAttempt[]
+  marks           StudentQuestionMark[]
+  communityStats  QuestionCommunityStat?
 
   @@index([status, createdAt, id])
   @@index([bankId, status])
@@ -805,13 +829,16 @@ model Assessment {
   createdByAdminId String?
   createdByAdmin   User?               @relation("AssessmentCreatedByAdmin", fields: [createdByAdminId], references: [id], onDelete: Restrict)
 
-  title           String
-  generationType  AssessmentGenerationType
-  mode            AssessmentMode           @default(EXAM)
-  isTimed         Boolean                  @default(false)
-  durationSeconds Int?
-  questionCount   Int
-  status          AssessmentStatus         @default(READY)
+  title             String
+  generationType    AssessmentGenerationType
+  mode              AssessmentMode           @default(EXAM)
+  isTimed           Boolean                  @default(false)
+  durationSeconds   Int?
+  questionCount     Int
+  status            AssessmentStatus         @default(READY)
+  questionBankId    String?
+  questionBank      QuestionBank?            @relation(fields: [questionBankId], references: [id], onDelete: Restrict)
+  generationFilters Json?
 
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -825,6 +852,7 @@ model Assessment {
   @@index([ownerType, studentUserId, status, createdAt, id])
   @@index([ownerType, createdByAdminId, status, createdAt, id])
   @@index([status, createdAt, id])
+  @@index([questionBankId])
 }
 
 /// The hierarchy node(s) an assessment was generated from / is targeted at.
@@ -907,18 +935,44 @@ model AssessmentAttempt {
 /// Autosaved answer state per snapshot question. Upserted while the parent
 /// attempt is SUSPENDED; frozen once it is COMPLETED.
 model AssessmentAttemptAnswer {
-  id                   String             @id @default(cuid())
+  id                   String                     @id @default(cuid())
   attemptId            String
-  attempt              AssessmentAttempt  @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  attempt              AssessmentAttempt          @relation(fields: [attemptId], references: [id], onDelete: Cascade)
   assessmentQuestionId String
-  assessmentQuestion   AssessmentQuestion @relation(fields: [assessmentQuestionId], references: [id], onDelete: Cascade)
+  assessmentQuestion   AssessmentQuestion         @relation(fields: [assessmentQuestionId], references: [id], onDelete: Cascade)
   selectedOptionIds    String[]
   isCorrect            Boolean?
-  answeredAt           DateTime           @default(now())
-  updatedAt            DateTime           @updatedAt
+  outcome              AssessmentQuestionOutcome?
+  answeredAt           DateTime                   @default(now())
+  updatedAt            DateTime                   @updatedAt
 
   @@unique([attemptId, assessmentQuestionId])
   @@index([attemptId])
+}
+
+model StudentQuestionMark {
+  id            String         @id @default(cuid())
+  studentUserId String
+  questionId    String
+  createdAt     DateTime       @default(now())
+  student       StudentProfile @relation(fields: [studentUserId], references: [userId], onDelete: Cascade)
+  question      Question       @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([studentUserId, questionId])
+  @@index([studentUserId, createdAt])
+}
+
+model QuestionCommunityStat {
+  questionId         String                 @id
+  totalResponses     Int                    @default(0)
+  correctResponses   Int                    @default(0)
+  incorrectResponses Int                    @default(0)
+  incorrectRate      Float                  @default(0)
+  difficultyBand     QuestionDifficultyBand @default(D)
+  calculatedAt       DateTime               @default(now())
+  question           Question               @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@index([difficultyBand])
 }
 
 model BunnyStreamWebhookEvent {

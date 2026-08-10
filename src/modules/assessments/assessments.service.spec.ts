@@ -29,8 +29,9 @@ describe('AssessmentsService', () => {
       $transaction: jest.fn(async (arg: any) => (Array.isArray(arg) ? Promise.all(arg) : arg(prisma))),
     };
     const audit = { record: jest.fn().mockResolvedValue(undefined) };
+    const communityStats = { recordResponse: jest.fn().mockResolvedValue(undefined) };
     const access = new ContentAccessPolicyService(prisma);
-    return { service: new AssessmentsService(prisma, audit as any, access), prisma };
+    return { service: new AssessmentsService(prisma, audit as any, access, communityStats), prisma, communityStats };
   }
 
   describe('scope resolution', () => {

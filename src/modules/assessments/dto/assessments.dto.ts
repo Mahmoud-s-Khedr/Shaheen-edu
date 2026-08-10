@@ -2,7 +2,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { ArrayMaxSize, ArrayMinSize, IsArray, IsBoolean, IsEnum, IsInt, IsOptional, IsString, Max, MaxLength, Min, MinLength, ValidateNested } from 'class-validator';
 import { SearchPaginationQueryDto } from '../../../common/dto/pagination-query.dto';
-import { AssessmentMode, AssessmentStatus } from '../../../common/types/roles.enum';
+import { AssessmentMode, AssessmentStatus, QuestionDifficultyBand, QuestionSourceType } from '../../../common/types/roles.enum';
 
 export class AssessmentScopeDto {
   @ApiPropertyOptional() @IsOptional() @IsString() courseId?: string;
@@ -20,7 +20,18 @@ export class AssessmentScopeResponseDto {
 }
 
 export class GenerateStandardAssessmentDto {
-  @ApiProperty({ type: [AssessmentScopeDto] }) @IsArray() @ArrayMinSize(1) @ValidateNested({ each: true }) @Type(() => AssessmentScopeDto) scopes!: AssessmentScopeDto[];
+  /** Legacy shape retained for admin generation. Student requests use the grouped ID arrays below. */
+  @ApiPropertyOptional({ type: [AssessmentScopeDto] }) @IsOptional() @IsArray() @ArrayMinSize(1) @ValidateNested({ each: true }) @Type(() => AssessmentScopeDto) scopes?: AssessmentScopeDto[];
+  @ApiPropertyOptional() @IsOptional() @IsString() questionBankId?: string;
+  @ApiPropertyOptional({ type: [String] }) @IsOptional() @IsArray() @IsString({ each: true }) courseIds?: string[];
+  @ApiPropertyOptional({ type: [String] }) @IsOptional() @IsArray() @IsString({ each: true }) chapterIds?: string[];
+  @ApiPropertyOptional({ type: [String] }) @IsOptional() @IsArray() @IsString({ each: true }) lessonIds?: string[];
+  @ApiPropertyOptional({ type: [String] }) @IsOptional() @IsArray() @IsString({ each: true }) sectionIds?: string[];
+  @ApiPropertyOptional({ type: [String] }) @IsOptional() @IsArray() @IsString({ each: true }) sourceIds?: string[];
+  @ApiPropertyOptional({ enum: QuestionSourceType, isArray: true }) @IsOptional() @IsArray() @IsEnum(QuestionSourceType, { each: true }) sourceTypes?: QuestionSourceType[];
+  @ApiPropertyOptional({ enum: QuestionDifficultyBand, isArray: true }) @IsOptional() @IsArray() @IsEnum(QuestionDifficultyBand, { each: true }) difficultyBands?: QuestionDifficultyBand[];
+  @ApiPropertyOptional({ enum: ['UNUSED', 'USED', 'CORRECT', 'INCORRECT', 'OMITTED', 'ALL'], isArray: true }) @IsOptional() @IsArray() @IsString({ each: true }) questionStatuses?: ('UNUSED' | 'USED' | 'CORRECT' | 'INCORRECT' | 'OMITTED' | 'ALL')[];
+  @ApiPropertyOptional() @IsOptional() @IsBoolean() markedOnly?: boolean;
   @ApiProperty({ minimum: 1, maximum: 50 }) @Type(() => Number) @IsInt() @Min(1) @Max(50) questionCount!: number;
   @ApiPropertyOptional({ enum: AssessmentMode, default: AssessmentMode.EXAM }) @IsOptional() @IsEnum(AssessmentMode) mode?: AssessmentMode;
   @ApiPropertyOptional({ default: false }) @IsOptional() @IsBoolean() isTimed?: boolean;
@@ -79,6 +90,8 @@ export class PaginatedAssessmentsResponseDto {
 }
 
 export class AssessmentDetailDto extends AssessmentListItemDto {
+  @ApiPropertyOptional({ type: String, nullable: true }) questionBankId!: string | null;
+  @ApiPropertyOptional({ type: Object, nullable: true }) generationFilters!: object | null;
   @ApiProperty({ type: [AssessmentScopeResponseDto] }) scopes!: AssessmentScopeResponseDto[];
 }
 

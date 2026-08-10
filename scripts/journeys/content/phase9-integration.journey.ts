@@ -284,6 +284,7 @@ export const phase9IntegrationJourney: JourneyDefinition = {
         );
         expectStatus(source, 201);
         const bank = await admin.request<any>('POST', '/admin/question-banks', {
+          subjectId: context.academic.subjectId,
           title: factory.title('Phase 9 bank'),
         });
         expectStatus(bank, 201);
