@@ -35,6 +35,8 @@ import { GeographyModule } from './modules/geography/geography.module';
 import { CommerceModule } from './modules/commerce/commerce.module';
 import { LearningModule } from './modules/learning/learning.module';
 import { AssessmentsModule } from './modules/assessments/assessments.module';
+import { LeaderboardModule } from './modules/leaderboard/leaderboard.module';
+import { PerformanceModule } from './modules/performance/performance.module';
 import { UserAuthGuard } from './common/guards/user-auth.guard';
 import type { IncomingMessage } from 'http';
 
@@ -95,6 +97,8 @@ import type { IncomingMessage } from 'http';
     CommerceModule,
     LearningModule,
     AssessmentsModule,
+    LeaderboardModule,
+    PerformanceModule,
   ],
   providers: [
     // Global deny-by-default auth guard - @Public() opts a route out.

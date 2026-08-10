@@ -246,6 +246,7 @@ model User {
   questionsUpdated          Question[]               @relation("QuestionUpdatedBy")
   questionsReviewed         Question[]               @relation("QuestionReviewedBy")
   assessmentsCreated        Assessment[]             @relation("AssessmentCreatedByAdmin")
+  leaderboardWeeksFinalized LeaderboardWeek[]        @relation("LeaderboardWeekFinalizedBy")
 
   @@index([role])
   @@index([role, createdAt, id])
@@ -282,6 +283,7 @@ model StudentProfile {
   questionAttempts        StudentQuestionAttempt[]
   assessments             Assessment[]
   assessmentAttempts      AssessmentAttempt[]
+  leaderboardEntries      LeaderboardEntry[]
 
   @@unique([userId, parentPhoneNormalized])
   @@index([parentPhoneNormalized])
@@ -972,9 +974,68 @@ model AssessmentAttemptAnswer {
   activeSeconds        Int                        @default(0)
   answeredAt           DateTime                   @default(now())
   updatedAt            DateTime                   @updatedAt
+  answerChanges        AssessmentAnswerChange[]
 
   @@unique([attemptId, assessmentQuestionId])
   @@index([attemptId])
+}
+
+model AssessmentAnswerChange {
+  id              String                    @id @default(cuid())
+  attemptAnswerId String
+  attemptAnswer   AssessmentAttemptAnswer   @relation(fields: [attemptAnswerId], references: [id], onDelete: Cascade)
+  fromOptionIds   String[]
+  toOptionIds     String[]
+  fromOutcome     AssessmentQuestionOutcome
+  toOutcome       AssessmentQuestionOutcome
+  changedAt       DateTime                  @default(now())
+
+  @@index([attemptAnswerId, changedAt])
+}
+
+model LeaderboardWeek {
+  id            String             @id @default(cuid())
+  weekKey       String             @unique
+  startsAt      DateTime
+  endsAt        DateTime
+  finalizedAt   DateTime?
+  finalizedById String?
+  finalizedBy   User?              @relation("LeaderboardWeekFinalizedBy", fields: [finalizedById], references: [id], onDelete: SetNull)
+  entries       LeaderboardEntry[]
+  createdAt     DateTime           @default(now())
+
+  @@index([startsAt, endsAt])
+}
+
+model LeaderboardEntry {
+  id                String            @id @default(cuid())
+  weekId            String
+  week              LeaderboardWeek   @relation(fields: [weekId], references: [id], onDelete: Cascade)
+  studentUserId     String
+  student           StudentProfile    @relation(fields: [studentUserId], references: [userId], onDelete: Cascade)
+  academicGradeId   String?
+  displayName       String
+  rank              Int
+  quizzesCompleted  Int
+  totalQuestions    Int
+  answeredQuestions Int
+  correctAnswers    Int
+  smartScore        Float
+  accuracyPercent   Float
+  award             LeaderboardAward?
+  createdAt         DateTime          @default(now())
+
+  @@unique([weekId, studentUserId])
+  @@index([weekId, academicGradeId, rank])
+}
+
+model LeaderboardAward {
+  id        String           @id @default(cuid())
+  entryId   String           @unique
+  entry     LeaderboardEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  tier      String
+  label     String
+  createdAt DateTime         @default(now())
 }
 
 model StudentQuestionMark {

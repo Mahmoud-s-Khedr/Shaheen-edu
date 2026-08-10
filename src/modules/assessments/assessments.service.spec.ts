@@ -24,7 +24,9 @@ describe('AssessmentsService', () => {
         update: jest.fn(),
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
-      assessmentAttemptAnswer: { findMany: jest.fn().mockResolvedValue([]), upsert: jest.fn() },
+      assessmentAttemptAnswer: { findMany: jest.fn().mockResolvedValue([]), findUnique: jest.fn().mockResolvedValue(null), upsert: jest.fn().mockResolvedValue({ id: 'answer-1' }) },
+      assessmentAnswerChange: { create: jest.fn() },
+      questionCommunityStat: { findMany: jest.fn().mockResolvedValue([]) },
       $queryRaw: jest.fn(),
       $transaction: jest.fn(async (arg: any) => (Array.isArray(arg) ? Promise.all(arg) : arg(prisma))),
     };
@@ -212,7 +214,8 @@ describe('AssessmentsService', () => {
         body: `Body ${id}`,
         explanation: 'Explanation',
         options: [{ id: `${id}-a`, body: 'A', isCorrect: true }, { id: `${id}-b`, body: 'B', isCorrect: false }],
-        placements: [{ courseId: 'c1', chapterId: null, lessonId: null, sectionId: null, course: { id: 'c1', status: ContentStatus.PUBLISHED, accessType: AccessType.PUBLIC } }],
+        course: { subject: { id: 'subject-1', title: 'Subject' } },
+        placements: [{ courseId: 'c1', chapterId: null, lessonId: null, sectionId: null, course: { id: 'c1', title: 'Course', status: ContentStatus.PUBLISHED, accessType: AccessType.PUBLIC } }],
       };
     }
 
@@ -353,6 +356,19 @@ describe('AssessmentsService', () => {
 
       const result = await service.autosaveAnswer(studentUserId, 'a1', 'q1', { selectedOptionIds: ['opt-b'] });
       expect(result.isCorrect).toBe(false);
+    });
+
+    it('records every material answer change with outcome direction', async () => {
+      const { service, prisma } = build();
+      prisma.assessment.findUnique.mockResolvedValue(readyAssessment());
+      prisma.assessmentAttempt.findUnique.mockResolvedValue({ id: 'attempt-1', status: AssessmentAttemptStatus.SUSPENDED, expiresAt: null });
+      prisma.assessmentQuestion.findFirst.mockResolvedValue({ id: 'q1', type: QuestionType.SINGLE_CHOICE, explanation: null, options: [{ id: 'opt-a', isCorrect: true }, { id: 'opt-b', isCorrect: false }] });
+      prisma.assessmentAttemptAnswer.findUnique.mockResolvedValue({ id: 'answer-1', selectedOptionIds: ['opt-a'], isCorrect: true });
+      prisma.assessmentAttemptAnswer.upsert.mockResolvedValue({ id: 'answer-1' });
+
+      await service.autosaveAnswer(studentUserId, 'a1', 'q1', { selectedOptionIds: ['opt-b'] });
+
+      expect(prisma.assessmentAnswerChange.create).toHaveBeenCalledWith({ data: expect.objectContaining({ fromOutcome: 'CORRECT', toOutcome: 'INCORRECT' }) });
     });
 
     it('rejects selecting an option that does not belong to the question', async () => {
