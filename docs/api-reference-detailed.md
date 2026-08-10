@@ -133,6 +133,110 @@ No path, query, or header input.
 }
 ```
 
+### `GET /api/v1/student/assessments/question-banks`
+
+**Authorization:** Bearer token; role must be `STUDENT`
+
+**Request**
+
+- query `subjectId` (optional; limits results to the selected subject)
+
+**Success response — HTTP 200**
+
+```json
+{
+  "data": [
+    {
+      "id": "string",
+      "title": "string",
+      "subject": { "id": "string", "title": "string" },
+      "availableQuestionCount": "number"
+    }
+  ]
+}
+```
+
+### `GET /api/v1/student/assessments/question-sources`
+
+**Authorization:** Bearer token; role must be `STUDENT`
+
+**Request**
+
+- query `questionBankId` (required)
+
+**Success response — HTTP 200**
+
+```json
+{
+  "data": [
+    {
+      "id": "string",
+      "title": { "ar": "string", "en": "string" },
+      "type": "PLATFORM | CONTENT_PUBLISHER | EXTERNAL_BOOK | PREVIOUS_EXAM | MINISTRY_MODEL",
+      "availableQuestionCount": "number"
+    }
+  ]
+}
+```
+
+### `POST /api/v1/student/assessments/question-marks/{questionId}`
+
+**Authorization:** Bearer token; role must be `STUDENT`
+
+**Request**
+
+- path `questionId` (required)
+
+**Success response — HTTP 201**
+
+```json
+{
+  "questionId": "string",
+  "marked": true
+}
+```
+
+### `GET /api/v1/student/assessments/question-marks`
+
+**Authorization:** Bearer token; role must be `STUDENT`
+
+**Request**
+
+No path, query, or header input.
+
+**Success response — HTTP 200**
+
+```json
+{
+  "data": [
+    {
+      "questionId": "string",
+      "markedAt": "ISO-8601 date-time",
+      "bank": { "id": "string", "title": "string", "subject": { "id": "string", "title": "string" } },
+      "source": { "id": "string", "type": "string", "title": { "ar": "string", "en": "string" } },
+      "difficultyBand": "A_PLUS | A | B | C | D"
+    }
+  ]
+}
+```
+
+### `DELETE /api/v1/student/assessments/question-marks/{questionId}`
+
+**Authorization:** Bearer token; role must be `STUDENT`
+
+**Request**
+
+- path `questionId` (required)
+
+**Success response — HTTP 200**
+
+```json
+{
+  "questionId": "string",
+  "marked": false
+}
+```
+
 ### `GET /api/v1/student/assessments`
 
 **Authorization:** Bearer token; role must be `STUDENT`

@@ -14617,6 +14617,245 @@
         ]
       }
     },
+    "/api/v1/student/assessments/question-banks": {
+      "get": {
+        "operationId": "AssessmentsController_questionBanks_v1",
+        "parameters": [
+          {
+            "name": "subjectId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List accessible question banks, optionally within one subject",
+        "tags": [
+          "student/assessments"
+        ]
+      }
+    },
+    "/api/v1/student/assessments/question-sources": {
+      "get": {
+        "operationId": "AssessmentsController_questionSources_v1",
+        "parameters": [
+          {
+            "name": "questionBankId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List accessible sources in a selected question bank",
+        "tags": [
+          "student/assessments"
+        ]
+      }
+    },
+    "/api/v1/student/assessments/question-marks/{questionId}": {
+      "post": {
+        "operationId": "AssessmentsController_markQuestion_v1",
+        "parameters": [
+          {
+            "name": "questionId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Mark an accessible question",
+        "tags": [
+          "student/assessments"
+        ]
+      },
+      "delete": {
+        "operationId": "AssessmentsController_unmarkQuestion_v1",
+        "parameters": [
+          {
+            "name": "questionId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Remove a question mark",
+        "tags": [
+          "student/assessments"
+        ]
+      }
+    },
+    "/api/v1/student/assessments/question-marks": {
+      "get": {
+        "operationId": "AssessmentsController_questionMarks_v1",
+        "parameters": [],
+        "responses": {
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the current student’s accessible marked questions",
+        "tags": [
+          "student/assessments"
+        ]
+      }
+    },
     "/api/v1/student/assessments/{id}": {
       "get": {
         "operationId": "AssessmentsController_get_v1",
@@ -19503,6 +19742,9 @@
       "CreateQuestionBankDto": {
         "type": "object",
         "properties": {
+          "subjectId": {
+            "type": "string"
+          },
           "title": {
             "type": "string"
           },
@@ -19511,12 +19753,16 @@
           }
         },
         "required": [
+          "subjectId",
           "title"
         ]
       },
       "UpdateQuestionBankDto": {
         "type": "object",
         "properties": {
+          "subjectId": {
+            "type": "string"
+          },
           "title": {
             "type": "string"
           },
@@ -20688,6 +20934,82 @@
               "$ref": "#/components/schemas/AssessmentScopeDto"
             }
           },
+          "questionBankId": {
+            "type": "string"
+          },
+          "courseIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "chapterIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "lessonIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "sectionIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "sourceIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "sourceTypes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "PLATFORM",
+                "CONTENT_PUBLISHER",
+                "EXTERNAL_BOOK",
+                "PREVIOUS_EXAM",
+                "MINISTRY_MODEL"
+              ]
+            }
+          },
+          "difficultyBands": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "A_PLUS",
+                "A",
+                "B",
+                "C",
+                "D"
+              ]
+            }
+          },
+          "questionStatuses": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "UNUSED",
+                "USED",
+                "CORRECT",
+                "INCORRECT",
+                "OMITTED",
+                "ALL"
+              ]
+            }
+          },
+          "markedOnly": {
+            "type": "boolean"
+          },
           "questionCount": {
             "type": "number",
             "minimum": 1,
@@ -20714,7 +21036,6 @@
           }
         },
         "required": [
-          "scopes",
           "questionCount"
         ]
       },
@@ -20781,6 +21102,14 @@
           },
           "score": {
             "type": "number",
+            "nullable": true
+          },
+          "questionBankId": {
+            "type": "string",
+            "nullable": true
+          },
+          "generationFilters": {
+            "type": "object",
             "nullable": true
           },
           "scopes": {

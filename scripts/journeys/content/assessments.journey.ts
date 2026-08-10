@@ -160,6 +160,9 @@ export const assessmentsJourney: JourneyDefinition = {
         const marks = await student<any>(student1Token, 'GET', '/student/assessments/question-marks');
         expectStatus(marks, 200);
         assert(marks.body.data.some((item: any) => item.questionId === questionIds[0] && item.bank.id === questionBankId), 'A student must be able to retrieve their accessible marked-question list');
+        const unmarked = await student<any>(student1Token, 'DELETE', `/student/assessments/question-marks/${questionIds[0]}`);
+        expectStatus(unmarked, 200);
+        assert(unmarked.body.questionId === questionIds[0] && unmarked.body.marked === false, 'A student must be able to remove a question mark');
         const generated = await student<any>(
           student1Token,
           'POST',
