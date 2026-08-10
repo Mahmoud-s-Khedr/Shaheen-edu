@@ -63,6 +63,11 @@ export const leaderboardPerformanceJourney: JourneyDefinition = {
     await step('Reading leaderboard and performance analytics', async () => {
       const leaderboard = await student<any>(studentOne, 'GET', '/student/leaderboard/current'); expectStatus(leaderboard, 200);
       assert(leaderboard.body.week?.key && leaderboard.body.data.some((row: any) => row.rank === 1 && typeof row.smartScore === 'number'), 'The weekly leaderboard must return ranked Smart Scores');
+      const currentWeek = new Date(`${leaderboard.body.week.key}T00:00:00.000Z`);
+      currentWeek.setUTCDate(currentWeek.getUTCDate() - 7);
+      const previousWeekKey = currentWeek.toISOString().slice(0, 10);
+      const history = await student<any>(studentOne, 'GET', `/student/leaderboard/history/${previousWeekKey}`); expectStatus(history, 200);
+      assert(history.body.week?.key === previousWeekKey && history.body.week.finalizedAt && history.body.meta?.page === 1, 'Leaderboard history must return the finalized prior-week result and pagination metadata');
       const overview = await student<any>(studentOne, 'GET', '/student/performance/overview'); expectStatus(overview, 200);
       assert(overview.body.tests.completed === 1 && overview.body.questionBank.used >= 1 && overview.body.assessmentScore.omitted === 1, 'Overview must combine completed assessment outcomes and unique QBank usage');
       const analysis = await student<any>(studentOne, 'GET', `/student/performance/analysis?level=chapter&subjectId=${subjectId}`); expectStatus(analysis, 200);

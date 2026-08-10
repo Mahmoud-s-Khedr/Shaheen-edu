@@ -14,6 +14,20 @@ Implementation-backed API contract. Every endpoint below is self-contained: its 
 
 ### `GET /api/v1/student/performance`
 
+### `GET /api/v1/student/performance/overview`
+
+### `GET /api/v1/student/performance/analysis`
+
+### `GET /api/v1/student/performance/trends`
+
+### `GET /api/v1/student/performance/peers`
+
+### `GET /api/v1/student/performance/answer-changes`
+
+### `GET /api/v1/student/leaderboard/current`
+
+### `GET /api/v1/student/leaderboard/history/{weekKey}`
+
 ### `GET /api/v1/student/practice/questions`
 
 ### `GET /api/v1/student/practice/questions/{questionId}/assets/{assetId}/access`
