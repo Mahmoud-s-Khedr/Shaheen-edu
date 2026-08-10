@@ -12,6 +12,7 @@ export const assessmentsJourney: JourneyDefinition = {
     let gradeId = '';
     let subjectId = '';
     let courseId = '';
+    let chapterId = '';
     let questionBankId = '';
     let questionSourceId = '';
     let questionIds: string[] = [];
@@ -69,6 +70,15 @@ export const assessmentsJourney: JourneyDefinition = {
         ])
           await publish(resource, id);
 
+        const chapter = await create('/admin/chapters', {
+          title: factory.title('Assessments chapter'),
+          slug: factory.slug('assessments-chapter'),
+          courseId,
+        });
+        chapterId = chapter.id;
+        context.created.chapters.push(chapterId);
+        await publish('chapters', chapterId);
+
         const source = await create('/admin/question-banks/sources', {
           type: 'PLATFORM',
           title: factory.localizedTitle('Assessments source'),
@@ -89,7 +99,7 @@ export const assessmentsJourney: JourneyDefinition = {
             bankId: bank.id,
             sourceId: source.id,
             courseId,
-            placements: [{ courseId }],
+            placements: [{ chapterId }],
             body: `Assessment question ${i + 1}`,
             explanation: `Explanation ${i + 1}`,
           });
@@ -167,7 +177,7 @@ export const assessmentsJourney: JourneyDefinition = {
           student1Token,
           'POST',
           '/student/assessments',
-          { questionBankId, courseIds: [courseId], sourceIds: [questionSourceId], questionCount: 2, mode: 'EXAM' },
+          { questionBankId, chapterIds: [chapterId], sourceIds: [questionSourceId], questionCount: 2, mode: 'EXAM' },
         );
         expectStatus(generated, 201);
         assert(
@@ -265,6 +275,15 @@ export const assessmentsJourney: JourneyDefinition = {
           'Autosaved answers must be reflected when resuming an attempt',
         );
 
+        const activeTime = await student<any>(
+          student1Token,
+          'PATCH',
+          `/student/assessments/${studentAssessmentId}/attempts/current/questions/${firstQuestion.id}/active-time`,
+          { activeSeconds: 18 },
+        );
+        expectStatus(activeTime, 200);
+        assert(activeTime.body.activeSeconds === 18, 'A resumable attempt must retain monotonic active time per question');
+
         const submit = await student<any>(
           student1Token,
           'POST',
@@ -288,6 +307,16 @@ export const assessmentsJourney: JourneyDefinition = {
           'The result must include the full explanation review after submission',
         );
         assert(result.body.questions.some((question: any) => question.outcome === 'OMITTED') && result.body.questions.some((question: any) => question.outcome === 'CORRECT'), 'Assessment results must explicitly distinguish correct and omitted outcomes');
+        assert(result.body.percentage === 50 && result.body.correctCount === 1 && result.body.omittedCount === 1 && result.body.questions[0].activeSeconds === 18, 'Completed results must expose persisted summary counts and question active time');
+        assert(result.body.comparison?.status === 'INSUFFICIENT_DATA' && result.body.comparison?.chapters?.some((chapter: any) => chapter.chapterId === chapterId), 'Comparison must derive chapter breakdowns from frozen question placements');
+
+        const withoutComparison = await student<any>(student1Token, 'GET', `/student/assessments/${studentAssessmentId}/attempts/current/result?includeComparison=false`);
+        expectStatus(withoutComparison, 200);
+        assert(withoutComparison.body.comparison === undefined, 'includeComparison=false must omit the peer benchmark');
+
+        const analytics = await student<any>(student1Token, 'GET', `/student/assessments/analytics/summary?subjectId=${subjectId}`);
+        expectStatus(analytics, 200);
+        assert(analytics.body.level === 'chapter' && analytics.body.data.some((chapter: any) => chapter.id === chapterId && chapter.total === 2), 'Assessment analytics must aggregate completed outcomes by chapter');
       },
     );
 

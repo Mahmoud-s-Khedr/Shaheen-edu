@@ -58,6 +58,7 @@ export interface AppConfig {
     };
     ip: { maxAttempts: number; windowSeconds: number };
   };
+  platformComparisonMinSample: number;
 }
 
 const envInteger = (name: string, fallback: number): number =>
@@ -190,4 +191,5 @@ export default (): AppConfig => ({
       windowSeconds: envInteger('RATE_LIMIT_IP_WINDOW_SECONDS', 900),
     },
   },
+  platformComparisonMinSample: envInteger('PLATFORM_COMPARISON_MIN_SAMPLE', 10),
 });

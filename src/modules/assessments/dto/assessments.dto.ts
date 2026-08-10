@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { ArrayMaxSize, ArrayMinSize, IsArray, IsBoolean, IsEnum, IsInt, IsOptional, IsString, Max, MaxLength, Min, MinLength, ValidateNested } from 'class-validator';
+import { ArrayMaxSize, ArrayMinSize, IsArray, IsBoolean, IsEnum, IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min, MinLength, ValidateNested } from 'class-validator';
 import { SearchPaginationQueryDto } from '../../../common/dto/pagination-query.dto';
 import { AssessmentMode, AssessmentStatus, QuestionDifficultyBand, QuestionSourceType } from '../../../common/types/roles.enum';
 
@@ -68,6 +68,23 @@ export class QueryAdminAssessmentDto extends SearchPaginationQueryDto {
 }
 
 export class AutosaveAnswerDto { @ApiProperty({ type: [String] }) @IsArray() @IsString({ each: true }) selectedOptionIds!: string[]; }
+export class ReportActiveTimeDto { @ApiProperty({ minimum: 0, maximum: 86400, description: 'Monotonic active-time total for this question in seconds' }) @Type(() => Number) @IsInt() @Min(0) @Max(86400) activeSeconds!: number; }
+
+export class AssessmentResultQueryDto {
+  @ApiPropertyOptional({ enum: ['true', 'false'], default: 'true' }) @IsOptional() @IsIn(['true', 'false']) includeComparison?: 'true' | 'false';
+}
+
+export class AssessmentAnalyticsQueryDto extends SearchPaginationQueryDto {
+  @ApiPropertyOptional() @IsOptional() @IsString() subjectId?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() chapterId?: string;
+}
+
+export class AssessmentAnalyticsResponseDto {
+  @ApiProperty({ enum: ['subject', 'chapter', 'topic'] }) level!: 'subject' | 'chapter' | 'topic';
+  @ApiProperty({ type: [Object], description: 'The requested, paginated hierarchy rollup.' }) data!: object[];
+  @ApiProperty({ type: [Object], description: 'Completed attempts for the selected chapter; empty without chapterId.' }) attempts!: object[];
+  @ApiProperty({ type: Object, description: 'Pagination metadata for groups and, with chapterId, attempts.' }) meta!: object;
+}
 
 /** Response models deliberately mirror the values returned by AssessmentsService. */
 export class AssessmentListItemDto {
@@ -124,6 +141,11 @@ export class AssessmentResultDto {
   @ApiProperty() attemptId!: string;
   @ApiProperty() score!: number;
   @ApiProperty() totalQuestions!: number;
+  @ApiProperty() percentage!: number;
+  @ApiProperty() correctCount!: number;
+  @ApiProperty() incorrectCount!: number;
+  @ApiProperty() omittedCount!: number;
+  @ApiProperty() answeredCount!: number;
   @ApiPropertyOptional({ type: String, format: 'date-time', nullable: true }) submittedAt!: Date | null;
   @ApiProperty({ type: [Object] }) questions!: object[];
 }

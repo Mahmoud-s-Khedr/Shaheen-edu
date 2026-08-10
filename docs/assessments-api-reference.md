@@ -380,7 +380,9 @@ the candidate set; duplicate targets are rejected.
 | `GET /student/assessments/:id/attempts/current` | — | Restore a saved attempt. |
 | `POST /student/assessments/:id/attempts/current/answers/:questionId` | `selectedOptionIds` | Autosave one answer. |
 | `POST /student/assessments/:id/attempts/current/submit` | — | Finalize and score. |
-| `GET /student/assessments/:id/attempts/current/result` | — | Retrieve completed review data. |
+| `GET /student/assessments/:id/attempts/current/result` | optional `includeComparison` (default `true`) | Retrieve completed review data and weighted chapter peer comparisons. |
+| `PATCH /student/assessments/:id/attempts/current/questions/:questionId/active-time` | `{ "activeSeconds": number }` | Persist the monotonic active-time total while an attempt is resumable. |
+| `GET /student/assessments/analytics/summary` | optional `subjectId`, `chapterId`, `q`, `page`, `limit` | Retrieve paginated completed-result subject/chapter/topic rollups and chapter attempt drill-down. |
 
 `GET /student/assessments` combines the student's non-archived private
 assessments with accessible published admin assessments. Its `status` query is
@@ -526,7 +528,14 @@ Submission is idempotent. The recorded response was:
 
 After `COMPLETED`, call `/result` to show the review. The response reveals
 every snapshot question, explanation, options with `isCorrect`, selected option
-IDs, and `answered`/`isCorrect`. Unanswered questions are scored incorrect.
+IDs, and `answered`/`isCorrect`. It also returns percentage and persisted
+correct/incorrect/omitted counts. It derives every represented chapter from
+the frozen question placements, returns a minimum-sample protected comparison
+for each chapter, then returns an overall comparison weighted by the number of
+questions in each chapter. This works for course, lesson, section, and
+multi-scope assessments when their snapshot questions have chapter placements;
+use `includeComparison=false` to omit that calculation.
+Unanswered questions are scored incorrect.
 
 For a timed attempt, compare `expiresAt` with the client clock for the UI
 countdown, but treat the server as authoritative. Accessing current state or

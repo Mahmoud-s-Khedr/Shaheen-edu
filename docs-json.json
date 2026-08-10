@@ -14856,6 +14856,104 @@
         ]
       }
     },
+    "/api/v1/student/assessments/analytics/summary": {
+      "get": {
+        "operationId": "AssessmentsController_analytics_v1",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "One-based page number.",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Maximum records to return per page.",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Case-insensitive text search.",
+            "schema": {
+              "minLength": 1,
+              "maxLength": 120,
+              "type": "string"
+            }
+          },
+          {
+            "name": "subjectId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "chapterId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssessmentAnalyticsResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get completed-assessment subject, chapter, and topic analytics",
+        "tags": [
+          "student/assessments"
+        ]
+      }
+    },
     "/api/v1/student/assessments/{id}": {
       "get": {
         "operationId": "AssessmentsController_get_v1",
@@ -15309,6 +15407,103 @@
         ]
       }
     },
+    "/api/v1/student/assessments/{id}/attempts/current/questions/{questionId}/active-time": {
+      "patch": {
+        "operationId": "AssessmentsController_reportActiveTime_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "questionId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportActiveTimeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Record monotonic active time for a question in a resumable attempt",
+        "tags": [
+          "student/assessments"
+        ]
+      }
+    },
     "/api/v1/student/assessments/{id}/attempts/current/submit": {
       "post": {
         "operationId": "AssessmentsController_submit_v1",
@@ -15378,6 +15573,19 @@
             "in": "path",
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "includeComparison",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "true",
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ]
             }
           }
         ],
@@ -21205,6 +21413,43 @@
           "meta"
         ]
       },
+      "AssessmentAnalyticsResponseDto": {
+        "type": "object",
+        "properties": {
+          "level": {
+            "type": "string",
+            "enum": [
+              "subject",
+              "chapter",
+              "topic"
+            ]
+          },
+          "data": {
+            "description": "The requested, paginated hierarchy rollup.",
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "attempts": {
+            "description": "Completed attempts for the selected chapter; empty without chapterId.",
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "meta": {
+            "type": "object",
+            "description": "Pagination metadata for groups and, with chapterId, attempts."
+          }
+        },
+        "required": [
+          "level",
+          "data",
+          "attempts",
+          "meta"
+        ]
+      },
       "RenameAssessmentDto": {
         "type": "object",
         "properties": {
@@ -21335,6 +21580,20 @@
           "selectedOptionIds"
         ]
       },
+      "ReportActiveTimeDto": {
+        "type": "object",
+        "properties": {
+          "activeSeconds": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 86400,
+            "description": "Monotonic active-time total for this question in seconds"
+          }
+        },
+        "required": [
+          "activeSeconds"
+        ]
+      },
       "AssessmentResultDto": {
         "type": "object",
         "properties": {
@@ -21345,6 +21604,21 @@
             "type": "number"
           },
           "totalQuestions": {
+            "type": "number"
+          },
+          "percentage": {
+            "type": "number"
+          },
+          "correctCount": {
+            "type": "number"
+          },
+          "incorrectCount": {
+            "type": "number"
+          },
+          "omittedCount": {
+            "type": "number"
+          },
+          "answeredCount": {
             "type": "number"
           },
           "submittedAt": {
@@ -21363,6 +21637,11 @@
           "attemptId",
           "score",
           "totalQuestions",
+          "percentage",
+          "correctCount",
+          "incorrectCount",
+          "omittedCount",
+          "answeredCount",
           "questions"
         ]
       },

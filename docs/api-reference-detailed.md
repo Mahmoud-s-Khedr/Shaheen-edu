@@ -276,6 +276,32 @@ No path, query, or header input.
 }
 ```
 
+### `GET /api/v1/student/assessments/analytics/summary`
+
+**Authorization:** Bearer token; role must be `STUDENT`
+
+**Request**
+
+- query `subjectId` (optional)
+- query `chapterId` (optional; enables attempt drill-down)
+- query `q` (optional case-insensitive, Arabic-normalized hierarchy/assessment-title search)
+- query `page` (optional, one-based; default `1`)
+- query `limit` (optional, 1–100; default `20`)
+
+**Success response — HTTP 200 (AssessmentAnalyticsResponseDto)**
+
+```json
+{
+  "level": "subject | chapter | topic",
+  "data": ["paginated hierarchy rollups"],
+  "attempts": ["paginated completed attempts when chapterId is supplied"],
+  "meta": {
+    "groups": { "page": "number", "limit": "number", "total": "number", "totalPages": "number" },
+    "attempts?": { "page": "number", "limit": "number", "total": "number", "totalPages": "number" }
+  }
+}
+```
+
 ### `GET /api/v1/student/assessments/{id}`
 
 **Authorization:** Bearer token; role must be `STUDENT`
@@ -485,6 +511,30 @@ No response body.
 **Success response — HTTP 201**
 
 No response body.
+
+### `PATCH /api/v1/student/assessments/{id}/attempts/current/questions/{questionId}/active-time`
+
+**Authorization:** Bearer token; role must be `STUDENT`
+
+**Request**
+
+- path `id` (required)
+- path `questionId` (required)
+
+```json
+{
+  "activeSeconds": "integer (0-86400)"
+}
+```
+
+**Success response — HTTP 200**
+
+```json
+{
+  "assessmentQuestionId": "string",
+  "activeSeconds": "number"
+}
+```
 
 ### `GET /api/v1/student/assessments/{id}/attempts/current/result`
 

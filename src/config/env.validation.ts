@@ -120,4 +120,5 @@ export const envValidationSchema = Joi.object({
     .default(900),
   RATE_LIMIT_IP_MAX_ATTEMPTS: Joi.number().integer().positive().default(20),
   RATE_LIMIT_IP_WINDOW_SECONDS: Joi.number().integer().positive().default(900),
+  PLATFORM_COMPARISON_MIN_SAMPLE: Joi.number().integer().min(1).default(10),
 });

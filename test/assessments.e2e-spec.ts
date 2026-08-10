@@ -162,6 +162,33 @@ describe('Assessments (e2e)', () => {
     expect(current.statusCode).toBe(200);
     expect(JSON.parse(current.body).questions.find((q: any) => q.id === firstQuestion.id).answered).toBe(true);
 
+    const activeTime = await app.inject({
+      method: 'PATCH',
+      url: `/api/v1/student/assessments/${studentAssessmentId}/attempts/current/questions/${firstQuestion.id}/active-time`,
+      headers: { authorization: `Bearer ${student1.accessToken}` },
+      payload: { activeSeconds: 12 },
+    });
+    expect(activeTime.statusCode).toBe(200);
+    expect(JSON.parse(activeTime.body).activeSeconds).toBe(12);
+
+    const lowerActiveTime = await app.inject({
+      method: 'PATCH',
+      url: `/api/v1/student/assessments/${studentAssessmentId}/attempts/current/questions/${firstQuestion.id}/active-time`,
+      headers: { authorization: `Bearer ${student1.accessToken}` },
+      payload: { activeSeconds: 8 },
+    });
+    expect(lowerActiveTime.statusCode).toBe(200);
+    expect(JSON.parse(lowerActiveTime.body).activeSeconds).toBe(12);
+
+    const concurrentActiveTimes = await Promise.all([20, 30].map((activeSeconds) => app.inject({
+      method: 'PATCH',
+      url: `/api/v1/student/assessments/${studentAssessmentId}/attempts/current/questions/${firstQuestion.id}/active-time`,
+      headers: { authorization: `Bearer ${student1.accessToken}` },
+      payload: { activeSeconds },
+    })));
+    expect(concurrentActiveTimes.map((response) => response.statusCode)).toEqual([200, 200]);
+    expect(Math.max(...concurrentActiveTimes.map((response) => JSON.parse(response.body).activeSeconds))).toBe(30);
+
     const submit = await app.inject({ method: 'POST', url: `/api/v1/student/assessments/${studentAssessmentId}/attempts/current/submit`, headers: { authorization: `Bearer ${student1.accessToken}` } });
     expect(submit.statusCode).toBe(201);
     expect(JSON.parse(submit.body).status).toBe('COMPLETED');
@@ -170,9 +197,21 @@ describe('Assessments (e2e)', () => {
     expect(result.statusCode).toBe(200);
     const resultBody = JSON.parse(result.body);
     expect(resultBody.totalQuestions).toBe(2);
+    expect(resultBody).toMatchObject({ percentage: 50, correctCount: 1, incorrectCount: 0, omittedCount: 1, answeredCount: 1 });
+    expect(resultBody.comparison).toMatchObject({ status: 'NOT_APPLICABLE' });
+    expect(resultBody.questions[0].activeSeconds).toBe(30);
     expect(resultBody.questions[0].explanation).toBeDefined();
     expect(resultBody.questions).toEqual(expect.arrayContaining([expect.objectContaining({ outcome: 'CORRECT' }), expect.objectContaining({ outcome: 'OMITTED' })]));
     expect((await prisma.questionCommunityStat.aggregate({ where: { questionId: { in: questionIds } }, _sum: { totalResponses: true, correctResponses: true } }))._sum).toEqual({ totalResponses: 1, correctResponses: 1 });
+
+    const resultWithoutComparison = await app.inject({ method: 'GET', url: `/api/v1/student/assessments/${studentAssessmentId}/attempts/current/result?includeComparison=false`, headers: { authorization: `Bearer ${student1.accessToken}` } });
+    expect(resultWithoutComparison.statusCode).toBe(200);
+    expect(JSON.parse(resultWithoutComparison.body).comparison).toBeUndefined();
+
+    const analytics = await app.inject({ method: 'GET', url: '/api/v1/student/assessments/analytics/summary?q=Assessments%20Subject&page=1&limit=1', headers: { authorization: `Bearer ${student1.accessToken}` } });
+    expect(analytics.statusCode).toBe(200);
+    expect(JSON.parse(analytics.body)).toMatchObject({ level: 'subject', data: [expect.objectContaining({ id: subjectId, total: 2, correct: 1, omitted: 1 })] });
+    expect(JSON.parse(analytics.body).meta).toEqual({ groups: { page: 1, limit: 1, total: 1, totalPages: 1 } });
 
     const resubmit = await app.inject({ method: 'POST', url: `/api/v1/student/assessments/${studentAssessmentId}/attempts/current/submit`, headers: { authorization: `Bearer ${student1.accessToken}` } });
     expect(resubmit.statusCode).toBe(201);

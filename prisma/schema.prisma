@@ -874,6 +874,7 @@ model AssessmentScope {
   @@index([assessmentId])
   @@index([courseId])
   @@index([chapterId])
+  @@index([chapterId, assessmentId])
   @@index([lessonId])
   @@index([sectionId])
 }
@@ -893,9 +894,33 @@ model AssessmentQuestion {
   explanation      String?
   options          AssessmentQuestionOption[]
   answers          AssessmentAttemptAnswer[]
+  placements       AssessmentQuestionPlacement[]
 
   @@unique([assessmentId, sortOrder])
   @@index([assessmentId])
+}
+
+/// Immutable resolved hierarchy labels copied from the authored question when
+/// an assessment is generated. They keep historical analytics stable when the
+/// live hierarchy or a question's placements are later edited.
+model AssessmentQuestionPlacement {
+  id                   String             @id @default(cuid())
+  assessmentQuestionId String
+  assessmentQuestion   AssessmentQuestion @relation(fields: [assessmentQuestionId], references: [id], onDelete: Cascade)
+  subjectId            String
+  subjectTitle         String
+  courseId             String
+  courseTitle          String
+  chapterId            String?
+  chapterTitle         String?
+  lessonId             String?
+  lessonTitle          String?
+  sectionId            String?
+  sectionTitle         String?
+
+  @@index([assessmentQuestionId])
+  @@index([subjectId])
+  @@index([chapterId])
 }
 
 model AssessmentQuestionOption {
@@ -930,6 +955,7 @@ model AssessmentAttempt {
   @@unique([assessmentId, studentUserId])
   @@index([studentUserId, status, lastActivityAt])
   @@index([assessmentId])
+  @@index([assessmentId, status, studentUserId])
 }
 
 /// Autosaved answer state per snapshot question. Upserted while the parent
@@ -943,6 +969,7 @@ model AssessmentAttemptAnswer {
   selectedOptionIds    String[]
   isCorrect            Boolean?
   outcome              AssessmentQuestionOutcome?
+  activeSeconds        Int                        @default(0)
   answeredAt           DateTime                   @default(now())
   updatedAt            DateTime                   @updatedAt
 

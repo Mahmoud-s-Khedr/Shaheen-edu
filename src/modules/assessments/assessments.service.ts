@@ -1,4 +1,6 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { randomUUID } from 'node:crypto';
 import { Prisma } from '@prisma/client';
 import {
   AssessmentAttemptStatus,
@@ -17,18 +19,22 @@ import { toPaginationMeta } from '../../common/dto/pagination-query.dto';
 import {
   orderByIds,
   paginateArabicSearch,
+  normalizeArabic,
   resolveSearchQuery,
   searchArabicOffsetPage,
   sqlAnd,
   type ArabicSearchScope,
 } from '../../common/search/arabic-search';
 import type { RequestUser } from '../../common/types/request-with-user.types';
+import type { AppConfig } from '../../config/configuration';
 import { PrismaService } from '../../database/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { ContentAccessPolicyService } from '../entitlements/content-access-policy.service';
 import { QuestionCommunityStatsService } from '../question-banks/question-community-stats.service';
 import type {
   AssessmentScopeDto,
+  AssessmentAnalyticsQueryDto,
+  AssessmentResultQueryDto,
   AutosaveAnswerDto,
   CreateCustomAssessmentDto,
   GenerateStandardAssessmentDto,
@@ -36,6 +42,7 @@ import type {
   QueryAssessmentDto,
   RenameAssessmentDto,
   UpdateAdminAssessmentDto,
+  ReportActiveTimeDto,
 } from './dto/assessments.dto';
 
 type ScopeField = 'courseId' | 'chapterId' | 'lessonId' | 'sectionId';
@@ -57,6 +64,7 @@ export class AssessmentsService {
     private readonly audit: AuditService,
     private readonly access: ContentAccessPolicyService,
     private readonly communityStats: QuestionCommunityStatsService,
+    private readonly config: ConfigService<AppConfig, true>,
   ) {}
 
   private assertAdmin(actor: RequestUser) {
@@ -193,6 +201,7 @@ export class AssessmentsService {
         },
       },
       include: {
+        course: { include: { subject: true } },
         options: { orderBy: { sortOrder: 'asc' } },
         communityStats: true,
         placements: { include: this.questionPlacementInclude() },
@@ -290,10 +299,26 @@ export class AssessmentsService {
               sortOrder: index + 1,
             })),
           },
+          placements: { create: question.placements.map((placement: any) => this.snapshotPlacement(question, placement)) },
         },
       });
     }
     return assessment;
+  }
+
+  private snapshotPlacement(question: any, placement: any) {
+    const course = placement.section?.lesson?.chapter?.course ?? placement.lesson?.chapter?.course ?? placement.chapter?.course ?? placement.course;
+    const lesson = placement.section?.lesson ?? placement.lesson ?? null;
+    const chapter = lesson?.chapter ?? placement.chapter ?? null;
+    const subject = question.course?.subject;
+    if (!course || !subject) throw new BadRequestException('Question placement cannot be resolved for analytics');
+    return {
+      subjectId: subject.id, subjectTitle: subject.title,
+      courseId: course.id, courseTitle: course.title,
+      chapterId: chapter?.id ?? null, chapterTitle: chapter?.title ?? null,
+      lessonId: lesson?.id ?? null, lessonTitle: lesson?.title ?? null,
+      sectionId: placement.section?.id ?? null, sectionTitle: placement.section?.title ?? null,
+    };
   }
 
   // --- Student: generation ------------------------------------------------
@@ -591,7 +616,7 @@ export class AssessmentsService {
   // --- Student: attempt lifecycle ---------------------------------------
 
   private async questionsForAssessment(id: string) {
-    return this.prisma.assessmentQuestion.findMany({ where: { assessmentId: id }, include: { options: { orderBy: { sortOrder: 'asc' } } }, orderBy: { sortOrder: 'asc' } });
+    return this.prisma.assessmentQuestion.findMany({ where: { assessmentId: id }, include: { options: { orderBy: { sortOrder: 'asc' } }, placements: true }, orderBy: { sortOrder: 'asc' } });
   }
 
   async startAttempt(studentId: string, id: string) {
@@ -758,6 +783,36 @@ export class AssessmentsService {
     };
   }
 
+  async reportActiveTime(studentId: string, id: string, assessmentQuestionId: string, dto: ReportActiveTimeDto) {
+    await this.assessmentOrNotFound(id);
+    const attempt = await this.ensureNotExpired(await this.ownAttempt(studentId, id));
+    if (attempt.status !== AssessmentAttemptStatus.SUSPENDED) throw new ConflictException('Attempt is no longer in progress');
+    const question = await this.prisma.assessmentQuestion.findFirst({ where: { id: assessmentQuestionId, assessmentId: id }, select: { id: true } });
+    if (!question) throw new NotFoundException('Assessment question not found');
+    const activeSeconds = await this.prisma.$transaction(async (tx) => {
+      // This update locks the attempt row until the monotonic upsert completes,
+      // so submission/expiry cannot race a report into a completed attempt.
+      const gate = await tx.assessmentAttempt.updateMany({
+        where: { id: attempt.id, status: AssessmentAttemptStatus.SUSPENDED },
+        data: { lastActivityAt: new Date() },
+      });
+      if (!gate.count) throw new ConflictException('Attempt is no longer in progress');
+      const rows = await tx.$queryRaw<{ activeSeconds: number }[]>`
+        INSERT INTO "AssessmentAttemptAnswer"
+          ("id", "attemptId", "assessmentQuestionId", "selectedOptionIds", "activeSeconds", "answeredAt", "updatedAt")
+        VALUES
+          (${`active_${randomUUID()}`}, ${attempt.id}, ${assessmentQuestionId}, ARRAY[]::TEXT[], ${dto.activeSeconds}, NOW(), NOW())
+        ON CONFLICT ("attemptId", "assessmentQuestionId")
+        DO UPDATE SET
+          "activeSeconds" = GREATEST("AssessmentAttemptAnswer"."activeSeconds", EXCLUDED."activeSeconds"),
+          "updatedAt" = NOW()
+        RETURNING "activeSeconds"
+      `;
+      return rows[0].activeSeconds;
+    });
+    return { assessmentQuestionId, activeSeconds };
+  }
+
   async submitAttempt(studentId: string, id: string) {
     await this.assessmentOrNotFound(id);
     const attempt = await this.ownAttempt(studentId, id);
@@ -765,22 +820,89 @@ export class AssessmentsService {
     return { attemptId: final.id, status: final.status, score: final.score, totalQuestions: final.totalQuestions, submittedAt: final.submittedAt };
   }
 
-  async result(studentId: string, id: string) {
+  private round(value: number, decimals = 1) {
+    const factor = 10 ** decimals;
+    return Math.round((value + Number.EPSILON) * factor) / factor;
+  }
+
+  private async comparison(studentId: string, questions: any[], answersByQuestion: Map<string, any>) {
+    const chapters = new Map<string, any>();
+    for (const question of questions) {
+      const outcome = answersByQuestion.get(question.id)?.outcome;
+      for (const placement of question.placements.filter((item: any) => item.chapterId)) {
+        const chapter = chapters.get(placement.chapterId) ?? { chapterId: placement.chapterId, chapterTitle: placement.chapterTitle, courseId: placement.courseId, subjectId: placement.subjectId, total: 0, correct: 0 };
+        chapter.total++;
+        if (outcome === AssessmentQuestionOutcome.CORRECT) chapter.correct++;
+        chapters.set(placement.chapterId, chapter);
+      }
+    }
+    if (!chapters.size) return { status: 'NOT_APPLICABLE', reason: 'COMPARISON_REQUIRES_CHAPTER_PLACEMENTS', sampleSize: 0, platformAveragePercentage: null, differenceFromAverage: null, percentile: null, performanceLabel: null, chapters: [] };
+
+    const chapterIds = [...chapters.keys()];
+    const peerAnswers = await this.prisma.assessmentAttemptAnswer.findMany({
+      where: { attempt: { status: AssessmentAttemptStatus.COMPLETED, studentUserId: { not: studentId } }, assessmentQuestion: { placements: { some: { chapterId: { in: chapterIds } } } } },
+      include: { attempt: { select: { id: true } }, assessmentQuestion: { select: { placements: { where: { chapterId: { in: chapterIds } }, select: { chapterId: true } } } } },
+    });
+    const peerByAttemptAndChapter = new Map<string, { chapterId: string; total: number; correct: number }>();
+    for (const answer of peerAnswers) for (const placement of answer.assessmentQuestion.placements) {
+      if (!placement.chapterId) continue;
+      const key = `${answer.attempt.id}:${placement.chapterId}`;
+      const value = peerByAttemptAndChapter.get(key) ?? { chapterId: placement.chapterId, total: 0, correct: 0 };
+      value.total++;
+      if (answer.outcome === AssessmentQuestionOutcome.CORRECT) value.correct++;
+      peerByAttemptAndChapter.set(key, value);
+    }
+    const minimum = this.config.get('platformComparisonMinSample', { infer: true });
+    const chapterComparisons = [...chapters.values()].map((chapter) => {
+      const peers = [...peerByAttemptAndChapter.values()].filter((peer) => peer.chapterId === chapter.chapterId && peer.total > 0).map((peer) => (peer.correct / peer.total) * 100);
+      const sampleSize = peers.length;
+      const percentage = (chapter.correct / chapter.total) * 100;
+      if (sampleSize < minimum) return { status: 'INSUFFICIENT_DATA', ...chapter, percentage: this.round(percentage), sampleSize, platformAveragePercentage: null, differenceFromAverage: null, percentile: null };
+      const average = peers.reduce((sum, value) => sum + value, 0) / sampleSize;
+      return { status: 'AVAILABLE', ...chapter, percentage: this.round(percentage), sampleSize, platformAveragePercentage: this.round(average), differenceFromAverage: this.round(percentage - average), percentile: Math.round((peers.filter((value) => value <= percentage).length / sampleSize) * 100) };
+    });
+    const available = chapterComparisons.filter((chapter) => chapter.status === 'AVAILABLE');
+    const total = chapterComparisons.reduce((sum, chapter) => sum + chapter.total, 0);
+    const weightedPercentage = chapterComparisons.reduce((sum, chapter) => sum + (chapter.percentage * chapter.total), 0) / total;
+    const weightedSampleSize = available.length ? Math.min(...available.map((chapter) => chapter.sampleSize)) : 0;
+    const context = { sampleSize: weightedSampleSize, coveredChapterCount: chapterComparisons.length, unclassifiedQuestionCount: questions.filter((question) => !question.placements.some((placement: any) => placement.chapterId)).length, chapters: chapterComparisons };
+    if (available.length !== chapterComparisons.length) return { status: 'INSUFFICIENT_DATA', ...context, platformAveragePercentage: null, differenceFromAverage: null, percentile: null, performanceLabel: null };
+    const weightedAverage = available.reduce((sum, chapter) => sum + (chapter.platformAveragePercentage * chapter.total), 0) / total;
+    const weightedPercentile = Math.round(available.reduce((sum, chapter) => sum + (chapter.percentile * chapter.total), 0) / total);
+    const performanceLabel = weightedPercentile >= 90 ? 'EXCELLENT' : weightedPercentile >= 60 ? 'GOOD_PROGRESS' : 'NEEDS_IMPROVEMENT';
+    return { status: 'AVAILABLE', ...context, platformAveragePercentage: this.round(weightedAverage), differenceFromAverage: this.round(weightedPercentage - weightedAverage), percentile: weightedPercentile, performanceLabel };
+  }
+
+  async result(studentId: string, id: string, query: AssessmentResultQueryDto = {}) {
     await this.assessmentOrNotFound(id);
     const attempt = await this.ownAttempt(studentId, id);
     if (attempt.status !== AssessmentAttemptStatus.COMPLETED) throw new ConflictException('Attempt has not been submitted yet');
     const questions = await this.questionsForAssessment(id);
     const answers = await this.prisma.assessmentAttemptAnswer.findMany({ where: { attemptId: attempt.id } });
     const byQuestion = new Map(answers.map((a) => [a.assessmentQuestionId, a]));
-    return {
+    const outcomes = answers.map((answer) => answer.outcome);
+    const correctCount = outcomes.filter((outcome) => outcome === AssessmentQuestionOutcome.CORRECT).length;
+    const incorrectCount = outcomes.filter((outcome) => outcome === AssessmentQuestionOutcome.INCORRECT).length;
+    const omittedCount = outcomes.filter((outcome) => outcome === AssessmentQuestionOutcome.OMITTED).length;
+    const percentage = this.round(((attempt.score ?? 0) / attempt.totalQuestions) * 100);
+    const stats = await this.prisma.questionCommunityStat.findMany({ where: { questionId: { in: questions.map((question) => question.sourceQuestionId) } }, select: { questionId: true, totalResponses: true, correctResponses: true } });
+    const statsByQuestion = new Map(stats.map((stat) => [stat.questionId, stat]));
+    const result: any = {
       attemptId: attempt.id,
       score: attempt.score,
       totalQuestions: attempt.totalQuestions,
+      percentage,
+      correctCount,
+      incorrectCount,
+      omittedCount,
+      answeredCount: correctCount + incorrectCount,
       submittedAt: attempt.submittedAt,
       questions: questions.map((q) => {
         const answer = byQuestion.get(q.id);
+        const stat = statsByQuestion.get(q.sourceQuestionId);
         return {
           id: q.id,
+          sourceQuestionId: q.sourceQuestionId,
           sortOrder: q.sortOrder,
           type: q.type,
           body: q.body,
@@ -790,9 +912,54 @@ export class AssessmentsService {
           isCorrect: answer?.isCorrect ?? false,
           answered: Boolean(answer && answer.selectedOptionIds.length),
           outcome: answer?.outcome ?? AssessmentQuestionOutcome.OMITTED,
+          activeSeconds: answer?.activeSeconds ?? null,
+          placements: q.placements,
+          platformSuccessRate: stat?.totalResponses ? this.round((stat.correctResponses / stat.totalResponses) * 100) : null,
         };
       }),
     };
+    if (query.includeComparison !== 'false') result.comparison = await this.comparison(studentId, questions, byQuestion);
+    return result;
+  }
+
+  async analytics(studentId: string, query: AssessmentAnalyticsQueryDto) {
+    const searchQuery = resolveSearchQuery(query);
+    const normalizedSearch = searchQuery ? normalizeArabic(searchQuery) : undefined;
+    const answers = await this.prisma.assessmentAttemptAnswer.findMany({
+      where: { attempt: { studentUserId: studentId, status: AssessmentAttemptStatus.COMPLETED }, assessmentQuestion: { placements: { some: query.chapterId ? { chapterId: query.chapterId } : query.subjectId ? { subjectId: query.subjectId } : {} } } },
+      include: { attempt: { select: { assessmentId: true, score: true, totalQuestions: true, submittedAt: true, assessment: { select: { title: true, mode: true } } } }, assessmentQuestion: { include: { placements: true } } },
+    });
+    const level = query.chapterId ? 'topic' : query.subjectId ? 'chapter' : 'subject';
+    const groups = new Map<string, any>();
+    for (const answer of answers) {
+      const placements = answer.assessmentQuestion.placements.filter((placement) => !query.subjectId || placement.subjectId === query.subjectId).filter((placement) => !query.chapterId || placement.chapterId === query.chapterId);
+      const distinct = new Map<string, any>();
+      for (const placement of placements) {
+        const id = level === 'subject' ? placement.subjectId : level === 'chapter' ? placement.chapterId : placement.sectionId ?? placement.lessonId ?? placement.chapterId;
+        if (!id) continue;
+        const title = level === 'subject' ? placement.subjectTitle : level === 'chapter' ? placement.chapterTitle : placement.sectionTitle ?? placement.lessonTitle ?? placement.chapterTitle;
+        distinct.set(id, { id, title, subjectId: placement.subjectId, chapterId: placement.chapterId, lessonId: placement.lessonId, sectionId: placement.sectionId });
+      }
+      for (const group of distinct.values()) {
+        const value = groups.get(group.id) ?? { ...group, total: 0, correct: 0, incorrect: 0, omitted: 0 };
+        value.total++;
+        if (answer.outcome === AssessmentQuestionOutcome.CORRECT) value.correct++;
+        else if (answer.outcome === AssessmentQuestionOutcome.INCORRECT) value.incorrect++;
+        else value.omitted++;
+        groups.set(group.id, value);
+      }
+    }
+    const page = query.page ?? 1; const limit = query.limit ?? 20;
+    const grouped = [...groups.values()]
+      .filter((group) => !normalizedSearch || normalizeArabic(group.title).includes(normalizedSearch))
+      .map((group) => ({ ...group, answered: group.correct + group.incorrect, percentage: group.total ? this.round((group.correct / group.total) * 100) : 0 }))
+      .sort((a, b) => a.title.localeCompare(b.title));
+    const groupMeta = toPaginationMeta(page, limit, grouped.length);
+    const data = grouped.slice((page - 1) * limit, page * limit);
+    const attemptCandidates = query.chapterId ? await this.prisma.assessmentAttempt.findMany({ where: { studentUserId: studentId, status: AssessmentAttemptStatus.COMPLETED, assessment: { questions: { some: { placements: { some: { chapterId: query.chapterId } } } } } }, select: { id: true, assessmentId: true, score: true, totalQuestions: true, submittedAt: true, assessment: { select: { title: true, mode: true } } }, orderBy: { submittedAt: 'desc' } }) : [];
+    const matchingAttempts = attemptCandidates.filter((attempt) => !normalizedSearch || normalizeArabic(attempt.assessment.title).includes(normalizedSearch));
+    const attempts = matchingAttempts.slice((page - 1) * limit, page * limit);
+    return { level, data, attempts, meta: { groups: groupMeta, ...(query.chapterId ? { attempts: toPaginationMeta(page, limit, matchingAttempts.length) } : {}) } };
   }
 
   // --- Admin ---------------------------------------------------------------
@@ -835,7 +1002,7 @@ export class AssessmentsService {
     const scopes = await this.resolveScopes(dto.scopes);
     const questions = await this.prisma.question.findMany({
       where: { id: { in: dto.questionIds }, status: QuestionStatus.PUBLISHED },
-      include: { options: { orderBy: { sortOrder: 'asc' } }, placements: { include: this.questionPlacementInclude() } },
+      include: { course: { include: { subject: true } }, options: { orderBy: { sortOrder: 'asc' } }, placements: { include: this.questionPlacementInclude() } },
     });
     const byId = new Map(questions.map((q) => [q.id, q]));
     const ordered = dto.questionIds.map((id) => byId.get(id));

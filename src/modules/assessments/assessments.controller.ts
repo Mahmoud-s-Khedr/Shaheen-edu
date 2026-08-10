@@ -10,9 +10,13 @@ import { AssessmentsService } from './assessments.service';
 import {
   AdminAssessmentListItemDto,
   AssessmentAttemptStateDto,
+  AssessmentAnalyticsQueryDto,
+  AssessmentAnalyticsResponseDto,
+  AssessmentResultQueryDto,
   AssessmentDetailDto,
   AssessmentResultDto,
   AutosaveAnswerDto,
+  ReportActiveTimeDto,
   CreateCustomAssessmentDto,
   GenerateStandardAssessmentDto,
   IdDeletedResponseDto,
@@ -50,6 +54,9 @@ export class AssessmentsController {
   @Get() @ApiOperation({ summary: 'List own and publicly visible assessments' }) @ApiOkResponse({ type: PaginatedAssessmentsResponseDto }) @ApiStandardErrors(401, 403)
   list(@CurrentUser() user: RequestUser, @Query() query: QueryAssessmentDto) { return this.assessments.list(user.id, query); }
 
+  @Get('analytics/summary') @ApiOperation({ summary: 'Get completed-assessment subject, chapter, and topic analytics' }) @ApiOkResponse({ type: AssessmentAnalyticsResponseDto }) @ApiStandardErrors(401, 403)
+  analytics(@CurrentUser() user: RequestUser, @Query() query: AssessmentAnalyticsQueryDto) { return this.assessments.analytics(user.id, query); }
+
   @Get(':id') @ApiOperation({ summary: 'Get an assessment by ID' }) @ApiOkResponse({ type: AssessmentDetailDto }) @ApiStandardErrors(401, 403, 404)
   get(@CurrentUser() user: RequestUser, @Param('id') id: string) { return this.assessments.get(user.id, id); }
 
@@ -68,11 +75,15 @@ export class AssessmentsController {
   @Post(':id/attempts/current/answers/:questionId') @ApiOperation({ summary: 'Autosave a selected answer' }) @ApiCreatedResponse() @ApiStandardErrors(400, 401, 403, 404, 409)
   autosave(@CurrentUser() user: RequestUser, @Param('id') id: string, @Param('questionId') questionId: string, @Body() dto: AutosaveAnswerDto) { return this.assessments.autosaveAnswer(user.id, id, questionId, dto); }
 
+  @Patch(':id/attempts/current/questions/:questionId/active-time') @ApiOperation({ summary: 'Record monotonic active time for a question in a resumable attempt' }) @ApiOkResponse() @ApiStandardErrors(400, 401, 403, 404, 409)
+  reportActiveTime(@CurrentUser() user: RequestUser, @Param('id') id: string, @Param('questionId') questionId: string, @Body() dto: ReportActiveTimeDto) { return this.assessments.reportActiveTime(user.id, id, questionId, dto); }
+
   @Post(':id/attempts/current/submit') @ApiOperation({ summary: 'Submit and score the attempt' }) @ApiCreatedResponse() @ApiStandardErrors(401, 403, 404)
   submit(@CurrentUser() user: RequestUser, @Param('id') id: string) { return this.assessments.submitAttempt(user.id, id); }
 
   @Get(':id/attempts/current/result') @ApiOperation({ summary: 'Get the full result/review after submission' }) @ApiOkResponse({ type: AssessmentResultDto }) @ApiStandardErrors(401, 403, 404, 409)
-  result(@CurrentUser() user: RequestUser, @Param('id') id: string) { return this.assessments.result(user.id, id); }
+  result(@CurrentUser() user: RequestUser, @Param('id') id: string, @Query() query: AssessmentResultQueryDto) { return this.assessments.result(user.id, id, query); }
+
 }
 
 @ApiTags('admin/assessments') @ApiBearerAuth() @UseGuards(RolesGuard) @Roles(Role.ADMIN, Role.SUPER_ADMIN)
