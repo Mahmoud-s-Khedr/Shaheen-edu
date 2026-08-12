@@ -117,5 +117,19 @@ describe('Admin (e2e)', () => {
     });
     expect(response.statusCode).toBe(201);
     expect(JSON.parse(response.body).displayName).toBe('Test Partner');
+
+    const list = await app.inject({
+      method: 'GET',
+      url: '/api/v1/admin/partners',
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(list.statusCode).toBe(200);
+    expect(JSON.parse(list.body)).toMatchObject({
+      data: [expect.objectContaining({
+        id: JSON.parse(response.body).id,
+        displayName: 'Test Partner',
+      })],
+      meta: { total: 1 },
+    });
   });
 });

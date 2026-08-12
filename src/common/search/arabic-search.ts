@@ -188,6 +188,7 @@ export function orderByIds<T extends { id: string }>(rows: T[], ids: string[]): 
  */
 export function arabicMatchText(normalizedText: Prisma.Sql, query: string): Prisma.Sql {
   const terms = searchTerms(query);
+  if (!terms.length) return Prisma.sql`FALSE`;
   return Prisma.sql`(${Prisma.join(
     terms.map((term) => Prisma.sql`${normalizedText} LIKE ${likePattern(term)} ESCAPE E'\\\\'`),
     ' AND ',
