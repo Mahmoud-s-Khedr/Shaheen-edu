@@ -37,6 +37,7 @@ import { LearningModule } from './modules/learning/learning.module';
 import { AssessmentsModule } from './modules/assessments/assessments.module';
 import { LeaderboardModule } from './modules/leaderboard/leaderboard.module';
 import { PerformanceModule } from './modules/performance/performance.module';
+import { PartnerAnalyticsModule } from './modules/partner-analytics/partner-analytics.module';
 import { UserAuthGuard } from './common/guards/user-auth.guard';
 import type { IncomingMessage } from 'http';
 
@@ -99,6 +100,7 @@ import type { IncomingMessage } from 'http';
     AssessmentsModule,
     LeaderboardModule,
     PerformanceModule,
+    PartnerAnalyticsModule,
   ],
   providers: [
     // Global deny-by-default auth guard - @Public() opts a route out.

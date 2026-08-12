@@ -6422,3 +6422,54 @@ No path, query, or header input.
   "deleted": true
 }
 ```
+
+### `GET /api/v1/partners/dashboard`
+
+**Authorization:** Bearer token; role must be `PARTNER` with type `CONTENT_PUBLISHER`
+
+**Request**
+
+- query `from` / `to` (optional `YYYY-MM-DD` Cairo dates; default current Cairo month)
+
+**Success response — HTTP 200**
+
+Returns Cairo-period KPIs, including separate realized statement values and approved-order estimates, compact daily earnings trends, agreement/content counts, and latest issued statements. All money is EGP minor units; no learner-identifying data is returned.
+
+### `GET /api/v1/partners/analytics/earnings`
+
+**Authorization:** Bearer token; role must be `PARTNER` with type `CONTENT_PUBLISHER`
+
+**Request**
+
+- query `from` / `to` (optional `YYYY-MM-DD` Cairo dates)
+- query `granularity` (optional `day | month`)
+
+**Success response — HTTP 200**
+
+Returns date-bucketed estimated approved-order gross/earnings and realized statement gross/earnings. Estimated values are explicitly not settlement records.
+
+### `GET /api/v1/partners/analytics/content`
+
+**Authorization:** Bearer token; role must be `PARTNER` with type `CONTENT_PUBLISHER`
+
+**Request**
+
+- query `status` (optional publisher agreement status)
+- query `page` / `limit` (optional offset pagination)
+
+**Success response — HTTP 200**
+
+Returns the authenticated publisher's course, chapter, and lesson agreements with target hierarchy context, revenue-share terms, historical status, and current-activity state.
+
+### `GET /api/v1/partners/earnings-statements`
+
+**Authorization:** Bearer token; role must be `PARTNER` with type `CONTENT_PUBLISHER`
+
+**Request**
+
+- query `from` / `to` (optional `YYYY-MM-DD` Cairo date filter on statement period end)
+- query `page` / `limit` (optional offset pagination)
+
+**Success response — HTTP 200**
+
+Returns only the authenticated publisher's issued statements, including period, target, revenue share, gross revenue, and publisher earnings.

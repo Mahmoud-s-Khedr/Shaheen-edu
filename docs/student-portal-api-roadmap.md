@@ -137,7 +137,7 @@ added:
 | [x] | `/admin/publisher-agreements/*` | Draft/active/ended publisher agreements, effective agreement lookup, and earnings-statement creation/listing. |
 | [x] | Academic/content administration | Grade/subject/course/chapter/lesson/section/content-item CRUD, move/reorder, publication/archive/restore, access types, and audit records. |
 | [x] | Geography and account support | Governorate/center management, public registration geography, admin student support, partner account lifecycle. |
-| [ ] | Reporting/export | No Excel subscriber export, consolidated payment/revenue report, partner dashboard, parent directory, or admin cross-domain student dashboard. |
+| [-] | Reporting/export | Content-publisher partners have a self-scoped dashboard, content agreements, statement history, and approved-order estimates. Excel export, consolidated admin reporting, referral-partner reporting, parent directory, and admin cross-domain student dashboard remain absent. |
 
 ## Remaining roadmap
 
@@ -159,8 +159,8 @@ added:
 1. Add a parent domain or explicitly document parent as a session-only role;
    then add selected-child orders, entitlements, assessment results, and
    richer progress views if required.
-2. Add partner-facing dashboard/reporting for assigned content, referred
-   students, payments, profit share, and earnings statements.
+2. Add referral-partner reporting and any approved learner-level publisher
+   reporting; the content-publisher aggregate financial dashboard is delivered.
 3. Add admin reporting/export, including consolidated student purchase,
    entitlement, learning, and performance views.
 4. Add configurable leaderboard prize/reward records and fulfilment if

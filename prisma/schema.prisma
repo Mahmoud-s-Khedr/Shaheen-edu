@@ -1291,6 +1291,7 @@ model Order {
 
   @@index([studentUserId, createdAt, id])
   @@index([status, createdAt, id])
+  @@index([status, approvedAt])
 }
 
 model OrderItem {
@@ -1309,6 +1310,8 @@ model OrderItem {
   createdAt     DateTime            @default(now())
 
   @@index([orderId])
+  @@index([courseId])
+  @@index([chapterId])
 }
 
 model ManualPaymentSubmission {

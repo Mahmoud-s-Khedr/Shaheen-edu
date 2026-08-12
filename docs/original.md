@@ -35,7 +35,7 @@ asset, and integration surfaces needed to operate the platform.
 | E-ASSESSMENT | Student/admin assessment generation, all current filters, immutable snapshots, attempt autosave/active time/submit/result, comparison, and analytics: [`src/modules/assessments/assessments.controller.ts`](../src/modules/assessments/assessments.controller.ts), [`src/modules/assessments/assessments.service.ts`](../src/modules/assessments/assessments.service.ts), and [`src/modules/assessments/dto/assessments.dto.ts`](../src/modules/assessments/dto/assessments.dto.ts). |
 | E-PERFORMANCE | Overview, analysis, trends, peer comparison, and answer-change endpoints: [`src/modules/performance/performance.controller.ts`](../src/modules/performance/performance.controller.ts) and [`src/modules/performance/performance.service.ts`](../src/modules/performance/performance.service.ts). |
 | E-LEADERBOARD | Friday/Cairo weekly calculation, grade cohort ranking, honor board, pagination, current rank, history, and top-three award labels: [`src/modules/leaderboard/leaderboard.controller.ts`](../src/modules/leaderboard/leaderboard.controller.ts) and [`src/modules/leaderboard/leaderboard.service.ts`](../src/modules/leaderboard/leaderboard.service.ts). |
-| E-PUBLISHER | Course/chapter/lesson pricing, effective pricing, publisher agreements, and earnings statements: [`src/modules/publisher-agreements/publisher-agreements.controller.ts`](../src/modules/publisher-agreements/publisher-agreements.controller.ts). |
+| E-PUBLISHER | Course/chapter/lesson pricing, effective pricing, publisher agreements, earnings statements, and content-publisher reporting: [`src/modules/publisher-agreements/publisher-agreements.controller.ts`](../src/modules/publisher-agreements/publisher-agreements.controller.ts) and [`src/modules/partner-analytics`](../src/modules/partner-analytics). |
 | E-MEDIA | General assets/covers, Bunny Storage access, Bunny Stream direct upload/playback/retry/archive, and webhook handling: [`src/modules/assets`](../src/modules/assets), [`src/modules/videos/videos.controller.ts`](../src/modules/videos/videos.controller.ts), and [`docs/video-api-reference.md`](video-api-reference.md). |
 
 ## Implemented platform surface
@@ -47,6 +47,7 @@ asset, and integration surfaces needed to operate the platform.
 | Catalogue and delivery | Public catalogue plus current-grade student catalogue; cursor-paginated child traversal; direct content previews; Arabic-aware search; library and “my subjects”; effective access/lock/price state; protected content and asset URLs. |
 | Learning | Content completion, study-state/video resume, continue learning, current-grade and owned-library progress rollups, direct-practice questions, immutable practice attempts, explanations, question assets, and parent selected-child summary. |
 | Commerce | Course/chapter purchases only; cart, server-calculated EGP checkout, immutable order snapshots, idempotent manual proof upload/resubmission, admin approve/reject, cancellation, and entitlement fulfilment. |
+| Content publisher reporting | CONTENT_PUBLISHER-only dashboard, agreement-covered content, issued statement history, approved-order earnings estimates, Cairo-time trends, and aggregate customer counts. Realized statements remain distinct from estimates; no learner PII is exposed. |
 | Authoring | Question source/bank/question lifecycle, options, placements, attachments, question video timestamp links, publication/review state, per-student marks, and community incorrect-rate/difficulty-band statistics. |
 | Assessments | Private student and public admin assessments; random or admin hand-picked generation; TUTOR/EXAM modes; optional timers; source/bank/hierarchy/difficulty/question-state/marked filters; frozen question/options/placement snapshots; one resumable attempt; active time, omitted outcomes, result review, comparison, and analytics. |
 | Performance | `overview`, grouped `analysis`, date/test `trends`, cohort `peers`, and assessment answer-change endpoints, in addition to the legacy direct-practice `GET /student/performance` summary. |
@@ -120,7 +121,7 @@ asset, and integration surfaces needed to operate the platform.
 | [-] | Admin user management for students, parents, and companies. | Student directory/detail/lifecycle, admin management, and partner CRUD/lifecycle exist. Parent sessions are not a registered parent entity and have no admin directory. Partner statistics and network reporting are absent. [E-AUTH, E-ADMIN] |
 | [-] | Admin student data, payments, subscriptions, and full performance dashboard. | Safe student administration, separate orders/entitlements, and student performance APIs exist; there is no consolidated admin student dashboard joining all domains. [E-ADMIN, E-COMMERCE, E-PERFORMANCE] |
 | [ ] | Admin parent management. | No parent account/entity administration or parent-scoped orders/entitlements API. |
-| [-] | Partner company, assigned subjects, students, payments, and revenue share. | Partner accounts, publisher agreements, pricing, and earnings statements exist for admins; no partner-facing reporting/dashboard exists. [E-PUBLISHER, E-AUTH] |
+| [-] | Partner company, assigned subjects, students, payments, and revenue share. | Content publishers have a self-scoped dashboard, agreement-covered content, issued earnings statements, and approved-order estimates with aggregate customer counts. Referral reporting and learner-level reporting remain absent by design. [E-PUBLISHER, E-AUTH] |
 | [-] | Content management including uploads and PDF-to-question generation. | Hierarchy, content, assets, video, question authoring, review, and placements exist. Automatic PDF-to-question generation does not. [E-HIERARCHY, E-MEDIA, E-QBANK] |
 | [-] | Pricing, discounts, coupons, and payments. | Course/chapter/lesson pricing, manual payment, and fulfilment exist. Coupons, timed discounts, refunds, payment expiry, and PSP integration do not. [E-COMMERCE, E-PUBLISHER] |
 | [ ] | Excel subscriber export and payment/revenue reports. | No export or consolidated reporting endpoints exist. |
@@ -130,7 +131,30 @@ asset, and integration surfaces needed to operate the platform.
 | [-] | Parent registration and monitoring. | Parent access is a lightweight session using child National ID + parent phone, with child selection and a basic selected-child progress/practice summary. There is no parent account, relationship field, assessment report, order view, or entitlement view. [E-AUTH, E-CONTENT] |
 | [x] | Separate parent access. | Parent sessions are distinct from user access tokens and enforce linked-child selection. [E-AUTH] |
 | [x] | Partner account created by admin. | Admin partner create/list/update/suspend/reactivate and partner login/profile are implemented. [E-AUTH] |
-| [-] | Partner dashboard and reports. | Partner profile and publisher-agreement foundations exist; partner-facing subject, student, payment, profit-share, and referral reports do not. [E-PUBLISHER] |
+| [-] | Partner dashboard and reports. | Content publishers can access self-scoped content, financial statements, approved-order estimates, earnings trends, and aggregate customer counts. Referral-partner reporting and learner-level views remain unavailable. [E-PUBLISHER] |
+
+## Content Publisher API surface
+
+All authenticated partner endpoints below are mounted under `/api/v1`. The
+reporting routes require `PARTNER` role plus `CONTENT_PUBLISHER` partner type;
+`REFERRAL_PARTNER` receives `403`.
+
+| Endpoint | Capability |
+| --- | --- |
+| `POST /auth/partners/login` | Authenticate a partner and receive an access token plus refresh cookie. |
+| `GET/PATCH /partners/me` | Read or update the authenticated partner's own profile. |
+| `GET /partners/dashboard?from&to` | Cairo-date dashboard KPIs, active agreements, covered content, compact daily earnings trend, and latest statements. |
+| `GET /partners/analytics/earnings?from&to&granularity=day\|month` | Bucketed approved-order estimates and realized statement revenue/earnings. Defaults to daily for ranges up to 93 days, otherwise monthly. |
+| `GET /partners/analytics/content?page&limit&status` | Paginated own course/chapter/lesson agreements, target hierarchy context, revenue-share terms, and current activity state. |
+| `GET /partners/earnings-statements?page&limit&from&to` | Paginated own issued statements, filtered by statement-period end date. |
+
+Financial definitions: **realized** values are admin-issued earnings statements;
+**estimated** values are approved order items attributed using the agreement
+effective at `approvedAt`, with per-item earnings rounded down using the
+agreement basis points. All money is returned as EGP minor units. Reporting
+returns aggregate customer counts only—never learner identity data. Partners
+cannot create pricing, agreements, statements, payments, or platform content;
+those operations remain admin-only.
 
 ## Current gap summary
 
@@ -141,13 +165,13 @@ asset, and integration surfaces needed to operate the platform.
    aligned with the original percentage-based formula, and rewards need a
    real prize/configuration/fulfilment model if prizes are required.
 3. **Reporting:** no admin exports, consolidated student dashboard,
-   payment/revenue reports, partner reports, or parent orders/entitlements
-   views exist.
+   payment/revenue reports, referral-partner reports, or parent
+   orders/entitlements views exist.
 4. **Commercial lifecycle:** no subject-level subscriptions, PSP/webhooks,
    refunds, coupons, timed discounts, or payment/entitlement expiry workflow.
 5. **Learning metadata and commands:** no structured video topics/concepts,
    no direct higher-level completion command, and no unified performance model
    combining direct practice and assessments in every analytic view.
 6. **Operational workflows:** no automatic PDF-to-question generation,
-   question-report/moderation flow, parent entity administration, or partner
-   self-service reporting.
+   question-report/moderation flow, parent entity administration, or
+   referral-partner reporting.
