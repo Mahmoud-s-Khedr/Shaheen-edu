@@ -1,407 +1,193 @@
 # Student Portal API Roadmap
 
-> **Status: proposed reference only.** This is a logical API and schema roadmap
-> based on the current repository. It is not an implemented API contract.
-> Implemented endpoints remain documented in
-> [api-reference-compact.md](api-reference-compact.md).
-
-## Implementation status (reviewed 2026-08-07)
-
-- [x] Student registration and profile updates persist a published
-      `academicGradeId`.
-- [x] The published public catalogue supports grades, grade-filtered subjects,
-      subject-filtered courses, course details, and a full course outline with
-      entitlement-aware lock indicators.
-- [x] Course/chapter pricing and course/chapter `StudentEntitlement` records
-      exist; entitled students can retrieve published content and protected assets.
-- [x] Manual commerce supports carts, immutable EGP orders, receipt-proof
-      submission, staff review, and payment-backed course/chapter entitlements.
-- [x] Content-item completion, current-grade and library progress, direct
-      practice, immutable practice attempts, student performance, and selected-child
-      parent performance are implemented.
-- [x] Generated assessments (student-owned private quizzes/exams and
-      admin-owned public quizzes/exams) exist, built from standard random
-      sampling or admin hand-picked questions, with a full attempt lifecycle
-      (start/resume, autosave, submit, result).
-- [x] Administrators can list and filter safe student account data, view a
-      student detail response, suspend/reactivate or soft-delete a student,
-      and issue a forced password reset that revokes existing sessions.
-- [x] Public and student hierarchy responses expose `hasChildren` for each
-      expandable level. Administrative course and chapter list/detail responses
-      expose the resolved effective price, including inherited course pricing.
-- [ ] AI-assisted question selection and the broader student analytics APIs in
-      this roadmap remain not implemented.
-
-`[x]` means the backend implementation exists. `[ ]` means the item remains
-planned; frontend rendering, response composition, and client-side navigation
-are outside this API roadmap. An existing endpoint with a narrower or
-different server-side response is called out in the relevant section rather
-than being marked complete.
-
-## Core product rule
-
-A student has one current `academicGradeId`, selected at registration and
-changeable from their profile. Their **student catalogue must show published
-content for that grade only**. It must not expose subjects, courses, chapters,
-or questions from lower or higher grades.
-
-Changing grade affects future catalogue discovery only. It must **not** revoke
-access to courses or chapters already purchased; those continue to appear in
-the student's library until their entitlement expires or is revoked.
-
-```text
-StudentProfile.academicGradeId
-  → AcademicGrade → Subject → Course → Chapter → Lesson → Section
-```
-
-This relationship already exists in the schema: `StudentProfile` has
-`academicGradeId`, a `Subject` belongs to an academic grade, a `Course` belongs
-to a subject, and a chapter belongs to a course.
-
-## Current API and schema findings
-
-| Area             | Status                                      | Already present                                                                                                                                                                                                                                         | Gap to close                                                                                      |
-| ---------------- | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| Grade selection  | [x]                                         | Registration accepts `academicGradeId`; `PATCH /api/v1/students/me` can change it.                                                                                                                                                                      | —                                                                                                 |
-| Public hierarchy | [x]                                         | Published grade/subject/course discovery plus cursor-paginated course chapters, chapter lessons, lesson sections, and direct content previews.                                                                                                          | —                                                                                                 |
-| Paid access      | [x]                                         | Course/chapter pricing, `StudentEntitlement`, carts, manual-payment orders, proof review, and payment-backed grants exist.                                                                                                                              | No refunds, payment expiry, or PSP integration.                                                   |
-| Questions        | [x] Authoring, direct practice, and assessments | Questions are linked to a course and may be placed at course/chapter/lesson/section level; eligible published questions can be delivered for direct practice with immutable answer-attempt history. Student- and admin-generated assessments freeze an immutable question/option snapshot with a full attempt lifecycle. | No AI-assisted selection, difficulty bands, marked/omitted-question filters, or assessment-history analytics. |
-| Content delivery | [x] Foundation, completion, and study state | An entitled student can fetch a content item and its protected assets, view completion/study state, record activity/resume position, and retrieve the next continue-learning item. Current-grade and accessible-library progress rollups are available. | Higher-level completion remains derived from content-item completion.                             |
-| Student administration | [x] Account support and lifecycle | `ADMIN`/`SUPER_ADMIN` can list/search/filter safe student accounts, view a safe detail response, suspend/reactivate, soft-delete with a reason, and issue a forced password reset. The reset revokes sessions and requires the student to choose a new password before accessing protected routes. | No consolidated admin view of a student's orders, entitlements, and performance; parent administration is also absent. |
-
-Question banks and sources are authoring/provenance metadata. They are not a
-student catalogue concept and must not be exposed in learner responses.
-
-## Implemented student account administration
-
-These support endpoints are restricted to `ADMIN` and `SUPER_ADMIN`, except
-that administrator-password resets remain restricted to `SUPER_ADMIN`.
-
-| Status | Endpoint | Purpose |
-| ------ | -------- | ------- |
-| [x] | `GET /api/v1/admin/students` | Paginated safe student directory with search plus grade, governorate, center, and status filters. |
-| [x] | `GET /api/v1/admin/students/:id` | Safe account/profile detail; full National ID and password data are never returned. |
-| [x] | `POST /api/v1/admin/students/:id/suspend` | Suspend the account and revoke its student and selected-parent sessions. |
-| [x] | `POST /api/v1/admin/students/:id/reactivate` | Reactivate a suspended student. |
-| [x] | `DELETE /api/v1/admin/students/:id` | Soft-delete an active or suspended student with a required deletion reason and revoke sessions. |
-| [x] | `POST /api/v1/admin/students/:id/reset-password` | Return a temporary password, revoke sessions, and force a password change at next login. |
-| [x] | `POST /api/v1/admin/admins/:id/reset-password` | Super-admin-only administrator password reset with the same forced-change/session-revocation behavior. |
-
-## API design: two catalogue views
-
-### A. Public catalogue — published hierarchy only
-
-These routes support registration, marketing pages, and visitors. They return
-only published records and contain no personal entitlement information.
-
-| Proposed endpoint                                 | Purpose                                                                       |
-| ------------------------------------------------- | ----------------------------------------------------------------------------- |
-| `GET /api/v1/academic-grades`                     | Existing public grade list; retain as the registration grade selector.        |
-| `GET /api/v1/catalog/grades/:gradeId`             | Published grade detail and its published subjects.                            |
-| `GET /api/v1/catalog/grades/:gradeId/subjects`    | Subjects belonging to one published grade.                                    |
-| `GET /api/v1/catalog/subjects/:subjectId/courses` | Courses belonging to one published subject.                                   |
-| `GET /api/v1/catalog/courses/:courseId`           | Existing public course detail; include effective public price/purchasability. |
-| `GET /api/v1/catalog/courses/:courseId/chapters`  | Cursor-paginated published chapter list.                                      |
-| `GET /api/v1/catalog/chapters/:chapterId/lessons` | Cursor-paginated published lesson list.                                       |
-| `GET /api/v1/catalog/lessons/:lessonId/sections`  | Cursor-paginated published section list.                                      |
-
-Completed equivalents:
-
-- [x] `GET /api/v1/academic-grades`
-- [x] `GET /api/v1/catalog/subjects?academicGradeId=`
-- [x] `GET /api/v1/catalog/courses?subjectId=`
-- [x] `GET /api/v1/catalog/courses/:courseId`
-- [x] Cursor-paginated child routes replace the former nested outline endpoint.
-
-The existing `GET /api/v1/catalog/subjects?academicGradeId=` and
-`GET /api/v1/catalog/courses?subjectId=` can remain. The nested routes above make the
-hierarchy discoverable without the frontend constructing filters itself.
-
-Every expandable grade, subject, course, chapter, and lesson response includes
-`hasChildren`, calculated only from visible children. This lets a client show
-an expand affordance without speculative child-list calls.
-
-### B. Student catalogue — current grade and personal access state
-
-These routes require `STUDENT`. The server reads `StudentProfile.academicGradeId`
-from the token; clients must not choose a grade ID in this API. This prevents a
-student from browsing other grades by changing a query parameter.
-
-| Status | Endpoint                                                  | Purpose                                                                                               |
-| ------ | --------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| [x]    | `GET /api/v1/student/catalog`                             | Current grade and published hierarchy summary counts.                                                 |
-| [x]    | `GET /api/v1/student/catalog/subjects`                    | Only published subjects of the student's current grade.                                               |
-| [x]    | `GET /api/v1/student/catalog/subjects/:subjectId/courses` | Grade-scoped published courses with server-resolved `access`, lock state, and effective course price. |
-| [x]    | `GET /api/v1/student/catalog/courses/:courseId`           | Grade-scoped course detail.                                                                           |
-| [x]    | Cursor-paginated student child routes                     | Chapters, lessons, sections, and content previews with server-resolved access, price, and lock state. |
-| [x]    | `GET /api/v1/student/library`                             | Active course/chapter entitlements across grades, grouped with their published hierarchy and expiry.  |
-| [x]    | `GET /api/v1/student/entitlements`                        | The authenticated student's raw, paginated active entitlement records.                                |
-
-Completion/progress summaries, persisted study activity, and continue-learning
-delivery are implemented. Public and student catalogue routes
-traverse one hierarchy level at a time; composing their ordered responses into
-cards, outlines, or previous/next controls is client work and requires no
-additional API.
-
-For a course/chapter response, return one explicit `access` object rather than
-forcing the frontend to infer it from many fields:
-
-```json
-{
-  "access": {
-    "state": "ENTITLED | FREE | PUBLIC | PURCHASABLE | LOCKED",
-    "entitlementId": "optional",
-    "expiresAt": "optional ISO date",
-    "price": { "amountMinor": 0, "currency": "EGP" }
-  }
-}
-```
-
-`PURCHASABLE` means the student may buy that exact course or chapter. A chapter
-covered by a course entitlement is `ENTITLED`; it should never be offered for
-sale again. A course page may show a purchasable chapter only when the student
-does not already own the whole course or that chapter.
-
-Administrative `GET /api/v1/admin/courses` / `:id` and
-`GET /api/v1/admin/chapters` / `:id` responses include a resolved `pricing`
-object. For chapters this distinguishes a local override from inherited course
-pricing through `resolvedFrom`, so staff UIs do not need to reproduce the
-inheritance rule.
-
-## Purchase model: courses and chapters
-
-The first commerce model should sell only the things the current access schema
-can grant: **a complete course or an individual chapter**. Do not introduce a
-lesson purchase until `StudentEntitlement` explicitly supports it; lesson
-pricing exists today, but lesson-level access does not.
-
-### Required schema additions
-
-Keep current `Course`, `Chapter`, pricing, and `StudentEntitlement` records.
-Add a financial ledger rather than duplicating course/chapter as a new product
-catalogue. Payments are **manual for this phase**: the student follows a
-payment instruction shown by the frontend, uploads a proof image, and an
-administrator approves or rejects the submission. There is no PSP redirect,
-card capture, provider callback, or payment webhook in this model.
-
-| Status | Model                     | Essential responsibility                                                                                                                                                                                                                      |
-| ------ | ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [x]    | `Cart` / `CartItem`       | One active cart per student; item targets exactly one course or chapter.                                                                                                                                                                      |
-| [x]    | `ManualPaymentMethod`     | Admin-managed, active payment instructions shown to students (for example, transfer account/wallet details, title, and display order). The order snapshots the selected method text so later edits do not change an existing payment request. |
-| [x]    | `Order`                   | Immutable purchase snapshot: student, total EGP amount, selected manual-payment instruction snapshot, lifecycle status, timestamps.                                                                                                           |
-| [x]    | `OrderItem`               | Immutable price and target snapshot for each purchased course/chapter.                                                                                                                                                                        |
-| [x]    | `ManualPaymentSubmission` | A student's submitted transfer reference, optional note, receipt-proof asset, review status, reviewer, rejection reason, and timestamps. Rejected orders preserve submission history and accept replacement proof.                            |
-| [ ]    | `Refund`                  | Refund/cancellation history and corresponding entitlement action, when refunds become part of the operating process.                                                                                                                          |
-
-All listed commerce schema additions except `Refund` are implemented. The
-existing `StudentEntitlement` model supports exactly one course or chapter
-target and is the implemented foundation for the fulfilment flow.
-
-`StudentEntitlement` remains the authoritative access record. An **approved**
-manual-payment submission creates exactly one entitlement per order item with
-`source = PAYMENT`. The implemented optional `orderItemId` reference makes the
-grant traceable and prevents duplication.
-
-Recommended lifecycle:
-
-```text
-DRAFT_CART → AWAITING_PAYMENT → SUBMITTED → APPROVED
-                                    └──→ REJECTED → SUBMITTED (replacement proof)
-AWAITING_PAYMENT / REJECTED → CANCELLED
-```
-
-Only an administrator may transition a submission to `APPROVED` or `REJECTED`.
-Approval, order status change, and entitlement creation must run in one
-database transaction. Repeating the approval request must be idempotent and
-must never create a second entitlement. A receipt proof is private: only its
-owner and authorized administrators may retrieve it; it must not use the
-existing admin-only general asset upload endpoint.
-
-### Proposed commerce APIs
-
-| Status | Proposed endpoint                                                                 | Purpose                                                                                                                                            |
-| ------ | --------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [x]    | `POST /api/v1/student/cart/items`                                                 | Add an eligible course or chapter. The server validates grade, publication, purchasability, price, and existing access.                            |
-| [x]    | `GET /api/v1/student/cart`                                                        | Cart lines with server-calculated current totals and EGP prices.                                                                                   |
-| [x]    | `DELETE /api/v1/student/cart/items/:itemId`                                       | Remove a line.                                                                                                                                     |
-| [x]    | `GET /api/v1/student/manual-payment-methods`                                      | Active payment instructions the frontend can present before the student creates an order.                                                          |
-| [x]    | `POST /api/v1/student/checkout`                                                   | Atomically create an `AWAITING_PAYMENT` order and immutable order items, snapshotting the selected payment method and server-calculated EGP total. |
-| [x]    | `GET /api/v1/student/orders`                                                      | Student purchase history.                                                                                                                          |
-| [x]    | `GET /api/v1/student/orders/:orderId`                                             | One order, selected instruction snapshot, submission/review state, any safe rejection reason, purchased targets, and fulfilment state.             |
-| [x]    | `POST /api/v1/student/orders/:orderId/payment-proof`                              | Upload one receipt image and transfer reference for an eligible order, creating a `SUBMITTED` manual-payment submission.                           |
-| [x]    | `POST /api/v1/student/orders/:orderId/payment-submissions/:submissionId/resubmit` | Submit replacement proof after a rejection; preserve the rejected submission as audit history.                                                     |
-| [x]    | `GET /api/v1/admin/manual-payment-methods`                                        | List configured payment instructions, including inactive methods.                                                                                  |
-| [x]    | `POST /api/v1/admin/manual-payment-methods`                                       | Create a payment instruction.                                                                                                                      |
-| [x]    | `PATCH /api/v1/admin/manual-payment-methods/:id`                                  | Update, reorder, activate, or deactivate a payment instruction.                                                                                    |
-| [x]    | `GET /api/v1/admin/payment-submissions`                                           | Queue of submitted/reviewable payments, filterable by status, student, and date.                                                                   |
-| [x]    | `GET /api/v1/admin/payment-submissions/:id`                                       | Full review view, including the private proof asset and immutable order snapshot.                                                                  |
-| [x]    | `POST /api/v1/admin/payment-submissions/:id/approve`                              | Atomically approve the submission and grant its order's entitlements once.                                                                         |
-| [x]    | `POST /api/v1/admin/payment-submissions/:id/reject`                               | Reject with a staff-visible and student-safe reason; the student may resubmit if the order remains eligible.                                       |
-
-`POST /api/v1/student/orders/:orderId/payment-proof` accepts an initial proof
-only; rejected orders must use the dedicated resubmission route. `POST
-/api/v1/student/orders/:orderId/cancel` is also implemented for awaiting-payment
-or rejected orders.
-
-The API server—not the client—is authoritative for price, total, eligibility,
-payment state, review decisions, and entitlement fulfilment. Checkout and proof
-submission require idempotency keys; repeating approval is safe because an
-already approved submission is returned without creating a second entitlement.
-The displayed payment
-instruction is guidance only; an uploaded proof is not itself a verified
-payment and must grant no access until approved.
-
-## Learning and completion APIs
-
-| Proposed endpoint                                                           | Purpose                                                                                       |
-| --------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| `GET /api/v1/student/content-items/:contentItemId`                          | [x] Protected delivery with the student's item completion state.                              |
-| `POST /api/v1/student/content-items/:contentItemId/complete`                | [x] Idempotently mark one accessible published item complete.                                 |
-| `GET /api/v1/student/progress`                                              | [x] Current-grade course/chapter/lesson/section completion totals.                            |
-| `GET /api/v1/student/library/:targetType/:targetId/progress`                | [x] Detailed course or chapter progress for accessible library content.                       |
-| `GET /api/v1/student/practice/questions`                                    | [x] Learner-safe published direct-practice questions for one hierarchy scope and descendants. |
-| `POST /api/v1/student/practice/questions/:questionId/attempts`              | [x] Store an immutable selected-answer attempt and return immediate feedback.                 |
-| `GET /api/v1/student/practice/questions/:questionId/attempts`               | [x] Paginated personal retry history.                                                         |
-| `GET /api/v1/student/practice/questions/:questionId/assets/:assetId/access` | [x] Protected access to an asset or video attached to an eligible direct-practice question.   |
-| `GET /api/v1/student/performance`                                           | [x] Current-grade question totals, accuracy, solved count, and first-try correctness.         |
-| `GET /api/v1/parent/selected-child/performance`                             | [x] Selected-child summary-only progress and question performance.                            |
-
-Completion records are keyed by `(studentUserId, contentItemId)` and store the
-completion timestamp. The client marks only an item complete; all hierarchy
-completion is derived from accessible published content and these records. A
-direct command to mark a course, chapter, lesson, or section complete is not
-implemented.
-
-## Generated quizzes and exams from the existing question bank
-
-The generated-assessment domain is implemented for both owners. A student can
-generate their own private quiz/exam, and an admin can build a public one, in
-both cases from **existing reviewed, published questions** only. AI-assisted
-selection is explicitly **deferred by product decision** (not a gap to close
-yet) — every generation path today is either random sampling (`STANDARD`) or
-exact hand-picked question IDs (`CUSTOM`, admin only). No path creates
-unreviewed live questions or changes correct answers.
-
-Visibility is owner-based: a `STUDENT`-owned assessment is private to its
-creator; an `ADMIN`-owned assessment becomes public, once published, to any
-student entitled to every one of its target scopes — the frozen snapshot is
-the union of all scopes' questions, so partial entitlement to only some
-scopes must not surface the whole assessment.
-
-Question selection is always limited to:
-
-1. Published questions whose course/chapter/lesson/section placement is
-   published.
-2. For student-owned generation, the student's current academic grade and
-   their own entitlement on the selected scope (mirroring direct practice's
-   eligibility rule).
-3. For admin-owned generation, any published question in the given scope;
-   visibility to a given student is enforced separately, at read/attempt time,
-   against that student's grade and entitlement.
-
-"Quiz" vs "exam" is not two separate models — it is the assessment's `mode`
-(`TUTOR` reveals per-question correctness immediately; `EXAM` withholds it
-until submission) plus an optional `isTimed`/`durationSeconds` pair. There is
-no retry: one attempt per (assessment, student), which is `SUSPENDED`
-(resumable) until submitted, then `COMPLETED`.
-
-### Implemented assessment schema
-
-| Model                       | Essential responsibility                                                                                                      |
-| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| `Assessment`                | Owner (`STUDENT` private or `ADMIN` public), title, generation type, mode, timer, question count, and status.                  |
-| `AssessmentScope`           | One or more course/chapter/lesson/section targets used to generate/visibility-gate the assessment.                            |
-| `AssessmentQuestion`        | Ordered immutable snapshot of a selected question's body/type/explanation, with a non-FK `sourceQuestionId` for traceability.  |
-| `AssessmentQuestionOption`  | Immutable snapshot of each option's body and correctness.                                                                     |
-| `AssessmentAttempt`         | One resumable attempt per (assessment, student): start/expiry/submit state and score.                                        |
-| `AssessmentAttemptAnswer`   | Autosaved selected options per snapshot question, upserted while the attempt is in progress.                                  |
-
-All rows above are `[x]`. `QuestionReport` (student flag for a broken/unclear
-question) remains `[ ]` — not part of this pass.
-
-The snapshot is enforced: editing or archiving an authoring `Question` never
-changes an assessment already generated or completed from it, since
-`AssessmentQuestion`/`AssessmentQuestionOption` hold their own copies and
-`sourceQuestionId` is a plain non-relational reference.
-
-### Implemented assessment APIs
-
-| Status | Endpoint                                                                       | Purpose                                                                                                    |
-| ------ | ------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------- |
-| [x]    | `POST /api/v1/student/assessments`                                             | Generate a private `STANDARD` (random-sample) assessment from a chosen scope/count/mode/timer.             |
-| [x]    | `GET /api/v1/student/assessments`                                              | Paginated list merging the student's own assessments with visible public admin assessments.                |
-| [x]    | `GET /api/v1/student/assessments/:id`                                          | Read one owned or publicly visible assessment's metadata.                                                  |
-| [x]    | `PATCH /api/v1/student/assessments/:id`                                        | Rename an owned assessment.                                                                                |
-| [x]    | `DELETE /api/v1/student/assessments/:id`                                       | Delete an owned assessment.                                                                                |
-| [x]    | `POST /api/v1/student/assessments/:id/attempts/start`                          | Start or idempotently resume the student's attempt.                                                        |
-| [x]    | `GET /api/v1/student/assessments/:id/attempts/current`                        | Resumable state: per-question answered flags and remaining time, with mode-aware answer visibility.        |
-| [x]    | `POST /api/v1/student/assessments/:id/attempts/current/answers/:questionId`   | Autosave one selected answer; force-submits if the timer has already expired.                              |
-| [x]    | `POST /api/v1/student/assessments/:id/attempts/current/submit`                | Idempotently finalize and score the attempt.                                                                |
-| [x]    | `GET /api/v1/student/assessments/:id/attempts/current/result`                 | Full review after submission: every question, correct answers, explanations, and the student's answers.   |
-| [x]    | `POST /api/v1/admin/assessments/standard`                                     | Admin: create via random sample.                                                                           |
-| [x]    | `POST /api/v1/admin/assessments/custom`                                       | Admin: create by hand-picking exact question IDs from the question bank.                                   |
-| [x]    | `GET /api/v1/admin/assessments`, `GET /api/v1/admin/assessments/:id`          | Admin listing/detail, including correct answers.                                                            |
-| [x]    | `PATCH /api/v1/admin/assessments/:id`                                          | Update title/mode/timer while still `DRAFT`.                                                                |
-| [x]    | `POST /api/v1/admin/assessments/:id/publish`                                   | `DRAFT` → `READY`, making it publicly visible to entitled students.                                          |
-| [x]    | `POST /api/v1/admin/assessments/:id/archive`                                   | `READY` → `ARCHIVED`, removing it from student lists; past attempts remain readable.                        |
-| [x]    | `DELETE /api/v1/admin/assessments/:id`                                        | Hard delete, `DRAFT` only.                                                                                  |
-| [ ]    | AI Prompt generation, difficulty bands, source/bank filters, marked/omitted/community-incorrect filters, multiple attempts, question reporting | Explicitly deferred; not built in this pass. |
-
-Do not add a generic `GET /api/v1/student/questions` endpoint that returns raw
-question records. Questions are delivered only within an owned/visible
-assessment's snapshot, so correct answers and explanations stay protected
-until the appropriate reveal point (immediately in `TUTOR` mode, or after
-submission in `EXAM` mode).
-
-## Analytics to expose to students
-
-Analytics must come from progress and submitted assessment attempts, not from
-the question bank alone.
-
-| Proposed endpoint                                   | Presentation purpose                                                                                                   |
-| --------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `GET /api/v1/student/analytics/overview`            | Courses owned/completed, chapters completed, study time, latest scores, and continue-learning action.                  |
-| `GET /api/v1/student/analytics/courses/:courseId`   | Course and chapter completion plus quiz/exam score history for an entitled course.                                     |
-| `GET /api/v1/student/analytics/chapters/:chapterId` | Chapter progress and related practice history.                                                                         |
-| `GET /api/v1/student/analytics/questions`           | Optional personal accuracy, skipped count, and average time grouped by the question's course/chapter/lesson placement. |
-
-All student analytics APIs above remain [ ].
-
-Present these as simple Arabic-first student metrics: owned courses, completed
-courses/chapters, current completion percentage, study time, recent practice
-score, and topics needing more practice. Do not expose question-bank sources,
-answer keys, or staff-only question-quality data.
-
-## Future additions, after the core flow
-
-- In-app notifications for payment success, entitlement expiry, generated quiz
-  readiness, and result availability.
-- Comments tied to a course/chapter/lesson/content item, plus reporting and
-  staff moderation. Do not add unrestricted private messaging initially.
-- Parent purchase/progress views, where purchaser and entitled student can be
-  different users.
-- Curriculum objectives/mastery and adaptive question selection once sufficient
-  trustworthy response data exists.
-- Coupons, subscriptions, bundles, refunds, and referral programs.
-
-## Cross-cutting implementation rules
-
-- [x] Existing student delivery/profile endpoints scope the student to the
-      authenticated user; the client does not supply a `studentUserId`.
-- [x] Student catalogue APIs obtain grade from the profile, not a request parameter.
-- [x] Library APIs return active entitlements across all grades so a grade change
-      cannot hide paid content.
-- [x] The implemented public catalogue and student content-delivery paths only
-      return published hierarchy/content records.
-- [x] `Course` ownership covers its chapters; a chapter entitlement covers that
-      chapter and descendants only.
-- [x] Checkout and manual-payment proof submission require idempotency keys;
-      approval is safe to retry and cannot grant a second entitlement.
-- [x] Assessment answer autosave upserts per question, and submission is
-      idempotent (resubmitting a completed attempt returns the existing score
-      rather than rescoring); neither uses an explicit `idempotency-key`
-      header the way checkout/payment-proof do.
-- [x] Entitlement grants/revocations and admin assessment publish/archive
-      actions are audited; grade-change audits remain [ ].
-- [x] Existing APIs use the current error envelope, bearer authentication,
-      correlation IDs, and pagination conventions.
+> **Status: implementation inventory plus remaining roadmap.** Reviewed
+> 2026-08-10 against the NestJS controllers/services, Prisma schema, tests,
+> journey scripts, and the checked-in OpenAPI document. This file is no
+> longer a proposal-only contract: `[x]` entries are implemented API/data
+> capabilities, while `[ ]` and `[-]` entries are the remaining roadmap.
+
+The current OpenAPI document contains **223 paths and 276 operations**. All
+versioned routes use `/api/v1`; `GET /health` is intentionally unversioned.
+For request-level schemas and examples, use the [compact API reference](api-reference-compact.md),
+[detailed API reference](api-reference-detailed.md), [catalogue guide](student-content-catalog-api-guide.md),
+[assessment reference](assessments-api-reference.md), and [video reference](video-api-reference.md).
+
+## Status legend
+
+- [x] Implemented and represented in the current runtime API.
+- [-] Partially implemented; the remaining limitation is recorded explicitly.
+- [ ] Planned or absent from the current codebase.
+
+## Product and security invariants
+
+The following rules are implemented and should remain stable as new routes are
+added:
+
+- A student has one profile `academicGradeId`. Student catalogue and question
+  eligibility derive grade from the authenticated profile; the client cannot
+  select another grade through a query parameter.
+- Published visibility and delivery access are separate decisions. Public and
+  student catalogue responses expose previews, access/lock state, effective
+  price, and `hasChildren`; protected content bodies and asset URLs require
+  their dedicated delivery/access route.
+- The hierarchy is `AcademicGrade → Subject → Course → Chapter → Lesson →
+  Section`. Course and chapter are the purchasable entitlement targets. A
+  course entitlement covers its descendants; a chapter entitlement covers
+  that chapter and its descendants.
+- A grade change changes future catalogue discovery but does not revoke active
+  paid access. `/student/library` remains cross-grade so purchased content is
+  not hidden after a profile change.
+- Assessment questions/options/placement labels are frozen snapshots. Student
+  assessments are private; published admin assessments are visible only when
+  the student can access all of their target scopes.
+- Checkout and payment-proof upload/resubmission require `Idempotency-Key`.
+  Assessment answer autosave and submission are idempotent by persisted state,
+  but do not use that header.
+- Student responses never expose National ID plaintext, passwords, question
+  answer keys before the appropriate reveal point, or raw storage keys. Parent
+  access is a separate session model with explicit selected-child checks.
+
+## Current implementation inventory
+
+### Identity, sessions, and roles
+
+| Status | API surface | Implementation |
+| --- | --- | --- |
+| [x] | `POST /auth/students/register`, `POST /auth/students/login` | Student registration, login, profile, grade selection, geography fields, and protected National ID handling. |
+| [x] | `POST /auth/admins/login`, `POST /auth/partners/login` | Admin/super-admin and partner login with role-based authorization. |
+| [x] | `POST /auth/parents/login`, `/auth/parents/children`, `/select-child`, `/selected-child` | Lightweight parent session, linked-child discovery, and selected-child authorization. This is not a parent User account. |
+| [x] | `/auth/refresh`, `/logout`, `/logout-all`, `/me`, `/change-password` | Opaque refresh-token rotation, reuse detection, revocation, password change, throttling, and forced password-change support. |
+| [x] | `/admin/admins/*`, `/admin/students/*`, `/admin/partners/*` | Super-admin admin lifecycle; admin/super-admin student and partner lifecycle; safe student detail; suspension, reactivation, soft deletion, and password reset. |
+
+### Public and student catalogue
+
+| Status | API surface | Implementation |
+| --- | --- | --- |
+| [x] | `GET /academic-grades`, `GET /geography/governorates` | Published registration selectors. |
+| [x] | `GET /catalog/subjects`, `GET /catalog/courses`, `GET /catalog/courses/:id` | Published public subject/course discovery, optional grade/subject filters, course detail, and effective public pricing. |
+| [x] | `GET /catalog/courses/:id/chapters`, `/catalog/chapters/:id/lessons`, `/catalog/lessons/:id/sections` | Stable cursor-paginated child traversal. |
+| [x] | `GET /catalog/:resource/:id/content-items`, `/catalog/content-items/:id`, and public asset access | Direct content previews and access to assets attached to public content. |
+| [x] | `GET /student/catalog`, `/student/catalog/subjects`, `/student/catalog/subjects/:id/courses` | Current-grade student catalogue with server-resolved access, lock, entitlement, and price state. |
+| [x] | `/student/catalog/courses/:id`, child traversal, direct content previews | Grade-scoped student course detail and cursor-paginated hierarchy/content traversal. |
+| [x] | `GET /student/catalog/search` | Arabic-aware search for published chapter/lesson/section nodes within a subject, with breadcrumbs and access state. |
+| [x] | `GET /student/library`, `/student/my-subjects`, `/student/entitlements` | Cross-grade active library, subject-grouped owned access/progress, and raw active entitlement views. |
+
+### Content delivery and learning
+
+| Status | API surface | Implementation |
+| --- | --- | --- |
+| [x] | `GET /student/content-items/:id` and asset access | Entitled published content delivery with completion and study state, plus short-lived asset/video access. |
+| [x] | `POST /student/content-items/:id/complete` | Idempotent completion of one accessible content item. Higher-level completion is derived, not directly commanded. |
+| [x] | `PUT /student/content-items/:id/study-state`, `GET /student/learning/continue` | Last-opened state and optional video playback position, with inaccessible/unpublished items skipped. |
+| [x] | `GET /student/progress`, `/student/library/:targetType/:targetId/progress` | Current-grade and owned course/chapter content rollups for course, chapter, lesson, and section. |
+| [x] | `/student/practice/questions*`, `/student/performance` | Entitled published direct-practice questions, immediate answer feedback, immutable retry history, question assets, and basic practice summary. |
+| [x] | `GET /parent/selected-child/performance` | Selected-child content progress plus direct-practice summary. Assessment/order/entitlement parent views are not included. |
+
+### Commerce and entitlements
+
+| Status | API surface | Implementation |
+| --- | --- | --- |
+| [x] | `/student/cart/*`, `/student/manual-payment-methods` | One active cart per student, course/chapter targets, overlap checks, and active transfer instructions. |
+| [x] | `POST /student/checkout`, `/student/orders*` | Serializable, idempotent checkout; immutable EGP totals, payment-method snapshots, order items, cancellation, and purchase history. |
+| [x] | `/student/orders/:id/payment-proof*` | Direct-upload authorization plus proof completion; initial submission, rejected-proof resubmission, transaction reference, note, and idempotency. |
+| [x] | `/admin/manual-payment-methods*`, `/admin/payment-submissions*` | Payment instruction administration and review queue; approval atomically grants one entitlement per order item, rejection retains history. |
+| [x] | `/admin/entitlements*` | Manual grant, revoke, archived-access revoke, and paginated administration. |
+| [-] | Commercial lifecycle | No PSP/card/webhook payment, subject-level purchase, refunds, coupons, timed discounts, payment expiry, or automated entitlement expiry job. Lesson pricing can be configured, but the purchase/entitlement model sells courses and chapters. |
+
+### Authoring, question banks, and media
+
+| Status | API surface | Implementation |
+| --- | --- | --- |
+| [x] | `/admin/question-banks/sources*`, `/admin/question-banks*` | Source and bank CRUD, bilingual metadata, source type, publisher association, publication lifecycle. |
+| [x] | `/admin/questions*` | Question CRUD/review lifecycle, single/multiple-choice options, hierarchy placements, attachments, question video links/timestamps, and learner-safe delivery. |
+| [x] | Student marks and question discovery | `/student/assessments/question-banks`, `/question-sources`, `/question-marks*` expose eligible banks/sources and private marks. |
+| [x] | Community statistics | Practice attempts update incorrect-rate aggregates and A+–D difficulty bands used by assessment filtering. No ranked community-incorrect feed exists. |
+| [x] | `/admin/assets*`, covers, `/admin/video-assets*` | General file/cover upload authorization, protected access, Bunny Stream direct upload, confirmation, playback, retry, archive/delete, and webhook processing. |
+| [ ] | Automated question extraction | No PDF-to-question generation, AI question selection, AI explanation, or question-report/moderation workflow. |
+
+### Assessments and results
+
+| Status | API surface | Implementation |
+| --- | --- | --- |
+| [x] | `POST /student/assessments` | Private random-sample assessment. Supports question bank, multiple hierarchy scopes, source IDs/types, A+–D difficulty bands, `UNUSED`/`USED`/`CORRECT`/`INCORRECT`/`OMITTED`/`ALL`, marked-only, count 1–50, TUTOR/EXAM mode, timer, duration, and title. |
+| [x] | Student assessment history/actions | `GET/PATCH/DELETE /student/assessments`, detail, search/status filters, rename, and visibility-safe merging of own/private and accessible public assessments. |
+| [x] | Attempt lifecycle | Start/resume, current state, per-question autosave, monotonic active-time reporting, timer expiry, submit, immutable score/result, omitted outcome, and mode-aware answer reveal. One attempt per assessment/student. |
+| [x] | Results and assessment analytics | Full question review; frozen hierarchy/source/placement context; platform comparison; subject/chapter/topic rollups; chapter attempt drill-down. |
+| [x] | Admin assessment authoring | Standard random and custom hand-picked generation, draft list/detail/edit, publish/archive, and draft-only delete. |
+| [ ] | Deferred assessment features | AI prompt generation, AI explanations, assessment snapshot video timestamps, multiple attempts, and question reports remain absent. |
+
+### Performance and leaderboard
+
+| Status | API surface | Implementation |
+| --- | --- | --- |
+| [x] | `GET /student/performance/overview` | Date-filterable test totals, completed/suspended counts, eligible/used/unused question-bank metrics, usage percentage, assessment outcomes, and practice metrics. |
+| [x] | `GET /student/performance/analysis` | Searchable subject/chapter/lesson rollups from completed assessment answers. |
+| [x] | `GET /student/performance/trends` | Date/test-filterable completed-assessment outcome trends. |
+| [-] | `GET /student/performance/peers` | Grade cohort average, median, percentile, and minimum sample are implemented for course/optional chapter; bell curves and arbitrary topic-level cohorts are not. |
+| [x] | `GET /student/performance/answer-changes` | Assessment answer-change counts and rows for correct→incorrect and incorrect→correct. Direct practice remains immutable-attempt based. |
+| [-] | Smart Score | Leaderboard computes and stores a Smart Score, but the formula currently uses raw correct-question and total-question counts rather than a normalized accuracy percentage. |
+| [x] | `/student/leaderboard/current`, `/history/:weekKey` | Friday/Cairo weekly windows, lazy previous-week finalization, top-five honor board, full pagination, current rank, history, and top-three award labels. |
+| [ ] | Prize/reward operations | No configurable prizes, reward ledger, notification, or fulfilment workflow. |
+
+### Pricing, publisher, and operations
+
+| Status | API surface | Implementation |
+| --- | --- | --- |
+| [x] | `/admin/pricing/*` | Course, chapter, lesson pricing and effective-price resolution; chapter inheritance is surfaced for admin UI. |
+| [x] | `/admin/publisher-agreements/*` | Draft/active/ended publisher agreements, effective agreement lookup, and earnings-statement creation/listing. |
+| [x] | Academic/content administration | Grade/subject/course/chapter/lesson/section/content-item CRUD, move/reorder, publication/archive/restore, access types, and audit records. |
+| [x] | Geography and account support | Governorate/center management, public registration geography, admin student support, partner account lifecycle. |
+| [ ] | Reporting/export | No Excel subscriber export, consolidated payment/revenue report, partner dashboard, parent directory, or admin cross-domain student dashboard. |
+
+## Remaining roadmap
+
+### Priority 0 — resolve contract gaps before frontend freeze
+
+1. Decide whether the required Smart Score is the original normalized
+   percentage formula. If yes, change the leaderboard calculation and add
+   regression tests for ties, zero-answer students, and ranking stability.
+2. Decide whether assessment review must preserve question video-link metadata.
+   If yes, copy timestamp/link data into the immutable assessment snapshot and
+   expose it only at the appropriate reveal point.
+3. Define whether analytics are assessment-only or must combine direct practice
+   and assessments. The current `analysis`, `trends`, `peers`, and
+   `answer-changes` views are assessment-based, while `overview` combines
+   practice and assessment data in selected metrics.
+
+### Priority 1 — missing product capabilities
+
+1. Add a parent domain or explicitly document parent as a session-only role;
+   then add selected-child orders, entitlements, assessment results, and
+   richer progress views if required.
+2. Add partner-facing dashboard/reporting for assigned content, referred
+   students, payments, profit share, and earnings statements.
+3. Add admin reporting/export, including consolidated student purchase,
+   entitlement, learning, and performance views.
+4. Add configurable leaderboard prize/reward records and fulfilment if
+   medals are meant to carry real benefits.
+
+### Priority 2 — commercial and learning extensions
+
+1. Add refunds/cancellations with entitlement reversal rules, payment expiry,
+   coupons, timed discounts, and PSP integration only after the manual-payment
+   operating process is settled.
+2. Add structured video topics/concepts and a direct higher-level completion
+   command only if the client needs server-authored node completion rather than
+   derived progress.
+3. Add AI question generation/explanations, automated PDF extraction, and
+   question reporting/moderation behind explicit product and safety decisions.
+
+## Verification sources
+
+The implementation review used:
+
+- runtime route inventory from [`docs-json.json`](../docs-json.json);
+- controllers/services under [`src/modules`](../src/modules);
+- persistence and lifecycle models in [`prisma/schema.prisma`](../prisma/schema.prisma);
+- focused e2e coverage under [`test`](../test) and acceptance journeys under
+  [`scripts/journeys`](../scripts/journeys);
+- the detailed endpoint guides linked at the top of this document.
+
+When routes change, regenerate `docs-json.json` with `pnpm api:docs:generate` and
+revisit this inventory so implemented status does not drift from the runtime
+contract.

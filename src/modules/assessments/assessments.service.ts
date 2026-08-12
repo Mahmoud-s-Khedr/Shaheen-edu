@@ -43,7 +43,8 @@ import type {
   AssessmentResultQueryDto,
   AutosaveAnswerDto,
   CreateCustomAssessmentDto,
-  GenerateStandardAssessmentDto,
+  GenerateAdminStandardAssessmentDto,
+  GenerateStudentAssessmentDto,
   QueryAdminAssessmentDto,
   QueryAssessmentDto,
   RenameAssessmentDto,
@@ -159,8 +160,8 @@ export class AssessmentsService {
   }
 
   private async studentScopes(
-    dto: GenerateStandardAssessmentDto,
-    subjectId: string,
+    dto: GenerateStudentAssessmentDto,
+    subjectId?: string,
   ) {
     const grouped: AssessmentScopeDto[] = [
       ...(dto.courseIds ?? []).map((courseId) => ({ courseId })),
@@ -168,12 +169,11 @@ export class AssessmentsService {
       ...(dto.lessonIds ?? []).map((lessonId) => ({ lessonId })),
       ...(dto.sectionIds ?? []).map((sectionId) => ({ sectionId })),
     ];
-    const requested = grouped.length ? grouped : (dto.scopes ?? []);
-    if (!requested.length)
+    if (!grouped.length)
       throw new BadRequestException(
         'Select at least one course, chapter, lesson, or section',
       );
-    const scopes = await this.resolveScopes(requested);
+    const scopes = await this.resolveScopes(grouped);
     for (const scope of scopes) {
       const node: any = scope.courseId
         ? await this.prisma.course.findUnique({
@@ -211,7 +211,7 @@ export class AssessmentsService {
         node?.course?.subjectId ??
         node?.chapter?.course?.subjectId ??
         node?.lesson?.chapter?.course?.subjectId;
-      if (nodeSubjectId !== subjectId)
+      if (subjectId && nodeSubjectId !== subjectId)
         throw new BadRequestException(
           'All selected scopes must belong to the question bank subject',
         );
@@ -303,7 +303,7 @@ export class AssessmentsService {
     studentIdForEntitlement?: string,
     gradeId?: string,
     filters?: {
-      bankId?: string;
+      bankIds?: string[];
       sourceIds?: string[];
       sourceTypes?: any[];
       difficultyBands?: QuestionDifficultyBand[];
@@ -314,7 +314,9 @@ export class AssessmentsService {
     const questions = await this.prisma.question.findMany({
       where: {
         status: QuestionStatus.PUBLISHED,
-        ...(filters?.bankId ? { bankId: filters.bankId } : {}),
+        ...(filters?.bankIds?.length
+          ? { bankId: { in: filters.bankIds } }
+          : {}),
         ...(filters?.sourceIds?.length
           ? { sourceId: { in: filters.sourceIds } }
           : {}),
@@ -464,6 +466,7 @@ export class AssessmentsService {
       scopes: ScopeRow[];
       questions: any[];
       questionBankId?: string;
+      questionBankIds?: string[];
       generationFilters?: object;
     },
   ) {
@@ -480,6 +483,13 @@ export class AssessmentsService {
         questionCount: params.questions.length,
         status: params.status,
         questionBankId: params.questionBankId,
+        questionBanks: params.questionBankIds?.length
+          ? {
+              create: params.questionBankIds.map((questionBankId) => ({
+                questionBankId,
+              })),
+            }
+          : undefined,
         generationFilters: params.generationFilters,
         publishedAt:
           params.status === AssessmentStatus.READY ? new Date() : null,
@@ -543,64 +553,51 @@ export class AssessmentsService {
 
   // --- Student: generation ------------------------------------------------
 
-  async generateStandard(
-    studentId: string,
-    dto: GenerateStandardAssessmentDto,
-  ) {
+  async generateStandard(studentId: string, dto: GenerateStudentAssessmentDto) {
     const gradeId = await this.studentGrade(studentId);
     if (dto.isTimed && !dto.durationSeconds)
       throw new BadRequestException(
         'durationSeconds is required when isTimed is true',
       );
-    // Keep already-created clients working while they migrate to bank-aware generation.
-    // New clients must send questionBankId; this compatibility path is deliberately
-    // limited to the pre-existing scope-only behaviour.
-    if (!dto.questionBankId) {
-      if (!dto.scopes?.length)
-        throw new BadRequestException('questionBankId is required');
-      const scopes = await this.resolveScopes(dto.scopes);
-      const eligible = await this.eligibleQuestions(scopes, studentId, gradeId);
-      if (eligible.length < dto.questionCount)
-        throw new BadRequestException(
-          'Not enough eligible questions in the selected scope',
-        );
-      const mode = dto.mode ?? AssessmentMode.EXAM;
-      const assessment = await this.prisma.$transaction((tx) =>
-        this.freezeSnapshot(tx, {
-          ownerType: AssessmentOwnerType.STUDENT,
-          studentUserId: studentId,
-          title: dto.title?.trim() || this.defaultTitle(mode),
-          generationType: AssessmentGenerationType.STANDARD,
-          mode,
-          isTimed: dto.isTimed ?? false,
-          durationSeconds: dto.durationSeconds,
-          status: AssessmentStatus.READY,
-          scopes,
-          questions: this.shuffle(eligible).slice(0, dto.questionCount),
-        }),
+    const bankIds = dto.questionBankIds ?? [];
+    const banks = bankIds.length
+      ? await this.prisma.questionBank.findMany({
+          where: {
+            id: { in: bankIds },
+            status: ContentStatus.PUBLISHED,
+            subject: {
+              status: ContentStatus.PUBLISHED,
+              academicGradeId: gradeId,
+              academicGrade: { status: ContentStatus.PUBLISHED },
+            },
+          },
+          select: { id: true, subjectId: true },
+        })
+      : [];
+    if (
+      banks.length !== bankIds.length ||
+      banks.some((bank) => !bank.subjectId)
+    )
+      throw new NotFoundException(
+        'One or more question banks are not accessible',
       );
-      return this.get(studentId, assessment.id);
-    }
-    const bank = await this.prisma.questionBank.findFirst({
-      where: {
-        id: dto.questionBankId,
-        status: ContentStatus.PUBLISHED,
-        subject: {
-          status: ContentStatus.PUBLISHED,
-          academicGradeId: gradeId,
-          academicGrade: { status: ContentStatus.PUBLISHED },
-        },
-      },
-    });
-    if (!bank?.subjectId)
-      throw new NotFoundException('Question bank is not accessible');
-    const scopes = await this.studentScopes(dto, bank.subjectId);
-    const eligible = await this.eligibleQuestions(
-      scopes,
-      studentId,
-      gradeId,
+    const subjectIds = new Set(banks.map((bank) => bank.subjectId));
+    if (subjectIds.size > 1)
+      throw new BadRequestException(
+        'All selected question banks must belong to the same subject',
+      );
+    const scopes = await this.studentScopes(
       dto,
+      banks[0]?.subjectId ?? undefined,
     );
+    const eligible = await this.eligibleQuestions(scopes, studentId, gradeId, {
+      bankIds,
+      sourceIds: dto.sourceIds,
+      sourceTypes: dto.sourceTypes,
+      difficultyBands: dto.difficultyBands,
+      markedOnly: dto.markedOnly,
+      questionStatuses: dto.questionStatuses,
+    });
     if (eligible.length < dto.questionCount)
       throw new BadRequestException(
         'Not enough eligible questions in the selected scope',
@@ -617,8 +614,9 @@ export class AssessmentsService {
         isTimed: dto.isTimed ?? false,
         durationSeconds: dto.durationSeconds,
         status: AssessmentStatus.READY,
-        questionBankId: bank.id,
+        questionBankIds: bankIds,
         generationFilters: {
+          questionBankIds: bankIds,
           sourceIds: dto.sourceIds ?? [],
           sourceTypes: dto.sourceTypes ?? [],
           difficultyBands: dto.difficultyBands ?? [],
@@ -668,7 +666,7 @@ export class AssessmentsService {
     });
     if (!bank) throw new NotFoundException('Question bank is not accessible');
     const questions = await this.eligibleQuestions([], studentId, gradeId, {
-      bankId,
+      bankIds: [bankId],
     });
     const counts = new Map<string, number>();
     for (const question of questions)
@@ -960,7 +958,7 @@ export class AssessmentsService {
   private async assessmentWithScopes(id: string) {
     const assessment = await this.prisma.assessment.findUnique({
       where: { id },
-      include: { scopes: { include: scopeInclude } },
+      include: { scopes: { include: scopeInclude }, questionBanks: true },
     });
     if (!assessment) throw new NotFoundException('Assessment not found');
     return assessment;
@@ -1002,6 +1000,11 @@ export class AssessmentsService {
     return {
       ...this.listItemDto(assessment, visibility, attempt),
       questionBankId: assessment.questionBankId,
+      questionBankIds: assessment.questionBanks?.length
+        ? assessment.questionBanks.map((bank: any) => bank.questionBankId)
+        : assessment.questionBankId
+          ? [assessment.questionBankId]
+          : [],
       generationFilters: assessment.generationFilters,
       scopes: assessment.scopes.map((s: any) => ({
         courseId: s.courseId,
@@ -1884,7 +1887,10 @@ export class AssessmentsService {
     });
   }
 
-  async createStandard(actor: RequestUser, dto: GenerateStandardAssessmentDto) {
+  async createStandard(
+    actor: RequestUser,
+    dto: GenerateAdminStandardAssessmentDto,
+  ) {
     this.assertAdmin(actor);
     if (dto.isTimed && !dto.durationSeconds)
       throw new BadRequestException(

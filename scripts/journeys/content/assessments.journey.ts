@@ -14,6 +14,7 @@ export const assessmentsJourney: JourneyDefinition = {
     let courseId = '';
     let chapterId = '';
     let questionBankId = '';
+    let secondQuestionBankId = '';
     let questionSourceId = '';
     let questionIds: string[] = [];
     let student1Token = '';
@@ -94,6 +95,14 @@ export const assessmentsJourney: JourneyDefinition = {
         await publish('question-banks/sources', source.id);
         await publish('question-banks', bank.id);
 
+        const secondBank = await create('/admin/question-banks', {
+          subjectId,
+          title: factory.title('Assessments second bank'),
+        });
+        secondQuestionBankId = secondBank.id;
+        context.created.questionBanks.push(secondBank.id);
+        await publish('question-banks', secondBank.id);
+
         for (let i = 0; i < 3; i++) {
           const question = await create('/admin/questions', {
             bankId: bank.id,
@@ -128,6 +137,38 @@ export const assessmentsJourney: JourneyDefinition = {
           questionIds.push(question.id);
           context.created.questions.push(question.id);
         }
+
+        const secondBankQuestion = await create('/admin/questions', {
+          bankId: secondQuestionBankId,
+          sourceId: source.id,
+          courseId,
+          placements: [{ chapterId }],
+          body: 'Assessment question from second bank',
+          explanation: 'Second-bank explanation',
+        });
+        await create(`/admin/questions/${secondBankQuestion.id}/options`, {
+          body: 'Correct',
+          isCorrect: true,
+        });
+        await create(`/admin/questions/${secondBankQuestion.id}/options`, {
+          body: 'Wrong',
+          isCorrect: false,
+        });
+        expectStatus(
+          await admin.request<any>(
+            'POST',
+            `/admin/questions/${secondBankQuestion.id}/submit`,
+          ),
+          201,
+        );
+        expectStatus(
+          await admin.request<any>(
+            'POST',
+            `/admin/questions/${secondBankQuestion.id}/publish`,
+          ),
+          201,
+        );
+        context.created.questions.push(secondBankQuestion.id);
       },
     );
 
@@ -158,11 +199,12 @@ export const assessmentsJourney: JourneyDefinition = {
     });
 
     await step(
-      'Discovering a bank and generating a filtered private standard assessment',
+      'Discovering banks and generating optional/multi-bank private assessments',
       async () => {
         const banks = await student<any>(student1Token, 'GET', `/student/assessments/question-banks?subjectId=${subjectId}`);
         expectStatus(banks, 200);
         assert(banks.body.data.some((item: any) => item.id === questionBankId && item.availableQuestionCount === 3), 'A student must discover only an accessible bank with its available count');
+        assert(banks.body.data.some((item: any) => item.id === secondQuestionBankId && item.availableQuestionCount === 1), 'A student must discover every accessible selected bank with its available count');
         const sources = await student<any>(student1Token, 'GET', `/student/assessments/question-sources?questionBankId=${questionBankId}`);
         expectStatus(sources, 200);
         assert(sources.body.data.some((item: any) => item.id === questionSourceId && item.type === 'PLATFORM'), 'A bank source list must be learner-safe and accessible');
@@ -173,18 +215,39 @@ export const assessmentsJourney: JourneyDefinition = {
         const unmarked = await student<any>(student1Token, 'DELETE', `/student/assessments/question-marks/${questionIds[0]}`);
         expectStatus(unmarked, 200);
         assert(unmarked.body.questionId === questionIds[0] && unmarked.body.marked === false, 'A student must be able to remove a question mark');
+        const allBanksGenerated = await student<any>(
+          student1Token,
+          'POST',
+          '/student/assessments',
+          { chapterIds: [chapterId], sourceIds: [questionSourceId], questionCount: 1 },
+        );
+        expectStatus(allBanksGenerated, 201);
+        assert(
+          Array.isArray(allBanksGenerated.body.questionBankIds) &&
+            allBanksGenerated.body.questionBankIds.length === 0,
+          'Omitting questionBankIds must create an assessment from all eligible banks without persisting a bank restriction',
+        );
         const generated = await student<any>(
           student1Token,
           'POST',
           '/student/assessments',
-          { questionBankId, chapterIds: [chapterId], sourceIds: [questionSourceId], questionCount: 2, mode: 'EXAM' },
+          { questionBankIds: [questionBankId, secondQuestionBankId], chapterIds: [chapterId], sourceIds: [questionSourceId], questionCount: 2, mode: 'EXAM' },
         );
         expectStatus(generated, 201);
         assert(
           generated.body.questionCount === 2 &&
-            generated.body.visibility === 'MINE' && generated.body.questionBankId === questionBankId,
-          'A generated assessment must reflect the requested question count and be owned by the requester',
+            generated.body.visibility === 'MINE' &&
+            generated.body.questionBankIds.includes(questionBankId) &&
+            generated.body.questionBankIds.includes(secondQuestionBankId),
+          'A generated assessment must reflect the requested question count, selected bank set, and owner',
         );
+        const legacy = await student<any>(
+          student1Token,
+          'POST',
+          '/student/assessments',
+          { scopes: [{ chapterId }], questionCount: 1 },
+        );
+        expectStatus(legacy, 400);
         studentAssessmentId = generated.body.id;
 
         const ownList = await student<any>(

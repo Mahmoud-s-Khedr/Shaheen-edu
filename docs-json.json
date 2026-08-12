@@ -14447,7 +14447,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/GenerateStandardAssessmentDto"
+                "$ref": "#/components/schemas/GenerateStudentAssessmentDto"
               }
             }
           }
@@ -15661,7 +15661,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/GenerateStandardAssessmentDto"
+                "$ref": "#/components/schemas/GenerateAdminStandardAssessmentDto"
               }
             }
           }
@@ -21340,34 +21340,38 @@
           "optionIds"
         ]
       },
-      "AssessmentScopeDto": {
+      "GenerateStudentAssessmentDto": {
         "type": "object",
         "properties": {
-          "courseId": {
+          "questionCount": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 50
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "TUTOR",
+              "EXAM"
+            ],
+            "default": "EXAM"
+          },
+          "isTimed": {
+            "type": "boolean",
+            "default": false
+          },
+          "durationSeconds": {
+            "type": "number",
+            "description": "Required when isTimed is true"
+          },
+          "title": {
             "type": "string"
           },
-          "chapterId": {
-            "type": "string"
-          },
-          "lessonId": {
-            "type": "string"
-          },
-          "sectionId": {
-            "type": "string"
-          }
-        }
-      },
-      "GenerateStandardAssessmentDto": {
-        "type": "object",
-        "properties": {
-          "scopes": {
+          "questionBankIds": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/AssessmentScopeDto"
+              "type": "string"
             }
-          },
-          "questionBankId": {
-            "type": "string"
           },
           "courseIds": {
             "type": "array",
@@ -21441,30 +21445,6 @@
           },
           "markedOnly": {
             "type": "boolean"
-          },
-          "questionCount": {
-            "type": "number",
-            "minimum": 1,
-            "maximum": 50
-          },
-          "mode": {
-            "type": "string",
-            "enum": [
-              "TUTOR",
-              "EXAM"
-            ],
-            "default": "EXAM"
-          },
-          "isTimed": {
-            "type": "boolean",
-            "default": false
-          },
-          "durationSeconds": {
-            "type": "number",
-            "description": "Required when isTimed is true"
-          },
-          "title": {
-            "type": "string"
           }
         },
         "required": [
@@ -21540,6 +21520,12 @@
             "type": "string",
             "nullable": true
           },
+          "questionBankIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
           "generationFilters": {
             "type": "object",
             "nullable": true
@@ -21560,6 +21546,7 @@
           "isTimed",
           "questionCount",
           "createdAt",
+          "questionBankIds",
           "scopes"
         ]
       },
@@ -21867,6 +21854,62 @@
           "omittedCount",
           "answeredCount",
           "questions"
+        ]
+      },
+      "AssessmentScopeDto": {
+        "type": "object",
+        "properties": {
+          "courseId": {
+            "type": "string"
+          },
+          "chapterId": {
+            "type": "string"
+          },
+          "lessonId": {
+            "type": "string"
+          },
+          "sectionId": {
+            "type": "string"
+          }
+        }
+      },
+      "GenerateAdminStandardAssessmentDto": {
+        "type": "object",
+        "properties": {
+          "questionCount": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 50
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "TUTOR",
+              "EXAM"
+            ],
+            "default": "EXAM"
+          },
+          "isTimed": {
+            "type": "boolean",
+            "default": false
+          },
+          "durationSeconds": {
+            "type": "number",
+            "description": "Required when isTimed is true"
+          },
+          "title": {
+            "type": "string"
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AssessmentScopeDto"
+            }
+          }
+        },
+        "required": [
+          "questionCount",
+          "scopes"
         ]
       },
       "AdminAssessmentListItemDto": {

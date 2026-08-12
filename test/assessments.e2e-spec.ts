@@ -106,13 +106,13 @@ describe('Assessments (e2e)', () => {
       method: 'POST',
       url: '/api/v1/student/assessments',
       headers: { authorization: `Bearer ${student1.accessToken}` },
-      payload: { questionBankId, courseIds: [courseId], sourceIds: [sourceId], questionCount: 2, mode: 'EXAM' },
+      payload: { questionBankIds: [questionBankId], courseIds: [courseId], sourceIds: [sourceId], questionCount: 2, mode: 'EXAM' },
     });
     expect(response.statusCode).toBe(201);
     const body = JSON.parse(response.body);
     expect(body.questionCount).toBe(2);
     expect(body.visibility).toBe('MINE');
-    expect(body.questionBankId).toBe(questionBankId);
+    expect(body.questionBankIds).toEqual([questionBankId]);
     studentAssessmentId = body.id;
   });
 
@@ -121,7 +121,7 @@ describe('Assessments (e2e)', () => {
       method: 'POST',
       url: '/api/v1/student/assessments',
       headers: { authorization: `Bearer ${student1.accessToken}` },
-      payload: { questionBankId, courseIds: [courseId], questionCount: 50 },
+      payload: { questionBankIds: [questionBankId], courseIds: [courseId], questionCount: 50 },
     });
     expect(response.statusCode).toBe(400);
   });
@@ -230,7 +230,7 @@ describe('Assessments (e2e)', () => {
     const marks = await app.inject({ method: 'GET', url: '/api/v1/student/assessments/question-marks', headers: { authorization: `Bearer ${student1.accessToken}` } });
     expect(marks.statusCode).toBe(200);
     expect(JSON.parse(marks.body).data).toEqual(expect.arrayContaining([expect.objectContaining({ questionId: questionIds[0], bank: expect.objectContaining({ id: questionBankId }) })]));
-    const generated = await app.inject({ method: 'POST', url: '/api/v1/student/assessments', headers: { authorization: `Bearer ${student1.accessToken}` }, payload: { questionBankId, courseIds: [courseId], markedOnly: true, questionCount: 1 } });
+    const generated = await app.inject({ method: 'POST', url: '/api/v1/student/assessments', headers: { authorization: `Bearer ${student1.accessToken}` }, payload: { questionBankIds: [questionBankId], courseIds: [courseId], markedOnly: true, questionCount: 1 } });
     expect(generated.statusCode).toBe(201);
     const unmark = await app.inject({ method: 'DELETE', url: `/api/v1/student/assessments/question-marks/${questionIds[0]}`, headers: { authorization: `Bearer ${student1.accessToken}` } });
     expect(unmark.statusCode).toBe(200);
@@ -383,7 +383,7 @@ describe('Assessments (e2e)', () => {
       method: 'POST',
       url: '/api/v1/student/assessments',
       headers: { authorization: `Bearer ${student1.accessToken}` },
-      payload: { scopes: [{ courseId }], questionCount: 1 },
+      payload: { courseIds: [courseId], questionCount: 1 },
     });
     const blankTitleAssessmentId = JSON.parse(create.body).id;
 

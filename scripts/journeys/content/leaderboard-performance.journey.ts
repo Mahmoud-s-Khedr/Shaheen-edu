@@ -45,7 +45,7 @@ export const leaderboardPerformanceJourney: JourneyDefinition = {
     });
 
     const completeAssessment = async (token: string, changeAnswer: boolean) => {
-      const generated = await student<any>(token, 'POST', '/student/assessments', { questionBankId: bankId, chapterIds: [chapterId], sourceIds: [sourceId], questionCount: 2, mode: 'EXAM' }); expectStatus(generated, 201);
+      const generated = await student<any>(token, 'POST', '/student/assessments', { questionBankIds: [bankId], chapterIds: [chapterId], sourceIds: [sourceId], questionCount: 2, mode: 'EXAM' }); expectStatus(generated, 201);
       const started = await student<any>(token, 'POST', `/student/assessments/${generated.body.id}/attempts/start`); expectStatus(started, 201);
       const question = started.body.questions[0]; const wrong = question.options.find((option: any) => option.body === 'Wrong').id; const correct = question.options.find((option: any) => option.body === 'Correct').id;
       expectStatus(await student<any>(token, 'POST', `/student/assessments/${generated.body.id}/attempts/current/answers/${question.id}`, { selectedOptionIds: changeAnswer ? [wrong] : [correct] }), 201);

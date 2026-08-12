@@ -714,7 +714,8 @@ model QuestionBank {
   createdBy   User          @relation("QuestionBankCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
   updatedBy   User          @relation("QuestionBankUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
   questions   Question[]
-  assessments Assessment[]
+  assessments Assessment[] @relation("AssessmentLegacyQuestionBank")
+  assessmentQuestionBanks AssessmentQuestionBank[]
 
   @@index([status, createdAt, id])
   @@index([subjectId, status])
@@ -839,7 +840,7 @@ model Assessment {
   questionCount     Int
   status            AssessmentStatus         @default(READY)
   questionBankId    String?
-  questionBank      QuestionBank?            @relation(fields: [questionBankId], references: [id], onDelete: Restrict)
+  questionBank      QuestionBank?            @relation("AssessmentLegacyQuestionBank", fields: [questionBankId], references: [id], onDelete: Restrict)
   generationFilters Json?
 
   createdAt   DateTime  @default(now())
@@ -848,12 +849,24 @@ model Assessment {
   archivedAt  DateTime?
 
   scopes    AssessmentScope[]
+  questionBanks AssessmentQuestionBank[]
   questions AssessmentQuestion[]
   attempts  AssessmentAttempt[]
 
   @@index([ownerType, studentUserId, status, createdAt, id])
   @@index([ownerType, createdByAdminId, status, createdAt, id])
   @@index([status, createdAt, id])
+  @@index([questionBankId])
+}
+
+model AssessmentQuestionBank {
+  assessmentId  String
+  questionBankId String
+  assessment    Assessment   @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  questionBank  QuestionBank @relation(fields: [questionBankId], references: [id], onDelete: Restrict)
+  createdAt     DateTime     @default(now())
+
+  @@id([assessmentId, questionBankId])
   @@index([questionBankId])
 }
 
