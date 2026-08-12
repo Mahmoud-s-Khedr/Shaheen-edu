@@ -153,7 +153,7 @@ export class ChaptersService {
       where,
       args: {
         include: {
-          course: { select: { title: true, isPurchasable: true, priceMinor: true, currency: true } },
+          course: { select: { id: true, title: true, isPurchasable: true, priceMinor: true, currency: true } },
           coverAsset: { select: { filename: true } },
           _count: { select: { lessons: { where: { status: { not: ContentStatus.ARCHIVED } } } } },
         },
