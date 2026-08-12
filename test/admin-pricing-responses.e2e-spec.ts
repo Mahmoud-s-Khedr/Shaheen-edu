@@ -155,16 +155,25 @@ describe('Admin course and chapter pricing responses (e2e)', () => {
       expect.arrayContaining([
         expect.objectContaining({
           id: courseId,
-          pricing: { ...pricing, resolvedFrom: { courseId } },
+          pricing: expect.objectContaining({
+            ...pricing,
+            resolvedFrom: expect.objectContaining({
+              courseId,
+              courseName: 'Paid course',
+            }),
+          }),
         }),
         expect.objectContaining({
           id: otherCourseId,
-          pricing: {
+          pricing: expect.objectContaining({
             isPurchasable: false,
             priceMinor: null,
             currency: null,
-            resolvedFrom: { courseId: otherCourseId },
-          },
+            resolvedFrom: expect.objectContaining({
+              courseId: otherCourseId,
+              courseName: 'Free course',
+            }),
+          }),
         }),
       ]),
     );
@@ -219,28 +228,37 @@ describe('Admin course and chapter pricing responses (e2e)', () => {
       expect.arrayContaining([
         expect.objectContaining({
           id: inheritedChapterId,
-          pricing: {
+          pricing: expect.objectContaining({
             isPurchasable: true,
             priceMinor: 20_000,
             currency: 'EGP',
-            resolvedFrom: { courseId },
-          },
+            resolvedFrom: expect.objectContaining({
+              courseId,
+              courseName: 'Paid course',
+            }),
+          }),
         }),
         expect.objectContaining({
           id: overriddenChapterId,
-          pricing: {
+          pricing: expect.objectContaining({
             ...chapterPricing,
-            resolvedFrom: { chapterId: overriddenChapterId },
-          },
+            resolvedFrom: expect.objectContaining({
+              chapterId: overriddenChapterId,
+              chapterName: 'Override',
+            }),
+          }),
         }),
         expect.objectContaining({
           id: nonPurchasableChapterId,
-          pricing: {
+          pricing: expect.objectContaining({
             isPurchasable: false,
             priceMinor: null,
             currency: null,
-            resolvedFrom: { chapterId: nonPurchasableChapterId },
-          },
+            resolvedFrom: expect.objectContaining({
+              chapterId: nonPurchasableChapterId,
+              chapterName: 'Not purchasable',
+            }),
+          }),
         }),
       ]),
     );

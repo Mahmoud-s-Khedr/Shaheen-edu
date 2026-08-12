@@ -96,7 +96,46 @@ export class PublisherAgreementsService {
     if (field === 'courseId') await this.prisma.course.update({ where: { id }, data: pricing }); else if (field === 'chapterId') await this.prisma.chapter.update({ where: { id }, data: pricing }); else await this.prisma.lesson.update({ where: { id }, data: pricing });
     await this.audit.record({ actorUserId: actor.id, action: 'CONTENT_PRICING_UPDATED', targetType: field.replace('Id', ''), targetId: id, metadata: pricing }); return this.resolvePricing(actor, target);
   }
-  async resolvePricing(actor: RequestUser, target: Target) { this.assertAdmin(actor); const targets = await this.hierarchyTarget(target); for (const candidate of targets) { const [field, id] = this.targetKey(candidate); const value = field === 'courseId' ? await this.prisma.course.findUnique({ where: { id }, select: { priceMinor: true, currency: true, isPurchasable: true } }) : field === 'chapterId' ? await this.prisma.chapter.findUnique({ where: { id }, select: { priceMinor: true, currency: true, isPurchasable: true } }) : await this.prisma.lesson.findUnique({ where: { id }, select: { priceMinor: true, currency: true, isPurchasable: true } }); if (!value) continue; if (field === 'courseId' || value.isPurchasable !== null) return { ...value, resolvedFrom: candidate }; } throw new NotFoundException('Content not found'); }
+  async resolvePricing(actor: RequestUser, target: Target) {
+    this.assertAdmin(actor);
+    const targets = await this.hierarchyTarget(target);
+
+    for (const candidate of targets) {
+      const [field, id] = this.targetKey(candidate);
+      const value =
+        field === 'courseId'
+          ? await this.prisma.course.findUnique({
+              where: { id },
+              select: { title: true, priceMinor: true, currency: true, isPurchasable: true },
+            })
+          : field === 'chapterId'
+            ? await this.prisma.chapter.findUnique({
+                where: { id },
+                select: { title: true, priceMinor: true, currency: true, isPurchasable: true },
+              })
+            : await this.prisma.lesson.findUnique({
+                where: { id },
+                select: { title: true, priceMinor: true, currency: true, isPurchasable: true },
+              });
+
+      if (!value) continue;
+      if (field === 'courseId' || value.isPurchasable !== null) {
+        return {
+          ...value,
+          resolvedFrom: {
+            ...candidate,
+            ...(field === 'courseId'
+              ? { courseName: value.title }
+              : field === 'chapterId'
+                ? { chapterName: value.title }
+                : { lessonName: value.title }),
+          },
+        };
+      }
+    }
+
+    throw new NotFoundException('Content not found');
+  }
 
   async createStatement(actor: RequestUser, dto: CreateEarningsStatementDto) {
     this.assertAdmin(actor); await this.assertTargetExists(dto); this.assertDates(dto.periodStartsAt, dto.periodEndsAt); if (dto.currency !== 'EGP') throw new BadRequestException('Only EGP is supported');
