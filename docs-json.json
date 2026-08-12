@@ -1839,6 +1839,81 @@
         "tags": [
           "partners"
         ]
+      },
+      "patch": {
+        "operationId": "PartnersController_updateMe_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePartnerDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PartnerSummaryDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update the authenticated partner profile",
+        "tags": [
+          "partners"
+        ]
       }
     },
     "/api/v1/students/me": {
@@ -17144,11 +17219,13 @@
           },
           "legalName": {
             "type": "string",
-            "example": "Acme Learning LLC"
+            "example": "Acme Learning LLC",
+            "nullable": true
           },
           "phone": {
             "type": "string",
-            "example": "01098765432"
+            "example": "01098765432",
+            "nullable": true
           }
         }
       },
@@ -17213,6 +17290,9 @@
           "academicGradeId": {
             "type": "string",
             "nullable": true
+          },
+          "parentPhone": {
+            "type": "string"
           }
         },
         "required": [
@@ -17220,7 +17300,8 @@
           "governorate",
           "center",
           "nationalIdLast4",
-          "academicGradeId"
+          "academicGradeId",
+          "parentPhone"
         ]
       },
       "StudentProfileDto": {
@@ -17268,6 +17349,15 @@
           "fullName": {
             "type": "string",
             "example": "Ahmed Mohamed Ali"
+          },
+          "parentPhone": {
+            "type": "string",
+            "example": "01098765432",
+            "description": "Parent's phone number"
+          },
+          "governorateId": {
+            "type": "string",
+            "description": "ID of a managed governorate"
           },
           "centerId": {
             "type": "object",

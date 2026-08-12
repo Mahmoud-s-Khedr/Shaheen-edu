@@ -7,13 +7,23 @@ export class UpdatePartnerDto {
   @IsString()
   displayName?: string;
 
-  @ApiProperty({ example: 'Acme Learning LLC', required: false })
+  @ApiProperty({
+    type: String,
+    example: 'Acme Learning LLC',
+    required: false,
+    nullable: true,
+  })
   @IsOptional()
   @IsString()
-  legalName?: string;
+  legalName?: string | null;
 
-  @ApiProperty({ example: '01098765432', required: false })
+  @ApiProperty({
+    type: String,
+    example: '01098765432',
+    required: false,
+    nullable: true,
+  })
   @IsOptional()
   @IsString()
-  phone?: string;
+  phone?: string | null;
 }

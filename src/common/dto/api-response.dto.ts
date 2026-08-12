@@ -51,6 +51,9 @@ export class StudentProfileDetailsDto {
 
   @ApiProperty({ type: String, nullable: true })
   academicGradeId!: string | null;
+
+  @ApiProperty()
+  parentPhone!: string;
 }
 
 export class ApiErrorResponseDto {
@@ -60,14 +63,32 @@ export class ApiErrorResponseDto {
   @ApiProperty({ example: 'UNAUTHORIZED.INVALID_CREDENTIALS' })
   code!: string;
 
-  @ApiProperty({ example: { ar: 'بيانات تسجيل الدخول غير صحيحة', en: 'Invalid credentials' } })
+  @ApiProperty({
+    example: { ar: 'بيانات تسجيل الدخول غير صحيحة', en: 'Invalid credentials' },
+  })
   message!: { ar: string; en: string };
 
   @ApiProperty({ example: { ar: 'غير مصرح', en: 'Unauthorized' } })
   error!: { ar: string; en: string };
 
-  @ApiPropertyOptional({ type: 'array', example: [{ field: 'phone', code: 'VALIDATION.ISSTRING', message: { ar: 'يجب أن تكون القيمة نصاً', en: 'phone must be a string' } }] })
-  details?: Array<{ field: string; code: string; message: { ar: string; en: string } }>;
+  @ApiPropertyOptional({
+    type: 'array',
+    example: [
+      {
+        field: 'phone',
+        code: 'VALIDATION.ISSTRING',
+        message: {
+          ar: 'يجب أن تكون القيمة نصاً',
+          en: 'phone must be a string',
+        },
+      },
+    ],
+  })
+  details?: Array<{
+    field: string;
+    code: string;
+    message: { ar: string; en: string };
+  }>;
 
   @ApiProperty({ example: '3eb75610-8bc8-4fc2-b821-dc90d7f3f39a' })
   correlationId!: string;
@@ -310,7 +331,6 @@ export class HierarchySummaryDto {
 
   @ApiPropertyOptional({ type: String, format: 'date-time', nullable: true })
   archivedAt?: Date | null;
-
 }
 
 export class AcademicGradeSummaryDto {
@@ -335,7 +355,10 @@ export class AcademicGradeSummaryDto {
   @ApiPropertyOptional({ type: String, nullable: true })
   coverAssetId?: string | null;
 
-  @ApiProperty({ example: true, description: 'Whether this grade has visible subject children.' })
+  @ApiProperty({
+    example: true,
+    description: 'Whether this grade has visible subject children.',
+  })
   hasChildren!: boolean;
 
   @ApiProperty({ type: String, format: 'date-time' })
@@ -355,7 +378,10 @@ export class SubjectSummaryDto extends HierarchySummaryDto {
   @ApiProperty()
   academicGradeId!: string;
 
-  @ApiProperty({ example: true, description: 'Whether this subject has visible course children.' })
+  @ApiProperty({
+    example: true,
+    description: 'Whether this subject has visible course children.',
+  })
   hasChildren!: boolean;
 }
 
@@ -363,7 +389,10 @@ export class CourseSummaryDto extends HierarchySummaryDto {
   @ApiProperty()
   subjectId!: string;
 
-  @ApiProperty({ example: true, description: 'Whether this course has visible chapter children.' })
+  @ApiProperty({
+    example: true,
+    description: 'Whether this course has visible chapter children.',
+  })
   hasChildren!: boolean;
 }
 
@@ -399,7 +428,10 @@ export class ChapterSummaryDto extends HierarchySummaryDto {
   @ApiProperty()
   courseId!: string;
 
-  @ApiProperty({ example: true, description: 'Whether this chapter has visible lesson children.' })
+  @ApiProperty({
+    example: true,
+    description: 'Whether this chapter has visible lesson children.',
+  })
   hasChildren!: boolean;
 }
 
@@ -413,7 +445,10 @@ export class LessonSummaryDto extends HierarchySummaryDto {
   @ApiProperty()
   chapterId!: string;
 
-  @ApiProperty({ example: true, description: 'Whether this lesson has visible section children.' })
+  @ApiProperty({
+    example: true,
+    description: 'Whether this lesson has visible section children.',
+  })
   hasChildren!: boolean;
 }
 
@@ -504,7 +539,6 @@ export class ContentPlacementSummaryDto {
 
   @ApiProperty()
   sortOrder!: number;
-
 }
 
 export class ContentItemSummaryDto {
@@ -538,7 +572,10 @@ export class ContentItemSummaryDto {
   @ApiPropertyOptional({ type: String, nullable: true })
   primaryAssetId!: string | null;
 
-  @ApiPropertyOptional({ type: () => ContentPrimaryAssetSummaryDto, nullable: true })
+  @ApiPropertyOptional({
+    type: () => ContentPrimaryAssetSummaryDto,
+    nullable: true,
+  })
   primaryAsset!: ContentPrimaryAssetSummaryDto | null;
 
   @ApiProperty({ type: ContentPlacementSummaryDto })
@@ -555,7 +592,6 @@ export class ContentItemSummaryDto {
 
   @ApiPropertyOptional({ type: String, format: 'date-time', nullable: true })
   archivedAt!: Date | null;
-
 }
 
 export class ContentPrimaryAssetSummaryDto {
@@ -596,7 +632,10 @@ export class ContentPrimaryAssetDetailDto extends ContentPrimaryAssetSummaryDto 
   @ApiProperty()
   filename!: string;
 
-  @ApiPropertyOptional({ type: () => ContentPrimaryAssetVideoDto, nullable: true })
+  @ApiPropertyOptional({
+    type: () => ContentPrimaryAssetVideoDto,
+    nullable: true,
+  })
   video!: ContentPrimaryAssetVideoDto | null;
 }
 
@@ -622,7 +661,10 @@ export class ContentAttachmentDto {
 
 /** Full admin read shape; list and mutation responses remain summaries. */
 export class ContentItemDetailDto extends ContentItemSummaryDto {
-  @ApiPropertyOptional({ type: () => ContentPrimaryAssetDetailDto, nullable: true })
+  @ApiPropertyOptional({
+    type: () => ContentPrimaryAssetDetailDto,
+    nullable: true,
+  })
   declare primaryAsset: ContentPrimaryAssetDetailDto | null;
 
   @ApiProperty({ type: [ContentAttachmentDto] })

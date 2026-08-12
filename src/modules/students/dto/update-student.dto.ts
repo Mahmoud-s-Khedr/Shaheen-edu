@@ -14,7 +14,25 @@ export class UpdateStudentDto {
   @MaxLength(200)
   fullName?: string;
 
-  @ApiProperty({ description: 'ID of a managed center in the student governorate', required: false, nullable: true })
+  @ApiProperty({
+    example: '01098765432',
+    description: "Parent's phone number",
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  parentPhone?: string;
+
+  @ApiProperty({ description: 'ID of a managed governorate', required: false })
+  @IsOptional()
+  @IsString()
+  governorateId?: string;
+
+  @ApiProperty({
+    description: 'ID of a managed center in the student governorate',
+    required: false,
+    nullable: true,
+  })
   @IsOptional()
   @IsString()
   centerId?: string | null;

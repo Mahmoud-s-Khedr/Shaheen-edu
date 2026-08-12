@@ -1454,6 +1454,37 @@ No path, query, or header input.
 }
 ```
 
+### `PATCH /api/v1/partners/me`
+
+**Authorization:** Bearer token; role must be `PARTNER`
+
+**Request**
+
+No path, query, or header input.
+
+```json
+{
+  "displayName?": "string",
+  "legalName?": "string | null",
+  "phone?": "string | null"
+}
+```
+
+**Success response — HTTP 200 (PartnerSummaryDto)**
+
+```json
+{
+  "id": "string",
+  "status": "ACTIVE | SUSPENDED | DISABLED",
+  "loginIdentifier": "string",
+  "createdAt": "ISO-8601 date-time",
+  "partnerType": "CONTENT_PUBLISHER | REFERRAL_PARTNER",
+  "displayName": "string | null",
+  "legalName": "string | null",
+  "phone": "string | null"
+}
+```
+
 ### `GET /api/v1/students/me`
 
 **Authorization:** Bearer token; role must be `STUDENT`
@@ -1475,7 +1506,8 @@ No path, query, or header input.
     "governorate?": "string",
     "center?": "string",
     "nationalIdLast4?": "string",
-    "academicGradeId?": "string"
+    "academicGradeId?": "string",
+    "parentPhone?": "string"
   }
 }
 ```
@@ -1491,7 +1523,9 @@ No path, query, or header input.
 ```json
 {
   "fullName?": "string",
-  "center?": "string",
+  "parentPhone?": "string",
+  "governorateId?": "string",
+  "centerId?": "string | null",
   "academicGradeId?": "string"
 }
 ```
@@ -1509,7 +1543,8 @@ No path, query, or header input.
     "governorate?": "string",
     "center?": "string",
     "nationalIdLast4?": "string",
-    "academicGradeId?": "string"
+    "academicGradeId?": "string",
+    "parentPhone?": "string"
   }
 }
 ```

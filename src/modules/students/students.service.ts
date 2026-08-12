@@ -19,8 +19,17 @@ import type { QueryAdminStudentsDto } from './dto/query-admin-students.dto';
 import type { DeleteStudentDto } from './dto/delete-student.dto';
 import type { RequestUser } from '../../common/types/request-with-user.types';
 import { toPaginationMeta } from '../../common/dto/pagination-query.dto';
-import { arabicMatch, paginateArabicSearch, resolveSearchQuery, sqlAnd } from '../../common/search/arabic-search';
+import {
+  arabicMatch,
+  paginateArabicSearch,
+  resolveSearchQuery,
+  sqlAnd,
+} from '../../common/search/arabic-search';
 import { Prisma } from '@prisma/client';
+import {
+  isValidEgyptianPhone,
+  normalizeEgyptianPhone,
+} from '../../common/utils/phone.util';
 
 @Injectable()
 export class StudentsService {
@@ -44,10 +53,13 @@ export class StudentsService {
             fullName: true,
             governorate: true,
             center: true,
-            governorateRef: { select: { id: true, nameAr: true, nameEn: true } },
+            governorateRef: {
+              select: { id: true, nameAr: true, nameEn: true },
+            },
             centerRef: { select: { id: true, nameAr: true, nameEn: true } },
             nationalIdLast4: true,
             academicGradeId: true,
+            parentPhoneNormalized: true,
           },
         },
       },
@@ -55,7 +67,20 @@ export class StudentsService {
     if (!student) {
       throw new NotFoundException('Student not found');
     }
-    return { ...student, studentProfile: student.studentProfile && { ...student.studentProfile, governorate: this.geographyDto(student.studentProfile.governorateRef), center: this.geographyDto(student.studentProfile.centerRef), governorateRef: undefined, centerRef: undefined } };
+    const { studentProfile, ...user } = student;
+    if (!studentProfile) return { ...user, studentProfile };
+
+    const { parentPhoneNormalized, governorateRef, centerRef, ...profile } =
+      studentProfile;
+    return {
+      ...user,
+      studentProfile: {
+        ...profile,
+        parentPhone: parentPhoneNormalized,
+        governorate: this.geographyDto(governorateRef),
+        center: this.geographyDto(centerRef),
+      },
+    };
   }
 
   async updateOwnProfile(userId: string, dto: UpdateStudentDto) {
@@ -67,16 +92,91 @@ export class StudentsService {
         throw new ConflictException('Academic grade must be published');
       }
     }
-    const current = await this.prisma.studentProfile.findUniqueOrThrow({ where: { userId }, select: { governorateId: true } });
-    const selectedCenter = dto.centerId == null ? null : dto.centerId === undefined ? undefined : await this.prisma.center.findFirst({ where: { id: dto.centerId, governorateId: current.governorateId } });
-    if (dto.centerId !== undefined && dto.centerId !== null && !selectedCenter) throw new ConflictException('Center must belong to the student governorate');
-    await this.prisma.studentProfile.update({
+    const current = await this.prisma.studentProfile.findUniqueOrThrow({
       where: { userId },
-      data: {
-        fullName: dto.fullName,
-        ...(dto.centerId === undefined ? {} : { centerId: dto.centerId, center: selectedCenter?.nameAr ?? null }),
-        academicGradeId: dto.academicGradeId,
-      },
+      select: { governorateId: true, parentPhoneNormalized: true },
+    });
+    const governorateChanged =
+      dto.governorateId !== undefined &&
+      dto.governorateId !== current.governorateId;
+    const governorate =
+      dto.governorateId === undefined
+        ? undefined
+        : await this.prisma.governorate.findUnique({
+            where: { id: dto.governorateId },
+          });
+    if (dto.governorateId !== undefined && !governorate) {
+      throw new NotFoundException('Governorate not found');
+    }
+    const targetGovernorateId = dto.governorateId ?? current.governorateId;
+    const selectedCenter =
+      dto.centerId == null
+        ? null
+        : dto.centerId === undefined
+          ? undefined
+          : await this.prisma.center.findFirst({
+              where: { id: dto.centerId, governorateId: targetGovernorateId },
+            });
+    if (
+      dto.centerId !== undefined &&
+      dto.centerId !== null &&
+      !selectedCenter
+    ) {
+      throw new ConflictException(
+        'Center must belong to the student governorate',
+      );
+    }
+
+    const parentPhoneNormalized =
+      dto.parentPhone === undefined
+        ? undefined
+        : normalizeEgyptianPhone(dto.parentPhone);
+    if (
+      parentPhoneNormalized !== undefined &&
+      !isValidEgyptianPhone(parentPhoneNormalized)
+    ) {
+      throw new BadRequestException('Invalid parent phone number format');
+    }
+    const parentPhoneChanged =
+      parentPhoneNormalized !== undefined &&
+      parentPhoneNormalized !== current.parentPhoneNormalized;
+    const centerWasImplicitlyCleared =
+      governorateChanged && dto.centerId === undefined;
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.studentProfile.update({
+        where: { userId },
+        data: {
+          fullName: dto.fullName,
+          parentPhoneNormalized,
+          academicGradeId: dto.academicGradeId,
+          ...(governorate
+            ? { governorateId: governorate.id, governorate: governorate.nameAr }
+            : {}),
+          ...(dto.centerId === undefined && !centerWasImplicitlyCleared
+            ? {}
+            : {
+                centerId: selectedCenter?.id ?? null,
+                center: selectedCenter?.nameAr ?? null,
+              }),
+        },
+      });
+      if (parentPhoneChanged) {
+        await tx.parentAccessSession.updateMany({
+          where: {
+            parentPhoneNormalized: current.parentPhoneNormalized,
+            revoked: false,
+          },
+          data: { revoked: true, revokedAt: new Date() },
+        });
+      }
+      await this.auditService.recordWithClient(tx, {
+        actorUserId: userId,
+        action: 'STUDENT_SELF_UPDATED',
+        targetType: 'User',
+        targetId: userId,
+        metadata: { fields: Object.keys(dto) },
+      });
     });
     return this.getOwnProfile(userId);
   }
@@ -89,7 +189,9 @@ export class StudentsService {
       studentProfile: {
         ...(query.governorateId ? { governorateId: query.governorateId } : {}),
         ...(query.centerId ? { centerId: query.centerId } : {}),
-        ...(query.academicGradeId ? { academicGradeId: query.academicGradeId } : {}),
+        ...(query.academicGradeId
+          ? { academicGradeId: query.academicGradeId }
+          : {}),
       },
     };
     const search = resolveSearchQuery(query);
@@ -104,9 +206,15 @@ export class StudentsService {
           query.status
             ? Prisma.sql`t.status = ${query.status}::"AccountStatus"`
             : Prisma.sql`t.status <> ${AccountStatus.DISABLED}::"AccountStatus"`,
-          query.governorateId ? Prisma.sql`sp."governorateId" = ${query.governorateId}` : undefined,
-          query.centerId ? Prisma.sql`sp."centerId" = ${query.centerId}` : undefined,
-          query.academicGradeId ? Prisma.sql`sp."academicGradeId" = ${query.academicGradeId}` : undefined,
+          query.governorateId
+            ? Prisma.sql`sp."governorateId" = ${query.governorateId}`
+            : undefined,
+          query.centerId
+            ? Prisma.sql`sp."centerId" = ${query.centerId}`
+            : undefined,
+          query.academicGradeId
+            ? Prisma.sql`sp."academicGradeId" = ${query.academicGradeId}`
+            : undefined,
         ),
         join: Prisma.sql`JOIN "StudentProfile" sp ON sp."userId" = t.id`,
         // The student's name lives on the profile, so a hit there is OR-ed with
@@ -209,7 +317,11 @@ export class StudentsService {
     return this.toAdminStudent(updated);
   }
 
-  async softDelete(actor: RequestUser, targetId: string, dto: DeleteStudentDto) {
+  async softDelete(
+    actor: RequestUser,
+    targetId: string,
+    dto: DeleteStudentDto,
+  ) {
     this.assertAdmin(actor);
     const target = await this.getStudentOrThrow(targetId);
     if (target.status === AccountStatus.DISABLED) {
@@ -298,7 +410,9 @@ export class StudentsService {
   }
 
   private async getStudentOrThrow(targetId: string) {
-    const target = await this.prisma.user.findUnique({ where: { id: targetId } });
+    const target = await this.prisma.user.findUnique({
+      where: { id: targetId },
+    });
     if (!target || target.role !== Role.STUDENT) {
       throw new NotFoundException('Student not found');
     }
@@ -357,5 +471,14 @@ export class StudentsService {
     };
   }
 
-  private geographyDto(record: { id: string; nameAr: string; nameEn: string | null } | null) { return record && { id: record.id, name: { ar: record.nameAr, en: record.nameEn } }; }
+  private geographyDto(
+    record: { id: string; nameAr: string; nameEn: string | null } | null,
+  ) {
+    return (
+      record && {
+        id: record.id,
+        name: { ar: record.nameAr, en: record.nameEn },
+      }
+    );
+  }
 }

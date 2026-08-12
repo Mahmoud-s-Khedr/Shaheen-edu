@@ -4,7 +4,10 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { arabicMatch, paginateArabicSearch } from '../../common/search/arabic-search';
+import {
+  arabicMatch,
+  paginateArabicSearch,
+} from '../../common/search/arabic-search';
 import { PrismaService } from '../../database/prisma.service';
 import { PasswordService } from '../auth/services/password.service';
 import { SessionService } from '../auth/services/session.service';
@@ -140,6 +143,32 @@ export class PartnersService {
     });
 
     return this.getById(id);
+  }
+
+  async updateOwnProfile(userId: string, dto: UpdatePartnerDto) {
+    const partner = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+    if (!partner || partner.role !== Role.PARTNER) {
+      throw new NotFoundException('Partner not found');
+    }
+
+    await this.prisma.partnerProfile.update({
+      where: { userId },
+      data: {
+        displayName: dto.displayName,
+        legalName: dto.legalName,
+        phone: dto.phone,
+      },
+    });
+    await this.auditService.record({
+      actorUserId: userId,
+      action: 'PARTNER_SELF_UPDATED',
+      targetType: 'User',
+      targetId: userId,
+      metadata: { fields: Object.keys(dto) },
+    });
+    return this.getOwnProfile(userId);
   }
 
   async suspend(actor: RequestUser, id: string) {

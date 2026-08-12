@@ -2,24 +2,128 @@ import { assert, expectStatus } from '../lib/assertions.js';
 import type { JourneyDefinition } from '../lib/types.js';
 
 export const partnerJourney: JourneyDefinition = {
-  id: 'AUTH-003', name: 'Partner lifecycle', category: 'auth', dependsOn: ['AUTH-002'],
+  id: 'AUTH-003',
+  name: 'Partner lifecycle',
+  category: 'auth',
+  dependsOn: ['AUTH-002'],
   async run({ clients, context, factory, step }) {
-    const email = factory.email('partner'); const password = factory.password('Partner');
+    const email = factory.email('partner');
+    const password = factory.password('Partner');
     await step('Creating content-publisher partner', async () => {
-      const r = await clients.admin.request<any>('POST', '/admin/partners', { email, password, partnerType: 'CONTENT_PUBLISHER', displayName: factory.title('Partner'), phone: factory.phone() }); expectStatus(r, 201); assert(r.body.partnerType === 'CONTENT_PUBLISHER', 'Partner type must persist'); context.partner = { id: r.body.id, email, password }; context.created.partners.push(r.body.id);
-      const listed = await clients.admin.request<any>('GET', `/admin/partners?q=${encodeURIComponent('partner')}&limit=1`); expectStatus(listed, 200); assert(listed.body.data.some((partner: any) => partner.id === r.body.id) && listed.body.meta.total >= 1, 'Partner lists must support q search and pagination metadata');
+      const r = await clients.admin.request<any>('POST', '/admin/partners', {
+        email,
+        password,
+        partnerType: 'CONTENT_PUBLISHER',
+        displayName: factory.title('Partner'),
+        phone: factory.phone(),
+      });
+      expectStatus(r, 201);
+      assert(
+        r.body.partnerType === 'CONTENT_PUBLISHER',
+        'Partner type must persist',
+      );
+      context.partner = { id: r.body.id, email, password };
+      context.created.partners.push(r.body.id);
+      const listed = await clients.admin.request<any>(
+        'GET',
+        `/admin/partners?q=${encodeURIComponent('partner')}&limit=1`,
+      );
+      expectStatus(listed, 200);
+      assert(
+        listed.body.data.some((partner: any) => partner.id === r.body.id) &&
+          listed.body.meta.total >= 1,
+        'Partner lists must support q search and pagination metadata',
+      );
     });
-    await step('Updating, logging in, and reading partner profile', async () => {
-      const update = await clients.admin.request<any>('PATCH', `/admin/partners/${context.partner.id}`, { displayName: factory.title('Updated partner') }); expectStatus(update, 200);
-      const login = await clients.partner.request<any>('POST', '/auth/partners/login', { email, password }); expectStatus(login, 201); assert(login.body.user.role === 'PARTNER', 'Partner login role must be PARTNER'); clients.partner.accessToken = login.body.accessToken; context.partner.accessToken = login.body.accessToken;
-      const me = await clients.partner.request<any>('GET', '/partners/me'); expectStatus(me, 200); assert(me.body.id === context.partner.id, 'Partner profile must be structurally owned');
+    await step(
+      'Updating, logging in, and self-updating the partner profile',
+      async () => {
+        const update = await clients.admin.request<any>(
+          'PATCH',
+          `/admin/partners/${context.partner.id}`,
+          { displayName: factory.title('Updated partner') },
+        );
+        expectStatus(update, 200);
+        const login = await clients.partner.request<any>(
+          'POST',
+          '/auth/partners/login',
+          { email, password },
+        );
+        expectStatus(login, 201);
+        assert(
+          login.body.user.role === 'PARTNER',
+          'Partner login role must be PARTNER',
+        );
+        clients.partner.accessToken = login.body.accessToken;
+        context.partner.accessToken = login.body.accessToken;
+        const me = await clients.partner.request<any>('GET', '/partners/me');
+        expectStatus(me, 200);
+        assert(
+          me.body.id === context.partner.id,
+          'Partner profile must be structurally owned',
+        );
+        const displayName = factory.title('Partner self update');
+        const selfUpdate = await clients.partner.request<any>(
+          'PATCH',
+          '/partners/me',
+          { displayName, legalName: null, phone: null },
+        );
+        expectStatus(selfUpdate, 200);
+        assert(
+          selfUpdate.body.displayName === displayName,
+          'Partner display name update must persist',
+        );
+        assert(
+          selfUpdate.body.legalName === null,
+          'Partner must be able to clear legal name',
+        );
+        assert(
+          selfUpdate.body.phone === null,
+          'Partner must be able to clear phone',
+        );
+        const protectedField = await clients.partner.request<any>(
+          'PATCH',
+          '/partners/me',
+          { partnerType: 'REFERRAL_PARTNER' },
+        );
+        expectStatus(protectedField, 400);
+      },
+    );
+    await step('Rejecting partner access to admin operations', async () => {
+      const r = await clients.partner.request<any>(
+        'POST',
+        '/admin/academic-grades',
+        { title: factory.localizedTitle('Forbidden') },
+      );
+      expectStatus(r, 403);
     });
-    await step('Rejecting partner access to admin operations', async () => { const r = await clients.partner.request<any>('POST', '/admin/academic-grades', { title: factory.localizedTitle('Forbidden') }); expectStatus(r, 403); });
     await step('Suspending and reactivating partner', async () => {
-      const suspend = await clients.admin.request<any>('POST', `/admin/partners/${context.partner.id}/suspend`); expectStatus(suspend, 201); assert(suspend.body.status === 'SUSPENDED', 'Partner must be suspended');
-      const rejected = await clients.partner.request<any>('POST', '/auth/partners/login', { email, password }); expectStatus(rejected, 401);
-      const reactivate = await clients.admin.request<any>('POST', `/admin/partners/${context.partner.id}/reactivate`); expectStatus(reactivate, 201); assert(reactivate.body.status === 'ACTIVE', 'Partner must be active');
-      const login = await clients.partner.request<any>('POST', '/auth/partners/login', { email, password }); expectStatus(login, 201); clients.partner.accessToken = login.body.accessToken; context.partner.accessToken = login.body.accessToken;
+      const suspend = await clients.admin.request<any>(
+        'POST',
+        `/admin/partners/${context.partner.id}/suspend`,
+      );
+      expectStatus(suspend, 201);
+      assert(suspend.body.status === 'SUSPENDED', 'Partner must be suspended');
+      const rejected = await clients.partner.request<any>(
+        'POST',
+        '/auth/partners/login',
+        { email, password },
+      );
+      expectStatus(rejected, 401);
+      const reactivate = await clients.admin.request<any>(
+        'POST',
+        `/admin/partners/${context.partner.id}/reactivate`,
+      );
+      expectStatus(reactivate, 201);
+      assert(reactivate.body.status === 'ACTIVE', 'Partner must be active');
+      const login = await clients.partner.request<any>(
+        'POST',
+        '/auth/partners/login',
+        { email, password },
+      );
+      expectStatus(login, 201);
+      clients.partner.accessToken = login.body.accessToken;
+      context.partner.accessToken = login.body.accessToken;
     });
   },
 };

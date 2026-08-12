@@ -50,8 +50,9 @@ Request cheat sheet for the implementation-backed API contract. Base URL is `/ap
 | `POST /api/v1/admin/partners/{id}/suspend`    | Suspend a partner and revoke sessions        | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id                                                            |
 | `POST /api/v1/admin/partners/{id}/reactivate` | Reactivate a partner                         | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id                                                            |
 | `GET /api/v1/partners/me`                     | Get the authenticated partner profile        | Bearer token; role must be `PARTNER`                | —                                                                   |
+| `PATCH /api/v1/partners/me`                   | Update the authenticated partner profile     | Bearer token; role must be `PARTNER`                | body: displayName?, legalName?, phone?                              |
 | `GET /api/v1/students/me`                     | Get the authenticated student profile        | Bearer token; role must be `STUDENT`                | —                                                                   |
-| `PATCH /api/v1/students/me`                   | Update the authenticated student profile     | Bearer token; role must be `STUDENT`                | body: fullName?, center?, academicGradeId?                          |
+| `PATCH /api/v1/students/me`                   | Update the authenticated student profile     | Bearer token; role must be `STUDENT`                | body: fullName?, parentPhone?, governorateId?, centerId?, academicGradeId? |
 
 ## Manual commerce
 
