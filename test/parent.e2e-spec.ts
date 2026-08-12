@@ -6,6 +6,13 @@ import {
   flushTestRedis,
   seedPublishedAcademicGrade,
 } from './utils/db';
+import { PrismaService } from '../src/database/prisma.service';
+import {
+  CommerceTargetType,
+  ContentStatus,
+  OrderStatus,
+  Role,
+} from '../src/common/types/roles.enum';
 
 const childA = {
   fullName: 'Child A',
@@ -38,20 +45,28 @@ describe('Parent (e2e)', () => {
   let app: NestFastifyApplication;
   let childAUserId: string;
   let unrelatedChildUserId: string;
+  let academicGradeId: string;
+  let governorateId: string;
 
   beforeAll(async () => {
     app = await createTestApp();
     await cleanDatabase(app);
     await flushTestRedis(app);
-    const academicGradeId = (
+    academicGradeId = (
       await seedPublishedAcademicGrade(app, 'parent-e2e-grade')
+    ).id;
+    governorateId = (
+      await app.get(PrismaService).governorate.create({
+        data: { nameAr: 'الجيزة', nameEn: 'Giza' },
+      })
     ).id;
 
     for (const payload of [childA, childB, unrelatedChild]) {
+      const { governorate: _governorate, ...registration } = payload;
       const response = await app.inject({
         method: 'POST',
         url: '/api/v1/auth/students/register',
-        payload: { ...payload, academicGradeId },
+        payload: { ...registration, academicGradeId, governorateId },
       });
       const body = JSON.parse(response.body);
       if (payload === childA) childAUserId = body.user.id;
@@ -230,6 +245,126 @@ describe('Parent (e2e)', () => {
       payload: { studentUserId: unrelatedChildUserId },
     });
     expect(response.statusCode).toBe(403);
+  });
+
+  it('discovers approved purchased scopes and reads scoped analytics', async () => {
+    const prisma = app.get(PrismaService);
+    const admin = await prisma.user.findFirstOrThrow({
+      where: { role: Role.SUPER_ADMIN },
+    });
+    const subject = await prisma.subject.create({
+      data: {
+        academicGradeId,
+        title: 'Parent analytics subject',
+        slug: 'parent-analytics-subject',
+        sortOrder: 1,
+        status: ContentStatus.PUBLISHED,
+        publishedAt: new Date(),
+        createdById: admin.id,
+        updatedById: admin.id,
+      },
+    });
+    const course = await prisma.course.create({
+      data: {
+        subjectId: subject.id,
+        title: 'Parent analytics course',
+        slug: 'parent-analytics-course',
+        sortOrder: 1,
+        status: ContentStatus.PUBLISHED,
+        publishedAt: new Date(),
+        createdById: admin.id,
+        updatedById: admin.id,
+      },
+    });
+    const method = await prisma.manualPaymentMethod.create({
+      data: {
+        titleAr: 'تحويل',
+        instructionsAr: 'ادفع',
+        sortOrder: 1,
+        createdById: admin.id,
+      },
+    });
+    const order = await prisma.order.create({
+      data: {
+        studentUserId: childAUserId,
+        manualPaymentMethodId: method.id,
+        paymentMethodSnapshot: {},
+        totalMinor: 1000,
+        currency: 'EGP',
+        status: OrderStatus.APPROVED,
+        approvedAt: new Date('2026-08-12T10:00:00.000Z'),
+        items: {
+          create: {
+            targetType: CommerceTargetType.COURSE,
+            courseId: course.id,
+            titleSnapshot: course.title,
+            priceMinor: 1000,
+            currency: 'EGP',
+          },
+        },
+      },
+      include: { items: true },
+    });
+
+    const login = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/parents/login',
+      payload: {
+        nationalId: childA.nationalId,
+        parentPhone: childA.parentPhone,
+      },
+    });
+    const selected = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/parents/select-child',
+      headers: {
+        authorization: `Bearer ${JSON.parse(login.body).accessToken}`,
+      },
+      payload: { studentUserId: childAUserId },
+    });
+    const headers = {
+      authorization: `Bearer ${JSON.parse(selected.body).accessToken}`,
+    };
+
+    const scopes = await app.inject({
+      method: 'GET',
+      url: '/api/v1/parent/selected-child/analytics/scopes',
+      headers,
+    });
+    expect(scopes.statusCode).toBe(200);
+    expect(JSON.parse(scopes.body)).toMatchObject({
+      data: [
+        {
+          subject: { id: subject.id, title: subject.title },
+          purchases: [
+            {
+              orderId: order.id,
+              orderItemId: order.items[0].id,
+              target: { type: 'COURSE', id: course.id, title: course.title },
+            },
+          ],
+        },
+      ],
+    });
+
+    for (const resource of ['content', 'assessments', 'practice']) {
+      const response = await app.inject({
+        method: 'GET',
+        url: `/api/v1/parent/selected-child/analytics/${resource}?orderItemId=${order.items[0].id}`,
+        headers,
+      });
+      expect(response.statusCode).toBe(200);
+      expect(JSON.parse(response.body).scope.orderItemId).toBe(
+        order.items[0].id,
+      );
+    }
+
+    const foreign = await app.inject({
+      method: 'GET',
+      url: '/api/v1/parent/selected-child/analytics/content?orderItemId=missing',
+      headers,
+    });
+    expect(foreign.statusCode).toBe(404);
   });
 
   it('is blocked from /api/v1/admin/* routes', async () => {

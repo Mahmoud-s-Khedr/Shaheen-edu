@@ -36,3 +36,9 @@ export class UpdateContentStudyStateDto {
   @Min(0)
   playbackPositionSeconds?: number | null;
 }
+
+/** Selects either all purchased material in a subject or one approved order item. */
+export class ParentAnalyticsScopeQueryDto extends PaginationQueryDto {
+  @ApiPropertyOptional() @IsOptional() @IsString() subjectId?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() orderItemId?: string;
+}

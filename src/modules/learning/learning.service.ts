@@ -5,7 +5,10 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import {
+  AssessmentAttemptStatus,
+  AssessmentQuestionOutcome,
   ContentStatus,
+  OrderStatus,
   QuestionStatus,
   QuestionType,
 } from '../../common/types/roles.enum';
@@ -18,6 +21,7 @@ import { VideosService } from '../videos/videos.service';
 import { QuestionCommunityStatsService } from '../question-banks/question-community-stats.service';
 import type {
   PracticeScopeQueryDto,
+  ParentAnalyticsScopeQueryDto,
   UpdateContentStudyStateDto,
 } from './dto/learning.dto';
 
@@ -296,15 +300,16 @@ export class LearningService {
             continue;
           throw error;
         }
-        if (item.status !== ContentStatus.PUBLISHED || !this.publishedPath(item))
+        if (
+          item.status !== ContentStatus.PUBLISHED ||
+          !this.publishedPath(item)
+        )
           continue;
         const path = this.itemPath(item);
         const progress = await this.contentProgress(studentId, item.id);
-        const subjectItems = (await this.eligibleItems(
-          studentId,
-          false,
-          path.course.subjectId,
-        )).filter(
+        const subjectItems = (
+          await this.eligibleItems(studentId, false, path.course.subjectId)
+        ).filter(
           (candidate) =>
             this.publishedPath(candidate) &&
             this.itemPath(candidate).course.subjectId === path.course.subjectId,
@@ -742,6 +747,444 @@ export class LearningService {
         : 0,
       firstTryCorrect: attempted.filter((x) => x[0].isCorrect).length,
       lastActivityAt: attempts.at(-1)?.submittedAt ?? null,
+    };
+  }
+
+  private async parentAnalyticsChild(parent: RequestParentSession) {
+    if (!parent.activeStudentId)
+      throw new ForbiddenException('No child selected');
+    const child = await this.prisma.studentProfile.findUnique({
+      where: { userId: parent.activeStudentId },
+      select: { userId: true, fullName: true, parentPhoneNormalized: true },
+    });
+    if (!child || child.parentPhoneNormalized !== parent.parentPhoneNormalized)
+      throw new ForbiddenException('Student is not linked to this parent');
+    return child;
+  }
+
+  private async parentAnalyticsPurchases(studentId: string) {
+    const orders = await this.prisma.order.findMany({
+      where: { studentUserId: studentId, status: OrderStatus.APPROVED },
+      select: {
+        id: true,
+        approvedAt: true,
+        items: {
+          select: {
+            id: true,
+            targetType: true,
+            titleSnapshot: true,
+            course: {
+              select: {
+                id: true,
+                title: true,
+                subject: { select: { id: true, title: true } },
+              },
+            },
+            chapter: {
+              select: {
+                id: true,
+                title: true,
+                course: {
+                  select: {
+                    id: true,
+                    subject: { select: { id: true, title: true } },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      orderBy: [{ approvedAt: 'desc' }, { id: 'desc' }],
+    });
+    return orders.flatMap((order) =>
+      order.items.map((item) => {
+        const course = item.course ?? item.chapter?.course;
+        const subject = course?.subject;
+        return {
+          orderId: order.id,
+          orderItemId: item.id,
+          approvedAt: order.approvedAt!,
+          targetType: item.targetType,
+          targetId: item.course?.id ?? item.chapter?.id!,
+          targetTitle:
+            item.course?.title ?? item.chapter?.title ?? item.titleSnapshot,
+          courseId: item.course?.id ?? item.chapter?.course.id!,
+          chapterId: item.chapter?.id ?? null,
+          subjectId: subject!.id,
+          subjectTitle: subject!.title,
+        };
+      }),
+    );
+  }
+
+  private async parentAnalyticsScope(
+    parent: RequestParentSession,
+    query: ParentAnalyticsScopeQueryDto,
+  ) {
+    const child = await this.parentAnalyticsChild(parent);
+    const selected = [query.subjectId, query.orderItemId].filter(Boolean);
+    if (selected.length !== 1)
+      throw new BadRequestException(
+        'Provide exactly one of subjectId or orderItemId',
+      );
+    const purchases = await this.parentAnalyticsPurchases(child.userId);
+    const targets = query.subjectId
+      ? purchases.filter((item) => item.subjectId === query.subjectId)
+      : purchases.filter((item) => item.orderItemId === query.orderItemId);
+    if (!targets.length)
+      throw new NotFoundException('Purchased analytics scope not found');
+    return {
+      child,
+      targets,
+      scope: query.subjectId
+        ? {
+            type: 'SUBJECT',
+            id: query.subjectId,
+            title: targets[0].subjectTitle,
+          }
+        : {
+            type: targets[0].targetType,
+            id: targets[0].targetId,
+            title: targets[0].targetTitle,
+            orderItemId: targets[0].orderItemId,
+          },
+    };
+  }
+
+  private parentAnalyticsMeta(
+    query: ParentAnalyticsScopeQueryDto,
+    total: number,
+  ) {
+    return toPaginationMeta(query.page, Math.min(query.limit, 50), total);
+  }
+
+  async parentAnalyticsScopes(
+    parent: RequestParentSession,
+    query: ParentAnalyticsScopeQueryDto,
+  ) {
+    const child = await this.parentAnalyticsChild(parent);
+    const purchases = await this.parentAnalyticsPurchases(child.userId);
+    const subjects = new Map<string, any>();
+    for (const item of purchases) {
+      const subject = subjects.get(item.subjectId) ?? {
+        subject: { id: item.subjectId, title: item.subjectTitle },
+        purchases: [],
+      };
+      subject.purchases.push({
+        orderId: item.orderId,
+        orderItemId: item.orderItemId,
+        approvedAt: item.approvedAt,
+        target: {
+          type: item.targetType,
+          id: item.targetId,
+          title: item.targetTitle,
+        },
+      });
+      subjects.set(item.subjectId, subject);
+    }
+    const data = [...subjects.values()].sort((a, b) =>
+      a.subject.title.localeCompare(b.subject.title),
+    );
+    const limit = Math.min(query.limit, 50);
+    return {
+      child: { userId: child.userId, fullName: child.fullName },
+      data: data.slice((query.page - 1) * limit, query.page * limit),
+      meta: this.parentAnalyticsMeta(query, data.length),
+    };
+  }
+
+  private targetForPlacement(targets: any[], placement: any) {
+    return targets.find((target) =>
+      target.chapterId
+        ? placement.resolvedChapterId === target.chapterId ||
+          placement.chapterId === target.chapterId
+        : placement.resolvedCourseId === target.courseId ||
+          placement.courseId === target.courseId,
+    );
+  }
+
+  private percentage(numerator: number, denominator: number) {
+    return denominator
+      ? Math.round((numerator / denominator) * 1000) / 10
+      : null;
+  }
+
+  async parentAnalyticsContent(
+    parent: RequestParentSession,
+    query: ParentAnalyticsScopeQueryDto,
+  ) {
+    const { child, targets, scope } = await this.parentAnalyticsScope(
+      parent,
+      query,
+    );
+    const placementWhere = {
+      OR: targets.map((target) =>
+        target.chapterId
+          ? { resolvedChapterId: target.chapterId }
+          : { resolvedCourseId: target.courseId },
+      ),
+    };
+    const items = await this.prisma.contentItem.findMany({
+      where: {
+        status: ContentStatus.PUBLISHED,
+        placement: { is: placementWhere },
+      },
+      select: {
+        id: true,
+        placement: {
+          select: {
+            courseId: true,
+            chapterId: true,
+            resolvedCourseId: true,
+            resolvedChapterId: true,
+          },
+        },
+      },
+    });
+    const ids = items.map((item) => item.id);
+    const [progress, states] = await Promise.all([
+      this.prisma.studentContentProgress.findMany({
+        where: { studentUserId: child.userId, contentItemId: { in: ids } },
+        select: { contentItemId: true, completedAt: true },
+      }),
+      this.prisma.studentContentStudyState.findMany({
+        where: { studentUserId: child.userId, contentItemId: { in: ids } },
+        select: { contentItemId: true, lastOpenedAt: true },
+      }),
+    ]);
+    const done = new Map(
+      progress.map((item) => [item.contentItemId, item.completedAt]),
+    );
+    const opened = new Map(
+      states.map((item) => [item.contentItemId, item.lastOpenedAt]),
+    );
+    const build = (targetItems: any[]) => {
+      const completed = targetItems.filter((item) => done.has(item.id)).length;
+      const dates = targetItems
+        .flatMap((item) => [done.get(item.id), opened.get(item.id)])
+        .filter(Boolean) as Date[];
+      return {
+        completedItems: completed,
+        totalItems: targetItems.length,
+        completionPercent: this.percentage(completed, targetItems.length),
+        lastActivityAt: dates.length
+          ? new Date(Math.max(...dates.map((date) => date.getTime())))
+          : null,
+      };
+    };
+    const rows = targets.map((target) => ({
+      type: target.targetType,
+      id: target.targetId,
+      title: target.targetTitle,
+      ...build(
+        items.filter((item) =>
+          this.targetForPlacement([target], item.placement),
+        ),
+      ),
+    }));
+    const limit = Math.min(query.limit, 50);
+    return {
+      scope,
+      summary: build(items),
+      data: rows.slice((query.page - 1) * limit, query.page * limit),
+      meta: this.parentAnalyticsMeta(query, rows.length),
+    };
+  }
+
+  private assessmentMetrics(answers: any[]) {
+    const correct = answers.filter(
+      (answer) => answer.outcome === AssessmentQuestionOutcome.CORRECT,
+    ).length;
+    const incorrect = answers.filter(
+      (answer) => answer.outcome === AssessmentQuestionOutcome.INCORRECT,
+    ).length;
+    const omitted = answers.length - correct - incorrect;
+    const total = correct + incorrect + omitted;
+    const submitted = answers
+      .map((answer) => answer.attempt.submittedAt)
+      .filter(Boolean) as Date[];
+    return {
+      completedAssessments: new Set(answers.map((answer) => answer.attemptId))
+        .size,
+      correct,
+      incorrect,
+      omitted,
+      scorePercent: this.percentage(correct, total),
+      accuracyPercent: this.percentage(correct, correct + incorrect),
+      omissionPercent: this.percentage(omitted, total),
+      lastCompletedAt: submitted.length
+        ? new Date(Math.max(...submitted.map((date) => date.getTime())))
+        : null,
+    };
+  }
+
+  async parentAnalyticsAssessments(
+    parent: RequestParentSession,
+    query: ParentAnalyticsScopeQueryDto,
+  ) {
+    const { child, targets, scope } = await this.parentAnalyticsScope(
+      parent,
+      query,
+    );
+    const placements = targets.map((target) =>
+      target.chapterId
+        ? { chapterId: target.chapterId }
+        : { courseId: target.courseId },
+    );
+    const answers = await this.prisma.assessmentAttemptAnswer.findMany({
+      where: {
+        attempt: {
+          studentUserId: child.userId,
+          status: AssessmentAttemptStatus.COMPLETED,
+        },
+        assessmentQuestion: { placements: { some: { OR: placements } } },
+      },
+      select: {
+        attemptId: true,
+        outcome: true,
+        attempt: { select: { submittedAt: true } },
+        assessmentQuestion: {
+          select: {
+            placements: { select: { courseId: true, chapterId: true } },
+          },
+        },
+      },
+    });
+    const rows = targets.map((target) => ({
+      type: target.targetType,
+      id: target.targetId,
+      title: target.targetTitle,
+      ...this.assessmentMetrics(
+        answers.filter((answer) =>
+          answer.assessmentQuestion.placements.some((placement) =>
+            target.chapterId
+              ? placement.chapterId === target.chapterId
+              : placement.courseId === target.courseId,
+          ),
+        ),
+      ),
+    }));
+    const limit = Math.min(query.limit, 50);
+    return {
+      scope,
+      summary: this.assessmentMetrics(answers),
+      data: rows.slice((query.page - 1) * limit, query.page * limit),
+      meta: this.parentAnalyticsMeta(query, rows.length),
+    };
+  }
+
+  private practiceMetrics(attempts: any[]) {
+    const byQuestion = new Map<string, any[]>();
+    for (const attempt of attempts) {
+      const group = byQuestion.get(attempt.questionId) ?? [];
+      group.push(attempt);
+      byQuestion.set(attempt.questionId, group);
+    }
+    for (const group of byQuestion.values())
+      group.sort((a, b) => a.attemptNumber - b.attemptNumber);
+    const correctAttempts = attempts.filter(
+      (attempt) => attempt.isCorrect,
+    ).length;
+    const dates = attempts.map((attempt) => attempt.submittedAt);
+    return {
+      uniqueQuestionsAttempted: byQuestion.size,
+      totalAttempts: attempts.length,
+      correctAttempts,
+      attemptAccuracyPercent: this.percentage(correctAttempts, attempts.length),
+      firstAttemptCorrectQuestions: [...byQuestion.values()].filter(
+        (group) => group[0].isCorrect,
+      ).length,
+      solvedAfterRetryQuestions: [...byQuestion.values()].filter(
+        (group) =>
+          !group[0].isCorrect &&
+          group.slice(1).some((attempt) => attempt.isCorrect),
+      ).length,
+      lastActivityAt: dates.length
+        ? new Date(Math.max(...dates.map((date) => date.getTime())))
+        : null,
+    };
+  }
+
+  private questionMatchesTarget(question: any, target: any) {
+    if (!target.chapterId) return question.courseId === target.courseId;
+    return question.placements.some(
+      (placement: any) =>
+        placement.chapterId === target.chapterId ||
+        placement.lesson?.chapterId === target.chapterId ||
+        placement.section?.lesson?.chapterId === target.chapterId,
+    );
+  }
+
+  async parentAnalyticsPractice(
+    parent: RequestParentSession,
+    query: ParentAnalyticsScopeQueryDto,
+  ) {
+    const { child, targets, scope } = await this.parentAnalyticsScope(
+      parent,
+      query,
+    );
+    const courseIds = targets
+      .filter((target) => !target.chapterId)
+      .map((target) => target.courseId);
+    const chapterIds = targets
+      .filter((target) => target.chapterId)
+      .map((target) => target.chapterId);
+    const chapterConditions: any[] = chapterIds.flatMap((id) => [
+      { chapterId: id },
+      { lesson: { is: { chapterId: id } } },
+      { section: { is: { lesson: { is: { chapterId: id } } } } },
+    ]);
+    const attempts = await this.prisma.studentQuestionAttempt.findMany({
+      where: {
+        studentUserId: child.userId,
+        question: {
+          OR: [
+            ...(courseIds.length ? [{ courseId: { in: courseIds } }] : []),
+            ...(chapterConditions.length
+              ? [{ placements: { some: { OR: chapterConditions } } }]
+              : []),
+          ],
+        },
+      },
+      select: {
+        questionId: true,
+        attemptNumber: true,
+        isCorrect: true,
+        submittedAt: true,
+        question: {
+          select: {
+            courseId: true,
+            placements: {
+              select: {
+                chapterId: true,
+                lesson: { select: { chapterId: true } },
+                section: {
+                  select: { lesson: { select: { chapterId: true } } },
+                },
+              },
+            },
+          },
+        },
+      },
+      orderBy: [{ submittedAt: 'asc' }, { attemptNumber: 'asc' }],
+    });
+    const rows = targets.map((target) => ({
+      type: target.targetType,
+      id: target.targetId,
+      title: target.targetTitle,
+      ...this.practiceMetrics(
+        attempts.filter((attempt) =>
+          this.questionMatchesTarget(attempt.question, target),
+        ),
+      ),
+    }));
+    const limit = Math.min(query.limit, 50);
+    return {
+      scope,
+      summary: this.practiceMetrics(attempts),
+      data: rows.slice((query.page - 1) * limit, query.page * limit),
+      meta: this.parentAnalyticsMeta(query, rows.length),
     };
   }
 

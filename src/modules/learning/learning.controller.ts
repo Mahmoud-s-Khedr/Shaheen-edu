@@ -26,6 +26,7 @@ import type {
 import { LearningService } from './learning.service';
 import {
   PracticeScopeQueryDto,
+  ParentAnalyticsScopeQueryDto,
   SubmitQuestionAttemptDto,
   UpdateContentStudyStateDto,
 } from './dto/learning.dto';
@@ -133,5 +134,39 @@ export class ParentLearningController {
   @ApiOperation({ summary: 'Get selected child learning summary' })
   performance(@CurrentParentSession() parent: RequestParentSession) {
     return this.learning.parentPerformance(parent);
+  }
+  @Get('analytics/scopes')
+  @ApiOperation({
+    summary: 'List selected child approved purchase analytics scopes',
+  })
+  analyticsScopes(
+    @CurrentParentSession() parent: RequestParentSession,
+    @Query() query: ParentAnalyticsScopeQueryDto,
+  ) {
+    return this.learning.parentAnalyticsScopes(parent, query);
+  }
+  @Get('analytics/content')
+  @ApiOperation({ summary: 'Get purchased-scope content progress' })
+  analyticsContent(
+    @CurrentParentSession() parent: RequestParentSession,
+    @Query() query: ParentAnalyticsScopeQueryDto,
+  ) {
+    return this.learning.parentAnalyticsContent(parent, query);
+  }
+  @Get('analytics/assessments')
+  @ApiOperation({ summary: 'Get purchased-scope assessment performance' })
+  analyticsAssessments(
+    @CurrentParentSession() parent: RequestParentSession,
+    @Query() query: ParentAnalyticsScopeQueryDto,
+  ) {
+    return this.learning.parentAnalyticsAssessments(parent, query);
+  }
+  @Get('analytics/practice')
+  @ApiOperation({ summary: 'Get purchased-scope direct-practice performance' })
+  analyticsPractice(
+    @CurrentParentSession() parent: RequestParentSession,
+    @Query() query: ParentAnalyticsScopeQueryDto,
+  ) {
+    return this.learning.parentAnalyticsPractice(parent, query);
   }
 }
