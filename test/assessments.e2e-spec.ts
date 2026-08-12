@@ -180,6 +180,30 @@ describe('Assessments (e2e)', () => {
     expect(lowerActiveTime.statusCode).toBe(200);
     expect(JSON.parse(lowerActiveTime.body).activeSeconds).toBe(12);
 
+    // Assessment questions use snapshot IDs. Marking must resolve that ID to
+    // the authored question used by the private question-mark store.
+    const snapshot = await prisma.assessmentQuestion.findUniqueOrThrow({
+      where: { id: firstQuestion.id },
+      select: { sourceQuestionId: true },
+    });
+    const mark = await app.inject({
+      method: 'POST',
+      url: `/api/v1/student/assessments/question-marks/${firstQuestion.id}`,
+      headers: { authorization: `Bearer ${student1.accessToken}` },
+    });
+    expect(mark.statusCode).toBe(201);
+    expect(JSON.parse(mark.body)).toEqual({
+      questionId: snapshot.sourceQuestionId,
+      marked: true,
+    });
+
+    const unmark = await app.inject({
+      method: 'DELETE',
+      url: `/api/v1/student/assessments/question-marks/${firstQuestion.id}`,
+      headers: { authorization: `Bearer ${student1.accessToken}` },
+    });
+    expect(unmark.statusCode).toBe(200);
+
     const concurrentActiveTimes = await Promise.all([20, 30].map((activeSeconds) => app.inject({
       method: 'PATCH',
       url: `/api/v1/student/assessments/${studentAssessmentId}/attempts/current/questions/${firstQuestion.id}/active-time`,

@@ -685,19 +685,45 @@ export class AssessmentsService {
     };
   }
 
+  /**
+   * Assessment responses expose the immutable AssessmentQuestion id, while
+   * private marks belong to the authored Question row. Accept either id at
+   * this boundary so a student can mark a question directly from an
+   * assessment without getting a misleading "not accessible" response.
+   */
+  private async resolveMarkedQuestionId(questionId: string) {
+    const question = await this.prisma.question.findUnique({
+      where: { id: questionId },
+      select: { id: true },
+    });
+    if (question) return question.id;
+
+    const assessmentQuestion = await this.prisma.assessmentQuestion.findUnique({
+      where: { id: questionId },
+      select: { sourceQuestionId: true },
+    });
+    return assessmentQuestion?.sourceQuestionId ?? null;
+  }
+
   async markQuestion(studentId: string, questionId: string) {
+    const markedQuestionId = await this.resolveMarkedQuestionId(questionId);
+    if (!markedQuestionId)
+      throw new NotFoundException('Question is not accessible');
     const gradeId = await this.studentGrade(studentId);
     const accessible = await this.eligibleQuestions([], studentId, gradeId);
-    if (!accessible.some((question) => question.id === questionId))
+    if (!accessible.some((question) => question.id === markedQuestionId))
       throw new NotFoundException('Question is not accessible');
     await this.prisma.studentQuestionMark.upsert({
       where: {
-        studentUserId_questionId: { studentUserId: studentId, questionId },
+        studentUserId_questionId: {
+          studentUserId: studentId,
+          questionId: markedQuestionId,
+        },
       },
-      create: { studentUserId: studentId, questionId },
+      create: { studentUserId: studentId, questionId: markedQuestionId },
       update: {},
     });
-    return { questionId, marked: true };
+    return { questionId: markedQuestionId, marked: true };
   }
 
   async listMarkedQuestions(studentId: string) {
@@ -754,10 +780,14 @@ export class AssessmentsService {
   }
 
   async unmarkQuestion(studentId: string, questionId: string) {
+    const markedQuestionId = await this.resolveMarkedQuestionId(questionId);
     await this.prisma.studentQuestionMark.deleteMany({
-      where: { studentUserId: studentId, questionId },
+      where: {
+        studentUserId: studentId,
+        questionId: markedQuestionId ?? questionId,
+      },
     });
-    return { questionId, marked: false };
+    return { questionId: markedQuestionId ?? questionId, marked: false };
   }
 
   // --- Student: list/get ----------------------------------------------
