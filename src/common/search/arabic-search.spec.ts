@@ -1,5 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
-import { NORMALIZER_FIXTURES, likePattern, normalizeArabic, resolveSearchQuery } from './arabic-search';
+import { NORMALIZER_FIXTURES, likePattern, normalizeArabic, resolveSearchQuery, searchTerms } from './arabic-search';
 
 describe('Arabic search helpers', () => {
   it('normalizes Arabic spelling, diacritics, Persian letters, digits, and spacing', () => {
@@ -20,6 +20,11 @@ describe('Arabic search helpers', () => {
 
   it('normalizes punctuation out of a LIKE pattern', () => {
     expect(likePattern(' إسلام%_\\ ')).toBe('%اسلام%');
+  });
+
+  it('splits a multi-word query into independently searchable normalized terms', () => {
+    expect(searchTerms(' John--Doe ')).toEqual(['john', 'doe']);
+    expect(searchTerms('أحمد، محمد')).toEqual(['احمد', 'محمد']);
   });
 
   // Presentation forms (U+FB50-U+FEFF) are common in text pasted out of PDFs.

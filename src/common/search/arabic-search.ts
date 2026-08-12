@@ -161,6 +161,11 @@ export function likePattern(query: string): string {
   return `%${normalizeArabic(query).replace(/[\\%_]/g, '\\$&')}%`;
 }
 
+/** Splits a query into its normalized, non-empty search terms. */
+export function searchTerms(query: string): string[] {
+  return normalizeArabic(query).split(' ').filter(Boolean);
+}
+
 /** ANDs the defined fragments; returns undefined when none apply. */
 export function sqlAnd(...parts: Array<Prisma.Sql | undefined | false>): Prisma.Sql | undefined {
   const defined = parts.filter((part): part is Prisma.Sql => Boolean(part));
@@ -181,10 +186,21 @@ export function orderByIds<T extends { id: string }>(rows: T[], ids: string[]): 
  * matching through one of its centers, a user through their profile) without
  * restating the text expression and risking drift from the index.
  */
+export function arabicMatchText(normalizedText: Prisma.Sql, query: string): Prisma.Sql {
+  const terms = searchTerms(query);
+  return Prisma.sql`(${Prisma.join(
+    terms.map((term) => Prisma.sql`${normalizedText} LIKE ${likePattern(term)} ESCAPE E'\\\\'`),
+    ' AND ',
+  )})`;
+}
+
 export function arabicMatch(target: ArabicSearchTarget, query: string, alias = 't'): Prisma.Sql {
   // Four backslashes: the template literal collapses them to two, so Postgres
   // receives E'\\' -- a single literal backslash. Fewer would be unterminated.
-  return Prisma.sql`arabic_normalize(${Prisma.raw(searchableText(target, alias))}) LIKE ${likePattern(query)} ESCAPE E'\\\\'`;
+  return arabicMatchText(
+    Prisma.sql`arabic_normalize(${Prisma.raw(searchableText(target, alias))})`,
+    query,
+  );
 }
 
 function matchPredicate(target: ArabicSearchTarget, query: string, scope?: ArabicSearchScope): Prisma.Sql {

@@ -19,7 +19,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { SearchCursorPaginationQueryDto } from '../../common/dto/cursor-pagination-query.dto';
 import { StudentCatalogSearchDto } from './dto/student-catalog-search.dto';
-import { likePattern, normalizeArabic, paginateArabicSearch, searchArabicIds, searchNeedle, sqlAnd } from '../../common/search/arabic-search';
+import { arabicMatchText, normalizeArabic, paginateArabicSearch, searchArabicIds, searchNeedle, sqlAnd } from '../../common/search/arabic-search';
 import { publishedScope, sortOrderSql } from '../../common/search/content-scope';
 import { nodeMatches } from '../../common/search/node-match';
 
@@ -149,7 +149,6 @@ export class StudentCatalogService {
     const searchQuery = searchNeedle(query.q)!;
     const cursor = this.searchCursor(query.cursor, searchQuery);
     const normalizedQuery = normalizeArabic(searchQuery);
-    const pattern = likePattern(searchQuery);
     const searches: Prisma.Sql[] = [];
     if (types.includes('CHAPTER'))
       searches.push(Prisma.sql`
@@ -161,7 +160,7 @@ export class StudentCatalogService {
         WHERE h.status = ${published}::"ContentStatus" AND c.status = ${published}::"ContentStatus"
           AND c."subjectId" = ${subject.id}
           AND (
-            arabic_normalize(coalesce(h.title, '') || ' ' || coalesce(h.slug, '') || ' ' || coalesce(h.description, '')) LIKE ${pattern} ESCAPE E'\\\\'
+            ${arabicMatchText(Prisma.sql`arabic_normalize(coalesce(h.title, '') || ' ' || coalesce(h.slug, '') || ' ' || coalesce(h.description, ''))`, searchQuery)}
             OR to_tsvector('simple', arabic_normalize(coalesce(h.title, '') || ' ' || coalesce(h.slug, '') || ' ' || coalesce(h.description, ''))) @@ plainto_tsquery('simple', ${normalizedQuery})
             OR (length(${normalizedQuery}) >= 3 AND similarity(arabic_normalize(coalesce(h.title, '') || ' ' || coalesce(h.slug, '') || ' ' || coalesce(h.description, '')), ${normalizedQuery}) >= 0.35)
           )
@@ -177,7 +176,7 @@ export class StudentCatalogService {
         WHERE l.status = ${published}::"ContentStatus" AND h.status = ${published}::"ContentStatus" AND c.status = ${published}::"ContentStatus"
           AND c."subjectId" = ${subject.id}
           AND (
-            arabic_normalize(coalesce(l.title, '') || ' ' || coalesce(l.slug, '') || ' ' || coalesce(l.description, '')) LIKE ${pattern} ESCAPE E'\\\\'
+            ${arabicMatchText(Prisma.sql`arabic_normalize(coalesce(l.title, '') || ' ' || coalesce(l.slug, '') || ' ' || coalesce(l.description, ''))`, searchQuery)}
             OR to_tsvector('simple', arabic_normalize(coalesce(l.title, '') || ' ' || coalesce(l.slug, '') || ' ' || coalesce(l.description, ''))) @@ plainto_tsquery('simple', ${normalizedQuery})
             OR (length(${normalizedQuery}) >= 3 AND similarity(arabic_normalize(coalesce(l.title, '') || ' ' || coalesce(l.slug, '') || ' ' || coalesce(l.description, '')), ${normalizedQuery}) >= 0.35)
           )
@@ -195,7 +194,7 @@ export class StudentCatalogService {
           AND h.status = ${published}::"ContentStatus" AND c.status = ${published}::"ContentStatus"
           AND c."subjectId" = ${subject.id}
           AND (
-            arabic_normalize(coalesce(x.title, '') || ' ' || coalesce(x.slug, '') || ' ' || coalesce(x.description, '')) LIKE ${pattern} ESCAPE E'\\\\'
+            ${arabicMatchText(Prisma.sql`arabic_normalize(coalesce(x.title, '') || ' ' || coalesce(x.slug, '') || ' ' || coalesce(x.description, ''))`, searchQuery)}
             OR to_tsvector('simple', arabic_normalize(coalesce(x.title, '') || ' ' || coalesce(x.slug, '') || ' ' || coalesce(x.description, ''))) @@ plainto_tsquery('simple', ${normalizedQuery})
             OR (length(${normalizedQuery}) >= 3 AND similarity(arabic_normalize(coalesce(x.title, '') || ' ' || coalesce(x.slug, '') || ' ' || coalesce(x.description, '')), ${normalizedQuery}) >= 0.35)
           )
