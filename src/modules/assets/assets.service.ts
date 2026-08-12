@@ -58,7 +58,7 @@ export class AssetsService {
     if (asset.status === AssetStatus.READY) return this.summary(asset);
     if (asset.status !== AssetStatus.UPLOADING || !asset.storageKey) throw new ConflictException('Asset cannot be completed in its current state');
     try {
-      const object = await this.storage.inspect(asset.storageKey);
+      const object = await this.inspectAfterDirectUpload(asset.storageKey);
       if (!object.sizeBytes) throw new BadRequestException('Empty files are not allowed');
       if (object.sizeBytes > this.limit(asset.kind)) throw new BadRequestException('File exceeds configured size limit');
       if (object.mimeType && object.mimeType !== asset.mimeType) throw new BadRequestException('Uploaded MIME type does not match authorization');
@@ -78,6 +78,24 @@ export class AssetsService {
     // OOXML (docx/xlsx/pptx) and plain zips are ZIP containers: 'PK\x03\x04', 'PK\x05\x06' (empty), or 'PK\x07\x08' (spanned). text/csv and text/plain have no reliable signature.
     const zip = first.subarray(0, 2).toString() === 'PK' && [3, 5, 7].includes(first[2]) && first[3] === first[2] + 1;
     if ((mime === 'image/png' && !png) || (mime === 'image/jpeg' && !jpg) || (mime === 'image/webp' && !webp) || ((kind === AssetKind.PDF || mime === 'application/pdf') && !pdf) || ((mime === docxMime || mime === xlsxMime || mime === pptxMime || mime === 'application/zip') && !zip)) throw new BadRequestException('File signature does not match declared MIME type');
+  }
+
+  /**
+   * Bunny's S3-compatible endpoint can briefly return 404 immediately after a
+   * successful presigned PUT.  The client has no server-side signal to await,
+   * so verify with a short, bounded retry before declaring the upload failed.
+   */
+  private async inspectAfterDirectUpload(key: string) {
+    const retryDelaysMs = [100, 250, 500, 1_000, 2_000];
+    for (let attempt = 0; ; attempt += 1) {
+      try {
+        return await this.storage.inspect(key);
+      } catch (error) {
+        const statusCode = (error as { $metadata?: { httpStatusCode?: number } })?.$metadata?.httpStatusCode;
+        if (statusCode !== 404 || attempt === retryDelaysMs.length) throw error;
+        await new Promise<void>((resolve) => setTimeout(resolve, retryDelaysMs[attempt]));
+      }
+    }
   }
 
   async get(actor: RequestUser, id: string) { this.assertAdmin(actor); const asset = await this.getReadyOrAny(id); if (asset.kind === AssetKind.PAYMENT_PROOF) throw new NotFoundException('Asset not found'); return this.summary(asset); }

@@ -33,6 +33,18 @@ describe('AssetsService direct uploads', () => {
     expect(audit.record).toHaveBeenCalledWith(expect.objectContaining({ action: 'ASSET_UPLOADED' }));
   });
 
+  it('retries a transient Bunny 404 while a direct upload becomes visible', async () => {
+    const { service, prisma, storage } = build();
+    prisma.asset.findUnique.mockResolvedValue({ id: 'asset-1', provider: 'BUNNY_STORAGE', kind: AssetKind.PDF, status: AssetStatus.UPLOADING, uploadedById: admin.id, storageKey: 'assets/pdf/a.pdf', mimeType: 'application/pdf' });
+    storage.inspect
+      .mockRejectedValueOnce({ name: 'NotFound', $metadata: { httpStatusCode: 404 } })
+      .mockResolvedValueOnce({ sizeBytes: pdf.length, mimeType: 'application/pdf', first: pdf });
+    prisma.asset.update.mockResolvedValue({ id: 'asset-1', status: AssetStatus.READY });
+
+    await expect(service.completeUpload(admin, 'asset-1')).resolves.toMatchObject({ id: 'asset-1', status: AssetStatus.READY });
+    expect(storage.inspect).toHaveBeenCalledTimes(2);
+  });
+
   it('fails and deletes an object that does not match its authorization', async () => {
     const { service, prisma, storage } = build();
     prisma.asset.findUnique.mockResolvedValue({ id: 'asset-1', provider: 'BUNNY_STORAGE', kind: AssetKind.PDF, status: AssetStatus.UPLOADING, uploadedById: admin.id, storageKey: 'assets/pdf/a.pdf', mimeType: 'application/pdf' });
