@@ -321,8 +321,9 @@ export const studentCatalogJourney: JourneyDefinition = {
         assert(
           entitlements.body.meta?.total === 1 &&
             entitlements.body.data?.[0]?.targetType === 'CHAPTER' &&
-            entitlements.body.data[0]?.targetId === entitledChapterId,
-          'Student entitlements must be paginated and scoped to the authenticated student',
+            entitlements.body.data[0]?.targetId === entitledChapterId &&
+            typeof entitlements.body.data[0]?.targetName === 'string',
+          'Student entitlements must be paginated, scoped to the authenticated student, and return the target name',
         );
 
         const changeGrade = await studentRequest<any>('PATCH', '/students/me', {

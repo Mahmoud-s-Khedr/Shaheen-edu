@@ -30,6 +30,8 @@ type Grant = {
   id: string;
   courseId: string | null;
   chapterId: string | null;
+  course?: { title: string } | null;
+  chapter?: { title: string } | null;
   expiresAt: Date | null;
 };
 type Pricing = {
@@ -82,7 +84,7 @@ export class StudentCatalogService {
       orderBySql: sortOrderSql,
       orderBy: order,
       where,
-      args: { include: { _count: { select: { courses: { where: { status: published } } } } } },
+      args: { include: { coverAsset: { select: { filename: true } }, _count: { select: { courses: { where: { status: published } } } } } },
       page: query.page,
       limit: query.limit,
     });
@@ -100,7 +102,7 @@ export class StudentCatalogService {
     const grade = await this.gradeFor(studentUserId);
     const subject = await this.prisma.subject.findFirst({
       where: { id: subjectId, academicGradeId: grade.id, status: published },
-      include: { _count: { select: { courses: { where: { status: published } } } } },
+      include: { coverAsset: { select: { filename: true } }, _count: { select: { courses: { where: { status: published } } } } },
     });
     if (!subject) throw new NotFoundException('Published subject not found');
     const grants = await this.activeGrants(studentUserId);
@@ -114,7 +116,7 @@ export class StudentCatalogService {
       orderBySql: sortOrderSql,
       orderBy: order,
       where,
-      args: { include: { _count: { select: { chapters: { where: { status: published } } } } } },
+      args: { include: { coverAsset: { select: { filename: true } }, _count: { select: { chapters: { where: { status: published } } } } } },
       page: query.page,
       limit: query.limit,
     });
@@ -385,6 +387,7 @@ export class StudentCatalogService {
               id: entitlement.id,
               targetType: entitlement.courseId ? 'COURSE' : 'CHAPTER',
               targetId: entitlement.courseId ?? entitlement.chapterId,
+              targetName: entitlement.course?.title ?? entitlement.chapter?.title ?? null,
               expiresAt: entitlement.expiresAt,
             })),
           },
@@ -416,8 +419,9 @@ export class StudentCatalogService {
         },
       },
       include: {
+        coverAsset: { select: { filename: true } },
         _count: { select: { chapters: { where: { status: published } } } },
-        subject: { include: { _count: { select: { courses: { where: { status: published } } } } } },
+        subject: { include: { coverAsset: { select: { filename: true } }, _count: { select: { courses: { where: { status: published } } } } } },
       },
     });
     if (!course) throw new NotFoundException('Published course not found');
@@ -447,7 +451,7 @@ export class StudentCatalogService {
           academicGrade: { status: published },
         },
       },
-      include: { _count: { select: { chapters: { where: { status: published } } } } },
+      include: { coverAsset: { select: { filename: true } }, _count: { select: { chapters: { where: { status: published } } } } },
     });
     if (!course) throw new NotFoundException('Published course not found');
     const grants = await this.activeGrants(studentUserId);
@@ -456,7 +460,7 @@ export class StudentCatalogService {
     });
     const rows = await this.prisma.chapter.findMany({
       where: { courseId, status: published, ...(ids ? { id: { in: ids } } : {}), ...this.after(query.cursor, query.q) },
-      include: { _count: { select: { lessons: { where: { status: published } } } } },
+      include: { coverAsset: { select: { filename: true } }, _count: { select: { lessons: { where: { status: published } } } } },
       orderBy: order,
       take: query.limit + 1,
     });
@@ -504,6 +508,7 @@ export class StudentCatalogService {
       },
       include: {
         course: true,
+        coverAsset: { select: { filename: true } },
         _count: { select: { lessons: { where: { status: published } } } },
       },
     });
@@ -514,7 +519,7 @@ export class StudentCatalogService {
     });
     const rows = await this.prisma.lesson.findMany({
       where: { chapterId, status: published, ...(ids ? { id: { in: ids } } : {}), ...this.after(query.cursor, query.q) },
-      include: { _count: { select: { sections: { where: { status: published } } } } },
+      include: { coverAsset: { select: { filename: true } }, _count: { select: { sections: { where: { status: published } } } } },
       orderBy: order,
       take: query.limit + 1,
     });
@@ -561,6 +566,7 @@ export class StudentCatalogService {
       },
       include: {
         chapter: { include: { course: true } },
+        coverAsset: { select: { filename: true } },
         _count: { select: { sections: { where: { status: published } } } },
       },
     });
@@ -572,6 +578,7 @@ export class StudentCatalogService {
     });
     const rows = await this.prisma.section.findMany({
       where: { lessonId, status: published, ...(ids ? { id: { in: ids } } : {}), ...this.after(query.cursor, query.q) },
+      include: { coverAsset: { select: { filename: true } } },
       orderBy: order,
       take: query.limit + 1,
     });
@@ -957,6 +964,8 @@ export class StudentCatalogService {
           id: true,
           courseId: true,
           chapterId: true,
+          course: { select: { title: true } },
+          chapter: { select: { title: true } },
           source: true,
           status: true,
           startsAt: true,
@@ -974,6 +983,7 @@ export class StudentCatalogService {
         ...record,
         targetType: record.courseId ? 'COURSE' : 'CHAPTER',
         targetId: record.courseId ?? record.chapterId,
+        targetName: record.course?.title ?? record.chapter?.title ?? null,
       })),
       meta: toPaginationMeta(query.page, query.limit, total),
     };
@@ -1057,6 +1067,7 @@ export class StudentCatalogService {
       include: {
         academicGrade: {
           include: {
+            coverAsset: { select: { filename: true } },
             _count: { select: { subjects: { where: { status: published } } } },
           },
         },
@@ -1085,7 +1096,14 @@ export class StudentCatalogService {
   private async activeGrants(studentUserId: string): Promise<Grant[]> {
     return this.prisma.studentEntitlement.findMany({
       where: this.activeGrantWhere(studentUserId),
-      select: { id: true, courseId: true, chapterId: true, expiresAt: true },
+      select: {
+        id: true,
+        courseId: true,
+        chapterId: true,
+        expiresAt: true,
+        course: { select: { title: true } },
+        chapter: { select: { title: true } },
+      },
       orderBy: { createdAt: 'desc' },
     });
   }
@@ -1275,6 +1293,7 @@ export class StudentCatalogService {
       description: record.description,
       sortOrder: record.sortOrder,
       coverAssetId: record.coverAssetId ?? null,
+      coverAssetName: record.coverAsset?.filename ?? null,
       ...(record._count
         ? { hasChildren: (Object.values(record._count)[0] as number) > 0 }
         : {}),
@@ -1288,6 +1307,7 @@ export class StudentCatalogService {
       description: { ar: grade.descriptionAr, en: grade.descriptionEn },
       sortOrder: grade.sortOrder,
       coverAssetId: grade.coverAssetId ?? null,
+      coverAssetName: grade.coverAsset?.filename ?? null,
       ...(grade._count ? { hasChildren: grade._count.subjects > 0 } : {}),
     };
   }

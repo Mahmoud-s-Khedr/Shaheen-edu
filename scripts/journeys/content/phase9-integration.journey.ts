@@ -109,7 +109,7 @@ export const phase9IntegrationJourney: JourneyDefinition = {
       await fetchDeliveryUrl(adminCover.body.url, 'Admin cover preview');
       const courseRead = await admin.request<any>('GET', `/admin/courses/${courseId}`);
       expectStatus(courseRead, 200);
-      assert(courseRead.body.coverAssetId === cover.body.id, 'Course read must expose its linked cover asset ID');
+      assert(courseRead.body.coverAssetId === cover.body.id && courseRead.body.coverAssetName === cover.body.filename, 'Course read must expose its linked cover asset ID and filename');
       const publicCover = await clients.public.request<any>('GET', `/catalog/courses/${courseId}/cover/access`);
       expectStatus(publicCover, 200);
       await fetchDeliveryUrl(publicCover.body.url, 'Public course cover');

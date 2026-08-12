@@ -44,7 +44,7 @@ export const pricingPublisherAgreementsJourney: JourneyDefinition = {
 
       const override = await admin.request<any>('POST', `/admin/pricing/chapter/${chapterId}`, { isPurchasable: false });
       expectStatus(override, 201);
-      assert(override.body.isPurchasable === false && override.body.resolvedFrom.chapterId === chapterId, 'Chapter override must supersede course pricing');
+      assert(override.body.isPurchasable === false && override.body.resolvedFrom.chapterId === chapterId && typeof override.body.resolvedFrom.chapterName === 'string', 'Chapter override must return the effective pricing source ID and name');
 
       const overriddenDetail = await admin.request<any>('GET', `/admin/chapters/${chapterId}`);
       const overriddenList = await admin.request<any>('GET', `/admin/chapters?courseId=${courseId}`);
@@ -64,7 +64,7 @@ export const pricingPublisherAgreementsJourney: JourneyDefinition = {
       expectStatus(await admin.request<any>('POST', `/admin/publisher-agreements/${chapter.body.id}/activate`), 201);
       const resolved = await admin.request<any>('GET', `/admin/publisher-agreements/effective?lessonId=${lessonId}`);
       expectStatus(resolved, 200);
-      assert(resolved.body.agreement?.id === chapter.body.id && resolved.body.agreement.revenueShareBps === 2_500 && resolved.body.resolvedFrom.chapterId === chapterId, 'Chapter agreement must override the active course agreement');
+      assert(resolved.body.agreement?.id === chapter.body.id && resolved.body.agreement.revenueShareBps === 2_500 && resolved.body.agreement.publisherUserId === publisherUserId && typeof resolved.body.agreement.publisherName === 'string' && resolved.body.resolvedFrom.chapterId === chapterId && typeof resolved.body.resolvedFrom.chapterName === 'string', 'Chapter agreement must return paired publisher and resolved-target labels');
     });
 
     await step('Rejecting an overlapping primary agreement and calculating publisher earnings', async () => {
@@ -76,7 +76,7 @@ export const pricingPublisherAgreementsJourney: JourneyDefinition = {
       assert(statement.body.publisherEarningsMinor === 2_000 && statement.body.revenueShareBps === 2_500, 'Earnings statement must calculate the chapter publisher share');
       const history = await admin.request<any>('GET', '/admin/publisher-agreements?history=true');
       expectStatus(history, 200);
-      assert(history.body.data.some((agreement: any) => agreement.id === courseAgreementId) && history.body.meta.total >= 1, 'Agreement history must retain the course agreement and pagination metadata');
+      assert(history.body.data.some((agreement: any) => agreement.id === courseAgreementId && agreement.courseId === courseId && typeof agreement.courseName === 'string' && agreement.publisherUserId === publisherUserId && typeof agreement.publisherName === 'string') && history.body.meta.total >= 1, 'Agreement history must retain related IDs with display names');
       const statements = await admin.request<any>('GET', '/admin/publisher-agreements/earnings-statements?limit=1');
       expectStatus(statements, 200);
       assert(statements.body.data.length >= 1 && statements.body.meta.limit === 1, 'Earnings statements must be paginated');

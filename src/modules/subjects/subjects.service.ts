@@ -48,7 +48,11 @@ export class SubjectsService {
   private async getOrThrow(id: string) {
     const record = await this.prisma.subject.findUnique({
       where: { id },
-      include: { _count: { select: { courses: { where: { status: { not: ContentStatus.ARCHIVED } } } } } },
+      include: {
+        academicGrade: { select: { titleAr: true, titleEn: true } },
+        coverAsset: { select: { filename: true } },
+        _count: { select: { courses: { where: { status: { not: ContentStatus.ARCHIVED } } } } },
+      },
     });
     if (!record) {
       throw new NotFoundException('Subject not found');
@@ -118,7 +122,7 @@ export class SubjectsService {
       metadata: { academicGradeId: dto.academicGradeId, slug },
     });
 
-    return this.toSummary(created);
+    return this.toSummary(await this.getOrThrow(created.id));
   }
 
   async getById(actor: RequestUser, id: string) {
@@ -146,7 +150,13 @@ export class SubjectsService {
       orderBySql: Prisma.sql`t."sortOrder" ASC, t.id ASC`,
       orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
       where,
-      args: { include: { _count: { select: { courses: { where: { status: { not: ContentStatus.ARCHIVED } } } } } } },
+      args: {
+        include: {
+          academicGrade: { select: { titleAr: true, titleEn: true } },
+          coverAsset: { select: { filename: true } },
+          _count: { select: { courses: { where: { status: { not: ContentStatus.ARCHIVED } } } } },
+        },
+      },
       page: query.page,
       limit: query.limit,
     });
@@ -454,11 +464,16 @@ export class SubjectsService {
     publishedAt: Date | null;
     archivedAt: Date | null;
     coverAssetId: string | null;
+    coverAsset?: { filename: string } | null;
+    academicGrade?: { titleAr: string; titleEn: string | null };
     _count?: { courses: number };
   }) {
     return {
       id: record.id,
       academicGradeId: record.academicGradeId,
+      academicGradeName: record.academicGrade
+        ? { ar: record.academicGrade.titleAr, en: record.academicGrade.titleEn }
+        : null,
       title: record.title,
       slug: record.slug,
       description: record.description,
@@ -469,6 +484,7 @@ export class SubjectsService {
       publishedAt: record.publishedAt,
       archivedAt: record.archivedAt,
       coverAssetId: record.coverAssetId,
+      coverAssetName: record.coverAsset?.filename ?? null,
       hasChildren: (record._count?.courses ?? 0) > 0,
     };
   }

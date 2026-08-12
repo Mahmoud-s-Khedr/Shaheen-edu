@@ -36,11 +36,19 @@ export class AssessmentScopeDto {
 export class AssessmentScopeResponseDto {
   @ApiPropertyOptional({ type: String, nullable: true }) courseId!:
     string | null;
+  @ApiPropertyOptional({ type: String, nullable: true }) courseName!:
+    string | null;
   @ApiPropertyOptional({ type: String, nullable: true }) chapterId!:
+    string | null;
+  @ApiPropertyOptional({ type: String, nullable: true }) chapterName!:
     string | null;
   @ApiPropertyOptional({ type: String, nullable: true }) lessonId!:
     string | null;
+  @ApiPropertyOptional({ type: String, nullable: true }) lessonName!:
+    string | null;
   @ApiPropertyOptional({ type: String, nullable: true }) sectionId!:
+    string | null;
+  @ApiPropertyOptional({ type: String, nullable: true }) sectionName!:
     string | null;
 }
 
@@ -300,7 +308,10 @@ export class PaginatedAssessmentsResponseDto {
 export class AssessmentDetailDto extends AssessmentListItemDto {
   @ApiPropertyOptional({ type: String, nullable: true }) questionBankId!:
     string | null;
+  @ApiPropertyOptional({ type: String, nullable: true }) questionBankName!:
+    string | null;
   @ApiProperty({ type: [String] }) questionBankIds!: string[];
+  @ApiProperty({ type: [Object] }) questionBanks!: { id: string; name: string }[];
   @ApiPropertyOptional({ type: Object, nullable: true }) generationFilters!:
     object | null;
   @ApiProperty({ type: [AssessmentScopeResponseDto] })

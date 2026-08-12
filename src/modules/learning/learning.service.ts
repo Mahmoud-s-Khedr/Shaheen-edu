@@ -218,6 +218,19 @@ export class LearningService {
       : null;
   }
 
+  private placementNode(placement: any) {
+    return {
+      courseId: placement.courseId,
+      courseName: placement.course?.title ?? null,
+      chapterId: placement.chapterId,
+      chapterName: placement.chapter?.title ?? null,
+      lessonId: placement.lessonId,
+      lessonName: placement.lesson?.title ?? null,
+      sectionId: placement.sectionId,
+      sectionName: placement.section?.title ?? null,
+    };
+  }
+
   private publishedPath(item: any) {
     const path = this.itemPath(item);
     return [path.course, path.chapter, path.lesson, path.section]
@@ -536,12 +549,7 @@ export class LearningService {
       id: question.id,
       type: question.type,
       body: question.body,
-      placements: question.placements.map((p: any) => ({
-        courseId: p.courseId,
-        chapterId: p.chapterId,
-        lessonId: p.lessonId,
-        sectionId: p.sectionId,
-      })),
+      placements: question.placements.map((p: any) => this.placementNode(p)),
       options: question.options.map((x: any) => ({
         id: x.id,
         body: x.body,
@@ -556,6 +564,7 @@ export class LearningService {
       video: question.videoLink
         ? {
             assetId: question.videoLink.videoAssetId,
+            assetName: question.videoLink.videoAsset?.asset?.filename ?? null,
             timestampSeconds: question.videoLink.timestampSeconds,
           }
         : null,

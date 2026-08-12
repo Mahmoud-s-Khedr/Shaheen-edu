@@ -29,7 +29,7 @@ export const manualCommerceJourney: JourneyDefinition = {
       const allMethods = await admin.request<any>('GET', '/admin/manual-payment-methods?limit=100'); expectStatus(allMethods, 200);
       expectStatus(await admin.request<any>('POST', '/admin/manual-payment-methods/reorder', { methodIds: allMethods.body.data.map((x: any) => x.id) }), 201);
       const emptyCart = await student<any>('GET', '/student/cart'); expectStatus(emptyCart, 200); assert(emptyCart.body.data.length === 0, 'New student cart must be empty');
-      const courseItem = await student<any>('POST', '/student/cart/items', { targetType: 'COURSE', targetId: courseId }); expectStatus(courseItem, 201);
+      const courseItem = await student<any>('POST', '/student/cart/items', { targetType: 'COURSE', targetId: courseId }); expectStatus(courseItem, 201); assert(courseItem.body.targetId === courseId && typeof courseItem.body.targetName === 'string', 'Cart items must return the purchasable target ID and name');
       expectStatus(await student<any>('DELETE', `/student/cart/items/${courseItem.body.id}`), 200);
       expectStatus(await student<any>('POST', '/student/cart/items', { targetType: 'COURSE', targetId: courseId }), 201);
       const cancelledCheckout = await student<any>('POST', '/student/checkout', { manualPaymentMethodId: methodId }, { 'idempotency-key': factory.slug('cancel-checkout') }); expectStatus(cancelledCheckout, 201);
@@ -39,7 +39,7 @@ export const manualCommerceJourney: JourneyDefinition = {
       const methods = await student<any>('GET', `/student/manual-payment-methods?q=${encodeURIComponent(methodSearchTerm)}`); expectStatus(methods, 200); assert(methods.body.data.some((x: any) => x.id === methodId) && methods.body.meta.total >= 1, 'Student must see searchable active payment methods');
       expectStatus(await student<any>('POST', '/student/cart/items', { targetType: 'CHAPTER', targetId: chapterId }), 201);
       const checkout = await student<any>('POST', '/student/checkout', { manualPaymentMethodId: methodId }, { 'idempotency-key': factory.slug('checkout') }); expectStatus(checkout, 201); orderId = checkout.body.id;
-      const orders = await student<any>('GET', '/student/orders'); expectStatus(orders, 200); assert(orders.body.data.some((x: any) => x.id === orderId), 'Checkout must appear in order history');
+      const orders = await student<any>('GET', '/student/orders'); expectStatus(orders, 200); assert(orders.body.data.some((x: any) => x.id === orderId && x.items.some((item: any) => item.targetId === chapterId && typeof item.targetName === 'string')), 'Checkout history must return each purchased target ID and name');
       expectStatus(await student<any>('GET', `/student/orders/${orderId}`), 200);
       const library = await student<any>('GET', '/student/library'); expectStatus(library, 200); assert(!library.body.data.some((x: any) => x.target?.id === chapterId), 'Checkout must not grant access before review');
     });

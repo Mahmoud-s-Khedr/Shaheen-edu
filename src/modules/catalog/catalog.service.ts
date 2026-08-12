@@ -22,6 +22,7 @@ const publicNode = (record: any) => ({
   description: record.description,
   sortOrder: record.sortOrder,
   coverAssetId: record.coverAssetId ?? null,
+  coverAssetName: record.coverAsset?.filename ?? null,
   ...(record.accessType ? { accessType: record.accessType } : {}),
   ...(record._count
     ? { hasChildren: (Object.values(record._count)[0] as number) > 0 }
@@ -57,7 +58,7 @@ export class CatalogService {
       orderBySql: sortOrderSql,
       orderBy: order,
       where,
-      args: { include: { _count: { select: { courses: { where: { status: published } } } } } },
+      args: { include: { coverAsset: { select: { filename: true } }, _count: { select: { courses: { where: { status: published } } } } } },
       page: query.page,
       limit: query.limit,
     });
@@ -83,7 +84,7 @@ export class CatalogService {
       orderBySql: sortOrderSql,
       orderBy: order,
       where,
-      args: { include: { _count: { select: { chapters: { where: { status: published } } } } } },
+      args: { include: { coverAsset: { select: { filename: true } }, _count: { select: { chapters: { where: { status: published } } } } } },
       page: query.page,
       limit: query.limit,
     });
@@ -101,11 +102,13 @@ export class CatalogService {
         subject: { status: published, academicGrade: { status: published } },
       },
       include: {
+        coverAsset: { select: { filename: true } },
         _count: { select: { chapters: { where: { status: published } } } },
         subject: {
           include: {
+            coverAsset: { select: { filename: true } },
             _count: { select: { courses: { where: { status: published } } } },
-            academicGrade: { include: { _count: { select: { subjects: { where: { status: published } } } } } },
+            academicGrade: { include: { coverAsset: { select: { filename: true } }, _count: { select: { subjects: { where: { status: published } } } } } },
           },
         },
       },
@@ -181,7 +184,7 @@ export class CatalogService {
         status: published,
         subject: { status: published, academicGrade: { status: published } },
       },
-      include: { _count: { select: { chapters: { where: { status: published } } } } },
+      include: { coverAsset: { select: { filename: true } }, _count: { select: { chapters: { where: { status: published } } } } },
     });
     if (!parent) throw new NotFoundException('Published course not found');
     const ids = await searchArabicIds(this.prisma, 'chapter', query.q, {
@@ -189,7 +192,7 @@ export class CatalogService {
     });
     const items = await this.prisma.chapter.findMany({
       where: { courseId, status: published, ...(ids ? { id: { in: ids } } : {}), ...this.after(query.cursor, query.q) },
-      include: { _count: { select: { lessons: { where: { status: published } } } } },
+      include: { coverAsset: { select: { filename: true } }, _count: { select: { lessons: { where: { status: published } } } } },
       orderBy: order,
       take: query.limit + 1,
     });
@@ -208,7 +211,7 @@ export class CatalogService {
           subject: { status: published, academicGrade: { status: published } },
         },
       },
-      include: { _count: { select: { lessons: { where: { status: published } } } } },
+      include: { coverAsset: { select: { filename: true } }, _count: { select: { lessons: { where: { status: published } } } } },
     });
     if (!parent) throw new NotFoundException('Published chapter not found');
     const ids = await searchArabicIds(this.prisma, 'lesson', query.q, {
@@ -216,7 +219,7 @@ export class CatalogService {
     });
     const items = await this.prisma.lesson.findMany({
       where: { chapterId, status: published, ...(ids ? { id: { in: ids } } : {}), ...this.after(query.cursor, query.q) },
-      include: { _count: { select: { sections: { where: { status: published } } } } },
+      include: { coverAsset: { select: { filename: true } }, _count: { select: { sections: { where: { status: published } } } } },
       orderBy: order,
       take: query.limit + 1,
     });
@@ -241,7 +244,7 @@ export class CatalogService {
           },
         },
       },
-      include: { _count: { select: { sections: { where: { status: published } } } } },
+      include: { coverAsset: { select: { filename: true } }, _count: { select: { sections: { where: { status: published } } } } },
     });
     if (!parent) throw new NotFoundException('Published lesson not found');
     const ids = await searchArabicIds(this.prisma, 'section', query.q, {

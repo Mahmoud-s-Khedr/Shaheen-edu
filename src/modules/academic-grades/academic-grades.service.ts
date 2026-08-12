@@ -47,7 +47,7 @@ export class AcademicGradesService {
   private async getOrThrow(id: string) {
     const record = await this.prisma.academicGrade.findUnique({
       where: { id },
-      include: { _count: { select: { subjects: { where: { status: { not: ContentStatus.ARCHIVED } } } } } },
+      include: { coverAsset: { select: { filename: true } }, _count: { select: { subjects: { where: { status: { not: ContentStatus.ARCHIVED } } } } } },
     });
     if (!record) {
       throw new NotFoundException('Academic grade not found');
@@ -91,7 +91,7 @@ export class AcademicGradesService {
       metadata: { slug },
     });
 
-    return this.toSummary(created);
+    return this.toSummary(await this.getOrThrow(created.id));
   }
 
   async getById(actor: RequestUser, id: string) {
@@ -111,7 +111,7 @@ export class AcademicGradesService {
       orderBySql: Prisma.sql`t."sortOrder" ASC, t.id ASC`,
       orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
       where,
-      args: { include: { _count: { select: { subjects: { where: { status: { not: ContentStatus.ARCHIVED } } } } } } },
+      args: { include: { coverAsset: { select: { filename: true } }, _count: { select: { subjects: { where: { status: { not: ContentStatus.ARCHIVED } } } } } } },
       page: query.page,
       limit: query.limit,
     });
@@ -132,7 +132,7 @@ export class AcademicGradesService {
       orderBySql: Prisma.sql`t."sortOrder" ASC, t.id ASC`,
       orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
       where,
-      args: { include: { _count: { select: { subjects: { where: { status: ContentStatus.PUBLISHED } } } } } },
+      args: { include: { coverAsset: { select: { filename: true } }, _count: { select: { subjects: { where: { status: ContentStatus.PUBLISHED } } } } } },
       page: query.page,
       limit: query.limit,
     });
@@ -338,6 +338,7 @@ export class AcademicGradesService {
     publishedAt: Date | null;
     archivedAt: Date | null;
     coverAssetId: string | null;
+    coverAsset?: { filename: string } | null;
     _count?: { subjects: number };
   }) {
     return {
@@ -352,6 +353,7 @@ export class AcademicGradesService {
       publishedAt: record.publishedAt,
       archivedAt: record.archivedAt,
       coverAssetId: record.coverAssetId,
+      coverAssetName: record.coverAsset?.filename ?? null,
       hasChildren: (record._count?.subjects ?? 0) > 0,
     };
   }

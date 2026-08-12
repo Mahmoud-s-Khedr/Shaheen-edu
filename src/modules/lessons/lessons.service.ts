@@ -48,7 +48,11 @@ export class LessonsService {
   private async getOrThrow(id: string) {
     const record = await this.prisma.lesson.findUnique({
       where: { id },
-      include: { _count: { select: { sections: { where: { status: { not: ContentStatus.ARCHIVED } } } } } },
+      include: {
+        chapter: { select: { title: true } },
+        coverAsset: { select: { filename: true } },
+        _count: { select: { sections: { where: { status: { not: ContentStatus.ARCHIVED } } } } },
+      },
     });
     if (!record) {
       throw new NotFoundException('Lesson not found');
@@ -112,7 +116,7 @@ export class LessonsService {
       metadata: { chapterId: dto.chapterId, slug },
     });
 
-    return this.toSummary(created);
+    return this.toSummary(await this.getOrThrow(created.id));
   }
 
   async getById(actor: RequestUser, id: string) {
@@ -140,7 +144,13 @@ export class LessonsService {
       orderBySql: Prisma.sql`t."sortOrder" ASC, t.id ASC`,
       orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
       where,
-      args: { include: { _count: { select: { sections: { where: { status: { not: ContentStatus.ARCHIVED } } } } } } },
+      args: {
+        include: {
+          chapter: { select: { title: true } },
+          coverAsset: { select: { filename: true } },
+          _count: { select: { sections: { where: { status: { not: ContentStatus.ARCHIVED } } } } },
+        },
+      },
       page: query.page,
       limit: query.limit,
     });
@@ -440,11 +450,14 @@ export class LessonsService {
     archivedAt: Date | null;
     accessType: AccessType;
     coverAssetId: string | null;
+    coverAsset?: { filename: string } | null;
+    chapter?: { title: string };
     _count?: { sections: number };
   }) {
     return {
       id: record.id,
       chapterId: record.chapterId,
+      chapterName: record.chapter?.title ?? null,
       title: record.title,
       slug: record.slug,
       description: record.description,
@@ -452,6 +465,7 @@ export class LessonsService {
       status: record.status,
       accessType: record.accessType,
       coverAssetId: record.coverAssetId,
+      coverAssetName: record.coverAsset?.filename ?? null,
       hasChildren: (record._count?.sections ?? 0) > 0,
       createdAt: record.createdAt,
       updatedAt: record.updatedAt,

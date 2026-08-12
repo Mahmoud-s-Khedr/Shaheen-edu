@@ -8681,7 +8681,14 @@
         },
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminEntitlementDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -8731,7 +8738,14 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedAdminEntitlementsResponseDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -8759,8 +8773,15 @@
           }
         ],
         "responses": {
-          "201": {
-            "description": ""
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminEntitlementDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -17291,6 +17312,15 @@
             "type": "string",
             "nullable": true
           },
+          "academicGrade": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/LocalizedResponseTextDto"
+              }
+            ]
+          },
           "parentPhone": {
             "type": "string"
           }
@@ -17301,6 +17331,7 @@
           "center",
           "nationalIdLast4",
           "academicGradeId",
+          "academicGrade",
           "parentPhone"
         ]
       },
@@ -17828,6 +17859,10 @@
             "type": "string",
             "nullable": true
           },
+          "coverAssetName": {
+            "type": "string",
+            "nullable": true
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time"
@@ -17849,6 +17884,9 @@
           "academicGradeId": {
             "type": "string"
           },
+          "academicGradeName": {
+            "$ref": "#/components/schemas/LocalizedResponseTextDto"
+          },
           "hasChildren": {
             "type": "boolean",
             "example": true,
@@ -17864,6 +17902,7 @@
           "createdAt",
           "updatedAt",
           "academicGradeId",
+          "academicGradeName",
           "hasChildren"
         ]
       },
@@ -18023,6 +18062,10 @@
             "type": "string",
             "nullable": true
           },
+          "coverAssetName": {
+            "type": "string",
+            "nullable": true
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time"
@@ -18044,6 +18087,9 @@
           "subjectId": {
             "type": "string"
           },
+          "subjectName": {
+            "type": "string"
+          },
           "hasChildren": {
             "type": "boolean",
             "example": true,
@@ -18059,6 +18105,7 @@
           "createdAt",
           "updatedAt",
           "subjectId",
+          "subjectName",
           "hasChildren"
         ]
       },
@@ -18070,6 +18117,14 @@
           },
           "chapterId": {
             "type": "string"
+          },
+          "courseName": {
+            "type": "string",
+            "nullable": true
+          },
+          "chapterName": {
+            "type": "string",
+            "nullable": true
           }
         }
       },
@@ -18141,6 +18196,10 @@
             "type": "string",
             "nullable": true
           },
+          "coverAssetName": {
+            "type": "string",
+            "nullable": true
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time"
@@ -18162,6 +18221,9 @@
           "subjectId": {
             "type": "string"
           },
+          "subjectName": {
+            "type": "string"
+          },
           "hasChildren": {
             "type": "boolean",
             "example": true,
@@ -18180,6 +18242,7 @@
           "createdAt",
           "updatedAt",
           "subjectId",
+          "subjectName",
           "hasChildren",
           "pricing"
         ]
@@ -18348,6 +18411,10 @@
             "type": "string",
             "nullable": true
           },
+          "coverAssetName": {
+            "type": "string",
+            "nullable": true
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time"
@@ -18369,6 +18436,9 @@
           "courseId": {
             "type": "string"
           },
+          "courseName": {
+            "type": "string"
+          },
           "hasChildren": {
             "type": "boolean",
             "example": true,
@@ -18384,6 +18454,7 @@
           "createdAt",
           "updatedAt",
           "courseId",
+          "courseName",
           "hasChildren"
         ]
       },
@@ -18427,6 +18498,10 @@
             "type": "string",
             "nullable": true
           },
+          "coverAssetName": {
+            "type": "string",
+            "nullable": true
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time"
@@ -18448,6 +18523,9 @@
           "courseId": {
             "type": "string"
           },
+          "courseName": {
+            "type": "string"
+          },
           "hasChildren": {
             "type": "boolean",
             "example": true,
@@ -18466,6 +18544,7 @@
           "createdAt",
           "updatedAt",
           "courseId",
+          "courseName",
           "hasChildren",
           "pricing"
         ]
@@ -18617,6 +18696,10 @@
             "type": "string",
             "nullable": true
           },
+          "coverAssetName": {
+            "type": "string",
+            "nullable": true
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time"
@@ -18638,6 +18721,9 @@
           "chapterId": {
             "type": "string"
           },
+          "chapterName": {
+            "type": "string"
+          },
           "hasChildren": {
             "type": "boolean",
             "example": true,
@@ -18653,6 +18739,7 @@
           "createdAt",
           "updatedAt",
           "chapterId",
+          "chapterName",
           "hasChildren"
         ]
       },
@@ -18803,6 +18890,10 @@
             "type": "string",
             "nullable": true
           },
+          "coverAssetName": {
+            "type": "string",
+            "nullable": true
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time"
@@ -18823,6 +18914,9 @@
           },
           "lessonId": {
             "type": "string"
+          },
+          "lessonName": {
+            "type": "string"
           }
         },
         "required": [
@@ -18833,7 +18927,8 @@
           "status",
           "createdAt",
           "updatedAt",
-          "lessonId"
+          "lessonId",
+          "lessonName"
         ]
       },
       "PaginatedSectionResponseDto": {
@@ -18995,6 +19090,9 @@
           "id": {
             "type": "string"
           },
+          "filename": {
+            "type": "string"
+          },
           "kind": {
             "type": "string",
             "enum": [
@@ -19038,6 +19136,7 @@
         },
         "required": [
           "id",
+          "filename",
           "kind",
           "status"
         ]
@@ -19052,7 +19151,15 @@
             "type": "string",
             "nullable": true
           },
+          "courseName": {
+            "type": "string",
+            "nullable": true
+          },
           "chapterId": {
+            "type": "string",
+            "nullable": true
+          },
+          "chapterName": {
             "type": "string",
             "nullable": true
           },
@@ -19060,7 +19167,15 @@
             "type": "string",
             "nullable": true
           },
+          "lessonName": {
+            "type": "string",
+            "nullable": true
+          },
           "sectionId": {
+            "type": "string",
+            "nullable": true
+          },
+          "sectionName": {
             "type": "string",
             "nullable": true
           },
@@ -19234,6 +19349,9 @@
           "id": {
             "type": "string"
           },
+          "filename": {
+            "type": "string"
+          },
           "kind": {
             "type": "string",
             "enum": [
@@ -19274,9 +19392,6 @@
             "type": "number",
             "nullable": true
           },
-          "filename": {
-            "type": "string"
-          },
           "video": {
             "nullable": true,
             "type": "object",
@@ -19289,9 +19404,9 @@
         },
         "required": [
           "id",
+          "filename",
           "kind",
-          "status",
-          "filename"
+          "status"
         ]
       },
       "ContentAttachmentDto": {
@@ -19571,6 +19686,130 @@
           "studentUserId"
         ]
       },
+      "AdminEntitlementDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "studentUserId": {
+            "type": "string"
+          },
+          "studentName": {
+            "type": "string",
+            "nullable": true
+          },
+          "courseId": {
+            "type": "string",
+            "nullable": true
+          },
+          "chapterId": {
+            "type": "string",
+            "nullable": true
+          },
+          "targetName": {
+            "type": "string",
+            "nullable": true
+          },
+          "orderItemId": {
+            "type": "string",
+            "nullable": true
+          },
+          "orderItemName": {
+            "type": "string",
+            "nullable": true
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "ADMIN",
+              "PROMOTION",
+              "MIGRATION",
+              "PAYMENT"
+            ]
+          },
+          "status": {
+            "type": "string"
+          },
+          "startsAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "grantedById": {
+            "type": "string",
+            "nullable": true
+          },
+          "grantedByName": {
+            "type": "string",
+            "nullable": true
+          },
+          "revokedById": {
+            "type": "string",
+            "nullable": true
+          },
+          "revokedByName": {
+            "type": "string",
+            "nullable": true
+          },
+          "revokedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "studentUserId",
+          "studentName",
+          "courseId",
+          "chapterId",
+          "targetName",
+          "orderItemId",
+          "orderItemName",
+          "source",
+          "status",
+          "startsAt",
+          "expiresAt",
+          "grantedById",
+          "grantedByName",
+          "revokedById",
+          "revokedByName",
+          "revokedAt",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "PaginatedAdminEntitlementsResponseDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminEntitlementDto"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/PaginationMetaDto"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ]
+      },
       "LocalizedDescriptionDto": {
         "type": "object",
         "properties": {
@@ -19611,6 +19850,10 @@
           "coverAssetId": {
             "type": "string",
             "nullable": true
+          },
+          "coverAssetName": {
+            "type": "string",
+            "nullable": true
           }
         },
         "required": [
@@ -19619,7 +19862,8 @@
           "slug",
           "description",
           "sortOrder",
-          "coverAssetId"
+          "coverAssetId",
+          "coverAssetName"
         ]
       },
       "StudentCatalogSummaryCountsDto": {
@@ -19679,6 +19923,10 @@
             "type": "string",
             "nullable": true
           },
+          "coverAssetName": {
+            "type": "string",
+            "nullable": true
+          },
           "hasChildren": {
             "type": "boolean",
             "description": "Present when child counts were requested."
@@ -19694,7 +19942,8 @@
           "slug",
           "description",
           "sortOrder",
-          "coverAssetId"
+          "coverAssetId",
+          "coverAssetName"
         ]
       },
       "PaginatedCatalogNodeResponseDto": {
@@ -19997,6 +20246,10 @@
             "type": "string",
             "nullable": true
           },
+          "targetName": {
+            "type": "string",
+            "nullable": true
+          },
           "status": {
             "type": "string",
             "example": "ACTIVE"
@@ -20015,6 +20268,7 @@
           "id",
           "targetType",
           "targetId",
+          "targetName",
           "status",
           "startsAt",
           "expiresAt"
@@ -20673,6 +20927,10 @@
             "type": "string",
             "example": "course-id"
           },
+          "targetName": {
+            "type": "string",
+            "example": "Physics course"
+          },
           "title": {
             "type": "string",
             "example": "Physics course"
@@ -20685,6 +20943,7 @@
           "id",
           "targetType",
           "targetId",
+          "targetName",
           "title",
           "price"
         ]
@@ -20800,6 +21059,10 @@
             "type": "string",
             "example": "course-id"
           },
+          "targetName": {
+            "type": "string",
+            "example": "Physics course"
+          },
           "title": {
             "type": "string",
             "example": "Physics course"
@@ -20812,6 +21075,7 @@
           "id",
           "targetType",
           "targetId",
+          "targetName",
           "title",
           "price"
         ]
@@ -21548,7 +21812,15 @@
             "type": "string",
             "nullable": true
           },
+          "courseName": {
+            "type": "string",
+            "nullable": true
+          },
           "chapterId": {
+            "type": "string",
+            "nullable": true
+          },
+          "chapterName": {
             "type": "string",
             "nullable": true
           },
@@ -21556,7 +21828,15 @@
             "type": "string",
             "nullable": true
           },
+          "lessonName": {
+            "type": "string",
+            "nullable": true
+          },
           "sectionId": {
+            "type": "string",
+            "nullable": true
+          },
+          "sectionName": {
             "type": "string",
             "nullable": true
           }
@@ -21610,10 +21890,20 @@
             "type": "string",
             "nullable": true
           },
+          "questionBankName": {
+            "type": "string",
+            "nullable": true
+          },
           "questionBankIds": {
             "type": "array",
             "items": {
               "type": "string"
+            }
+          },
+          "questionBanks": {
+            "type": "array",
+            "items": {
+              "type": "object"
             }
           },
           "generationFilters": {
@@ -21637,6 +21927,7 @@
           "questionCount",
           "createdAt",
           "questionBankIds",
+          "questionBanks",
           "scopes"
         ]
       },

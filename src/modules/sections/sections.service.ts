@@ -49,7 +49,10 @@ export class SectionsService {
   }
 
   private async getOrThrow(id: string) {
-    const record = await this.prisma.section.findUnique({ where: { id } });
+    const record = await this.prisma.section.findUnique({
+      where: { id },
+      include: { lesson: { select: { title: true } }, coverAsset: { select: { filename: true } } },
+    });
     if (!record) {
       throw new NotFoundException('Section not found');
     }
@@ -112,7 +115,7 @@ export class SectionsService {
       metadata: { lessonId: dto.lessonId, slug },
     });
 
-    return this.toSummary(created);
+    return this.toSummary(await this.getOrThrow(created.id));
   }
 
   async getById(actor: RequestUser, id: string) {
@@ -140,6 +143,7 @@ export class SectionsService {
       orderBySql: Prisma.sql`t."sortOrder" ASC, t.id ASC`,
       orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
       where,
+      args: { include: { lesson: { select: { title: true } }, coverAsset: { select: { filename: true } } } },
       page: query.page,
       limit: query.limit,
     });
@@ -431,10 +435,13 @@ export class SectionsService {
     archivedAt: Date | null;
     accessType: AccessType;
     coverAssetId: string | null;
+    coverAsset?: { filename: string } | null;
+    lesson?: { title: string };
   }) {
     return {
       id: record.id,
       lessonId: record.lessonId,
+      lessonName: record.lesson?.title ?? null,
       title: record.title,
       slug: record.slug,
       description: record.description,
@@ -442,6 +449,7 @@ export class SectionsService {
       status: record.status,
       accessType: record.accessType,
       coverAssetId: record.coverAssetId,
+      coverAssetName: record.coverAsset?.filename ?? null,
       createdAt: record.createdAt,
       updatedAt: record.updatedAt,
       publishedAt: record.publishedAt,

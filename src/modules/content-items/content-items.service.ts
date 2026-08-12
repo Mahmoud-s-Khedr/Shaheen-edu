@@ -57,6 +57,13 @@ export class ContentItemsService {
       throw new ForbiddenException('Forbidden');
   }
 
+  private readonly placementNames = {
+    course: { select: { title: true } },
+    chapter: { select: { title: true } },
+    lesson: { select: { title: true } },
+    section: { select: { title: true } },
+  } as const;
+
   private targetFromDto(target: ContentPlacementTargetDto): PlacementTarget {
     const entries = (
       ['courseId', 'chapterId', 'lessonId', 'sectionId'] as const
@@ -163,7 +170,10 @@ export class ContentItemsService {
   private async getOrThrow(id: string) {
     const item = await this.prisma.contentItem.findUnique({
       where: { id },
-      include: { placement: true, primaryAsset: { include: { video: true } } },
+      include: {
+        placement: { include: this.placementNames },
+        primaryAsset: { include: { video: true } },
+      },
     });
     if (!item || !item.placement)
       throw new NotFoundException('Content item not found');
@@ -176,7 +186,7 @@ export class ContentItemsService {
     const item = await this.prisma.contentItem.findUnique({
       where: { id },
       include: {
-        placement: true,
+        placement: { include: this.placementNames },
         primaryAsset: { include: { video: true } },
         assetReferences: {
           orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
@@ -266,7 +276,7 @@ export class ContentItemsService {
           },
         },
       },
-      include: { placement: true },
+      include: { placement: { include: this.placementNames } },
     });
     await this.auditService.record({
       actorUserId: actor.id,
@@ -347,7 +357,12 @@ export class ContentItemsService {
       orderBySql: Prisma.sql`p."sortOrder" ASC, t.id ASC`,
       orderBy: [{ placement: { sortOrder: 'asc' } }, { id: 'asc' }],
       where,
-      args: { include: { placement: true, primaryAsset: { include: { video: true } } } },
+      args: {
+        include: {
+          placement: { include: this.placementNames },
+          primaryAsset: { include: { video: true } },
+        },
+      },
       page: query.page,
       limit: query.limit,
     });
@@ -632,6 +647,7 @@ export class ContentItemsService {
     if (!asset) return null;
     return {
       id: asset.id,
+      filename: asset.filename,
       kind: asset.kind,
       status: asset.status,
       processingStatus: asset.video?.processingStatus ?? null,
@@ -654,9 +670,13 @@ export class ContentItemsService {
       placement: {
         id: placement.id,
         courseId: placement.courseId,
+        courseName: placement.course?.title ?? null,
         chapterId: placement.chapterId,
+        chapterName: placement.chapter?.title ?? null,
         lessonId: placement.lessonId,
+        lessonName: placement.lesson?.title ?? null,
         sectionId: placement.sectionId,
+        sectionName: placement.section?.title ?? null,
         sortOrder: placement.sortOrder,
       },
       createdAt: item.createdAt,

@@ -29,7 +29,7 @@ export const questionBankAuthoringJourney: JourneyDefinition = {
       expectStatus(source, 201);
       sourceId = source.body.id;
       context.created.questionSources.push(sourceId);
-      assert(source.body.publisherUserId === publisherUserId, 'Source must retain its supplying publisher');
+      assert(source.body.publisherUserId === publisherUserId && typeof source.body.publisherName === 'string', 'Source must retain its supplying publisher ID and display name');
 
       const bank = await admin.request<any>('POST', '/admin/question-banks', {
         subjectId, title: factory.title('Question bank'), description: 'Synthetic authoring bank',
@@ -37,6 +37,7 @@ export const questionBankAuthoringJourney: JourneyDefinition = {
       expectStatus(bank, 201);
       bankId = bank.body.id;
       context.created.questionBanks.push(bankId);
+      assert(bank.body.subjectId === subjectId && typeof bank.body.subjectName === 'string', 'Question bank must return its subject ID and name');
 
       expectStatus(await admin.request<any>('POST', `/admin/question-banks/sources/${sourceId}/publish`), 201);
       expectStatus(await admin.request<any>('POST', `/admin/question-banks/${bankId}/publish`), 201);
@@ -49,7 +50,7 @@ export const questionBankAuthoringJourney: JourneyDefinition = {
       expectStatus(question, 201);
       questionId = question.body.id;
       context.created.questions.push(questionId);
-      assert(question.body.type === 'SINGLE_CHOICE' && question.body.scope.courseId === courseId && question.body.placements.some((placement: any) => placement.chapterId === chapterId), 'Question must be single-choice and retain its chapter placement');
+      assert(question.body.type === 'SINGLE_CHOICE' && question.body.bankId === bankId && typeof question.body.bankName === 'string' && question.body.scope.courseId === courseId && typeof question.body.scope.courseName === 'string' && question.body.placements.some((placement: any) => placement.chapterId === chapterId && typeof placement.chapterName === 'string'), 'Question must return paired bank, scope, and placement labels');
 
       expectStatus(await admin.request<any>('POST', `/admin/questions/${questionId}/submit`), 409);
       const first = await admin.request<any>('POST', `/admin/questions/${questionId}/options`, { body: 'Correct option', isCorrect: true });

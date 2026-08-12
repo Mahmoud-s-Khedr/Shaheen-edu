@@ -268,7 +268,9 @@ export const apiCoverageJourney: JourneyDefinition = {
       expectStatus(login, 201);
       assert(typeof login.body.accessToken === 'string', 'Entitlement student login must return an access token');
       const entitlement = await create('/admin/entitlements', { studentUserId: entitlementStudent.id, courseId: course });
-      expectStatus(await admin.request('GET', `/admin/entitlements?studentUserId=${entitlementStudent.id}`), 200);
+      assert(entitlement.studentUserId === entitlementStudent.id && typeof entitlement.studentName === 'string' && entitlement.courseId === course && typeof entitlement.targetName === 'string' && typeof entitlement.grantedByName === 'string', 'Granted entitlement must pair every returned related ID with its label');
+      const entitlementList = await admin.request<any>('GET', `/admin/entitlements?studentUserId=${entitlementStudent.id}`); expectStatus(entitlementList, 200);
+      assert(entitlementList.body.data.some((item: any) => item.id === entitlement.id && item.studentUserId === entitlementStudent.id && typeof item.studentName === 'string' && item.courseId === course && typeof item.targetName === 'string' && typeof item.grantedByName === 'string'), 'Admin entitlement listing must retain all related labels');
       const studentDetail = await clients.student.request<any>('GET', `/student/content-items/${item.id}`, undefined, { accessToken: login.body.accessToken });
       expectStatus(studentDetail, 200);
       assert(
@@ -279,7 +281,8 @@ export const apiCoverageJourney: JourneyDefinition = {
         'Student content detail must return its ordered attachment metadata',
       );
       expectStatus(await admin.request('DELETE', `/admin/content-items/${item.id}/attachments/${pdf.id}`), 200);
-      expectStatus(await admin.request('POST', `/admin/entitlements/${entitlement.id}/revoke`), 201);
+      const revokedEntitlement = await admin.request<any>('POST', `/admin/entitlements/${entitlement.id}/revoke`); expectStatus(revokedEntitlement, 200);
+      assert(revokedEntitlement.body.id === entitlement.id && typeof revokedEntitlement.body.revokedByName === 'string', 'Revoked entitlement must return the revoking admin label');
       const agreement = await create('/admin/publisher-agreements', { lessonId: lesson, publisherUserId: String(context.partner.id), revenueShareBps: 1000, startsAt: new Date().toISOString(), isPrimary: false });
       expectStatus(await admin.request('PATCH', `/admin/publisher-agreements/${agreement.id}`, { revenueShareBps: 1200 }), 200);
       expectStatus(await admin.request('POST', `/admin/publisher-agreements/${agreement.id}/activate`), 201);

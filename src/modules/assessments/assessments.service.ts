@@ -294,6 +294,19 @@ export class AssessmentsService {
     };
   }
 
+  private scopeDto(scope: any) {
+    return {
+      courseId: scope.courseId,
+      courseName: scope.course?.title ?? null,
+      chapterId: scope.chapterId,
+      chapterName: scope.chapter?.title ?? null,
+      lessonId: scope.lessonId,
+      lessonName: scope.lesson?.title ?? null,
+      sectionId: scope.sectionId,
+      sectionName: scope.section?.title ?? null,
+    };
+  }
+
   /** Published questions whose placements intersect any of the given scopes.
    * When `studentIdForEntitlement` is set, also requires the requesting student's
    * own entitlement on each matched placement and their own grade to match
@@ -988,7 +1001,11 @@ export class AssessmentsService {
   private async assessmentWithScopes(id: string) {
     const assessment = await this.prisma.assessment.findUnique({
       where: { id },
-      include: { scopes: { include: scopeInclude }, questionBanks: true },
+      include: {
+        scopes: { include: scopeInclude },
+        questionBank: { select: { id: true, title: true } },
+        questionBanks: { include: { questionBank: { select: { id: true, title: true } } } },
+      },
     });
     if (!assessment) throw new NotFoundException('Assessment not found');
     return assessment;
@@ -1030,17 +1047,20 @@ export class AssessmentsService {
     return {
       ...this.listItemDto(assessment, visibility, attempt),
       questionBankId: assessment.questionBankId,
+      questionBankName: assessment.questionBank?.title ?? null,
       questionBankIds: assessment.questionBanks?.length
         ? assessment.questionBanks.map((bank: any) => bank.questionBankId)
         : assessment.questionBankId
           ? [assessment.questionBankId]
           : [],
+      questionBanks: assessment.questionBanks?.length
+        ? assessment.questionBanks.map((bank: any) => ({ id: bank.questionBank.id, name: bank.questionBank.title }))
+        : assessment.questionBank
+          ? [{ id: assessment.questionBank.id, name: assessment.questionBank.title }]
+          : [],
       generationFilters: assessment.generationFilters,
       scopes: assessment.scopes.map((s: any) => ({
-        courseId: s.courseId,
-        chapterId: s.chapterId,
-        lessonId: s.lessonId,
-        sectionId: s.sectionId,
+        ...this.scopeDto(s),
       })),
     };
   }
@@ -2065,7 +2085,9 @@ export class AssessmentsService {
     const assessment = await this.prisma.assessment.findUnique({
       where: { id },
       include: {
-        scopes: true,
+        scopes: { include: scopeInclude },
+        questionBank: { select: { id: true, title: true } },
+        questionBanks: { include: { questionBank: { select: { id: true, title: true } } } },
         questions: {
           include: { options: { orderBy: { sortOrder: 'asc' } } },
           orderBy: { sortOrder: 'asc' },
@@ -2082,12 +2104,19 @@ export class AssessmentsService {
     const assessment = await this.adminAssessment(id);
     return {
       ...this.adminListItemDto(assessment),
-      scopes: assessment.scopes.map((s: any) => ({
-        courseId: s.courseId,
-        chapterId: s.chapterId,
-        lessonId: s.lessonId,
-        sectionId: s.sectionId,
-      })),
+      questionBankId: assessment.questionBankId,
+      questionBankName: assessment.questionBank?.title ?? null,
+      questionBankIds: assessment.questionBanks?.length
+        ? assessment.questionBanks.map((bank: any) => bank.questionBankId)
+        : assessment.questionBankId
+          ? [assessment.questionBankId]
+          : [],
+      questionBanks: assessment.questionBanks?.length
+        ? assessment.questionBanks.map((bank: any) => ({ id: bank.questionBank.id, name: bank.questionBank.title }))
+        : assessment.questionBank
+          ? [{ id: assessment.questionBank.id, name: assessment.questionBank.title }]
+          : [],
+      scopes: assessment.scopes.map((s: any) => this.scopeDto(s)),
       questions: assessment.questions.map((q: any) => ({
         id: q.id,
         sortOrder: q.sortOrder,

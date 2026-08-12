@@ -14,6 +14,26 @@ export class EntitlementsService {
     if (actor.role !== Role.ADMIN && actor.role !== Role.SUPER_ADMIN) throw new ForbiddenException('Forbidden');
   }
 
+  private entitlementDto(entitlement: any) {
+    const {
+      student,
+      course,
+      chapter,
+      orderItem,
+      grantedBy,
+      revokedBy,
+      ...record
+    } = entitlement;
+    return {
+      ...record,
+      studentName: student?.fullName ?? null,
+      targetName: course?.title ?? chapter?.title ?? null,
+      orderItemName: orderItem?.titleSnapshot ?? null,
+      grantedByName: grantedBy?.loginIdentifier ?? null,
+      revokedByName: revokedBy?.loginIdentifier ?? null,
+    };
+  }
+
   async grant(actor: RequestUser, dto: GrantEntitlementDto) {
     this.assertAdmin(actor);
     if (Boolean(dto.courseId) === Boolean(dto.chapterId)) throw new BadRequestException('Provide exactly one courseId or chapterId');
@@ -24,16 +44,36 @@ export class EntitlementsService {
     if (dto.chapterId && !(await this.prisma.chapter.findUnique({ where: { id: dto.chapterId } }))) throw new NotFoundException('Chapter not found');
     const entitlement = await this.prisma.studentEntitlement.create({ data: { studentUserId: dto.studentUserId, courseId: dto.courseId, chapterId: dto.chapterId, source: dto.source ?? EntitlementSource.ADMIN, startsAt: dto.startsAt, expiresAt: dto.expiresAt, grantedById: actor.id } });
     await this.audit.record({ actorUserId: actor.id, action: 'ENTITLEMENT_GRANTED', targetType: 'StudentEntitlement', targetId: entitlement.id, metadata: { studentUserId: dto.studentUserId, courseId: dto.courseId, chapterId: dto.chapterId } });
-    return entitlement;
+    return this.entitlementDto(await this.prisma.studentEntitlement.findUnique({
+      where: { id: entitlement.id },
+      include: {
+        student: { select: { fullName: true } },
+        course: { select: { title: true } },
+        chapter: { select: { title: true } },
+        orderItem: { select: { titleSnapshot: true } },
+        grantedBy: { select: { loginIdentifier: true } },
+        revokedBy: { select: { loginIdentifier: true } },
+      },
+    }));
   }
 
   async revoke(actor: RequestUser, id: string) {
     this.assertAdmin(actor);
     const entitlement = await this.prisma.studentEntitlement.findUnique({ where: { id } });
     if (!entitlement) throw new NotFoundException('Entitlement not found');
-    const updated = await this.prisma.studentEntitlement.update({ where: { id }, data: { status: EntitlementStatus.REVOKED, revokedAt: new Date(), revokedById: actor.id } });
+    await this.prisma.studentEntitlement.update({ where: { id }, data: { status: EntitlementStatus.REVOKED, revokedAt: new Date(), revokedById: actor.id } });
     await this.audit.record({ actorUserId: actor.id, action: 'ENTITLEMENT_REVOKED', targetType: 'StudentEntitlement', targetId: id });
-    return updated;
+    return this.entitlementDto(await this.prisma.studentEntitlement.findUnique({
+      where: { id },
+      include: {
+        student: { select: { fullName: true } },
+        course: { select: { title: true } },
+        chapter: { select: { title: true } },
+        orderItem: { select: { titleSnapshot: true } },
+        grantedBy: { select: { loginIdentifier: true } },
+        revokedBy: { select: { loginIdentifier: true } },
+      },
+    }));
   }
 
   async revokeArchivedAccess(actor: RequestUser, id: string) {
@@ -49,9 +89,22 @@ export class EntitlementsService {
     this.assertAdmin(actor);
     const where = { studentUserId };
     const [data, total] = await this.prisma.$transaction([
-      this.prisma.studentEntitlement.findMany({ where, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], skip: (query.page - 1) * query.limit, take: query.limit }),
+      this.prisma.studentEntitlement.findMany({
+        where,
+        include: {
+          student: { select: { fullName: true } },
+          course: { select: { title: true } },
+          chapter: { select: { title: true } },
+          orderItem: { select: { titleSnapshot: true } },
+          grantedBy: { select: { loginIdentifier: true } },
+          revokedBy: { select: { loginIdentifier: true } },
+        },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        skip: (query.page - 1) * query.limit,
+        take: query.limit,
+      }),
       this.prisma.studentEntitlement.count({ where }),
     ]);
-    return { data, meta: toPaginationMeta(query.page, query.limit, total) };
+    return { data: data.map((item) => this.entitlementDto(item)), meta: toPaginationMeta(query.page, query.limit, total) };
   }
 }

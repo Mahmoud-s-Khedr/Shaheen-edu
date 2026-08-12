@@ -48,7 +48,11 @@ export class ChaptersService {
   private async getOrThrow(id: string) {
     const record = await this.prisma.chapter.findUnique({
       where: { id },
-      include: { _count: { select: { lessons: { where: { status: { not: ContentStatus.ARCHIVED } } } } } },
+      include: {
+        course: { select: { title: true, isPurchasable: true, priceMinor: true, currency: true } },
+        coverAsset: { select: { filename: true } },
+        _count: { select: { lessons: { where: { status: { not: ContentStatus.ARCHIVED } } } } },
+      },
     });
     if (!record) {
       throw new NotFoundException('Chapter not found');
@@ -112,14 +116,14 @@ export class ChaptersService {
       metadata: { courseId: dto.courseId, slug },
     });
 
-    return this.toSummary(created);
+    return this.toSummary(await this.getOrThrow(created.id));
   }
 
   async getById(actor: RequestUser, id: string) {
     this.assertActorRole(actor);
     const record = await this.prisma.chapter.findUnique({
       where: { id },
-      include: { course: true, _count: { select: { lessons: { where: { status: { not: ContentStatus.ARCHIVED } } } } } },
+      include: { course: true, coverAsset: { select: { filename: true } }, _count: { select: { lessons: { where: { status: { not: ContentStatus.ARCHIVED } } } } } },
     });
     if (!record) {
       throw new NotFoundException('Chapter not found');
@@ -147,7 +151,13 @@ export class ChaptersService {
       orderBySql: Prisma.sql`t."sortOrder" ASC, t.id ASC`,
       orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
       where,
-      args: { include: { course: true, _count: { select: { lessons: { where: { status: { not: ContentStatus.ARCHIVED } } } } } } },
+      args: {
+        include: {
+          course: { select: { title: true, isPurchasable: true, priceMinor: true, currency: true } },
+          coverAsset: { select: { filename: true } },
+          _count: { select: { lessons: { where: { status: { not: ContentStatus.ARCHIVED } } } } },
+        },
+      },
       page: query.page,
       limit: query.limit,
     });
@@ -444,11 +454,14 @@ export class ChaptersService {
     archivedAt: Date | null;
     accessType: AccessType;
     coverAssetId: string | null;
+    coverAsset?: { filename: string } | null;
+    course?: { title: string };
     _count?: { lessons: number };
   }) {
     return {
       id: record.id,
       courseId: record.courseId,
+      courseName: record.course?.title ?? null,
       title: record.title,
       slug: record.slug,
       description: record.description,
@@ -456,6 +469,7 @@ export class ChaptersService {
       status: record.status,
       accessType: record.accessType,
       coverAssetId: record.coverAssetId,
+      coverAssetName: record.coverAsset?.filename ?? null,
       hasChildren: (record._count?.lessons ?? 0) > 0,
       createdAt: record.createdAt,
       updatedAt: record.updatedAt,
@@ -483,6 +497,7 @@ export class ChaptersService {
     currency: string | null;
     course: {
       id: string;
+      title: string;
       isPurchasable: boolean;
       priceMinor: number | null;
       currency: string | null;
@@ -497,8 +512,8 @@ export class ChaptersService {
         currency: source.isPurchasable ? source.currency : null,
         resolvedFrom:
           record.isPurchasable === null
-            ? { courseId: record.course.id }
-            : { chapterId: record.id },
+            ? { courseId: record.course.id, courseName: record.course.title }
+            : { chapterId: record.id, chapterName: record.title },
       },
     };
   }

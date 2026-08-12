@@ -4069,7 +4069,20 @@ No path, query, or header input.
 **Success response — HTTP 201**
 
 ```json
-["StudentEntitlement record[]"]
+{
+  "id": "string",
+  "studentUserId": "string",
+  "studentName": "string",
+  "courseId": "string | null",
+  "chapterId": "string | null",
+  "targetName": "string | null",
+  "orderItemId": "string | null",
+  "orderItemName": "string | null",
+  "grantedById": "string | null",
+  "grantedByName": "string | null",
+  "revokedById": "string | null",
+  "revokedByName": "string | null"
+}
 ```
 
 ### `GET /api/v1/admin/entitlements`
@@ -4083,7 +4096,25 @@ No path, query, or header input.
 **Success response — HTTP 200**
 
 ```json
-["StudentEntitlement record[]"]
+{
+  "data": [
+    {
+      "id": "string",
+      "studentUserId": "string",
+      "studentName": "string",
+      "courseId": "string | null",
+      "chapterId": "string | null",
+      "targetName": "string | null",
+      "orderItemId": "string | null",
+      "orderItemName": "string | null",
+      "grantedById": "string | null",
+      "grantedByName": "string | null",
+      "revokedById": "string | null",
+      "revokedByName": "string | null"
+    }
+  ],
+  "meta": { "page": "number", "limit": "number", "total": "number", "totalPages": "number" }
+}
 ```
 
 ### `POST /api/v1/admin/entitlements/{id}/revoke`
@@ -4094,14 +4125,22 @@ No path, query, or header input.
 
 - path `id` (required)
 
-**Success response — HTTP 201**
+**Success response — HTTP 200**
 
 ```json
 {
   "id": "string",
   "studentUserId": "string",
+  "studentName": "string",
   "courseId?": "string | null",
   "chapterId?": "string | null",
+  "targetName": "string | null",
+  "orderItemId": "string | null",
+  "orderItemName": "string | null",
+  "grantedById": "string | null",
+  "grantedByName": "string | null",
+  "revokedById": "string | null",
+  "revokedByName": "string | null",
   "source": "ADMIN | PROMOTION | MIGRATION | PAYMENT",
   "status": "ACTIVE | REVOKED",
   "startsAt": "ISO-8601 date-time",
@@ -4868,6 +4907,7 @@ or entitlement-creation API.
       "chapterId": "string | null",
       "targetType": "COURSE | CHAPTER",
       "targetId": "string",
+      "targetName": "string | null",
       "source": "ADMIN | PROMOTION | MIGRATION | PAYMENT",
       "status": "ACTIVE",
       "startsAt": "ISO-8601 date-time",

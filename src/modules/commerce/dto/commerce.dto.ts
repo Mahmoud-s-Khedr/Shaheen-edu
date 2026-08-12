@@ -65,6 +65,7 @@ export class CartItemDto {
   @ApiProperty({ example: 'cart-item-id' }) id!: string;
   @ApiProperty({ enum: CommerceTargetType, example: CommerceTargetType.COURSE }) targetType!: CommerceTargetType;
   @ApiProperty({ example: 'course-id' }) targetId!: string;
+  @ApiProperty({ example: 'Physics course' }) targetName!: string;
   @ApiProperty({ example: 'Physics course' }) title!: string;
   @ApiProperty({ type: MoneyDto }) price!: MoneyDto;
 }
@@ -85,6 +86,7 @@ export class OrderItemDto {
   @ApiProperty({ example: 'order-item-id' }) id!: string;
   @ApiProperty({ enum: CommerceTargetType, example: CommerceTargetType.COURSE }) targetType!: CommerceTargetType;
   @ApiProperty({ example: 'course-id' }) targetId!: string;
+  @ApiProperty({ example: 'Physics course' }) targetName!: string;
   @ApiProperty({ example: 'Physics course' }) title!: string;
   @ApiProperty({ type: MoneyDto }) price!: MoneyDto;
 }

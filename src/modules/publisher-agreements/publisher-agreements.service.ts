@@ -13,6 +13,24 @@ export class PublisherAgreementsService {
   constructor(private readonly prisma: PrismaService, private readonly audit: AuditService) {}
 
   private assertAdmin(actor: RequestUser) { if (actor.role !== Role.ADMIN && actor.role !== Role.SUPER_ADMIN) throw new ForbiddenException('Forbidden'); }
+  private agreementDto(agreement: any) {
+    const { publisher, course, chapter, lesson, ...record } = agreement;
+    return {
+      ...record,
+      publisherName: publisher?.displayName ?? null,
+      courseName: course?.title ?? null,
+      chapterName: chapter?.title ?? null,
+      lessonName: lesson?.title ?? null,
+    };
+  }
+  private agreementInclude() {
+    return {
+      publisher: { select: { displayName: true } },
+      course: { select: { title: true } },
+      chapter: { select: { title: true } },
+      lesson: { select: { title: true } },
+    };
+  }
   private targetKey(target: Target): ['courseId' | 'chapterId' | 'lessonId', string] { return target.courseId ? ['courseId', target.courseId] : target.chapterId ? ['chapterId', target.chapterId] : ['lessonId', target.lessonId!]; }
   private assertTarget(target: Target) { if ([target.courseId, target.chapterId, target.lessonId].filter(Boolean).length !== 1) throw new BadRequestException('Provide exactly one courseId, chapterId, or lessonId'); }
   private async assertTargetExists(target: Target) {
@@ -31,12 +49,12 @@ export class PublisherAgreementsService {
   async create(actor: RequestUser, dto: CreatePublisherAgreementDto) {
     this.assertAdmin(actor); await this.assertTargetExists(dto); await this.assertPublisher(dto.publisherUserId); this.assertDates(dto.startsAt, dto.endsAt);
     const agreement = await this.prisma.publisherAgreement.create({ data: { ...dto, isPrimary: dto.isPrimary ?? true, createdById: actor.id } });
-    await this.audit.record({ actorUserId: actor.id, action: 'PUBLISHER_AGREEMENT_CREATED', targetType: 'PublisherAgreement', targetId: agreement.id }); return agreement;
+    await this.audit.record({ actorUserId: actor.id, action: 'PUBLISHER_AGREEMENT_CREATED', targetType: 'PublisherAgreement', targetId: agreement.id }); return this.agreementDto(await this.getOrThrow(agreement.id));
   }
   async update(actor: RequestUser, id: string, dto: UpdatePublisherAgreementDto) {
     this.assertAdmin(actor); const agreement = await this.getOrThrow(id); if (agreement.status !== PublisherAgreementStatus.DRAFT) throw new ConflictException('Only draft agreements can be updated');
     if (dto.publisherUserId) await this.assertPublisher(dto.publisherUserId); this.assertDates(dto.startsAt ?? agreement.startsAt, dto.endsAt ?? agreement.endsAt);
-    const updated = await this.prisma.publisherAgreement.update({ where: { id }, data: dto }); await this.audit.record({ actorUserId: actor.id, action: 'PUBLISHER_AGREEMENT_UPDATED', targetType: 'PublisherAgreement', targetId: id }); return updated;
+    await this.prisma.publisherAgreement.update({ where: { id }, data: dto }); await this.audit.record({ actorUserId: actor.id, action: 'PUBLISHER_AGREEMENT_UPDATED', targetType: 'PublisherAgreement', targetId: id }); return this.agreementDto(await this.getOrThrow(id));
   }
   async activate(actor: RequestUser, id: string) {
     this.assertAdmin(actor); const agreement = await this.getOrThrow(id); if (agreement.status !== PublisherAgreementStatus.DRAFT) throw new ConflictException('Only draft agreements can be activated');
@@ -52,14 +70,14 @@ export class PublisherAgreementsService {
       if ((error as { code?: string }).code === 'P2034') throw new ConflictException('Agreement activation conflicted; retry the request');
       throw error;
     }
-    await this.audit.record({ actorUserId: actor.id, action: 'PUBLISHER_AGREEMENT_ACTIVATED', targetType: 'PublisherAgreement', targetId: id }); return updated;
+    await this.audit.record({ actorUserId: actor.id, action: 'PUBLISHER_AGREEMENT_ACTIVATED', targetType: 'PublisherAgreement', targetId: id }); return this.agreementDto(await this.getOrThrow(updated.id));
   }
   async end(actor: RequestUser, id: string, dto: EndPublisherAgreementDto) {
     this.assertAdmin(actor); const agreement = await this.getOrThrow(id); if (agreement.status !== PublisherAgreementStatus.ACTIVE) throw new ConflictException('Only active agreements can be ended'); const endsAt = dto.endsAt ?? new Date(); this.assertDates(agreement.startsAt, endsAt);
-    const updated = await this.prisma.publisherAgreement.update({ where: { id }, data: { status: PublisherAgreementStatus.ENDED, endsAt } }); await this.audit.record({ actorUserId: actor.id, action: 'PUBLISHER_AGREEMENT_ENDED', targetType: 'PublisherAgreement', targetId: id }); return updated;
+    await this.prisma.publisherAgreement.update({ where: { id }, data: { status: PublisherAgreementStatus.ENDED, endsAt } }); await this.audit.record({ actorUserId: actor.id, action: 'PUBLISHER_AGREEMENT_ENDED', targetType: 'PublisherAgreement', targetId: id }); return this.agreementDto(await this.getOrThrow(id));
   }
-  async list(actor: RequestUser, query: PublisherAgreementsQueryDto) { this.assertAdmin(actor); const where = query.history ? {} : { status: { not: PublisherAgreementStatus.ENDED } }; const [data, total] = await this.prisma.$transaction([this.prisma.publisherAgreement.findMany({ where, include: { publisher: true }, orderBy: [{ startsAt: 'desc' }, { id: 'desc' }], skip: (query.page - 1) * query.limit, take: query.limit }), this.prisma.publisherAgreement.count({ where })]); return { data, meta: toPaginationMeta(query.page, query.limit, total) }; }
-  async getOrThrow(id: string) { const agreement = await this.prisma.publisherAgreement.findUnique({ where: { id } }); if (!agreement) throw new NotFoundException('Publisher agreement not found'); return agreement; }
+  async list(actor: RequestUser, query: PublisherAgreementsQueryDto) { this.assertAdmin(actor); const where = query.history ? {} : { status: { not: PublisherAgreementStatus.ENDED } }; const [data, total] = await this.prisma.$transaction([this.prisma.publisherAgreement.findMany({ where, include: this.agreementInclude(), orderBy: [{ startsAt: 'desc' }, { id: 'desc' }], skip: (query.page - 1) * query.limit, take: query.limit }), this.prisma.publisherAgreement.count({ where })]); return { data: data.map((item) => this.agreementDto(item)), meta: toPaginationMeta(query.page, query.limit, total) }; }
+  async getOrThrow(id: string) { const agreement = await this.prisma.publisherAgreement.findUnique({ where: { id }, include: this.agreementInclude() }); if (!agreement) throw new NotFoundException('Publisher agreement not found'); return agreement; }
 
   private async hierarchyTarget(target: Target): Promise<Target[]> {
     this.assertTarget(target); if (target.courseId) return [target];
@@ -68,7 +86,7 @@ export class PublisherAgreementsService {
   }
   async resolve(actor: RequestUser, target: Target, at = new Date()) {
     this.assertAdmin(actor); const targets = await this.hierarchyTarget(target);
-    for (const candidate of targets) { const agreement = await this.prisma.publisherAgreement.findFirst({ where: { ...candidate, status: PublisherAgreementStatus.ACTIVE, isPrimary: true, startsAt: { lte: at }, OR: [{ endsAt: null }, { endsAt: { gt: at } }] }, include: { publisher: true } }); if (agreement) return { agreement, resolvedFrom: candidate }; }
+    for (const candidate of targets) { const agreement = await this.prisma.publisherAgreement.findFirst({ where: { ...candidate, status: PublisherAgreementStatus.ACTIVE, isPrimary: true, startsAt: { lte: at }, OR: [{ endsAt: null }, { endsAt: { gt: at } }] }, include: this.agreementInclude() }); if (agreement) return { agreement: this.agreementDto(agreement), resolvedFrom: { ...candidate, courseName: agreement.course?.title ?? null, chapterName: agreement.chapter?.title ?? null, lessonName: agreement.lesson?.title ?? null } }; }
     return { agreement: null, resolvedFrom: null };
   }
 

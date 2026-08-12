@@ -61,6 +61,9 @@ export class CatalogNodeDto {
   @ApiProperty({ type: String, nullable: true })
   coverAssetId!: string | null;
 
+  @ApiProperty({ type: String, nullable: true })
+  coverAssetName!: string | null;
+
   @ApiPropertyOptional({ description: 'Present when child counts were requested.' })
   hasChildren?: boolean;
 
@@ -86,6 +89,9 @@ export class AcademicGradeNodeDto {
 
   @ApiProperty({ type: String, nullable: true })
   coverAssetId!: string | null;
+
+  @ApiProperty({ type: String, nullable: true })
+  coverAssetName!: string | null;
 }
 
 export class StudentCatalogSummaryCountsDto {
@@ -241,6 +247,9 @@ export class StudentEntitlementDto {
 
   @ApiProperty({ type: String, nullable: true })
   targetId!: string | null;
+
+  @ApiProperty({ type: String, nullable: true })
+  targetName!: string | null;
 
   @ApiProperty({ example: 'ACTIVE' })
   status!: string;

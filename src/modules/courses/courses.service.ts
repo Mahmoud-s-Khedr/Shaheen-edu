@@ -48,7 +48,11 @@ export class CoursesService {
   private async getOrThrow(id: string) {
     const record = await this.prisma.course.findUnique({
       where: { id },
-      include: { _count: { select: { chapters: { where: { status: { not: ContentStatus.ARCHIVED } } } } } },
+      include: {
+        subject: { select: { title: true } },
+        coverAsset: { select: { filename: true } },
+        _count: { select: { chapters: { where: { status: { not: ContentStatus.ARCHIVED } } } } },
+      },
     });
     if (!record) {
       throw new NotFoundException('Course not found');
@@ -113,7 +117,7 @@ export class CoursesService {
       metadata: { subjectId: dto.subjectId, slug },
     });
 
-    return this.toSummary(created);
+    return this.toSummary(await this.getOrThrow(created.id));
   }
 
   async getById(actor: RequestUser, id: string) {
@@ -141,7 +145,13 @@ export class CoursesService {
       orderBySql: Prisma.sql`t."sortOrder" ASC, t.id ASC`,
       orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
       where,
-      args: { include: { _count: { select: { chapters: { where: { status: { not: ContentStatus.ARCHIVED } } } } } } },
+      args: {
+        include: {
+          subject: { select: { title: true } },
+          coverAsset: { select: { filename: true } },
+          _count: { select: { chapters: { where: { status: { not: ContentStatus.ARCHIVED } } } } },
+        },
+      },
       page: query.page,
       limit: query.limit,
     });
@@ -443,11 +453,14 @@ export class CoursesService {
     archivedAt: Date | null;
     accessType: AccessType;
     coverAssetId: string | null;
+    coverAsset?: { filename: string } | null;
+    subject?: { title: string };
     _count?: { chapters: number };
   }) {
     return {
       id: record.id,
       subjectId: record.subjectId,
+      subjectName: record.subject?.title ?? null,
       title: record.title,
       slug: record.slug,
       description: record.description,
@@ -455,6 +468,7 @@ export class CoursesService {
       status: record.status,
       accessType: record.accessType,
       coverAssetId: record.coverAssetId,
+      coverAssetName: record.coverAsset?.filename ?? null,
       hasChildren: (record._count?.chapters ?? 0) > 0,
       createdAt: record.createdAt,
       updatedAt: record.updatedAt,
@@ -480,6 +494,7 @@ export class CoursesService {
     isPurchasable: boolean;
     priceMinor: number | null;
     currency: string | null;
+    subject?: { title: string };
   }) {
     return {
       ...this.toSummary(record),
@@ -487,7 +502,7 @@ export class CoursesService {
         isPurchasable: record.isPurchasable,
         priceMinor: record.isPurchasable ? record.priceMinor : null,
         currency: record.isPurchasable ? record.currency : null,
-        resolvedFrom: { courseId: record.id },
+        resolvedFrom: { courseId: record.id, courseName: record.title },
       },
     };
   }

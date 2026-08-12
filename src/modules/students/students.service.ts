@@ -59,6 +59,7 @@ export class StudentsService {
             centerRef: { select: { id: true, nameAr: true, nameEn: true } },
             nationalIdLast4: true,
             academicGradeId: true,
+            academicGrade: { select: { titleAr: true, titleEn: true } },
             parentPhoneNormalized: true,
           },
         },
@@ -70,13 +71,22 @@ export class StudentsService {
     const { studentProfile, ...user } = student;
     if (!studentProfile) return { ...user, studentProfile };
 
-    const { parentPhoneNormalized, governorateRef, centerRef, ...profile } =
+    const {
+      parentPhoneNormalized,
+      governorateRef,
+      centerRef,
+      academicGrade,
+      ...profile
+    } = studentProfile;
       studentProfile;
     return {
       ...user,
       studentProfile: {
         ...profile,
         parentPhone: parentPhoneNormalized,
+        academicGrade: academicGrade
+          ? { ar: academicGrade.titleAr, en: academicGrade.titleEn }
+          : null,
         governorate: this.geographyDto(governorateRef),
         center: this.geographyDto(centerRef),
       },

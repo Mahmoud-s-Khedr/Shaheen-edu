@@ -52,6 +52,9 @@ export class StudentProfileDetailsDto {
   @ApiProperty({ type: String, nullable: true })
   academicGradeId!: string | null;
 
+  @ApiProperty({ type: LocalizedResponseTextDto, nullable: true })
+  academicGrade!: LocalizedResponseTextDto | null;
+
   @ApiProperty()
   parentPhone!: string;
 }
@@ -320,6 +323,9 @@ export class HierarchySummaryDto {
   @ApiPropertyOptional({ type: String, nullable: true })
   coverAssetId?: string | null;
 
+  @ApiPropertyOptional({ type: String, nullable: true })
+  coverAssetName?: string | null;
+
   @ApiProperty({ type: String, format: 'date-time' })
   createdAt!: Date;
 
@@ -378,6 +384,9 @@ export class SubjectSummaryDto extends HierarchySummaryDto {
   @ApiProperty()
   academicGradeId!: string;
 
+  @ApiProperty({ type: LocalizedResponseTextDto })
+  academicGradeName!: LocalizedResponseTextDto;
+
   @ApiProperty({
     example: true,
     description: 'Whether this subject has visible course children.',
@@ -388,6 +397,9 @@ export class SubjectSummaryDto extends HierarchySummaryDto {
 export class CourseSummaryDto extends HierarchySummaryDto {
   @ApiProperty()
   subjectId!: string;
+
+  @ApiProperty()
+  subjectName!: string;
 
   @ApiProperty({
     example: true,
@@ -402,6 +414,12 @@ export class EffectivePricingResolvedFromDto {
 
   @ApiPropertyOptional({ type: String })
   chapterId?: string;
+
+  @ApiPropertyOptional({ type: String, nullable: true })
+  courseName?: string | null;
+
+  @ApiPropertyOptional({ type: String, nullable: true })
+  chapterName?: string | null;
 }
 
 export class EffectivePricingDto {
@@ -428,6 +446,9 @@ export class ChapterSummaryDto extends HierarchySummaryDto {
   @ApiProperty()
   courseId!: string;
 
+  @ApiProperty()
+  courseName!: string;
+
   @ApiProperty({
     example: true,
     description: 'Whether this chapter has visible lesson children.',
@@ -445,6 +466,9 @@ export class LessonSummaryDto extends HierarchySummaryDto {
   @ApiProperty()
   chapterId!: string;
 
+  @ApiProperty()
+  chapterName!: string;
+
   @ApiProperty({
     example: true,
     description: 'Whether this lesson has visible section children.',
@@ -455,6 +479,9 @@ export class LessonSummaryDto extends HierarchySummaryDto {
 export class SectionSummaryDto extends HierarchySummaryDto {
   @ApiProperty()
   lessonId!: string;
+
+  @ApiProperty()
+  lessonName!: string;
 }
 
 export class PaginatedAcademicGradeResponseDto {
@@ -529,13 +556,25 @@ export class ContentPlacementSummaryDto {
   courseId!: string | null;
 
   @ApiPropertyOptional({ type: String, nullable: true })
+  courseName!: string | null;
+
+  @ApiPropertyOptional({ type: String, nullable: true })
   chapterId!: string | null;
+
+  @ApiPropertyOptional({ type: String, nullable: true })
+  chapterName!: string | null;
 
   @ApiPropertyOptional({ type: String, nullable: true })
   lessonId!: string | null;
 
   @ApiPropertyOptional({ type: String, nullable: true })
+  lessonName!: string | null;
+
+  @ApiPropertyOptional({ type: String, nullable: true })
   sectionId!: string | null;
+
+  @ApiPropertyOptional({ type: String, nullable: true })
+  sectionName!: string | null;
 
   @ApiProperty()
   sortOrder!: number;
@@ -598,6 +637,9 @@ export class ContentPrimaryAssetSummaryDto {
   @ApiProperty()
   id!: string;
 
+  @ApiProperty()
+  filename!: string;
+
   @ApiProperty({ enum: AssetKind })
   kind!: AssetKind;
 
@@ -629,9 +671,6 @@ export class ContentPrimaryAssetVideoDto {
 }
 
 export class ContentPrimaryAssetDetailDto extends ContentPrimaryAssetSummaryDto {
-  @ApiProperty()
-  filename!: string;
-
   @ApiPropertyOptional({
     type: () => ContentPrimaryAssetVideoDto,
     nullable: true,
