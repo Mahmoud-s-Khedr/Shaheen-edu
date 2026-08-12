@@ -8,6 +8,14 @@ Implementation-backed API contract. Every endpoint below is self-contained: its 
 
 ### `GET /api/v1/parent/selected-child/performance`
 
+### `GET /api/v1/parent/selected-child/analytics/scopes`
+
+### `GET /api/v1/parent/selected-child/analytics/content`
+
+### `GET /api/v1/parent/selected-child/analytics/assessments`
+
+### `GET /api/v1/parent/selected-child/analytics/practice`
+
 ### `POST /api/v1/student/content-items/{id}/complete`
 
 ### `GET /api/v1/student/library/{targetType}/{targetId}/progress`
