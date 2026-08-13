@@ -175,7 +175,7 @@ export class PartnerSummaryDto {
   @ApiProperty({ type: String, nullable: true })
   displayName!: string | null;
 
-  @ApiProperty({ nullable: true })
+  @ApiProperty({ type: String, nullable: true })
   legalName!: string | null;
 
   @ApiProperty({ type: String, nullable: true })
