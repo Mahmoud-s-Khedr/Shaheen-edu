@@ -15335,6 +15335,136 @@
         ]
       }
     },
+    "/api/v1/student/assessments/question-notes/{questionId}": {
+      "put": {
+        "operationId": "AssessmentsController_saveQuestionNote_v1",
+        "parameters": [
+          {
+            "name": "questionId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateQuestionNoteDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create or update a private note for an accessible question",
+        "tags": [
+          "student/assessments"
+        ]
+      },
+      "delete": {
+        "operationId": "AssessmentsController_deleteQuestionNote_v1",
+        "parameters": [
+          {
+            "name": "questionId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Delete the current student’s private question note",
+        "tags": [
+          "student/assessments"
+        ]
+      }
+    },
     "/api/v1/student/assessments/analytics/summary": {
       "get": {
         "operationId": "AssessmentsController_analytics_v1",
@@ -23164,6 +23294,18 @@
           "scopes"
         ]
       },
+      "UpdateQuestionNoteDto": {
+        "type": "object",
+        "properties": {
+          "body": {
+            "type": "string",
+            "description": "The student’s private note for this question"
+          }
+        },
+        "required": [
+          "body"
+        ]
+      },
       "AssessmentListItemDto": {
         "type": "object",
         "properties": {
@@ -23336,6 +23478,10 @@
           },
           "isMarked": {
             "type": "boolean"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
           },
           "sortOrder": {
             "type": "number"

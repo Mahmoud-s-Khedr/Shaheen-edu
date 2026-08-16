@@ -35,7 +35,7 @@ export const assessmentsJourney: JourneyDefinition = {
     };
     const student = <T>(
       token: string,
-      method: 'GET' | 'POST' | 'PATCH' | 'DELETE',
+      method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
       path: string,
       body?: unknown,
     ) => clients.public.request<T>(method, path, body, { accessToken: token });
@@ -201,31 +201,116 @@ export const assessmentsJourney: JourneyDefinition = {
     await step(
       'Discovering banks and generating optional/multi-bank private assessments',
       async () => {
-        const banks = await student<any>(student1Token, 'GET', `/student/assessments/question-banks?subjectId=${subjectId}`);
+        const banks = await student<any>(
+          student1Token,
+          'GET',
+          `/student/assessments/question-banks?subjectId=${subjectId}`,
+        );
         expectStatus(banks, 200);
-        assert(banks.body.data.some((item: any) => item.id === questionBankId && item.availableQuestionCount === 3), 'A student must discover only an accessible bank with its available count');
-        assert(banks.body.data.some((item: any) => item.id === secondQuestionBankId && item.availableQuestionCount === 1), 'A student must discover every accessible selected bank with its available count');
-        const sources = await student<any>(student1Token, 'GET', `/student/assessments/question-sources?questionBankId=${questionBankId}`);
+        assert(
+          banks.body.data.some(
+            (item: any) =>
+              item.id === questionBankId && item.availableQuestionCount === 3,
+          ),
+          'A student must discover only an accessible bank with its available count',
+        );
+        assert(
+          banks.body.data.some(
+            (item: any) =>
+              item.id === secondQuestionBankId &&
+              item.availableQuestionCount === 1,
+          ),
+          'A student must discover every accessible selected bank with its available count',
+        );
+        const sources = await student<any>(
+          student1Token,
+          'GET',
+          `/student/assessments/question-sources?questionBankId=${questionBankId}`,
+        );
         expectStatus(sources, 200);
-        assert(sources.body.data.some((item: any) => item.id === questionSourceId && item.type === 'PLATFORM'), 'A bank source list must be learner-safe and accessible');
-        expectStatus(await student<any>(student1Token, 'POST', `/student/assessments/question-marks/${questionIds[0]}`), 201);
-        const marks = await student<any>(student1Token, 'GET', '/student/assessments/question-marks');
+        assert(
+          sources.body.data.some(
+            (item: any) =>
+              item.id === questionSourceId && item.type === 'PLATFORM',
+          ),
+          'A bank source list must be learner-safe and accessible',
+        );
+        expectStatus(
+          await student<any>(
+            student1Token,
+            'POST',
+            `/student/assessments/question-marks/${questionIds[0]}`,
+          ),
+          201,
+        );
+        const marks = await student<any>(
+          student1Token,
+          'GET',
+          '/student/assessments/question-marks',
+        );
         expectStatus(marks, 200);
-        assert(marks.body.data.some((item: any) => item.questionId === questionIds[0] && item.bank.id === questionBankId), 'A student must be able to retrieve their accessible marked-question list');
-        const unmarked = await student<any>(student1Token, 'DELETE', `/student/assessments/question-marks/${questionIds[0]}`);
+        assert(
+          marks.body.data.some(
+            (item: any) =>
+              item.questionId === questionIds[0] &&
+              item.bank.id === questionBankId,
+          ),
+          'A student must be able to retrieve their accessible marked-question list',
+        );
+        const unmarked = await student<any>(
+          student1Token,
+          'DELETE',
+          `/student/assessments/question-marks/${questionIds[0]}`,
+        );
         expectStatus(unmarked, 200);
-        assert(unmarked.body.questionId === questionIds[0] && unmarked.body.marked === false, 'A student must be able to remove a question mark');
-        const createdNote = await student<any>(student1Token, 'PUT', `/student/assessments/question-notes/${questionIds[0]}`, { body: 'Review the key definition' });
+        assert(
+          unmarked.body.questionId === questionIds[0] &&
+            unmarked.body.marked === false,
+          'A student must be able to remove a question mark',
+        );
+        const createdNote = await student<any>(
+          student1Token,
+          'PUT',
+          `/student/assessments/question-notes/${questionIds[0]}`,
+          { body: 'Review the key definition' },
+        );
         expectStatus(createdNote, 200);
-        assert(createdNote.body.questionId === questionIds[0] && createdNote.body.body === 'Review the key definition', 'A student must be able to add a private note to an accessible question');
-        const updatedNote = await student<any>(student1Token, 'PUT', `/student/assessments/question-notes/${questionIds[0]}`, { body: 'Review the updated definition' });
+        assert(
+          createdNote.body.questionId === questionIds[0] &&
+            createdNote.body.body === 'Review the key definition',
+          'A student must be able to add a private note to an accessible question',
+        );
+        const updatedNote = await student<any>(
+          student1Token,
+          'PUT',
+          `/student/assessments/question-notes/${questionIds[0]}`,
+          { body: 'Review the updated definition' },
+        );
         expectStatus(updatedNote, 200);
-        assert(updatedNote.body.body === 'Review the updated definition', 'A student must be able to update their private question note');
+        assert(
+          updatedNote.body.body === 'Review the updated definition',
+          'A student must be able to update their private question note',
+        );
+        const deletedNote = await student<any>(
+          student1Token,
+          'DELETE',
+          `/student/assessments/question-notes/${questionIds[0]}`,
+        );
+        expectStatus(deletedNote, 200);
+        assert(
+          deletedNote.body.questionId === questionIds[0] &&
+            deletedNote.body.deleted === true,
+          'A student must be able to delete their private question note',
+        );
         const allBanksGenerated = await student<any>(
           student1Token,
           'POST',
           '/student/assessments',
-          { chapterIds: [chapterId], sourceIds: [questionSourceId], questionCount: 1 },
+          {
+            chapterIds: [chapterId],
+            sourceIds: [questionSourceId],
+            questionCount: 1,
+          },
         );
         expectStatus(allBanksGenerated, 201);
         assert(
@@ -237,7 +322,13 @@ export const assessmentsJourney: JourneyDefinition = {
           student1Token,
           'POST',
           '/student/assessments',
-          { questionBankIds: [questionBankId, secondQuestionBankId], chapterIds: [chapterId], sourceIds: [questionSourceId], questionCount: 2, mode: 'EXAM' },
+          {
+            questionBankIds: [questionBankId, secondQuestionBankId],
+            chapterIds: [chapterId],
+            sourceIds: [questionSourceId],
+            questionCount: 2,
+            mode: 'EXAM',
+          },
         );
         expectStatus(generated, 201);
         assert(
@@ -360,7 +451,10 @@ export const assessmentsJourney: JourneyDefinition = {
           { activeSeconds: 18 },
         );
         expectStatus(activeTime, 200);
-        assert(activeTime.body.activeSeconds === 18, 'A resumable attempt must retain monotonic active time per question');
+        assert(
+          activeTime.body.activeSeconds === 18,
+          'A resumable attempt must retain monotonic active time per question',
+        );
 
         const submit = await student<any>(
           student1Token,
@@ -384,17 +478,54 @@ export const assessmentsJourney: JourneyDefinition = {
             typeof result.body.questions[0].explanation === 'string',
           'The result must include the full explanation review after submission',
         );
-        assert(result.body.questions.some((question: any) => question.outcome === 'OMITTED') && result.body.questions.some((question: any) => question.outcome === 'CORRECT'), 'Assessment results must explicitly distinguish correct and omitted outcomes');
-        assert(result.body.percentage === 50 && result.body.correctCount === 1 && result.body.omittedCount === 1 && result.body.questions[0].activeSeconds === 18, 'Completed results must expose persisted summary counts and question active time');
-        assert(result.body.comparison?.status === 'INSUFFICIENT_DATA' && result.body.comparison?.chapters?.some((chapter: any) => chapter.chapterId === chapterId), 'Comparison must derive chapter breakdowns from frozen question placements');
+        assert(
+          result.body.questions.some(
+            (question: any) => question.outcome === 'OMITTED',
+          ) &&
+            result.body.questions.some(
+              (question: any) => question.outcome === 'CORRECT',
+            ),
+          'Assessment results must explicitly distinguish correct and omitted outcomes',
+        );
+        assert(
+          result.body.percentage === 50 &&
+            result.body.correctCount === 1 &&
+            result.body.omittedCount === 1 &&
+            result.body.questions[0].activeSeconds === 18,
+          'Completed results must expose persisted summary counts and question active time',
+        );
+        assert(
+          result.body.comparison?.status === 'INSUFFICIENT_DATA' &&
+            result.body.comparison?.chapters?.some(
+              (chapter: any) => chapter.chapterId === chapterId,
+            ),
+          'Comparison must derive chapter breakdowns from frozen question placements',
+        );
 
-        const withoutComparison = await student<any>(student1Token, 'GET', `/student/assessments/${studentAssessmentId}/attempts/current/result?includeComparison=false`);
+        const withoutComparison = await student<any>(
+          student1Token,
+          'GET',
+          `/student/assessments/${studentAssessmentId}/attempts/current/result?includeComparison=false`,
+        );
         expectStatus(withoutComparison, 200);
-        assert(withoutComparison.body.comparison === undefined, 'includeComparison=false must omit the peer benchmark');
+        assert(
+          withoutComparison.body.comparison === undefined,
+          'includeComparison=false must omit the peer benchmark',
+        );
 
-        const analytics = await student<any>(student1Token, 'GET', `/student/assessments/analytics/summary?subjectId=${subjectId}`);
+        const analytics = await student<any>(
+          student1Token,
+          'GET',
+          `/student/assessments/analytics/summary?subjectId=${subjectId}`,
+        );
         expectStatus(analytics, 200);
-        assert(analytics.body.level === 'chapter' && analytics.body.data.some((chapter: any) => chapter.id === chapterId && chapter.total === 2), 'Assessment analytics must aggregate completed outcomes by chapter');
+        assert(
+          analytics.body.level === 'chapter' &&
+            analytics.body.data.some(
+              (chapter: any) => chapter.id === chapterId && chapter.total === 2,
+            ),
+          'Assessment analytics must aggregate completed outcomes by chapter',
+        );
       },
     );
 
@@ -412,10 +543,15 @@ export const assessmentsJourney: JourneyDefinition = {
           },
         );
         expectStatus(standard, 201);
-        const adminList = await admin.request<any>('GET', '/admin/assessments?search=Disposable');
+        const adminList = await admin.request<any>(
+          'GET',
+          '/admin/assessments?search=Disposable',
+        );
         expectStatus(adminList, 200);
         assert(
-          adminList.body.data.some((item: any) => item.id === standard.body.id) && adminList.body.meta.total >= 1,
+          adminList.body.data.some(
+            (item: any) => item.id === standard.body.id,
+          ) && adminList.body.meta.total >= 1,
           'Admin assessment lists must include draft assessments',
         );
         const adminDetail = await admin.request<any>(

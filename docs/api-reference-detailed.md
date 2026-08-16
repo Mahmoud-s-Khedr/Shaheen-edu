@@ -259,6 +259,27 @@ No path, query, or header input.
 }
 ```
 
+### `PUT /api/v1/student/assessments/question-notes/{questionId}`
+
+**Authorization:** Bearer token; role must be `STUDENT`
+
+**Request**
+
+- path `questionId` (required)
+- body `body` (required string; the student's private note for this question)
+
+Creates or updates the student's private note for an accessible question. Validation and access failures return HTTP 400, 401, 403, or 404.
+
+### `DELETE /api/v1/student/assessments/question-notes/{questionId}`
+
+**Authorization:** Bearer token; role must be `STUDENT`
+
+**Request**
+
+- path `questionId` (required)
+
+Deletes the current student's private note for an accessible question. Access failures return HTTP 401, 403, or 404.
+
 ### `GET /api/v1/student/assessments`
 
 **Authorization:** Bearer token; role must be `STUDENT`
@@ -6473,3 +6494,79 @@ Returns the authenticated publisher's course, chapter, and lesson agreements wit
 **Success response — HTTP 200**
 
 Returns only the authenticated publisher's issued statements, including period, target, revenue share, gross revenue, and publisher earnings.
+
+## Question contexts
+
+### `POST /api/v1/admin/questions/contexts`
+
+**Authorization:** Bearer token; admin role required.
+
+Creates a reusable question context from `CreateQuestionContextDto`; returns the created context (HTTP 201).
+
+### `GET /api/v1/admin/questions/contexts`
+
+**Authorization:** Bearer token; admin role required.
+
+Lists reusable question contexts (HTTP 200).
+
+### `PATCH /api/v1/admin/questions/contexts/{contextId}`
+
+**Authorization:** Bearer token; admin role required.
+
+Updates the path-selected context using `UpdateQuestionContextDto`; returns the updated context (HTTP 200).
+
+### `DELETE /api/v1/admin/questions/contexts/{contextId}`
+
+**Authorization:** Bearer token; admin role required.
+
+Deletes an unreferenced context; returns the deletion result (HTTP 200).
+
+## Student-protected media
+
+### `GET /api/v1/student/video-assets/{assetId}/playback`
+
+**Authorization:** Bearer token; student role required.
+
+Returns playback details for a video the student may access (HTTP 200).
+
+### `GET /api/v1/student/assessments/{id}/questions/{questionId}/assets/{assetId}/access`
+
+**Authorization:** Bearer token; student role required.
+
+Returns protected access details for an attachment belonging to an accessible assessment question. It can return HTTP 401, 403, 404, or 409 when access or the assessment state prevents delivery.
+
+## AI question imports
+
+All endpoints in this section require an administrator Bearer token.
+
+### `POST /api/v1/admin/ai/question-imports`
+
+Creates and queues an import from `CreateQuestionImportDto`; returns the queued import (HTTP 201).
+
+### `GET /api/v1/admin/ai/question-imports`
+
+Lists imports (HTTP 200). Optional query parameters: `page`, `limit`, `q`, and `status` (`QUEUED`, `EXTRACTING`, `SEGMENTING`, `AWAITING_REVIEW`, `GENERATING`, `COMPLETED`, `COMPLETED_WITH_ERRORS`, or `FAILED`).
+
+### `GET /api/v1/admin/ai/question-imports/{id}`
+
+Returns an import's progress and diagnostics (HTTP 200).
+
+### `GET /api/v1/admin/ai/question-imports/{id}/source-text`
+
+Returns the retained normalized source text for review (HTTP 200).
+
+### `PATCH /api/v1/admin/ai/question-imports/{id}/source-text`
+
+Corrects retained source text with `UpdateQuestionImportSourceTextDto` and reruns boundary identification (HTTP 200).
+
+### `GET /api/v1/admin/ai/question-imports/{id}/items`
+
+Lists candidate question items (HTTP 200). Supports the same optional `page`, `limit`, `q`, and `status` filters as the import list.
+
+### `POST /api/v1/admin/ai/question-imports/{id}/retry`
+
+Retries failed import chunks and returns the restarted import (HTTP 201).
+
+### `POST /api/v1/admin/ai/question-imports/{id}/items/{itemId}/retry`
+
+Retries one failed import item and returns the restarted item (HTTP 201).

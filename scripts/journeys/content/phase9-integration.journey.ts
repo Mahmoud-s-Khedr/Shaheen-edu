@@ -73,7 +73,11 @@ export const phase9IntegrationJourney: JourneyDefinition = {
     const chapterId = String(context.academic.chapterId);
     const gradeId = String(context.academic.gradeId);
     const videoFile = testVideo;
-    const [videoBytes, coverBytes, pdfBytes] = await Promise.all([readFile(videoFile), readFile(testCover), readFile(testPdf)]);
+    const [videoBytes, coverBytes, pdfBytes] = await Promise.all([
+      readFile(videoFile),
+      readFile(testCover),
+      readFile(testPdf),
+    ]);
     if (!videoBytes.length) throw new Error('JOURNEY_VIDEO_FILE is empty');
     const filePrefix = `phase9-${factory.runId}`;
     let pdfAssetId = '';
@@ -81,6 +85,8 @@ export const phase9IntegrationJourney: JourneyDefinition = {
     let pdfContentId = '';
     let videoContentId = '';
     let questionId = '';
+    let questionSourceId = '';
+    let questionBankId = '';
     let unentitledToken = '';
     let deliveryStudentId = '';
     let deliveryStudentToken = '';
@@ -104,13 +110,26 @@ export const phase9IntegrationJourney: JourneyDefinition = {
         ),
         201,
       );
-      const adminCover = await admin.request<any>('GET', `/admin/assets/${cover.body.id}/access`);
+      const adminCover = await admin.request<any>(
+        'GET',
+        `/admin/assets/${cover.body.id}/access`,
+      );
       expectStatus(adminCover, 200);
       await fetchDeliveryUrl(adminCover.body.url, 'Admin cover preview');
-      const courseRead = await admin.request<any>('GET', `/admin/courses/${courseId}`);
+      const courseRead = await admin.request<any>(
+        'GET',
+        `/admin/courses/${courseId}`,
+      );
       expectStatus(courseRead, 200);
-      assert(courseRead.body.coverAssetId === cover.body.id && courseRead.body.coverAssetName === cover.body.filename, 'Course read must expose its linked cover asset ID and filename');
-      const publicCover = await clients.public.request<any>('GET', `/catalog/courses/${courseId}/cover/access`);
+      assert(
+        courseRead.body.coverAssetId === cover.body.id &&
+          courseRead.body.coverAssetName === cover.body.filename,
+        'Course read must expose its linked cover asset ID and filename',
+      );
+      const publicCover = await clients.public.request<any>(
+        'GET',
+        `/catalog/courses/${courseId}/cover/access`,
+      );
       expectStatus(publicCover, 200);
       await fetchDeliveryUrl(publicCover.body.url, 'Public course cover');
       const pdf = await admin.upload<any>('/admin/assets/upload?kind=PDF', {
@@ -120,7 +139,10 @@ export const phase9IntegrationJourney: JourneyDefinition = {
       });
       expectStatus(pdf, 201);
       pdfAssetId = pdf.body.id;
-      const adminPdf = await admin.request<any>('GET', `/admin/assets/${pdfAssetId}/access`);
+      const adminPdf = await admin.request<any>(
+        'GET',
+        `/admin/assets/${pdfAssetId}/access`,
+      );
       expectStatus(adminPdf, 200);
       await fetchDeliveryUrl(adminPdf.body.url, 'Admin PDF preview');
     });
@@ -176,13 +198,23 @@ export const phase9IntegrationJourney: JourneyDefinition = {
           { assetId: videoAssetId },
         );
         expectStatus(linked, 201);
-        assert(linked.body.primaryAsset?.id === videoAssetId && linked.body.primaryAsset?.status === 'PENDING_UPLOAD', 'Video content must link before upload completes');
+        assert(
+          linked.body.primaryAsset?.id === videoAssetId &&
+            linked.body.primaryAsset?.status === 'PENDING_UPLOAD',
+          'Video content must link before upload completes',
+        );
         const unreadyPublish = await admin.request<any>(
           'POST',
           `/admin/content-items/${videoContentId}/publish`,
         );
         expectStatus(unreadyPublish, 409);
-        assert(unreadyPublish.body.code === 'VIDEO_NOT_READY' && unreadyPublish.body.meta?.assetId === videoAssetId && unreadyPublish.body.meta?.assetStatus === 'PENDING_UPLOAD' && unreadyPublish.body.meta?.processingStatus === 'CREATED', 'Unready video publication must return actionable processing metadata');
+        assert(
+          unreadyPublish.body.code === 'VIDEO_NOT_READY' &&
+            unreadyPublish.body.meta?.assetId === videoAssetId &&
+            unreadyPublish.body.meta?.assetStatus === 'PENDING_UPLOAD' &&
+            unreadyPublish.body.meta?.processingStatus === 'CREATED',
+          'Unready video publication must return actionable processing metadata',
+        );
         const authorization = await admin.request<any>(
           'POST',
           `/admin/video-assets/${videoAssetId}/upload-authorization`,
@@ -283,11 +315,13 @@ export const phase9IntegrationJourney: JourneyDefinition = {
           },
         );
         expectStatus(source, 201);
+        questionSourceId = source.body.id;
         const bank = await admin.request<any>('POST', '/admin/question-banks', {
           subjectId: context.academic.subjectId,
           title: factory.title('Phase 9 bank'),
         });
         expectStatus(bank, 201);
+        questionBankId = bank.body.id;
         expectStatus(
           await admin.request<any>(
             'POST',
@@ -312,11 +346,18 @@ export const phase9IntegrationJourney: JourneyDefinition = {
         });
         expectStatus(question, 201);
         questionId = question.body.id;
-        expectStatus(await admin.request<any>('POST', `/admin/questions/${questionId}/assets`, { assetId: pdfAssetId }), 201);
         expectStatus(
           await admin.request<any>(
             'POST',
-          `/admin/questions/${questionId}/options`,
+            `/admin/questions/${questionId}/assets`,
+            { assetId: pdfAssetId },
+          ),
+          201,
+        );
+        expectStatus(
+          await admin.request<any>(
+            'POST',
+            `/admin/questions/${questionId}/options`,
             { body: 'Correct', isCorrect: true },
           ),
           201,
@@ -324,7 +365,7 @@ export const phase9IntegrationJourney: JourneyDefinition = {
         expectStatus(
           await admin.request<any>(
             'POST',
-          `/admin/questions/${questionId}/options`,
+            `/admin/questions/${questionId}/options`,
             { body: 'Incorrect', isCorrect: false },
           ),
           201,
@@ -332,14 +373,14 @@ export const phase9IntegrationJourney: JourneyDefinition = {
         expectStatus(
           await admin.request<any>(
             'POST',
-          `/admin/questions/${questionId}/submit`,
+            `/admin/questions/${questionId}/submit`,
           ),
           201,
         );
         expectStatus(
           await admin.request<any>(
             'POST',
-          `/admin/questions/${questionId}/publish`,
+            `/admin/questions/${questionId}/publish`,
           ),
           201,
         );
@@ -357,7 +398,10 @@ export const phase9IntegrationJourney: JourneyDefinition = {
           ),
           200,
         );
-        const outline = await clients.public.request<any>('GET', `/catalog/courses/${courseId}/content-items`);
+        const outline = await clients.public.request<any>(
+          'GET',
+          `/catalog/courses/${courseId}/content-items`,
+        );
         expectStatus(outline, 200);
         assert(
           outline.body.data.length > 0,
@@ -413,7 +457,10 @@ export const phase9IntegrationJourney: JourneyDefinition = {
           { accessToken: deliveryStudentToken },
         );
         expectStatus(questionAsset, 200);
-        await fetchDeliveryUrl(questionAsset.body.url, 'Student practice-question PDF delivery');
+        await fetchDeliveryUrl(
+          questionAsset.body.url,
+          'Student practice-question PDF delivery',
+        );
         const playback = await clients.student.request<any>(
           'GET',
           `/student/content-items/${videoContentId}/assets/${videoAssetId}/access`,
@@ -422,7 +469,59 @@ export const phase9IntegrationJourney: JourneyDefinition = {
         );
         expectStatus(playback, 200);
         expectString(playback.body.embedUrl, 'video playback URL');
-        await fetchDeliveryUrl(playback.body.embedUrl, 'Student video playback');
+        await fetchDeliveryUrl(
+          playback.body.embedUrl,
+          'Student video playback',
+        );
+        const directVideoPlayback = await clients.student.request<any>(
+          'GET',
+          `/student/video-assets/${videoAssetId}/playback`,
+          undefined,
+          { accessToken: deliveryStudentToken },
+        );
+        expectStatus(directVideoPlayback, 200);
+        expectString(
+          directVideoPlayback.body.embedUrl,
+          'direct student video playback URL',
+        );
+
+        const assessment = await clients.student.request<any>(
+          'POST',
+          '/student/assessments',
+          {
+            questionBankIds: [questionBankId],
+            chapterIds: [chapterId],
+            sourceIds: [questionSourceId],
+            questionCount: 1,
+          },
+          { accessToken: deliveryStudentToken },
+        );
+        expectStatus(assessment, 201);
+        const attempt = await clients.student.request<any>(
+          'POST',
+          `/student/assessments/${assessment.body.id}/attempts/start`,
+          undefined,
+          { accessToken: deliveryStudentToken },
+        );
+        expectStatus(attempt, 201);
+        const snapshotQuestion = attempt.body.questions[0];
+        assert(
+          snapshotQuestion?.attachments?.some(
+            (asset: any) => asset.assetId === pdfAssetId,
+          ),
+          'Assessment snapshots must retain source question attachments',
+        );
+        const assessmentAsset = await clients.student.request<any>(
+          'GET',
+          `/student/assessments/${assessment.body.id}/questions/${snapshotQuestion.id}/assets/${pdfAssetId}/access`,
+          undefined,
+          { accessToken: deliveryStudentToken },
+        );
+        expectStatus(assessmentAsset, 200);
+        await fetchDeliveryUrl(
+          assessmentAsset.body.url,
+          'Student assessment-question PDF delivery',
+        );
       },
     );
 
