@@ -121,4 +121,10 @@ export const envValidationSchema = Joi.object({
   RATE_LIMIT_IP_MAX_ATTEMPTS: Joi.number().integer().positive().default(20),
   RATE_LIMIT_IP_WINDOW_SECONDS: Joi.number().integer().positive().default(900),
   PLATFORM_COMPARISON_MIN_SAMPLE: Joi.number().integer().min(1).default(10),
+  OPENROUTER_API_KEY: Joi.string().min(1).optional(),
+  AI_QUESTION_IMPORT_MODEL: Joi.string().min(1).optional(),
+  AI_WORKER_CONCURRENCY: Joi.number().integer().min(1).max(10).default(2),
+  AI_REQUEST_TIMEOUT_MS: Joi.number().integer().min(1000).max(300000).default(60000),
+  AI_SEGMENTATION_MAX_CHARACTERS: Joi.number().integer().min(1000).max(1000000).default(500000),
+  AI_EXTRACTION_MAX_CHARACTERS: Joi.number().integer().min(1000).max(500000).default(80000),
 });

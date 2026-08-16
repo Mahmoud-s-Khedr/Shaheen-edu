@@ -17,6 +17,7 @@ import { Role } from '../../common/types/roles.enum';
 import type { RequestUser } from '../../common/types/request-with-user.types';
 import {
   CreateQuestionBankDto,
+  CreateQuestionContextDto,
   CreateQuestionDto,
   CreateQuestionOptionDto,
   CreateQuestionSourceDto,
@@ -28,6 +29,7 @@ import {
   ReorderQuestionOptionsDto,
   SetQuestionVideoLinkDto,
   UpdateQuestionBankDto,
+  UpdateQuestionContextDto,
   UpdateQuestionDto,
   UpdateQuestionOptionDto,
   UpdateQuestionSourceDto,
@@ -145,6 +147,10 @@ export class QuestionBanksController {
 @Controller({ path: 'admin/questions', version: '1' })
 export class QuestionsController {
   constructor(private readonly service: QuestionBanksService) {}
+  @Post('contexts') @ApiOperation({ summary: 'Create reusable question context' }) createContext(@CurrentUser() a: RequestUser, @Body() d: CreateQuestionContextDto) { return this.service.createContext(a, d); }
+  @Get('contexts') @ApiOperation({ summary: 'List reusable question contexts' }) listContexts(@CurrentUser() a: RequestUser) { return this.service.listContexts(a); }
+  @Patch('contexts/:contextId') @ApiOperation({ summary: 'Update reusable question context' }) updateContext(@CurrentUser() a: RequestUser, @Param('contextId') id: string, @Body() d: UpdateQuestionContextDto) { return this.service.updateContext(a, id, d); }
+  @Delete('contexts/:contextId') @ApiOperation({ summary: 'Delete unreferenced question context' }) deleteContext(@CurrentUser() a: RequestUser, @Param('contextId') id: string) { return this.service.deleteContext(a, id); }
   @Post() @ApiOperation({ summary: 'Create a question' }) create(
     @CurrentUser() a: RequestUser,
     @Body() d: CreateQuestionDto,

@@ -496,6 +496,8 @@ export class LearningService {
       },
       include: {
         options: { orderBy: { sortOrder: 'asc' } },
+        contexts: { include: { context: true }, orderBy: { sortOrder: 'asc' } },
+        structuredExplanation: true,
         assets: { include: { asset: true }, orderBy: { sortOrder: 'asc' } },
         videoLink: { include: { videoAsset: { include: { asset: true } } } },
         placements: {
@@ -554,6 +556,7 @@ export class LearningService {
       id: question.id,
       type: question.type,
       body: question.body,
+      contexts: question.contexts.map((link: any) => link.context),
       placements: question.placements.map((p: any) => this.placementNode(p)),
       options: question.options.map((x: any) => ({
         id: x.id,
@@ -658,6 +661,7 @@ export class LearningService {
       isCorrect,
       correctOptionIds: correct,
       explanation: question.explanation,
+      structuredExplanation: question.structuredExplanation,
       submittedAt: attempt.submittedAt,
     };
   }

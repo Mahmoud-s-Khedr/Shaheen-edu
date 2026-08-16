@@ -153,6 +153,55 @@ enum QuestionType {
   MULTIPLE_CHOICE
 }
 
+enum QuestionContextType {
+  TEXT
+  IMAGE
+  TABLE
+  EQUATION
+}
+
+enum QuestionExplanationOrigin {
+  AI
+  HUMAN
+}
+
+enum QuestionAnswerOrigin {
+  EXPLICIT
+  INFERRED
+}
+
+enum QuestionImportInputType {
+  RAW_TEXT
+  ASSET
+}
+
+enum QuestionImportStatus {
+  QUEUED
+  EXTRACTING
+  SEGMENTING
+  AWAITING_REVIEW
+  GENERATING
+  COMPLETED
+  COMPLETED_WITH_ERRORS
+  FAILED
+}
+
+enum QuestionImportChunkStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum QuestionImportItemStatus {
+  PROCESSING
+  CREATED
+  REVIEW_REQUIRED
+  EXCLUDED
+  INVALID
+  FAILED
+}
+
 enum AssessmentOwnerType {
   STUDENT
   ADMIN
@@ -245,6 +294,7 @@ model User {
   questionsCreated          Question[]               @relation("QuestionCreatedBy")
   questionsUpdated          Question[]               @relation("QuestionUpdatedBy")
   questionsReviewed         Question[]               @relation("QuestionReviewedBy")
+  questionImportsCreated    QuestionImportBatch[]    @relation("QuestionImportCreatedBy")
   assessmentsCreated        Assessment[]             @relation("AssessmentCreatedByAdmin")
   leaderboardWeeksFinalized LeaderboardWeek[]        @relation("LeaderboardWeekFinalizedBy")
 
@@ -636,6 +686,7 @@ model Asset {
   video            VideoAsset?
   questionAssets   QuestionAsset[]           @relation("QuestionAttachmentAsset")
   paymentProofFor  ManualPaymentSubmission[] @relation("ManualPaymentProof")
+  questionImportBatches QuestionImportBatch[] @relation("QuestionImportSourceAsset")
 
   @@index([status, kind, createdAt])
 }
@@ -752,11 +803,171 @@ model Question {
   studentAttempts StudentQuestionAttempt[]
   marks           StudentQuestionMark[]
   communityStats  QuestionCommunityStat?
+  importItem      QuestionImportItem?
+  contexts        QuestionContextQuestion[]
+  structuredExplanation QuestionExplanation?
 
   @@index([status, createdAt, id])
   @@index([bankId, status])
   @@index([sourceId, status])
   @@index([courseId, status])
+}
+
+model QuestionContext {
+  id          String              @id @default(cuid())
+  type        QuestionContextType @default(TEXT)
+  title       String?
+  body        String
+  languageCode String              @default("ar")
+  sourceLocator Json?
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  questions   QuestionContextQuestion[]
+
+  @@index([type, createdAt])
+}
+
+model QuestionContextQuestion {
+  questionId String
+  contextId  String
+  sortOrder  Int                 @default(1)
+  question   Question             @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  context    QuestionContext      @relation(fields: [contextId], references: [id], onDelete: Restrict)
+
+  @@id([questionId, contextId])
+  @@index([contextId])
+}
+
+model QuestionExplanation {
+  id                  String                    @id @default(cuid())
+  questionId          String                    @unique
+  question            Question                  @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  languageCode        String                    @default("ar")
+  keywords            String
+  eliminationStrategy String
+  whyCorrect          String
+  generalRule         String
+  whatIf              String
+  commonMistakes      String
+  origin              QuestionExplanationOrigin @default(HUMAN)
+  model               String?
+  confidence          Float?
+  answerOrigin        QuestionAnswerOrigin?
+  warnings            Json?
+  reviewedAt          DateTime?
+  reviewedById        String?
+  createdAt           DateTime                  @default(now())
+  updatedAt           DateTime                  @updatedAt
+}
+
+model QuestionImportBatch {
+  id                  String                    @id @default(cuid())
+  inputType           QuestionImportInputType
+  rawText             String?
+  sourceAssetId       String?
+  sourceAsset         Asset?                    @relation("QuestionImportSourceAsset", fields: [sourceAssetId], references: [id], onDelete: Restrict)
+  bankId              String
+  sourceId            String
+  courseId            String
+  placements          Json
+  status              QuestionImportStatus     @default(QUEUED)
+  normalizedText      String?
+  extractionMetadata  Json?
+  segmentationRawOutput Json?
+  segmentationUsage   Json?
+  segmentationWarnings Json?
+  sourceTextEditedAt  DateTime?
+  errorSummary        String?
+  model               String
+  schemaVersion       String
+  totalChunks         Int                       @default(0)
+  completedChunks     Int                       @default(0)
+  totalItems          Int                       @default(0)
+  createdQuestions    Int                       @default(0)
+  invalidItems        Int                       @default(0)
+  failedItems         Int                       @default(0)
+  createdAt           DateTime                  @default(now())
+  updatedAt           DateTime                  @updatedAt
+  startedAt           DateTime?
+  completedAt         DateTime?
+  createdById         String
+  createdBy           User                      @relation("QuestionImportCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  chunks              QuestionImportChunk[]
+  items               QuestionImportItem[]
+  sourceBlocks        QuestionImportSourceBlock[]
+
+  @@index([status, createdAt])
+  @@index([createdById, createdAt])
+}
+
+/// Neutral extracted source units. They are never assumed to be question
+/// boundaries; Gemini identifies the question ranges over these block IDs.
+model QuestionImportSourceBlock {
+  id          String              @id @default(cuid())
+  batchId     String
+  batch       QuestionImportBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  sequence    Int
+  blockKey    String
+  text        String
+  sourceLocator Json?
+  assignment  Json?
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  @@unique([batchId, sequence])
+  @@unique([batchId, blockKey])
+  @@index([batchId])
+}
+
+model QuestionImportChunk {
+  id                 String                    @id @default(cuid())
+  batchId            String
+  batch              QuestionImportBatch       @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  sequence           Int
+  text               String
+  sourceLocator      Json?
+  checksum           String
+  status             QuestionImportChunkStatus @default(PENDING)
+  attemptCount       Int                       @default(0)
+  rawResponse        Json?
+  usage              Json?
+  errorDetail        String?
+  createdAt          DateTime                  @default(now())
+  updatedAt          DateTime                  @updatedAt
+  completedAt        DateTime?
+  items              QuestionImportItem[]
+
+  @@unique([batchId, sequence])
+  @@index([batchId, status])
+}
+
+model QuestionImportItem {
+  id                 String                   @id @default(cuid())
+  batchId            String
+  batch              QuestionImportBatch      @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  chunkId            String?
+  chunk              QuestionImportChunk?     @relation(fields: [chunkId], references: [id], onDelete: Cascade)
+  sequence           Int
+  status             QuestionImportItemStatus
+  rawOutput          Json?
+  normalizedOutput   Json?
+  confidence         Float?
+  warnings           Json?
+  sourceLocator      Json?
+  errorDetail        String?
+  questionId         String?                  @unique
+  question           Question?                @relation(fields: [questionId], references: [id], onDelete: SetNull)
+  sourceNumber       String?
+  globalOrder        Int?
+  section            String?
+  detectedType       String?
+  exclusionReason    String?
+  answerOrigin       QuestionAnswerOrigin?
+  createdAt          DateTime                 @default(now())
+  updatedAt          DateTime                 @updatedAt
+
+  @@unique([chunkId, sequence])
+  @@index([batchId, status])
 }
 
 model QuestionOption {
@@ -851,6 +1062,7 @@ model Assessment {
   scopes    AssessmentScope[]
   questionBanks AssessmentQuestionBank[]
   questions AssessmentQuestion[]
+  contexts  AssessmentContext[]
   attempts  AssessmentAttempt[]
 
   @@index([ownerType, studentUserId, status, createdAt, id])
@@ -907,12 +1119,42 @@ model AssessmentQuestion {
   type             QuestionType
   body             String
   explanation      String?
+  structuredExplanation Json?
   options          AssessmentQuestionOption[]
   answers          AssessmentAttemptAnswer[]
   placements       AssessmentQuestionPlacement[]
+  contexts         AssessmentQuestionContext[]
 
   @@unique([assessmentId, sortOrder])
   @@index([assessmentId])
+}
+
+model AssessmentContext {
+  id              String              @id @default(cuid())
+  assessmentId    String
+  assessment      Assessment          @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  sourceContextId String
+  type            QuestionContextType
+  title           String?
+  body            String
+  languageCode    String
+  sourceLocator   Json?
+  createdAt       DateTime            @default(now())
+  questions       AssessmentQuestionContext[]
+
+  @@unique([assessmentId, sourceContextId])
+  @@index([assessmentId])
+}
+
+model AssessmentQuestionContext {
+  assessmentQuestionId String
+  assessmentContextId  String
+  sortOrder            Int @default(1)
+  assessmentQuestion   AssessmentQuestion @relation(fields: [assessmentQuestionId], references: [id], onDelete: Cascade)
+  assessmentContext    AssessmentContext  @relation(fields: [assessmentContextId], references: [id], onDelete: Cascade)
+
+  @@id([assessmentQuestionId, assessmentContextId])
+  @@index([assessmentContextId])
 }
 
 /// Immutable resolved hierarchy labels copied from the authored question when

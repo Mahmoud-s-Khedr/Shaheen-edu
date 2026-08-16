@@ -1,0 +1,23 @@
+import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { Roles } from '../../common/decorators/roles.decorator';
+import { RolesGuard } from '../../common/guards/roles.guard';
+import { Role } from '../../common/types/roles.enum';
+import type { RequestUser } from '../../common/types/request-with-user.types';
+import { CreateQuestionImportDto, QueryQuestionImportDto, UpdateQuestionImportSourceTextDto } from './dto/question-import.dto';
+import { QuestionImportService } from './question-import.service';
+
+@ApiTags('admin/ai/question-imports') @ApiBearerAuth() @UseGuards(RolesGuard) @Roles(Role.ADMIN, Role.SUPER_ADMIN)
+@Controller({ path: 'admin/ai/question-imports', version: '1' })
+export class QuestionImportController {
+  constructor(private readonly service: QuestionImportService) {}
+  @Post() @ApiOperation({ summary: 'Create and queue an AI question import' }) create(@CurrentUser() actor: RequestUser, @Body() dto: CreateQuestionImportDto) { return this.service.create(actor, dto); }
+  @Get() @ApiOperation({ summary: 'List AI question imports' }) list(@CurrentUser() actor: RequestUser, @Query() query: QueryQuestionImportDto) { return this.service.list(actor, query); }
+  @Get(':id') @ApiOperation({ summary: 'Get AI question import progress and diagnostics' }) get(@CurrentUser() actor: RequestUser, @Param('id') id: string) { return this.service.get(actor, id); }
+  @Get(':id/source-text') @ApiOperation({ summary: 'Get retained normalized source text for review' }) sourceText(@CurrentUser() actor: RequestUser, @Param('id') id: string) { return this.service.sourceText(actor, id); }
+  @Patch(':id/source-text') @ApiOperation({ summary: 'Correct source text and rerun AI boundary identification' }) updateSourceText(@CurrentUser() actor: RequestUser, @Param('id') id: string, @Body() dto: UpdateQuestionImportSourceTextDto) { return this.service.updateSourceText(actor, id, dto); }
+  @Get(':id/items') @ApiOperation({ summary: 'List AI question import candidates' }) items(@CurrentUser() actor: RequestUser, @Param('id') id: string, @Query() query: QueryQuestionImportDto) { return this.service.items(actor, id, query); }
+  @Post(':id/retry') @ApiOperation({ summary: 'Retry failed import chunks' }) retry(@CurrentUser() actor: RequestUser, @Param('id') id: string) { return this.service.retry(actor, id); }
+  @Post(':id/items/:itemId/retry') @ApiOperation({ summary: 'Retry one failed import item' }) retryItem(@CurrentUser() actor: RequestUser, @Param('id') id: string, @Param('itemId') itemId: string) { return this.service.retry(actor, id, itemId); }
+}

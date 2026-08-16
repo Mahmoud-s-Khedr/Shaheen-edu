@@ -45,6 +45,7 @@ export class JourneyRunner {
         questionSources: [],
         questionBanks: [],
         questions: [],
+        questionImports: [],
         assessments: [],
       },
       superAdmin: {},

@@ -61,4 +61,8 @@ Purpose: use a real Bunny cover upload to verify that every returned admin-previ
 
 Purpose: validate the generated quiz/exam domain end to end. Depends on CONTENT-013. Authors a published course and three published questions, then: has a student generate a private standard assessment and confirms it is absent from another student's list and returns 403 on direct access; runs the full attempt lifecycle (start, autosave with EXAM-mode answers hidden, resume, submit, and full result review); has an admin hand-pick questions into a DRAFT custom assessment, confirms it is invisible to students until published, then publishes it and confirms it becomes visible to every entitled student with TUTOR-mode answers revealed immediately; and finally archives it and confirms it disappears from student lists. Script: `scripts/journeys/content/assessments.journey.ts`.
 
+## CONTENT-019 — AI question import queue and review contract
+
+Purpose: queue an admin-owned raw-text import against a valid question-bank target and validate its redacted queue summary, list/detail/source-text and empty-candidate retrieval contracts. It also rejects ambiguous input, retries and source-text edits outside their valid worker states, and partner access. The journey intentionally does not call OpenRouter or wait for a worker; asynchronous extraction and generation require separately configured provider credentials. Depends on CONTENT-006. Script: `scripts/journeys/content/ai-question-import.journey.ts`.
+
 All journey delivery APIs returning a browser URL (`url` or `embedUrl`) fetch that URL and consume its body; an issued URL alone is not treated as successful delivery.

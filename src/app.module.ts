@@ -38,6 +38,7 @@ import { AssessmentsModule } from './modules/assessments/assessments.module';
 import { LeaderboardModule } from './modules/leaderboard/leaderboard.module';
 import { PerformanceModule } from './modules/performance/performance.module';
 import { PartnerAnalyticsModule } from './modules/partner-analytics/partner-analytics.module';
+import { QuestionImportModule } from './modules/ai-question-import/question-import.module';
 import { UserAuthGuard } from './common/guards/user-auth.guard';
 import type { IncomingMessage } from 'http';
 
@@ -101,6 +102,7 @@ import type { IncomingMessage } from 'http';
     LeaderboardModule,
     PerformanceModule,
     PartnerAnalyticsModule,
+    QuestionImportModule,
   ],
   providers: [
     // Global deny-by-default auth guard - @Public() opts a route out.

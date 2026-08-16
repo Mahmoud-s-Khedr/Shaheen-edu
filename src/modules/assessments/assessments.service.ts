@@ -359,6 +359,8 @@ export class AssessmentsService {
       include: {
         course: { include: { subject: true } },
         options: { orderBy: { sortOrder: 'asc' } },
+        contexts: { include: { context: true }, orderBy: { sortOrder: 'asc' } },
+        structuredExplanation: true,
         communityStats: true,
         placements: { include: this.questionPlacementInclude() },
       },
@@ -511,7 +513,7 @@ export class AssessmentsService {
     });
     for (let i = 0; i < params.questions.length; i++) {
       const question = params.questions[i];
-      await tx.assessmentQuestion.create({
+      const snapshotQuestion = await tx.assessmentQuestion.create({
         data: {
           assessmentId: assessment.id,
           sourceQuestionId: question.id,
@@ -519,6 +521,7 @@ export class AssessmentsService {
           type: question.type,
           body: question.body,
           explanation: question.explanation,
+          structuredExplanation: question.structuredExplanation ? { languageCode: question.structuredExplanation.languageCode, keywords: question.structuredExplanation.keywords, eliminationStrategy: question.structuredExplanation.eliminationStrategy, whyCorrect: question.structuredExplanation.whyCorrect, generalRule: question.structuredExplanation.generalRule, whatIf: question.structuredExplanation.whatIf, commonMistakes: question.structuredExplanation.commonMistakes, origin: question.structuredExplanation.origin, confidence: question.structuredExplanation.confidence, answerOrigin: question.structuredExplanation.answerOrigin, warnings: question.structuredExplanation.warnings } : undefined,
           options: {
             create: question.options.map((option: any, index: number) => ({
               body: option.body,
@@ -533,6 +536,11 @@ export class AssessmentsService {
           },
         },
       });
+      for (const link of question.contexts ?? []) {
+        const source = link.context;
+        const context = await tx.assessmentContext.upsert({ where: { assessmentId_sourceContextId: { assessmentId: assessment.id, sourceContextId: source.id } }, create: { assessmentId: assessment.id, sourceContextId: source.id, type: source.type, title: source.title, body: source.body, languageCode: source.languageCode, sourceLocator: source.sourceLocator }, update: {} });
+        await tx.assessmentQuestionContext.create({ data: { assessmentQuestionId: snapshotQuestion.id, assessmentContextId: context.id, sortOrder: link.sortOrder } });
+      }
     }
     return assessment;
   }
@@ -1094,7 +1102,7 @@ export class AssessmentsService {
   private async questionsForAssessment(id: string) {
     return this.prisma.assessmentQuestion.findMany({
       where: { assessmentId: id },
-      include: { options: { orderBy: { sortOrder: 'asc' } }, placements: true },
+      include: { options: { orderBy: { sortOrder: 'asc' } }, placements: true, contexts: { include: { assessmentContext: true }, orderBy: { sortOrder: 'asc' } } },
       orderBy: { sortOrder: 'asc' },
     });
   }
@@ -1303,6 +1311,7 @@ export class AssessmentsService {
           sortOrder: q.sortOrder,
           type: q.type,
           body: q.body,
+          contexts: q.contexts.map((link) => link.assessmentContext),
           options: q.options.map((o) => ({
             id: o.id,
             body: o.body,
@@ -1318,6 +1327,7 @@ export class AssessmentsService {
             ? q.options.filter((o) => o.isCorrect).map((o) => o.id)
             : null,
           explanation: showAnswer ? q.explanation : null,
+          structuredExplanation: showAnswer ? q.structuredExplanation : null,
         };
       }),
     };
@@ -1990,6 +2000,8 @@ export class AssessmentsService {
       include: {
         course: { include: { subject: true } },
         options: { orderBy: { sortOrder: 'asc' } },
+        contexts: { include: { context: true }, orderBy: { sortOrder: 'asc' } },
+        structuredExplanation: true,
         placements: { include: this.questionPlacementInclude() },
       },
     });

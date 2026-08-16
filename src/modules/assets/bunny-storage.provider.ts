@@ -42,6 +42,14 @@ export class BunnyStorageProvider implements FileStorageProvider {
     return { sizeBytes: head.ContentLength ?? 0, mimeType: head.ContentType, first: Buffer.concat(chunks) };
   }
 
+  /** Reads a private storage object for trusted server-side processing. */
+  async download(key: string): Promise<Buffer> {
+    const output = await this.client.send(new GetObjectCommand({ Bucket: this.config.bucket, Key: key }));
+    const chunks: Buffer[] = [];
+    for await (const chunk of output.Body as Readable) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    return Buffer.concat(chunks);
+  }
+
   createProtectedUrl(key: string, expiresAt: Date): string {
     const base = this.config.pullZoneUrl.replace(/\/$/, '');
     const path = `/${key.split('/').map(encodeURIComponent).join('/')}`;

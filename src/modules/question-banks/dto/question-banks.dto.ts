@@ -2,7 +2,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { ArrayMinSize, IsArray, IsBoolean, IsEnum, IsInt, IsOptional, IsString, MaxLength, Min, MinLength, ValidateNested } from 'class-validator';
 import { SearchPaginationQueryDto } from '../../../common/dto/pagination-query.dto';
-import { ContentStatus, QuestionSourceType, QuestionStatus, QuestionType } from '../../../common/types/roles.enum';
+import { ContentStatus, QuestionContextType, QuestionSourceType, QuestionStatus, QuestionType } from '../../../common/types/roles.enum';
 import { LocalizedOptionalTextDto, LocalizedTextDto } from '../../../common/dto/localized-text.dto';
 
 export class CreateQuestionSourceDto {
@@ -25,6 +25,26 @@ export class QuestionPlacementDto {
   @ApiPropertyOptional() @IsOptional() @IsString() lessonId?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() sectionId?: string;
 }
+export class QuestionExplanationDto {
+  @ApiProperty() @IsString() @MinLength(1) @MaxLength(10000) keywords!: string;
+  @ApiProperty() @IsString() @MinLength(1) @MaxLength(10000) eliminationStrategy!: string;
+  @ApiProperty() @IsString() @MinLength(1) @MaxLength(10000) whyCorrect!: string;
+  @ApiProperty() @IsString() @MinLength(1) @MaxLength(10000) generalRule!: string;
+  @ApiProperty() @IsString() @MinLength(1) @MaxLength(10000) whatIf!: string;
+  @ApiProperty() @IsString() @MinLength(1) @MaxLength(10000) commonMistakes!: string;
+}
+export class CreateQuestionContextDto {
+  @ApiPropertyOptional({ enum: QuestionContextType }) @IsOptional() @IsEnum(QuestionContextType) type?: QuestionContextType;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(500) title?: string;
+  @ApiProperty() @IsString() @MinLength(1) @MaxLength(100000) body!: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(12) languageCode?: string;
+}
+export class UpdateQuestionContextDto {
+  @ApiPropertyOptional({ enum: QuestionContextType }) @IsOptional() @IsEnum(QuestionContextType) type?: QuestionContextType;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(500) title?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MinLength(1) @MaxLength(100000) body?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(12) languageCode?: string;
+}
 
 export class CreateQuestionDto {
   @ApiProperty() @IsString() bankId!: string; @ApiProperty() @IsString() sourceId!: string; @ApiProperty() @IsString() courseId!: string;
@@ -32,6 +52,8 @@ export class CreateQuestionDto {
   @ApiProperty({ type: [QuestionPlacementDto] }) @IsArray() @ArrayMinSize(1) @ValidateNested({ each: true }) @Type(() => QuestionPlacementDto) placements!: QuestionPlacementDto[];
   @ApiProperty() @IsString() @MinLength(1) @MaxLength(100000) body!: string;
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(100000) explanation?: string;
+  @ApiPropertyOptional({ type: [String] }) @IsOptional() @IsArray() @IsString({ each: true }) contextIds?: string[];
+  @ApiPropertyOptional({ type: QuestionExplanationDto }) @IsOptional() @ValidateNested() @Type(() => QuestionExplanationDto) structuredExplanation?: QuestionExplanationDto;
 }
 export class UpdateQuestionDto {
   @ApiPropertyOptional() @IsOptional() @IsString() bankId?: string; @ApiPropertyOptional() @IsOptional() @IsString() sourceId?: string; @ApiPropertyOptional() @IsOptional() @IsString() courseId?: string;
@@ -39,6 +61,8 @@ export class UpdateQuestionDto {
   @ApiPropertyOptional({ type: [QuestionPlacementDto] }) @IsOptional() @IsArray() @ArrayMinSize(1) @ValidateNested({ each: true }) @Type(() => QuestionPlacementDto) placements?: QuestionPlacementDto[];
   @ApiPropertyOptional() @IsOptional() @IsString() @MinLength(1) @MaxLength(100000) body?: string;
   @ApiPropertyOptional({ nullable: true }) @IsOptional() @IsString() @MaxLength(100000) explanation?: string | null;
+  @ApiPropertyOptional({ type: [String] }) @IsOptional() @IsArray() @IsString({ each: true }) contextIds?: string[];
+  @ApiPropertyOptional({ type: QuestionExplanationDto }) @IsOptional() @ValidateNested() @Type(() => QuestionExplanationDto) structuredExplanation?: QuestionExplanationDto;
 }
 export class CreateQuestionOptionDto { @ApiProperty() @IsString() @MinLength(1) @MaxLength(10000) body!: string; @ApiPropertyOptional() @IsOptional() @IsBoolean() isCorrect?: boolean; }
 export class UpdateQuestionOptionDto { @ApiPropertyOptional() @IsOptional() @IsString() @MinLength(1) @MaxLength(10000) body?: string; @ApiPropertyOptional() @IsOptional() @IsBoolean() isCorrect?: boolean; }

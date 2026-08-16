@@ -57,6 +57,23 @@ services:
       timeout: 5s
       retries: 10
 
+  ai-question-import-worker:
+    build:
+      context: .
+      target: development
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://edu:edu_dev_password@postgres:5432/edu?schema=public
+      REDIS_URL: redis://redis:6379
+    command: sh -c 'pnpm prisma migrate deploy && node dist/worker'
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
 volumes:
   edu_postgres_data:
   edu_redis_data:

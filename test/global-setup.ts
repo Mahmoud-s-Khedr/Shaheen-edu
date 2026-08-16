@@ -52,6 +52,8 @@ function testEnvironment(
     BUNNY_STREAM_API_KEY: 'test-stream-key',
     BUNNY_STREAM_READ_ONLY_KEY: 'test-read-only-key',
     BUNNY_STREAM_PLAYER_TOKEN_KEY: 'test-player-token-key',
+    OPENROUTER_API_KEY: 'test-openrouter-key',
+    AI_QUESTION_IMPORT_MODEL: '~google/gemini-flash-latest',
   };
 }
 

@@ -5,5 +5,5 @@ import { QuestionBanksController, QuestionsController } from './question-banks.c
 import { QuestionCommunityStatsService } from './question-community-stats.service';
 import { QuestionBanksService } from './question-banks.service';
 
-@Module({ imports: [AuditModule, PublicationModule], controllers: [QuestionBanksController, QuestionsController], providers: [QuestionBanksService, QuestionCommunityStatsService], exports: [QuestionCommunityStatsService] })
+@Module({ imports: [AuditModule, PublicationModule], controllers: [QuestionBanksController, QuestionsController], providers: [QuestionBanksService, QuestionCommunityStatsService], exports: [QuestionBanksService, QuestionCommunityStatsService] })
 export class QuestionBanksModule {}

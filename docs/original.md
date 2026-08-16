@@ -3,7 +3,7 @@
 Source: [`docs/MohamedDiab-Req.pdf`](MohamedDiab-Req.pdf) ("Sentivra —
 Mohamed Diab Req.").
 
-Last reviewed: **2026-08-10**. This is a backend-only review of the current
+Last reviewed: **2026-08-13**. This is a backend-only review of the current
 repository. Frontend rendering, page composition, chart drawing, and client
 navigation are treated as complete when the API exposes the required data and
 commands.
@@ -37,6 +37,7 @@ asset, and integration surfaces needed to operate the platform.
 | E-LEADERBOARD | Friday/Cairo weekly calculation, grade cohort ranking, honor board, pagination, current rank, history, and top-three award labels: [`src/modules/leaderboard/leaderboard.controller.ts`](../src/modules/leaderboard/leaderboard.controller.ts) and [`src/modules/leaderboard/leaderboard.service.ts`](../src/modules/leaderboard/leaderboard.service.ts). |
 | E-PUBLISHER | Course/chapter/lesson pricing, effective pricing, publisher agreements, earnings statements, and content-publisher reporting: [`src/modules/publisher-agreements/publisher-agreements.controller.ts`](../src/modules/publisher-agreements/publisher-agreements.controller.ts) and [`src/modules/partner-analytics`](../src/modules/partner-analytics). |
 | E-MEDIA | General assets/covers, Bunny Storage access, Bunny Stream direct upload/playback/retry/archive, and webhook handling: [`src/modules/assets`](../src/modules/assets), [`src/modules/videos/videos.controller.ts`](../src/modules/videos/videos.controller.ts), and [`docs/video-api-reference.md`](video-api-reference.md). |
+| E-AI-IMPORT | Admin-only raw-text/PDF/DOCX/TXT import queue, Redis/BullMQ worker, OpenRouter structured extraction, retained diagnostics, and draft-question creation: [`src/modules/ai-question-import`](../src/modules/ai-question-import), [`src/worker.ts`](../src/worker.ts), and [`scripts/journeys/content/ai-question-import.journey.ts`](../scripts/journeys/content/ai-question-import.journey.ts). |
 
 ## Implemented platform surface
 
@@ -53,6 +54,7 @@ asset, and integration surfaces needed to operate the platform.
 | Performance | `overview`, grouped `analysis`, date/test `trends`, cohort `peers`, and assessment answer-change endpoints, in addition to the legacy direct-practice `GET /student/performance` summary. |
 | Leaderboard | Cairo-time Friday weekly windows, current ranking and history, top-five honor board, paginated full ranking, exact student rank, Smart Score field, accuracy, and top-three gold/silver/bronze labels. |
 | Operations | Admin student lifecycle, partner CRUD/lifecycle, entitlement grant/revoke, manual-payment configuration/review, pricing, publisher agreements, earnings statements, geography, assets, video integration, and audit records. |
+| AI-assisted authoring | Admin-only queued import of raw text or ready text-based PDF/DOCX/TXT assets into validated draft questions. The worker retains source, segmentation, chunk, candidate, usage, and error diagnostics; it never publishes imported questions automatically. |
 
 ## Module 1 — Welcome section
 
@@ -122,7 +124,7 @@ asset, and integration surfaces needed to operate the platform.
 | [-] | Admin student data, payments, subscriptions, and full performance dashboard. | Safe student administration, separate orders/entitlements, and student performance APIs exist; there is no consolidated admin student dashboard joining all domains. [E-ADMIN, E-COMMERCE, E-PERFORMANCE] |
 | [ ] | Admin parent management. | No parent account/entity administration or parent-scoped orders/entitlements API. |
 | [-] | Partner company, assigned subjects, students, payments, and revenue share. | Content publishers have a self-scoped dashboard, agreement-covered content, issued earnings statements, and approved-order estimates with aggregate customer counts. Referral reporting and learner-level reporting remain absent by design. [E-PUBLISHER, E-AUTH] |
-| [-] | Content management including uploads and PDF-to-question generation. | Hierarchy, content, assets, video, question authoring, review, and placements exist. Automatic PDF-to-question generation does not. [E-HIERARCHY, E-MEDIA, E-QBANK] |
+| [-] | Content management including uploads and PDF-to-question generation. | Hierarchy, content, assets, video, question authoring, review, and placements exist. Admins can queue raw text or ready text-based PDF/DOCX/TXT assets for OpenRouter-assisted extraction into ordinary draft questions; scanned-PDF OCR and explicit per-item accept/reject controls are not delivered. [E-HIERARCHY, E-MEDIA, E-QBANK, E-AI-IMPORT] |
 | [-] | Pricing, discounts, coupons, and payments. | Course/chapter/lesson pricing, manual payment, and fulfilment exist. Coupons, timed discounts, refunds, payment expiry, and PSP integration do not. [E-COMMERCE, E-PUBLISHER] |
 | [ ] | Excel subscriber export and payment/revenue reports. | No export or consolidated reporting endpoints exist. |
 | [x] | Admin access and platform control. | Admin/super-admin authentication, role guards, audit records, and delivered administration surfaces are implemented. [E-AUTH, E-ADMIN, E-HIERARCHY] |
@@ -158,9 +160,10 @@ those operations remain admin-only.
 
 ## Current gap summary
 
-1. **Assessment intelligence:** AI prompt generation, AI explanations, and
-   assessment-level video timestamp snapshots are not implemented. Community
-   incorrect-rate data currently supports difficulty bands, not a ranked feed.
+1. **Assessment intelligence:** AI-assisted question import is implemented for
+   admins, but AI prompt generation, student AI explanations, and
+   assessment-level video timestamp snapshots are not. Community incorrect-rate
+   data currently supports difficulty bands, not a ranked feed.
 2. **Leaderboard parity:** the persisted Smart Score calculation needs to be
    aligned with the original percentage-based formula, and rewards need a
    real prize/configuration/fulfilment model if prizes are required.
@@ -172,6 +175,6 @@ those operations remain admin-only.
 5. **Learning metadata and commands:** no structured video topics/concepts,
    no direct higher-level completion command, and no unified performance model
    combining direct practice and assessments in every analytic view.
-6. **Operational workflows:** no automatic PDF-to-question generation,
-   question-report/moderation flow, parent entity administration, or
-   referral-partner reporting.
+6. **Operational workflows:** text-based PDF/DOCX/TXT-to-draft-question import
+   is implemented. Scanned-PDF OCR, question-report/moderation flow, parent
+   entity administration, and referral-partner reporting remain open.
