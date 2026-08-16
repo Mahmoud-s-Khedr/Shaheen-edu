@@ -308,6 +308,7 @@ model StudentProfile {
   user                    User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
   archivedAccessSnapshots ArchivedAccessSnapshot[]
   questionMarks           StudentQuestionMark[]
+  questionNotes           StudentQuestionNote[]
   fullName                String
   nationalIdHash          String                     @unique
   nationalIdEncrypted     String?
@@ -802,6 +803,7 @@ model Question {
   placements      QuestionPlacement[]
   studentAttempts StudentQuestionAttempt[]
   marks           StudentQuestionMark[]
+  notes           StudentQuestionNote[]
   communityStats  QuestionCommunityStat?
   importItem      QuestionImportItem?
   contexts        QuestionContextQuestion[]
@@ -1119,14 +1121,35 @@ model AssessmentQuestion {
   type             QuestionType
   body             String
   explanation      String?
+  videoAssetId     String?
+  videoAssetName   String?
+  timestampSeconds Int?
   structuredExplanation Json?
   options          AssessmentQuestionOption[]
   answers          AssessmentAttemptAnswer[]
   placements       AssessmentQuestionPlacement[]
   contexts         AssessmentQuestionContext[]
+  attachments      AssessmentQuestionAsset[]
 
   @@unique([assessmentId, sortOrder])
   @@index([assessmentId])
+}
+
+/// Immutable attachment metadata retained with an assessment question snapshot.
+/// assetId intentionally remains a plain reference so assessment history does
+/// not prevent deletion of the original live Question.
+model AssessmentQuestionAsset {
+  id                   String             @id @default(cuid())
+  assessmentQuestionId String
+  assetId              String
+  assetKind            AssetKind
+  assetName            String
+  sortOrder            Int
+  assessmentQuestion   AssessmentQuestion @relation(fields: [assessmentQuestionId], references: [id], onDelete: Cascade)
+
+  @@unique([assessmentQuestionId, assetId])
+  @@unique([assessmentQuestionId, sortOrder])
+  @@index([assetId])
 }
 
 model AssessmentContext {
@@ -1303,6 +1326,23 @@ model StudentQuestionMark {
 
   @@unique([studentUserId, questionId])
   @@index([studentUserId, createdAt])
+}
+
+/// A student's private, editable note for one authored question. Assessment
+/// questions retain their sourceQuestionId, so the same note follows a
+/// question between direct practice and every assessment snapshot.
+model StudentQuestionNote {
+  id            String         @id @default(cuid())
+  studentUserId String
+  questionId    String
+  body          String
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  student       StudentProfile @relation(fields: [studentUserId], references: [userId], onDelete: Cascade)
+  question      Question       @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([studentUserId, questionId])
+  @@index([studentUserId, updatedAt])
 }
 
 model QuestionCommunityStat {

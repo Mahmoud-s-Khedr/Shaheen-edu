@@ -47,6 +47,7 @@ describe('AssessmentsService', () => {
         findFirst: jest.fn(),
         create: jest.fn(),
       },
+      asset: { findUnique: jest.fn() },
       assessmentAttempt: {
         findUnique: jest.fn(),
         findUniqueOrThrow: jest.fn(),
@@ -58,6 +59,14 @@ describe('AssessmentsService', () => {
         findMany: jest.fn().mockResolvedValue([]),
         findUnique: jest.fn().mockResolvedValue(null),
         upsert: jest.fn().mockResolvedValue({ id: 'answer-1' }),
+      },
+      studentQuestionMark: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      studentQuestionNote: {
+        findMany: jest.fn().mockResolvedValue([]),
+        upsert: jest.fn(),
+        deleteMany: jest.fn(),
       },
       assessmentAnswerChange: { create: jest.fn() },
       questionCommunityStat: { findMany: jest.fn().mockResolvedValue([]) },
@@ -71,15 +80,23 @@ describe('AssessmentsService', () => {
       recordResponse: jest.fn().mockResolvedValue(undefined),
     };
     const access = new ContentAccessPolicyService(prisma);
+    const config = { get: jest.fn().mockReturnValue(10) };
+    const assets = { getReady: jest.fn(), protectedAccess: jest.fn() };
+    const videos = { playback: jest.fn() };
     return {
       service: new AssessmentsService(
         prisma,
         audit as any,
         access,
         communityStats,
+        config as any,
+        assets as any,
+        videos as any,
       ),
       prisma,
       communityStats,
+      assets,
+      videos,
     };
   }
 
@@ -594,6 +611,133 @@ describe('AssessmentsService', () => {
   });
 
   describe('attempt lifecycle', () => {
+    it('authorizes a video retained by the student-owned assessment snapshot', async () => {
+      const { service, prisma } = build();
+      prisma.assessmentQuestion.findMany.mockResolvedValue([
+        {
+          videoAssetId: 'video-1',
+          assessment: {
+            ownerType: AssessmentOwnerType.STUDENT,
+            studentUserId,
+            status: AssessmentStatus.READY,
+            scopes: [],
+          },
+        },
+      ]);
+
+      await expect(
+        service.assertSnapshotVideoAccess(studentUserId, 'video-1'),
+      ).resolves.toBeUndefined();
+    });
+
+    it('returns protected access only for an attachment in an accessible assessment snapshot', async () => {
+      const { service, prisma, assets } = build();
+      prisma.assessmentQuestion.findFirst.mockResolvedValue({
+        id: 'assessment-question-1',
+        assessment: {
+          id: 'assessment-1',
+          ownerType: AssessmentOwnerType.STUDENT,
+          studentUserId,
+          status: AssessmentStatus.READY,
+          scopes: [],
+        },
+      });
+      assets.getReady.mockResolvedValue({ id: 'attachment-1', kind: 'PDF' });
+      assets.protectedAccess.mockReturnValue({ url: 'https://cdn.example.test/attachment-1' });
+
+      await expect(
+        service.questionAttachmentAccess(
+          studentUserId,
+          'assessment-1',
+          'assessment-question-1',
+          'attachment-1',
+        ),
+      ).resolves.toEqual({ url: 'https://cdn.example.test/attachment-1' });
+      expect(prisma.assessmentQuestion.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            attachments: { some: { assetId: 'attachment-1' } },
+          }),
+        }),
+      );
+    });
+
+    it('authorizes a video retained by a completed attempt after its assessment is archived', async () => {
+      const { service, prisma } = build();
+      prisma.assessmentQuestion.findMany.mockResolvedValue([
+        {
+          videoAssetId: 'video-1',
+          assessment: {
+            id: 'assessment-1',
+            ownerType: AssessmentOwnerType.ADMIN,
+            status: AssessmentStatus.ARCHIVED,
+            scopes: [],
+          },
+        },
+      ]);
+      prisma.assessmentAttempt.findUnique.mockResolvedValue({
+        status: AssessmentAttemptStatus.COMPLETED,
+      });
+
+      await expect(
+        service.assertSnapshotVideoAccess(studentUserId, 'video-1'),
+      ).resolves.toBeUndefined();
+    });
+
+    it('returns the linked video and timestamp for each attempt question', async () => {
+      const { service, prisma } = build();
+      prisma.studentQuestionNote.findMany.mockResolvedValue([
+        { questionId: 'question-1', body: 'Review this rule' },
+      ]);
+      prisma.assessmentQuestion.findMany.mockResolvedValue([
+        {
+          id: 'assessment-question-1',
+          sourceQuestionId: 'question-1',
+          sortOrder: 1,
+          type: QuestionType.SINGLE_CHOICE,
+          body: 'Question',
+          videoAssetId: 'video-1',
+          videoAssetName: 'lesson.mp4',
+          timestampSeconds: 42,
+          attachments: [
+            {
+              assetId: 'attachment-1',
+              assetKind: 'PDF',
+              assetName: 'worksheet.pdf',
+              sortOrder: 1,
+            },
+          ],
+          contexts: [],
+          options: [],
+        },
+      ]);
+
+      const result = await (service as any).attemptStateDto(
+        {
+          id: 'attempt-1',
+          studentUserId,
+          status: AssessmentAttemptStatus.SUSPENDED,
+          expiresAt: null,
+        },
+        { id: 'assessment-1', mode: AssessmentMode.EXAM },
+      );
+
+      expect(result.questions[0].video).toEqual({
+        assetId: 'video-1',
+        assetName: 'lesson.mp4',
+        timestampSeconds: 42,
+      });
+      expect(result.questions[0].note).toBe('Review this rule');
+      expect(result.questions[0].attachments).toEqual([
+        {
+          assetId: 'attachment-1',
+          kind: 'PDF',
+          assetName: 'worksheet.pdf',
+          sortOrder: 1,
+        },
+      ]);
+    });
+
     function readyAssessment(overrides: Partial<any> = {}) {
       return {
         id: 'a1',
@@ -859,9 +1003,41 @@ describe('AssessmentsService', () => {
         totalQuestions: 1,
         submittedAt: new Date(),
       });
+      prisma.assessmentQuestion.findMany.mockResolvedValue([
+        {
+          id: 'assessment-question-1',
+          sourceQuestionId: 'question-1',
+          sortOrder: 1,
+          type: QuestionType.SINGLE_CHOICE,
+          body: 'Question',
+          attachments: [
+            {
+              assetId: 'attachment-1',
+              assetKind: 'PDF',
+              assetName: 'worksheet.pdf',
+              sortOrder: 1,
+            },
+          ],
+          contexts: [],
+          options: [],
+          placements: [],
+        },
+      ]);
 
       await expect(service.result(studentUserId, 'a1')).resolves.toMatchObject({
         score: 1,
+        questions: [
+          {
+            attachments: [
+              {
+                assetId: 'attachment-1',
+                kind: 'PDF',
+                assetName: 'worksheet.pdf',
+                sortOrder: 1,
+              },
+            ],
+          },
+        ],
       });
       await expect(
         service.currentAttemptState(studentUserId, 'a1'),

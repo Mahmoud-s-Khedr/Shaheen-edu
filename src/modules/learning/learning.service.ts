@@ -19,6 +19,7 @@ import { ContentAccessPolicyService } from '../entitlements/content-access-polic
 import { AssetsService } from '../assets/assets.service';
 import { VideosService } from '../videos/videos.service';
 import { QuestionCommunityStatsService } from '../question-banks/question-community-stats.service';
+import { AssessmentsService } from '../assessments/assessments.service';
 import type {
   PracticeScopeQueryDto,
   ParentAnalyticsScopeQueryDto,
@@ -35,6 +36,7 @@ export class LearningService {
     private readonly assets: AssetsService,
     private readonly videos: VideosService,
     private readonly communityStats: QuestionCommunityStatsService,
+    private readonly assessments: AssessmentsService,
   ) {}
 
   async completeContent(studentId: string, contentItemId: string) {
@@ -554,11 +556,13 @@ export class LearningService {
     question: any,
     attempts: any[] = [],
     isMarked = false,
+    note: string | null = null,
   ) {
     const last = attempts[0];
     return {
       id: question.id,
       isMarked,
+      note,
       type: question.type,
       body: question.body,
       contexts: question.contexts.map((link: any) => link.context),
@@ -616,6 +620,17 @@ export class LearningService {
         })
       ).map((mark) => mark.questionId),
     );
+    const notesByQuestion = new Map(
+      (
+        await this.prisma.studentQuestionNote.findMany({
+          where: {
+            studentUserId: studentId,
+            questionId: { in: questions.map((question) => question.id) },
+          },
+          select: { questionId: true, body: true },
+        })
+      ).map((note) => [note.questionId, note.body]),
+    );
     const start = (query.page - 1) * query.limit;
     return {
       data: questions
@@ -625,6 +640,7 @@ export class LearningService {
             x,
             byQuestion.get(x.id) ?? [],
             markedQuestionIds.has(x.id),
+            notesByQuestion.get(x.id) ?? null,
           ),
         ),
       meta: toPaginationMeta(query.page, query.limit, questions.length),
@@ -706,6 +722,85 @@ export class LearningService {
     return asset.kind === 'VIDEO'
       ? this.videos.playback(assetId)
       : this.assets.protectedAccess(asset);
+  }
+
+  /** Resolve an asset ID through every student-authorized video relationship. */
+  async videoPlaybackAccess(studentId: string, assetId: string) {
+    const asset = await this.assets.getReady(assetId);
+    if (asset.kind !== 'VIDEO')
+      throw new NotFoundException('Video asset not found');
+
+    const contentItems = await this.prisma.contentItem.findMany({
+      where: {
+        OR: [
+          { primaryAssetId: assetId },
+          { assetReferences: { some: { assetId } } },
+        ],
+      },
+      select: { id: true },
+    });
+    for (const item of contentItems) {
+      try {
+        await this.access.assertContentItemAccess(item.id, studentId);
+        return this.videos.playback(assetId);
+      } catch (error) {
+        if (
+          !(
+            error instanceof ForbiddenException ||
+            error instanceof NotFoundException
+          )
+        )
+          throw error;
+      }
+    }
+
+    const student = await this.prisma.studentProfile.findUnique({
+      where: { userId: studentId },
+      select: { academicGradeId: true },
+    });
+    const practiceQuestions = await this.prisma.question.findMany({
+      where: {
+        status: QuestionStatus.PUBLISHED,
+        videoLink: { is: { videoAssetId: assetId } },
+        bank: { status: ContentStatus.PUBLISHED },
+        source: { status: ContentStatus.PUBLISHED },
+        course: {
+          status: ContentStatus.PUBLISHED,
+          subject: {
+            status: ContentStatus.PUBLISHED,
+            academicGradeId: student?.academicGradeId ?? '__missing__',
+            academicGrade: { status: ContentStatus.PUBLISHED },
+          },
+        },
+      },
+      include: {
+        placements: {
+          include: {
+            course: true,
+            chapter: { include: { course: true } },
+            lesson: { include: { chapter: { include: { course: true } } } },
+            section: { include: { lesson: { include: { chapter: { include: { course: true } } } } } },
+          },
+        },
+      },
+    });
+    for (const question of practiceQuestions)
+      if (await this.questionAccessible(studentId, question.placements))
+        return this.videos.playback(assetId);
+
+    try {
+      await this.assessments.assertSnapshotVideoAccess(studentId, assetId);
+      return this.videos.playback(assetId);
+    } catch (error) {
+      if (
+        !(
+          error instanceof ForbiddenException ||
+          error instanceof NotFoundException
+        )
+      )
+        throw error;
+    }
+    throw new NotFoundException('Accessible video not found');
   }
 
   async attempts(

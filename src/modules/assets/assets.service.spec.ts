@@ -8,13 +8,33 @@ const config = { endpoint: 'https://s3.example.test', bucket: 'bucket', accessKe
 const pdf = Buffer.from('%PDF-1.7\n');
 
 function build() {
-  const prisma: any = { asset: { create: jest.fn(), findUnique: jest.fn(), update: jest.fn(), delete: jest.fn(), findMany: jest.fn() }, contentItem: { count: jest.fn() }, assetReference: { count: jest.fn() }, academicGrade: { count: jest.fn() }, subject: { count: jest.fn() }, course: { count: jest.fn() }, chapter: { count: jest.fn() }, lesson: { count: jest.fn() }, section: { count: jest.fn() }, questionAsset: { count: jest.fn() }, questionVideoLink: { count: jest.fn() }, $transaction: jest.fn() };
+  const prisma: any = { asset: { create: jest.fn(), findUnique: jest.fn(), update: jest.fn(), delete: jest.fn(), findMany: jest.fn() }, contentItem: { count: jest.fn() }, assetReference: { count: jest.fn() }, academicGrade: { count: jest.fn() }, subject: { count: jest.fn() }, course: { count: jest.fn() }, chapter: { count: jest.fn() }, lesson: { count: jest.fn() }, section: { count: jest.fn() }, questionAsset: { count: jest.fn() }, questionVideoLink: { count: jest.fn() }, assessmentQuestion: { count: jest.fn() }, assessmentQuestionAsset: { count: jest.fn() }, $transaction: jest.fn() };
   const storage: any = { createUploadUrl: jest.fn().mockResolvedValue('https://bunny.example.test/signed'), inspect: jest.fn(), delete: jest.fn().mockResolvedValue(undefined), createProtectedUrl: jest.fn() };
   const audit: any = { record: jest.fn() };
   return { service: new AssetsService(prisma, audit, storage, { get: () => config } as any), prisma, storage, audit };
 }
 
 describe('AssetsService direct uploads', () => {
+  it('keeps an asset referenced by an assessment video snapshot', async () => {
+    const { service, prisma } = build();
+    prisma.$transaction.mockResolvedValue([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0]);
+
+    await expect(service.isReferenced('video-1')).resolves.toBe(true);
+    expect(prisma.assessmentQuestion.count).toHaveBeenCalledWith({
+      where: { videoAssetId: 'video-1' },
+    });
+  });
+
+  it('keeps an asset referenced by an assessment attachment snapshot', async () => {
+    const { service, prisma } = build();
+    prisma.$transaction.mockResolvedValue([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]);
+
+    await expect(service.isReferenced('attachment-1')).resolves.toBe(true);
+    expect(prisma.assessmentQuestionAsset.count).toHaveBeenCalledWith({
+      where: { assetId: 'attachment-1' },
+    });
+  });
+
   it('authorizes only admins and validates the declared file', async () => {
     const { service, prisma, storage } = build();
     await expect(service.authorizeUpload(student, AssetKind.PDF, { filename: 'lesson.pdf', mimeType: 'application/pdf' })).rejects.toBeInstanceOf(ForbiddenException);

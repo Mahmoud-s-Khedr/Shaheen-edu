@@ -185,6 +185,14 @@ export class RenameAssessmentDto {
   @ApiProperty() @IsString() @MinLength(1) @MaxLength(200) title!: string;
 }
 
+export class UpdateQuestionNoteDto {
+  @ApiProperty({ description: 'The student’s private note for this question' })
+  @IsString()
+  @MinLength(1)
+  @MaxLength(10000)
+  body!: string;
+}
+
 export class UpdateAdminAssessmentDto {
   @ApiPropertyOptional()
   @IsOptional()
@@ -318,12 +326,31 @@ export class AssessmentDetailDto extends AssessmentListItemDto {
   scopes!: AssessmentScopeResponseDto[];
 }
 
+export class AssessmentQuestionVideoDto {
+  @ApiProperty() assetId!: string;
+  @ApiPropertyOptional({ type: String, nullable: true }) assetName!:
+    string | null;
+  @ApiProperty() timestampSeconds!: number;
+}
+
+export class AssessmentQuestionAttachmentDto {
+  @ApiProperty() assetId!: string;
+  @ApiProperty() kind!: string;
+  @ApiProperty() assetName!: string;
+  @ApiProperty() sortOrder!: number;
+}
+
 export class AssessmentAttemptQuestionDto {
   @ApiProperty() id!: string;
   @ApiProperty() isMarked!: boolean;
+  @ApiPropertyOptional({ type: String, nullable: true }) note!: string | null;
   @ApiProperty() sortOrder!: number;
   @ApiProperty() type!: string;
   @ApiProperty() body!: string;
+  @ApiPropertyOptional({ type: AssessmentQuestionVideoDto, nullable: true })
+  video!: AssessmentQuestionVideoDto | null;
+  @ApiProperty({ type: [AssessmentQuestionAttachmentDto] })
+  attachments!: AssessmentQuestionAttachmentDto[];
   @ApiProperty({ type: [Object] }) options!: {
     id: string;
     body: string;

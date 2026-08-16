@@ -107,6 +107,16 @@ export class LearningController {
   ) {
     return this.learning.questionAssetAccess(user.id, questionId, assetId);
   }
+  @Get('video-assets/:assetId/playback')
+  @ApiOperation({
+    summary: 'Get playback for a video reachable through student-authorized content',
+  })
+  videoPlayback(
+    @CurrentUser() user: RequestUser,
+    @Param('assetId') assetId: string,
+  ) {
+    return this.learning.videoPlaybackAccess(user.id, assetId);
+  }
   @Get('practice/questions/:questionId/attempts')
   @ApiOperation({ summary: 'List personal attempt history for a question' })
   attempts(

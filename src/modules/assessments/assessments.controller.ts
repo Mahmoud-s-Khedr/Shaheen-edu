@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   Query,
   UseGuards,
 } from '@nestjs/common';
@@ -43,6 +44,7 @@ import {
   QueryAssessmentDto,
   RenameAssessmentDto,
   UpdateAdminAssessmentDto,
+  UpdateQuestionNoteDto,
 } from './dto/assessments.dto';
 
 @ApiTags('student/assessments')
@@ -120,6 +122,27 @@ export class AssessmentsController {
     return this.assessments.unmarkQuestion(user.id, questionId);
   }
 
+  @Put('question-notes/:questionId')
+  @ApiOperation({ summary: 'Create or update a private note for an accessible question' })
+  @ApiStandardErrors(400, 401, 403, 404)
+  saveQuestionNote(
+    @CurrentUser() user: RequestUser,
+    @Param('questionId') questionId: string,
+    @Body() dto: UpdateQuestionNoteDto,
+  ) {
+    return this.assessments.saveQuestionNote(user.id, questionId, dto.body);
+  }
+
+  @Delete('question-notes/:questionId')
+  @ApiOperation({ summary: 'Delete the current student’s private question note' })
+  @ApiStandardErrors(401, 403, 404)
+  deleteQuestionNote(
+    @CurrentUser() user: RequestUser,
+    @Param('questionId') questionId: string,
+  ) {
+    return this.assessments.deleteQuestionNote(user.id, questionId);
+  }
+
   @Get()
   @ApiOperation({ summary: 'List own and publicly visible assessments' })
   @ApiOkResponse({ type: PaginatedAssessmentsResponseDto })
@@ -183,6 +206,18 @@ export class AssessmentsController {
   @ApiStandardErrors(401, 403, 404)
   current(@CurrentUser() user: RequestUser, @Param('id') id: string) {
     return this.assessments.currentAttemptState(user.id, id);
+  }
+
+  @Get(':id/questions/:questionId/assets/:assetId/access')
+  @ApiOperation({ summary: 'Get protected access to an assessment-question attachment' })
+  @ApiStandardErrors(401, 403, 404, 409)
+  attachmentAccess(
+    @CurrentUser() user: RequestUser,
+    @Param('id') id: string,
+    @Param('questionId') questionId: string,
+    @Param('assetId') assetId: string,
+  ) {
+    return this.assessments.questionAttachmentAccess(user.id, id, questionId, assetId);
   }
 
   @Post(':id/attempts/current/answers/:questionId')

@@ -11,6 +11,7 @@ import { Prisma } from '@prisma/client';
 import {
   AssessmentAttemptStatus,
   AssessmentQuestionOutcome,
+  AssetKind,
   AssessmentGenerationType,
   AssessmentMode,
   AssessmentOwnerType,
@@ -37,6 +38,8 @@ import { PrismaService } from '../../database/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { ContentAccessPolicyService } from '../entitlements/content-access-policy.service';
 import { QuestionCommunityStatsService } from '../question-banks/question-community-stats.service';
+import { AssetsService } from '../assets/assets.service';
+import { VideosService } from '../videos/videos.service';
 import type {
   AssessmentScopeDto,
   AssessmentAnalyticsQueryDto,
@@ -89,6 +92,8 @@ export class AssessmentsService {
     private readonly access: ContentAccessPolicyService,
     private readonly communityStats: QuestionCommunityStatsService,
     private readonly config: ConfigService<AppConfig, true>,
+    private readonly assets: AssetsService,
+    private readonly videos: VideosService,
   ) {}
 
   private assertAdmin(actor: RequestUser) {
@@ -362,6 +367,8 @@ export class AssessmentsService {
         contexts: { include: { context: true }, orderBy: { sortOrder: 'asc' } },
         structuredExplanation: true,
         communityStats: true,
+        videoLink: { include: { videoAsset: { include: { asset: true } } } },
+        assets: { include: { asset: true }, orderBy: { sortOrder: 'asc' } },
         placements: { include: this.questionPlacementInclude() },
       },
       orderBy: [{ publishedAt: 'asc' }, { id: 'asc' }],
@@ -521,6 +528,17 @@ export class AssessmentsService {
           type: question.type,
           body: question.body,
           explanation: question.explanation,
+          videoAssetId: question.videoLink?.videoAssetId ?? null,
+          videoAssetName: question.videoLink?.videoAsset?.asset?.filename ?? null,
+          timestampSeconds: question.videoLink?.timestampSeconds ?? null,
+          attachments: {
+            create: (question.assets ?? []).map((attachment: any, index: number) => ({
+              assetId: attachment.assetId,
+              assetKind: attachment.asset.kind,
+              assetName: attachment.asset.filename,
+              sortOrder: index + 1,
+            })),
+          },
           structuredExplanation: question.structuredExplanation ? { languageCode: question.structuredExplanation.languageCode, keywords: question.structuredExplanation.keywords, eliminationStrategy: question.structuredExplanation.eliminationStrategy, whyCorrect: question.structuredExplanation.whyCorrect, generalRule: question.structuredExplanation.generalRule, whatIf: question.structuredExplanation.whatIf, commonMistakes: question.structuredExplanation.commonMistakes, origin: question.structuredExplanation.origin, confidence: question.structuredExplanation.confidence, answerOrigin: question.structuredExplanation.answerOrigin, warnings: question.structuredExplanation.warnings } : undefined,
           options: {
             create: question.options.map((option: any, index: number) => ({
@@ -811,6 +829,39 @@ export class AssessmentsService {
     return { questionId: markedQuestionId ?? questionId, marked: false };
   }
 
+  private async accessibleSourceQuestionId(studentId: string, questionId: string) {
+    const sourceQuestionId = await this.resolveMarkedQuestionId(questionId);
+    if (!sourceQuestionId) throw new NotFoundException('Question is not accessible');
+    const gradeId = await this.studentGrade(studentId);
+    const accessible = await this.eligibleQuestions([], studentId, gradeId);
+    if (!accessible.some((question) => question.id === sourceQuestionId))
+      throw new NotFoundException('Question is not accessible');
+    return sourceQuestionId;
+  }
+
+  async saveQuestionNote(studentId: string, questionId: string, body: string) {
+    const sourceQuestionId = await this.accessibleSourceQuestionId(studentId, questionId);
+    const normalizedBody = body.trim();
+    if (!normalizedBody)
+      throw new BadRequestException('Note must not be blank');
+    const note = await this.prisma.studentQuestionNote.upsert({
+      where: {
+        studentUserId_questionId: { studentUserId: studentId, questionId: sourceQuestionId },
+      },
+      create: { studentUserId: studentId, questionId: sourceQuestionId, body: normalizedBody },
+      update: { body: normalizedBody },
+    });
+    return { questionId: sourceQuestionId, body: note.body, createdAt: note.createdAt, updatedAt: note.updatedAt };
+  }
+
+  async deleteQuestionNote(studentId: string, questionId: string) {
+    const sourceQuestionId = await this.accessibleSourceQuestionId(studentId, questionId);
+    await this.prisma.studentQuestionNote.deleteMany({
+      where: { studentUserId: studentId, questionId: sourceQuestionId },
+    });
+    return { questionId: sourceQuestionId, deleted: true };
+  }
+
   // --- Student: list/get ----------------------------------------------
 
   private listItemDto(
@@ -1073,6 +1124,69 @@ export class AssessmentsService {
     };
   }
 
+  /**
+   * Verifies that a student can reach a video through an immutable assessment
+   * question snapshot.  The snapshot, rather than the live question link, is
+   * the authorization source so historic assessments remain self-contained.
+   */
+  async assertSnapshotVideoAccess(studentId: string, assetId: string) {
+    const snapshots = await this.prisma.assessmentQuestion.findMany({
+      where: { videoAssetId: assetId },
+      include: { assessment: { include: { scopes: { include: scopeInclude } } } },
+    });
+    for (const snapshot of snapshots) {
+      try {
+        await this.assertViewable(studentId, snapshot.assessment);
+        return;
+      } catch (error) {
+        if (!(error instanceof ForbiddenException)) throw error;
+      }
+      const completedAttempt = await this.prisma.assessmentAttempt.findUnique({
+        where: {
+          assessmentId_studentUserId: {
+            assessmentId: snapshot.assessment.id,
+            studentUserId: studentId,
+          },
+        },
+        select: { status: true },
+      });
+      if (completedAttempt?.status === AssessmentAttemptStatus.COMPLETED) return;
+    }
+    throw new NotFoundException('Accessible assessment video not found');
+  }
+
+  async questionAttachmentAccess(
+    studentId: string,
+    assessmentId: string,
+    questionId: string,
+    assetId: string,
+  ) {
+    const snapshot = await this.prisma.assessmentQuestion.findFirst({
+      where: {
+        id: questionId,
+        assessmentId,
+        attachments: { some: { assetId } },
+      },
+      include: { assessment: { include: { scopes: { include: scopeInclude } } } },
+    });
+    if (!snapshot) throw new NotFoundException('Assessment question attachment not found');
+    try {
+      await this.assertViewable(studentId, snapshot.assessment);
+    } catch (error) {
+      if (!(error instanceof ForbiddenException)) throw error;
+      const completedAttempt = await this.prisma.assessmentAttempt.findUnique({
+        where: { assessmentId_studentUserId: { assessmentId, studentUserId: studentId } },
+        select: { status: true },
+      });
+      if (completedAttempt?.status !== AssessmentAttemptStatus.COMPLETED)
+        throw new NotFoundException('Assessment question attachment not found');
+    }
+    const asset = await this.assets.getReady(assetId);
+    return asset.kind === AssetKind.VIDEO
+      ? this.videos.playback(assetId)
+      : this.assets.protectedAccess(asset);
+  }
+
   async rename(studentId: string, id: string, dto: RenameAssessmentDto) {
     const assessment = await this.assessmentWithScopes(id);
     if (
@@ -1102,7 +1216,7 @@ export class AssessmentsService {
   private async questionsForAssessment(id: string) {
     return this.prisma.assessmentQuestion.findMany({
       where: { assessmentId: id },
-      include: { options: { orderBy: { sortOrder: 'asc' } }, placements: true, contexts: { include: { assessmentContext: true }, orderBy: { sortOrder: 'asc' } } },
+      include: { options: { orderBy: { sortOrder: 'asc' } }, placements: true, contexts: { include: { assessmentContext: true }, orderBy: { sortOrder: 'asc' } }, attachments: { orderBy: { sortOrder: 'asc' } } },
       orderBy: { sortOrder: 'asc' },
     });
   }
@@ -1117,6 +1231,15 @@ export class AssessmentsService {
       select: { questionId: true },
     });
     return new Set(marks.map((mark) => mark.questionId));
+  }
+
+  private async questionNotesByQuestionId(studentId: string, questionIds: string[]) {
+    if (!questionIds.length) return new Map<string, string>();
+    const notes = await this.prisma.studentQuestionNote.findMany({
+      where: { studentUserId: studentId, questionId: { in: questionIds } },
+      select: { questionId: true, body: true },
+    });
+    return new Map(notes.map((note) => [note.questionId, note.body]));
   }
 
   async startAttempt(studentId: string, id: string) {
@@ -1300,6 +1423,10 @@ export class AssessmentsService {
       attempt.studentUserId,
       questions.map((question) => question.sourceQuestionId),
     );
+    const notesByQuestionId = await this.questionNotesByQuestionId(
+      attempt.studentUserId,
+      questions.map((question) => question.sourceQuestionId),
+    );
     const answers = await this.prisma.assessmentAttemptAnswer.findMany({
       where: { attemptId: current.id },
     });
@@ -1325,9 +1452,23 @@ export class AssessmentsService {
         return {
           id: q.id,
           isMarked: markedQuestionIds.has(q.sourceQuestionId),
+          note: notesByQuestionId.get(q.sourceQuestionId) ?? null,
           sortOrder: q.sortOrder,
           type: q.type,
           body: q.body,
+          video: q.videoAssetId
+            ? {
+                assetId: q.videoAssetId,
+                assetName: q.videoAssetName,
+                timestampSeconds: q.timestampSeconds,
+              }
+            : null,
+          attachments: (q.attachments ?? []).map((attachment) => ({
+            assetId: attachment.assetId,
+            kind: attachment.assetKind,
+            assetName: attachment.assetName,
+            sortOrder: attachment.sortOrder,
+          })),
           contexts: q.contexts.map((link) => link.assessmentContext),
           options: q.options.map((o) => ({
             id: o.id,
@@ -1719,6 +1860,10 @@ export class AssessmentsService {
       studentId,
       questions.map((question) => question.sourceQuestionId),
     );
+    const notesByQuestionId = await this.questionNotesByQuestionId(
+      studentId,
+      questions.map((question) => question.sourceQuestionId),
+    );
     const answers = await this.prisma.assessmentAttemptAnswer.findMany({
       where: { attemptId: attempt.id },
     });
@@ -1768,9 +1913,23 @@ export class AssessmentsService {
           id: q.id,
           sourceQuestionId: q.sourceQuestionId,
           isMarked: markedQuestionIds.has(q.sourceQuestionId),
+          note: notesByQuestionId.get(q.sourceQuestionId) ?? null,
           sortOrder: q.sortOrder,
           type: q.type,
           body: q.body,
+          video: q.videoAssetId
+            ? {
+                assetId: q.videoAssetId,
+                assetName: q.videoAssetName,
+                timestampSeconds: q.timestampSeconds,
+              }
+            : null,
+          attachments: (q.attachments ?? []).map((attachment) => ({
+            assetId: attachment.assetId,
+            kind: attachment.assetKind,
+            assetName: attachment.assetName,
+            sortOrder: attachment.sortOrder,
+          })),
           explanation: q.explanation,
           options: q.options.map((o) => ({
             id: o.id,
@@ -2024,6 +2183,8 @@ export class AssessmentsService {
         options: { orderBy: { sortOrder: 'asc' } },
         contexts: { include: { context: true }, orderBy: { sortOrder: 'asc' } },
         structuredExplanation: true,
+        videoLink: { include: { videoAsset: { include: { asset: true } } } },
+        assets: { include: { asset: true }, orderBy: { sortOrder: 'asc' } },
         placements: { include: this.questionPlacementInclude() },
       },
     });
@@ -2123,7 +2284,7 @@ export class AssessmentsService {
         questionBank: { select: { id: true, title: true } },
         questionBanks: { include: { questionBank: { select: { id: true, title: true } } } },
         questions: {
-          include: { options: { orderBy: { sortOrder: 'asc' } } },
+          include: { options: { orderBy: { sortOrder: 'asc' } }, attachments: { orderBy: { sortOrder: 'asc' } } },
           orderBy: { sortOrder: 'asc' },
         },
       },
@@ -2157,6 +2318,19 @@ export class AssessmentsService {
         type: q.type,
         body: q.body,
         explanation: q.explanation,
+          video: q.videoAssetId
+          ? {
+              assetId: q.videoAssetId,
+              assetName: q.videoAssetName,
+              timestampSeconds: q.timestampSeconds,
+            }
+            : null,
+          attachments: (q.attachments ?? []).map((attachment: any) => ({
+            assetId: attachment.assetId,
+            kind: attachment.assetKind,
+            assetName: attachment.assetName,
+            sortOrder: attachment.sortOrder,
+          })),
         options: q.options.map((o: any) => ({
           id: o.id,
           body: o.body,

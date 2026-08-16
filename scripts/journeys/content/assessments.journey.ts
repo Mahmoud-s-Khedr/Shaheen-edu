@@ -215,6 +215,12 @@ export const assessmentsJourney: JourneyDefinition = {
         const unmarked = await student<any>(student1Token, 'DELETE', `/student/assessments/question-marks/${questionIds[0]}`);
         expectStatus(unmarked, 200);
         assert(unmarked.body.questionId === questionIds[0] && unmarked.body.marked === false, 'A student must be able to remove a question mark');
+        const createdNote = await student<any>(student1Token, 'PUT', `/student/assessments/question-notes/${questionIds[0]}`, { body: 'Review the key definition' });
+        expectStatus(createdNote, 200);
+        assert(createdNote.body.questionId === questionIds[0] && createdNote.body.body === 'Review the key definition', 'A student must be able to add a private note to an accessible question');
+        const updatedNote = await student<any>(student1Token, 'PUT', `/student/assessments/question-notes/${questionIds[0]}`, { body: 'Review the updated definition' });
+        expectStatus(updatedNote, 200);
+        assert(updatedNote.body.body === 'Review the updated definition', 'A student must be able to update their private question note');
         const allBanksGenerated = await student<any>(
           student1Token,
           'POST',
@@ -313,6 +319,13 @@ export const assessmentsJourney: JourneyDefinition = {
           'A fresh attempt must start suspended with every snapshot question',
         );
         const firstQuestion = start.body.questions[0];
+        const noteOnSnapshot = await student<any>(
+          student1Token,
+          'PUT',
+          `/student/assessments/question-notes/${firstQuestion.id}`,
+          { body: 'Remember this assessment question' },
+        );
+        expectStatus(noteOnSnapshot, 200);
 
         const autosave = await student<any>(
           student1Token,
@@ -334,8 +347,10 @@ export const assessmentsJourney: JourneyDefinition = {
         expectStatus(current, 200);
         assert(
           current.body.questions.find((q: any) => q.id === firstQuestion.id)
-            ?.answered === true,
-          'Autosaved answers must be reflected when resuming an attempt',
+            ?.answered === true &&
+            current.body.questions.find((q: any) => q.id === firstQuestion.id)
+              ?.note === 'Remember this assessment question',
+          'Autosaved answers and private notes must be reflected when resuming an attempt',
         );
 
         const activeTime = await student<any>(

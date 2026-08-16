@@ -8,6 +8,7 @@ describe('LearningService parent analytics metrics', () => {
     {} as any,
     {} as any,
     {} as any,
+    {} as any,
   );
 
   it('uses score, accuracy, and omission definitions independently', () => {

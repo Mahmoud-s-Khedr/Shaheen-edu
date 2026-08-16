@@ -11432,6 +11432,120 @@
         ]
       }
     },
+    "/api/v1/admin/questions/contexts": {
+      "post": {
+        "operationId": "QuestionsController_createContext_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateQuestionContextDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create reusable question context",
+        "tags": [
+          "admin/questions"
+        ]
+      },
+      "get": {
+        "operationId": "QuestionsController_listContexts_v1",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List reusable question contexts",
+        "tags": [
+          "admin/questions"
+        ]
+      }
+    },
+    "/api/v1/admin/questions/contexts/{contextId}": {
+      "patch": {
+        "operationId": "QuestionsController_updateContext_v1",
+        "parameters": [
+          {
+            "name": "contextId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateQuestionContextDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update reusable question context",
+        "tags": [
+          "admin/questions"
+        ]
+      },
+      "delete": {
+        "operationId": "QuestionsController_deleteContext_v1",
+        "parameters": [
+          {
+            "name": "contextId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Delete unreferenced question context",
+        "tags": [
+          "admin/questions"
+        ]
+      }
+    },
     "/api/v1/admin/questions": {
       "post": {
         "operationId": "QuestionsController_create_v1",
@@ -14494,6 +14608,35 @@
         ]
       }
     },
+    "/api/v1/student/video-assets/{assetId}/playback": {
+      "get": {
+        "operationId": "LearningController_videoPlayback_v1",
+        "parameters": [
+          {
+            "name": "assetId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get playback for a video reachable through student-authorized content",
+        "tags": [
+          "student/learning"
+        ]
+      }
+    },
     "/api/v1/student/performance": {
       "get": {
         "operationId": "LearningController_performance_v1",
@@ -15641,6 +15784,88 @@
           }
         ],
         "summary": "Get the current (resumable) attempt state",
+        "tags": [
+          "student/assessments"
+        ]
+      }
+    },
+    "/api/v1/student/assessments/{id}/questions/{questionId}/assets/{assetId}/access": {
+      "get": {
+        "operationId": "AssessmentsController_attachmentAccess_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "questionId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "assetId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get protected access to an assessment-question attachment",
         "tags": [
           "student/assessments"
         ]
@@ -17161,6 +17386,349 @@
           "partners/analytics"
         ]
       }
+    },
+    "/api/v1/admin/ai/question-imports": {
+      "post": {
+        "operationId": "QuestionImportController_create_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateQuestionImportDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create and queue an AI question import",
+        "tags": [
+          "admin/ai/question-imports"
+        ]
+      },
+      "get": {
+        "operationId": "QuestionImportController_list_v1",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "One-based page number.",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Maximum records to return per page.",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Case-insensitive text search.",
+            "schema": {
+              "minLength": 1,
+              "maxLength": 120,
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "QUEUED",
+                "EXTRACTING",
+                "SEGMENTING",
+                "AWAITING_REVIEW",
+                "GENERATING",
+                "COMPLETED",
+                "COMPLETED_WITH_ERRORS",
+                "FAILED"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List AI question imports",
+        "tags": [
+          "admin/ai/question-imports"
+        ]
+      }
+    },
+    "/api/v1/admin/ai/question-imports/{id}": {
+      "get": {
+        "operationId": "QuestionImportController_get_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get AI question import progress and diagnostics",
+        "tags": [
+          "admin/ai/question-imports"
+        ]
+      }
+    },
+    "/api/v1/admin/ai/question-imports/{id}/source-text": {
+      "get": {
+        "operationId": "QuestionImportController_sourceText_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get retained normalized source text for review",
+        "tags": [
+          "admin/ai/question-imports"
+        ]
+      },
+      "patch": {
+        "operationId": "QuestionImportController_updateSourceText_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateQuestionImportSourceTextDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Correct source text and rerun AI boundary identification",
+        "tags": [
+          "admin/ai/question-imports"
+        ]
+      }
+    },
+    "/api/v1/admin/ai/question-imports/{id}/items": {
+      "get": {
+        "operationId": "QuestionImportController_items_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "One-based page number.",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Maximum records to return per page.",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Case-insensitive text search.",
+            "schema": {
+              "minLength": 1,
+              "maxLength": 120,
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "QUEUED",
+                "EXTRACTING",
+                "SEGMENTING",
+                "AWAITING_REVIEW",
+                "GENERATING",
+                "COMPLETED",
+                "COMPLETED_WITH_ERRORS",
+                "FAILED"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List AI question import candidates",
+        "tags": [
+          "admin/ai/question-imports"
+        ]
+      }
+    },
+    "/api/v1/admin/ai/question-imports/{id}/retry": {
+      "post": {
+        "operationId": "QuestionImportController_retry_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Retry failed import chunks",
+        "tags": [
+          "admin/ai/question-imports"
+        ]
+      }
+    },
+    "/api/v1/admin/ai/question-imports/{id}/items/{itemId}/retry": {
+      "post": {
+        "operationId": "QuestionImportController_retryItem_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "itemId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Retry one failed import item",
+        "tags": [
+          "admin/ai/question-imports"
+        ]
+      }
     }
   },
   "info": {
@@ -17761,7 +18329,7 @@
             "nullable": true
           },
           "legalName": {
-            "type": "object",
+            "type": "string",
             "nullable": true
           },
           "phone": {
@@ -21115,6 +21683,55 @@
           }
         }
       },
+      "CreateQuestionContextDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "TEXT",
+              "IMAGE",
+              "TABLE",
+              "EQUATION"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          },
+          "languageCode": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "body"
+        ]
+      },
+      "UpdateQuestionContextDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "TEXT",
+              "IMAGE",
+              "TABLE",
+              "EQUATION"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          },
+          "languageCode": {
+            "type": "string"
+          }
+        }
+      },
       "QuestionPlacementDto": {
         "type": "object",
         "properties": {
@@ -21131,6 +21748,37 @@
             "type": "string"
           }
         }
+      },
+      "QuestionExplanationDto": {
+        "type": "object",
+        "properties": {
+          "keywords": {
+            "type": "string"
+          },
+          "eliminationStrategy": {
+            "type": "string"
+          },
+          "whyCorrect": {
+            "type": "string"
+          },
+          "generalRule": {
+            "type": "string"
+          },
+          "whatIf": {
+            "type": "string"
+          },
+          "commonMistakes": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "keywords",
+          "eliminationStrategy",
+          "whyCorrect",
+          "generalRule",
+          "whatIf",
+          "commonMistakes"
+        ]
       },
       "CreateQuestionDto": {
         "type": "object",
@@ -21162,6 +21810,15 @@
           },
           "explanation": {
             "type": "string"
+          },
+          "contextIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "structuredExplanation": {
+            "$ref": "#/components/schemas/QuestionExplanationDto"
           }
         },
         "required": [
@@ -21203,6 +21860,15 @@
           "explanation": {
             "type": "object",
             "nullable": true
+          },
+          "contextIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "structuredExplanation": {
+            "$ref": "#/components/schemas/QuestionExplanationDto"
           }
         }
       },
@@ -22620,11 +23286,56 @@
           "title"
         ]
       },
+      "AssessmentQuestionVideoDto": {
+        "type": "object",
+        "properties": {
+          "assetId": {
+            "type": "string"
+          },
+          "assetName": {
+            "type": "string",
+            "nullable": true
+          },
+          "timestampSeconds": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "assetId",
+          "timestampSeconds"
+        ]
+      },
+      "AssessmentQuestionAttachmentDto": {
+        "type": "object",
+        "properties": {
+          "assetId": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "assetName": {
+            "type": "string"
+          },
+          "sortOrder": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "assetId",
+          "kind",
+          "assetName",
+          "sortOrder"
+        ]
+      },
       "AssessmentAttemptQuestionDto": {
         "type": "object",
         "properties": {
           "id": {
             "type": "string"
+          },
+          "isMarked": {
+            "type": "boolean"
           },
           "sortOrder": {
             "type": "number"
@@ -22634,6 +23345,21 @@
           },
           "body": {
             "type": "string"
+          },
+          "video": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AssessmentQuestionVideoDto"
+              }
+            ]
+          },
+          "attachments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AssessmentQuestionAttachmentDto"
+            }
           },
           "options": {
             "type": "array",
@@ -22668,9 +23394,11 @@
         },
         "required": [
           "id",
+          "isMarked",
           "sortOrder",
           "type",
           "body",
+          "attachments",
           "options",
           "selectedOptionIds",
           "answered"
@@ -22992,6 +23720,51 @@
             "type": "number"
           }
         }
+      },
+      "CreateQuestionImportDto": {
+        "type": "object",
+        "properties": {
+          "bankId": {
+            "type": "string"
+          },
+          "sourceId": {
+            "type": "string"
+          },
+          "courseId": {
+            "type": "string"
+          },
+          "placements": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QuestionPlacementDto"
+            }
+          },
+          "rawText": {
+            "type": "string",
+            "description": "Use either rawText or sourceAssetId."
+          },
+          "sourceAssetId": {
+            "type": "string",
+            "description": "A ready DOCX, text, or text-based PDF asset."
+          }
+        },
+        "required": [
+          "bankId",
+          "sourceId",
+          "courseId",
+          "placements"
+        ]
+      },
+      "UpdateQuestionImportSourceTextDto": {
+        "type": "object",
+        "properties": {
+          "normalizedText": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "normalizedText"
+        ]
       }
     }
   }
