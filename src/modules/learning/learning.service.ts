@@ -550,10 +550,15 @@ export class LearningService {
     return false;
   }
 
-  private learnerQuestion(question: any, attempts: any[] = []) {
+  private learnerQuestion(
+    question: any,
+    attempts: any[] = [],
+    isMarked = false,
+  ) {
     const last = attempts[0];
     return {
       id: question.id,
+      isMarked,
       type: question.type,
       body: question.body,
       contexts: question.contexts.map((link: any) => link.context),
@@ -600,11 +605,28 @@ export class LearningService {
         ...(byQuestion.get(attempt.questionId) ?? []),
         attempt,
       ]);
+    const markedQuestionIds = new Set(
+      (
+        await this.prisma.studentQuestionMark.findMany({
+          where: {
+            studentUserId: studentId,
+            questionId: { in: questions.map((question) => question.id) },
+          },
+          select: { questionId: true },
+        })
+      ).map((mark) => mark.questionId),
+    );
     const start = (query.page - 1) * query.limit;
     return {
       data: questions
         .slice(start, start + query.limit)
-        .map((x) => this.learnerQuestion(x, byQuestion.get(x.id) ?? [])),
+        .map((x) =>
+          this.learnerQuestion(
+            x,
+            byQuestion.get(x.id) ?? [],
+            markedQuestionIds.has(x.id),
+          ),
+        ),
       meta: toPaginationMeta(query.page, query.limit, questions.length),
     };
   }

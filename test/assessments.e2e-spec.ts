@@ -147,6 +147,7 @@ describe('Assessments (e2e)', () => {
     expect(state.questions).toHaveLength(2);
 
     const firstQuestion = state.questions[0];
+    expect(firstQuestion.isMarked).toBe(false);
     const correctOptionId = firstQuestion.options[0].id;
     const autosave = await app.inject({
       method: 'POST',
@@ -197,12 +198,20 @@ describe('Assessments (e2e)', () => {
       marked: true,
     });
 
+    const markedCurrent = await app.inject({ method: 'GET', url: `/api/v1/student/assessments/${studentAssessmentId}/attempts/current`, headers: { authorization: `Bearer ${student1.accessToken}` } });
+    expect(markedCurrent.statusCode).toBe(200);
+    expect(JSON.parse(markedCurrent.body).questions.find((q: any) => q.id === firstQuestion.id).isMarked).toBe(true);
+
     const unmark = await app.inject({
       method: 'DELETE',
       url: `/api/v1/student/assessments/question-marks/${firstQuestion.id}`,
       headers: { authorization: `Bearer ${student1.accessToken}` },
     });
     expect(unmark.statusCode).toBe(200);
+
+    const unmarkedCurrent = await app.inject({ method: 'GET', url: `/api/v1/student/assessments/${studentAssessmentId}/attempts/current`, headers: { authorization: `Bearer ${student1.accessToken}` } });
+    expect(unmarkedCurrent.statusCode).toBe(200);
+    expect(JSON.parse(unmarkedCurrent.body).questions.find((q: any) => q.id === firstQuestion.id).isMarked).toBe(false);
 
     const concurrentActiveTimes = await Promise.all([20, 30].map((activeSeconds) => app.inject({
       method: 'PATCH',
@@ -224,6 +233,7 @@ describe('Assessments (e2e)', () => {
     expect(resultBody).toMatchObject({ percentage: 50, correctCount: 1, incorrectCount: 0, omittedCount: 1, answeredCount: 1 });
     expect(resultBody.comparison).toMatchObject({ status: 'NOT_APPLICABLE' });
     expect(resultBody.questions[0].activeSeconds).toBe(30);
+    expect(resultBody.questions[0].isMarked).toBe(false);
     expect(resultBody.questions[0].explanation).toBeDefined();
     expect(resultBody.questions).toEqual(expect.arrayContaining([expect.objectContaining({ outcome: 'CORRECT' }), expect.objectContaining({ outcome: 'OMITTED' })]));
     expect((await prisma.questionCommunityStat.aggregate({ where: { questionId: { in: questionIds } }, _sum: { totalResponses: true, correctResponses: true } }))._sum).toEqual({ totalResponses: 1, correctResponses: 1 });
@@ -251,6 +261,9 @@ describe('Assessments (e2e)', () => {
     expect(JSON.parse(sources.body).data).toEqual(expect.arrayContaining([expect.objectContaining({ id: sourceId, type: 'PLATFORM' })]));
     const mark = await app.inject({ method: 'POST', url: `/api/v1/student/assessments/question-marks/${questionIds[0]}`, headers: { authorization: `Bearer ${student1.accessToken}` } });
     expect(mark.statusCode).toBe(201);
+    const practiceWithMark = await app.inject({ method: 'GET', url: `/api/v1/student/practice/questions?courseId=${courseId}`, headers: { authorization: `Bearer ${student1.accessToken}` } });
+    expect(practiceWithMark.statusCode).toBe(200);
+    expect(JSON.parse(practiceWithMark.body).data.find((q: any) => q.id === questionIds[0]).isMarked).toBe(true);
     const marks = await app.inject({ method: 'GET', url: '/api/v1/student/assessments/question-marks', headers: { authorization: `Bearer ${student1.accessToken}` } });
     expect(marks.statusCode).toBe(200);
     expect(JSON.parse(marks.body).data).toEqual(expect.arrayContaining([expect.objectContaining({ questionId: questionIds[0], bank: expect.objectContaining({ id: questionBankId }) })]));
@@ -258,6 +271,9 @@ describe('Assessments (e2e)', () => {
     expect(generated.statusCode).toBe(201);
     const unmark = await app.inject({ method: 'DELETE', url: `/api/v1/student/assessments/question-marks/${questionIds[0]}`, headers: { authorization: `Bearer ${student1.accessToken}` } });
     expect(unmark.statusCode).toBe(200);
+    const practiceWithoutMark = await app.inject({ method: 'GET', url: `/api/v1/student/practice/questions?courseId=${courseId}`, headers: { authorization: `Bearer ${student1.accessToken}` } });
+    expect(practiceWithoutMark.statusCode).toBe(200);
+    expect(JSON.parse(practiceWithoutMark.body).data.find((q: any) => q.id === questionIds[0]).isMarked).toBe(false);
   });
 
   it('atomically aggregates concurrent community responses', async () => {

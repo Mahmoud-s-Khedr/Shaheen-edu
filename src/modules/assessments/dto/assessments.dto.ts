@@ -320,6 +320,7 @@ export class AssessmentDetailDto extends AssessmentListItemDto {
 
 export class AssessmentAttemptQuestionDto {
   @ApiProperty() id!: string;
+  @ApiProperty() isMarked!: boolean;
   @ApiProperty() sortOrder!: number;
   @ApiProperty() type!: string;
   @ApiProperty() body!: string;

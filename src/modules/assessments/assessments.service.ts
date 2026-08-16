@@ -1107,6 +1107,18 @@ export class AssessmentsService {
     });
   }
 
+  private async markedQuestionIds(studentId: string, questionIds: string[]) {
+    if (!questionIds.length) return new Set<string>();
+    const marks = await this.prisma.studentQuestionMark.findMany({
+      where: {
+        studentUserId: studentId,
+        questionId: { in: questionIds },
+      },
+      select: { questionId: true },
+    });
+    return new Set(marks.map((mark) => mark.questionId));
+  }
+
   async startAttempt(studentId: string, id: string) {
     const assessment = await this.assessmentWithScopes(id);
     const existing = await this.prisma.assessmentAttempt.findUnique({
@@ -1284,6 +1296,10 @@ export class AssessmentsService {
   private async attemptStateDto(attempt: any, assessment: any) {
     const current = await this.ensureNotExpired(attempt);
     const questions = await this.questionsForAssessment(assessment.id);
+    const markedQuestionIds = await this.markedQuestionIds(
+      attempt.studentUserId,
+      questions.map((question) => question.sourceQuestionId),
+    );
     const answers = await this.prisma.assessmentAttemptAnswer.findMany({
       where: { attemptId: current.id },
     });
@@ -1308,6 +1324,7 @@ export class AssessmentsService {
           (assessment.mode === AssessmentMode.TUTOR && Boolean(answer));
         return {
           id: q.id,
+          isMarked: markedQuestionIds.has(q.sourceQuestionId),
           sortOrder: q.sortOrder,
           type: q.type,
           body: q.body,
@@ -1698,6 +1715,10 @@ export class AssessmentsService {
     if (attempt.status !== AssessmentAttemptStatus.COMPLETED)
       throw new ConflictException('Attempt has not been submitted yet');
     const questions = await this.questionsForAssessment(id);
+    const markedQuestionIds = await this.markedQuestionIds(
+      studentId,
+      questions.map((question) => question.sourceQuestionId),
+    );
     const answers = await this.prisma.assessmentAttemptAnswer.findMany({
       where: { attemptId: attempt.id },
     });
@@ -1746,6 +1767,7 @@ export class AssessmentsService {
         return {
           id: q.id,
           sourceQuestionId: q.sourceQuestionId,
+          isMarked: markedQuestionIds.has(q.sourceQuestionId),
           sortOrder: q.sortOrder,
           type: q.type,
           body: q.body,
