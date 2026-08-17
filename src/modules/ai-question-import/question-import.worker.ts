@@ -14,32 +14,38 @@ import { PrismaService } from '../../database/prisma.service';
 import { BunnyStorageProvider } from '../assets/bunny-storage.provider';
 import { QuestionBanksService } from '../question-banks/question-banks.service';
 import { DocumentTextExtractor } from './document-text-extractor.service';
+import { PdfPageRangeService } from './pdf-page-range.service';
+import { PdfTranscriptionClient } from './pdf-transcription.client';
 import {
   OpenRouterQuestionImportClient,
   OpenRouterQuestionImportError,
   type ImportedCandidate,
   type SegmentationResult,
 } from './openrouter-question-import.client';
-import { QUESTION_IMPORT_MAX_ATTEMPTS, QUESTION_IMPORT_QUEUE } from './question-import.queue';
+import { QUESTION_IMPORT_MAX_ATTEMPTS, QUESTION_IMPORT_QUEUE, QuestionImportQueue } from './question-import.queue';
 
 class IncompleteImportError extends Error {
   constructor(readonly incompleteChunks: number) {
     super(`Waiting to recover ${incompleteChunks} unfinished import chunk(s)`);
   }
 }
+class ReviewRequiredImportError extends Error {}
 
 @Injectable()
 export class QuestionImportWorker {
   private worker?: Worker;
-  private readonly config: AppConfig['ai'];
+    private readonly config: AppConfig['ai'];
   private readonly redisUrl: string;
   private readonly processingLeaseMs: number;
   constructor(
     private readonly prisma: PrismaService,
     private readonly storage: BunnyStorageProvider,
     private readonly extractor: DocumentTextExtractor,
+    private readonly pdfRanges: PdfPageRangeService,
+    private readonly transcriber: PdfTranscriptionClient,
     private readonly client: OpenRouterQuestionImportClient,
     private readonly questions: QuestionBanksService,
+    private readonly queue: QuestionImportQueue,
     config: ConfigService<AppConfig, true>,
   ) {
     this.config = config.get('ai', { infer: true });
@@ -68,7 +74,7 @@ export class QuestionImportWorker {
   private async process(batchId: string, attemptsMade = 0) {
     const batch: any = await this.prisma.questionImportBatch.findUnique({
       where: { id: batchId },
-      include: { sourceAsset: true },
+      include: { sourceAsset: true, children: { select: { id: true } } },
     });
     if (!batch || batch.schemaVersion !== 'question-import-v2') return;
     try {
@@ -80,8 +86,9 @@ export class QuestionImportWorker {
             startedAt: new Date(),
           },
         });
-        const x =
-          batch.inputType === 'RAW_TEXT'
+        const x = batch.inputType === 'ASSET' && batch.sourceAsset.mimeType === 'application/pdf'
+          ? await this.transcribePdf(batch)
+          : batch.inputType === 'RAW_TEXT'
             ? { text: batch.rawText, metadata: { format: 'RAW_TEXT' } }
             : await this.extractor.extract({
                 mimeType: batch.sourceAsset.mimeType,
@@ -102,26 +109,40 @@ export class QuestionImportWorker {
         where: { id: batchId },
         include: { sourceBlocks: { orderBy: { sequence: 'asc' } } },
       });
-      if (current.normalizedText.length > this.config.segmentationMaxCharacters)
-        return this.awaitReview(
+      if (this.needsPageSplit(current.normalizedText)) {
+        const children = this.pageChildren(current.normalizedText);
+        if (children && !batch.parentId) {
+          if (batch.children.length) await Promise.all(batch.children.map((child: any) => this.queue.enqueue(child.id)));
+          else await this.createChildren(batch, children);
+          return;
+        }
+        await this.awaitReview(
           batchId,
-          'Source is too large for one AI boundary-identification request. Split it into separate imports.',
+          'Source exceeds the segmentation token threshold and has no safe PDF page boundaries for automatic splitting.',
         );
+        if (batch.parentId) await this.refreshParent(batch.parentId);
+        return;
+      }
       let blocks = current.sourceBlocks;
       if (!blocks.length) {
-        const parts = current.normalizedText
-          .split(/\n\s*\n|\n/)
-          .map((x: string) => x.trim())
-          .filter(Boolean);
+        let page: number | null = null;
+        let pageLine = 0;
+        const parts = current.normalizedText.split('\n').map((value: string, line: number) => {
+          const text = value.trim();
+          const marker = /^\[Page (\d+)]$/.exec(text);
+          if (marker) { page = Number(marker[1]); pageLine = 0; }
+          else if (text && page !== null) pageLine += 1;
+          return { text, sourceLocator: page === null ? { line: line + 1 } : marker ? { page } : { page, line: pageLine } };
+        }).filter((part: any) => Boolean(part.text));
         blocks = await Promise.all(
-          parts.map((text: string, index: number) =>
+          parts.map((part: any, index: number) =>
             this.prisma.questionImportSourceBlock.create({
               data: {
                 batchId,
                 sequence: index + 1,
                 blockKey: `B${String(index + 1).padStart(5, '0')}`,
-                text,
-                sourceLocator: { line: index + 1 },
+                text: part.text,
+                sourceLocator: part.sourceLocator,
               },
             }),
           ),
@@ -132,11 +153,18 @@ export class QuestionImportWorker {
           where: { id: batchId },
           data: { status: QuestionImportStatus.SEGMENTING },
         });
+        const scope = current.pageScope as any;
         const response = await this.client.segmentSource(
           blocks.map((b: any) => ({ key: b.blockKey, text: b.text })),
+          scope ? { corePageStart: scope.corePageStart, corePageEnd: scope.corePageEnd } : undefined,
         );
+        response.result = this.limitToOwnedPages(blocks, response.result, scope);
         const issue = this.validateSegmentation(blocks, response.result);
-        if (issue) return this.awaitReview(batchId, issue, response);
+        if (issue) {
+          await this.awaitReview(batchId, issue, response);
+          if (batch.parentId) await this.refreshParent(batch.parentId);
+          return;
+        }
         await this.persistSegmentationAndChunks(batchId, blocks, response);
       }
       await this.reclaimStaleProcessingChunks(batchId);
@@ -184,7 +212,9 @@ export class QuestionImportWorker {
           failedItems: failed,
         },
       });
+      if (batch.parentId) await this.refreshParent(batch.parentId);
     } catch (error: any) {
+      if (error instanceof ReviewRequiredImportError) return;
       if (error instanceof IncompleteImportError) {
         if (attemptsMade + 1 < QUESTION_IMPORT_MAX_ATTEMPTS) throw error;
         await this.prisma.questionImportBatch.update({
@@ -195,6 +225,7 @@ export class QuestionImportWorker {
             completedAt: new Date(),
           },
         });
+        if (batch.parentId) await this.refreshParent(batch.parentId);
         throw error;
       }
       await this.prisma.questionImportBatch.update({
@@ -205,9 +236,55 @@ export class QuestionImportWorker {
           completedAt: new Date(),
         },
       });
+      if (batch.parentId) await this.refreshParent(batch.parentId);
       throw error;
     }
   }
+  private async transcribePdf(batch: any): Promise<{ text: string; metadata: any }> {
+    if (!this.config.pdfTranscriptionModel) throw new Error('PDF imports require AI_PDF_TRANSCRIPTION_MODEL');
+    const original = await this.storage.download(batch.sourceAsset.storageKey);
+    const totalPages = await this.pdfRanges.pageCount(original);
+    await this.prisma.questionImportBatch.update({ where: { id: batch.id }, data: { status: QuestionImportStatus.TRANSCRIBING } });
+    // Layer 1 is deliberately neutral: every physical page is OCR'd.  Layer 2
+    // receives the complete marked source and decides what is a question,
+    // context, or excluded material.
+    await this.prisma.questionImportPage.createMany({ data: Array.from({ length: totalPages }, (_, index) => ({ batchId: batch.id, pageNumber: index + 1 })), skipDuplicates: true });
+    const existing: any[] = await this.prisma.questionImportPage.findMany({ where: { batchId: batch.id }, orderBy: { pageNumber: 'asc' } });
+    for (const stored of existing) {
+      // A page-specific retry changes only that page back to PENDING. Keep the
+      // persisted evidence for every other failed or review-required page.
+      if (stored.status !== 'PENDING') continue;
+      try {
+        const image = await this.pdfRanges.renderPage(original, stored.pageNumber, 350);
+        const initial = await this.transcriber.transcribeImage(image);
+        const initialCanonicalText = this.canonicalPageText(initial.page.content);
+        const suspicious = initial.page.confidence < 0.9 || initial.page.uncertainSpans.length > 0 || initial.page.warnings.length > 0 || !initialCanonicalText;
+        const verified = suspicious ? await this.transcriber.verifyImage(image, initial.page) : null;
+        const finalPage = verified?.page ?? initial.page;
+        const canonicalText = this.canonicalPageText(finalPage.content);
+        const warnings = finalPage.warnings;
+        const review = finalPage.uncertainSpans.length > 0 || warnings.length > 0 || !canonicalText;
+        await this.prisma.questionImportPage.update({ where: { batchId_pageNumber: { batchId: batch.id, pageNumber: stored.pageNumber } }, data: {
+          status: review ? 'REVIEW_REQUIRED' : 'AI_TRANSCRIBED', aiText: finalPage.content, canonicalText, confidence: finalPage.confidence,
+          uncertainSpans: finalPage.uncertainSpans as any, warnings: warnings as any, rawProviderResponse: (verified?.raw ?? initial.raw) as any, usage: (verified?.usage ?? initial.usage) as any,
+          initialAiText: initial.page.content, initialCanonicalText, initialProviderResponse: initial.raw as any, initialUsage: initial.usage as any,
+          verificationProviderResponse: verified?.raw as any, verificationUsage: verified?.usage as any, verifiedAt: verified ? new Date() : null,
+          errorDetail: review ? 'Visual OCR transcription requires admin review' : null, attemptCount: { increment: 1 },
+        } });
+      } catch (error: any) {
+        await this.prisma.questionImportPage.update({ where: { batchId_pageNumber: { batchId: batch.id, pageNumber: stored.pageNumber } }, data: { status: 'FAILED', errorDetail: error.message.slice(0, 2000), attemptCount: { increment: 1 } } });
+        throw error;
+      }
+    }
+    const pages: any[] = await this.prisma.questionImportPage.findMany({ where: { batchId: batch.id }, orderBy: { pageNumber: 'asc' } });
+    const unresolved = pages.filter((page) => page.status !== 'AI_TRANSCRIBED');
+    if (pages.length !== totalPages || unresolved.length) {
+      await this.awaitReview(batch.id, `PDF transcription has ${unresolved.length || totalPages - pages.length} unresolved page(s).`);
+      throw new ReviewRequiredImportError('PDF transcription requires review');
+    }
+    return { text: pages.map((page) => `[Page ${page.pageNumber}]\n${page.canonicalText}`).join('\n\n'), metadata: { format: 'VISUAL_PDF_OCR', pages: pages.map((page) => ({ page: page.pageNumber, confidence: page.confidence, lineCount: page.canonicalText.split('\n').length })) } };
+  }
+  private canonicalPageText(value: string) { return value.normalize('NFKC').replace(/\r\n?/g, '\n').replace(/[ \t]+/g, ' ').trim(); }
   private async reclaimStaleProcessingChunks(batchId: string) {
     await this.prisma.questionImportChunk.updateMany({
       where: {
@@ -221,7 +298,116 @@ export class QuestionImportWorker {
       },
     });
   }
+  private pageChildren(text: string): Array<{ text: string; scope: Record<string, number> }> | null {
+    const matches = [...text.matchAll(/^\[Page (\d+)]\s*$/gm)];
+    if (matches.length < 2) return null;
+    const pages = matches.map((match, index) => ({
+      page: Number(match[1]),
+      text: text.slice(match.index!, matches[index + 1]?.index).trim(),
+      tokens: 0,
+    }));
+    if (pages.some((page, index) => !page.text || (index && page.page !== pages[index - 1].page + 1))) return null;
+    for (const page of pages) page.tokens = this.estimateTokens(page.text);
+    const target = this.config.segmentationChildTargetTokens;
+    const coreBudget = Math.floor(target * 0.9);
+    const cores: Array<{ first: number; last: number }> = [];
+    for (let first = 0; first < pages.length;) {
+      let last = first;
+      let size = 0;
+      while (last < pages.length && size + pages[last].tokens <= coreBudget) {
+        size += pages[last].tokens;
+        last += 1;
+      }
+      if (last === first) return null;
+      cores.push({ first, last: last - 1 });
+      first = last;
+    }
+    if (cores.length < 2) return null;
+    const overlap = Math.max(0, this.config.pdfSplitOverlapPages);
+    const children: Array<{ text: string; scope: Record<string, number> }> = [];
+    for (const core of cores) {
+      let first = Math.max(0, core.first - overlap);
+      let last = Math.min(pages.length - 1, core.last + overlap);
+      while (pages.slice(first, last + 1).reduce((size, page) => size + page.tokens, 0) > target) {
+        if (first < core.first) first += 1;
+        else if (last > core.last) last -= 1;
+        else return null;
+      }
+      children.push({
+        text: pages.slice(first, last + 1).map((page) => page.text).join('\n\n'),
+        scope: {
+          includedPageStart: pages[first].page,
+          includedPageEnd: pages[last].page,
+          corePageStart: pages[core.first].page,
+          corePageEnd: pages[core.last].page,
+          coreTokenCount: pages.slice(core.first, core.last + 1).reduce((size, page) => size + page.tokens, 0),
+          includedTokenCount: pages.slice(first, last + 1).reduce((size, page) => size + page.tokens, 0),
+        },
+      });
+    }
+    return children;
+  }
+  private estimateTokens(text: string) {
+    const arabicCharacters = (text.match(/[\u0600-\u06ff]/g) ?? []).length;
+    const otherCharacters = text.length - arabicCharacters;
+    return Math.ceil(arabicCharacters / 2.5 + otherCharacters / 4);
+  }
+  private needsPageSplit(text: string) {
+    return this.estimateTokens(text) > this.config.segmentationSplitThresholdTokens;
+  }
+  private async createChildren(batch: any, children: Array<{ text: string; scope: Record<string, number> }>) {
+    const created = await this.prisma.$transaction(async (tx: any) => Promise.all(children.map((child, index) => tx.questionImportBatch.create({
+      data: {
+        inputType: 'RAW_TEXT', rawText: child.text, normalizedText: child.text,
+        extractionMetadata: { format: 'PDF_PAGE_CHUNK', pageScope: child.scope },
+        parentId: batch.id, childSequence: index + 1, pageScope: child.scope,
+        bankId: batch.bankId, sourceId: batch.sourceId, courseId: batch.courseId,
+        placements: batch.placements, model: batch.model, schemaVersion: batch.schemaVersion,
+        createdById: batch.createdById,
+      },
+    }))));
+    await this.prisma.questionImportBatch.update({ where: { id: batch.id }, data: { status: QuestionImportStatus.GENERATING, totalChunks: created.length, startedAt: batch.startedAt ?? new Date() } });
+    await Promise.all(created.map((child: any) => this.queue.enqueue(child.id)));
+  }
+  private async refreshParent(parentId: string) {
+    const children: any[] = await this.prisma.questionImportBatch.findMany({ where: { parentId } });
+    if (!children.length || children.some((child) => ![QuestionImportStatus.COMPLETED, QuestionImportStatus.COMPLETED_WITH_ERRORS, QuestionImportStatus.FAILED, QuestionImportStatus.AWAITING_REVIEW].includes(child.status))) return;
+    const failed = children.filter((child) => child.status !== QuestionImportStatus.COMPLETED).length;
+    await this.prisma.questionImportBatch.update({ where: { id: parentId }, data: {
+      status: failed ? QuestionImportStatus.COMPLETED_WITH_ERRORS : QuestionImportStatus.COMPLETED,
+      completedAt: new Date(), completedChunks: children.length,
+      totalItems: children.reduce((sum, child) => sum + child.totalItems, 0),
+      createdQuestions: children.reduce((sum, child) => sum + child.createdQuestions, 0),
+      invalidItems: children.reduce((sum, child) => sum + child.invalidItems, 0),
+      failedItems: children.reduce((sum, child) => sum + child.failedItems, 0),
+      errorSummary: failed ? `${failed} page range(s) require review or retry` : null,
+    } });
+  }
+  private pageForBlock(blocks: any[], blockKey: string) {
+    const index = blocks.findIndex((block) => block.blockKey === blockKey);
+    for (let i = index; i >= 0; i -= 1) {
+      const match = /^\[Page (\d+)]$/.exec(blocks[i].text);
+      if (match) return Number(match[1]);
+    }
+    return null;
+  }
+  private limitToOwnedPages(blocks: any[], result: SegmentationResult, scope?: { corePageStart: number; corePageEnd: number }) {
+    if (!scope) return result;
+    const owned = (firstBlock: string) => {
+      const page = this.pageForBlock(blocks, firstBlock);
+      return page !== null && page >= scope.corePageStart && page <= scope.corePageEnd;
+    };
+    return { ...result, questions: result.questions.filter((question) => {
+      const page = this.pageForBlock(blocks, question.firstBlock);
+      if (!owned(question.firstBlock)) return false;
+      question.page = page;
+      return true;
+    }), excluded: result.excluded.filter((item) => owned(item.firstBlock)), skippedRanges: (result.skippedRanges ?? []).filter((item) => owned(item.firstBlock)) };
+  }
   private validateSegmentation(blocks: any[], result: SegmentationResult) {
+    if (result.warnings.some((warning) => /(?:continues|additional).{0,80}(?:beyond|omitted)|only the extracted/i.test(warning))) {
+      return 'AI reported incomplete source coverage; reduce the segmentation range and retry.';
+    }
     const keys = blocks.map((b) => b.blockKey);
     const range = (firstBlock: string, lastBlock: string) => {
       const first = keys.indexOf(firstBlock), last = keys.indexOf(lastBlock);
@@ -240,8 +426,8 @@ export class QuestionImportWorker {
       for (let i = r.first; i <= r.last; i += 1) { if (questionRanges.has(keys[i])) return 'AI returned overlapping question boundaries.'; questionRanges.add(keys[i]); }
       previous = r.last;
     }
-    if (!result.questions.length) return 'AI did not identify any question candidates.';
-    return result.excluded.every((item) => Boolean(range(item.firstBlock, item.lastBlock))) ? null : 'AI returned invalid excluded-source metadata.';
+    if (!result.excluded.every((item) => Boolean(range(item.firstBlock, item.lastBlock)))) return 'AI returned invalid excluded-source metadata.';
+    return (result.skippedRanges ?? []).every((item) => Boolean(range(item.firstBlock, item.lastBlock))) ? null : 'AI returned invalid skipped-source metadata.';
   }
   private async awaitReview(id: string, message: string, response?: any) {
     await this.prisma.questionImportBatch.update({
@@ -288,31 +474,35 @@ export class QuestionImportWorker {
       };
     });
     const batches: any[] = [];
-    let current: any[] = [],
-      size = 0;
+    let current: any[] = [];
     for (const question of complete) {
+      const candidate = [...current, question];
+      const input = this.extractionInput(candidate);
       if (
         current.length &&
-        (current.length === 25 ||
-          size + question.text.length > this.config.extractionMaxCharacters)
+        (current.length === this.config.extractionMaxQuestions || this.estimateTokens(JSON.stringify(input)) + 4_000 > this.config.extractionTargetTokens)
       ) {
         batches.push(current);
         current = [];
-        size = 0;
       }
       current.push(question);
-      size += question.text.length;
     }
     if (current.length) batches.push(current);
     return batches.map((questions, index) => ({
       batchId,
       sequence: index + 1,
-      text: JSON.stringify(questions),
+      text: JSON.stringify(this.extractionInput(questions)),
       sourceLocator: { ranges: questions.map((q: any) => q.locator) },
       checksum: createHash('sha256')
         .update(JSON.stringify(questions))
         .digest('hex'),
     }));
+  }
+  private extractionInput(questions: any[]) {
+    const contexts = new Map<string, any>();
+    for (const question of questions) for (const context of question.contexts ?? []) contexts.set(context.id, context);
+    // Contexts were attached above only long enough to build a chunk; strip them from every question payload.
+    return { contexts: [...contexts.values()], questions: questions.map(({ contexts: _contexts, locator: _locator, ...question }) => question) };
   }
   private async persistSegmentationAndChunks(
     batchId: string,
@@ -337,6 +527,7 @@ export class QuestionImportWorker {
           totalChunks: chunks.length,
         },
       });
+      if ((response.result.skippedRanges ?? []).length) await tx.questionImportSkippedRange.createMany({ data: (response.result.skippedRanges ?? []).map((range: any, index: number) => ({ batchId, sequence: index + 1, firstBlock: range.firstBlock, lastBlock: range.lastBlock, reason: range.reason, sourceLocator: { firstBlock: range.firstBlock, lastBlock: range.lastBlock, first: blocks.find((block: any) => block.blockKey === range.firstBlock)?.sourceLocator, last: blocks.find((block: any) => block.blockKey === range.lastBlock)?.sourceLocator } })) });
       await tx.questionImportChunk.createMany({ data: chunks });
     });
   }
@@ -350,8 +541,9 @@ export class QuestionImportWorker {
     });
     if (!claim.count) return;
     try {
-      const questions = JSON.parse(chunk.text);
-      const r = await this.client.extractQuestions(questions);
+      const input = JSON.parse(chunk.text);
+      const questions = Array.isArray(input) ? input : input.questions;
+      const r = await this.client.extractQuestions(Array.isArray(input) ? { contexts: [], questions } : input);
       if (r.items.length !== questions.length)
         throw new Error(
           'AI did not return exactly one structured item for each identified question',
@@ -403,7 +595,10 @@ export class QuestionImportWorker {
         options.filter((o) => o.isCorrect).length === 1) &&
       (c.type !== 'MULTIPLE_CHOICE' ||
         options.filter((o) => o.isCorrect).length >= 2);
-    const reviewRequired = c.answer.confidence < 0.9 || c.warnings.some((warning) => /ambiguous|uncertain/i.test(warning));
+    const confidence = c.answer?.confidence;
+    const sourceWarnings = c.warnings ?? [];
+    const corruptionWarning = /ambiguous|uncertain|garbl|corrupt|illegible|مشوش|تشوش|غير\s*واضح|محرّف|محرف|مقطوع|غير\s*مقروء/i;
+    const reviewRequired = !Number.isFinite(confidence) || confidence < 0 || confidence > 1 || confidence < 0.9 || c.answer?.origin !== 'EXPLICIT' || sourceWarnings.some((warning) => corruptionWarning.test(warning));
     const plainExplanation = explanation ? [explanation.keywords, explanation.eliminationStrategy, explanation.whyCorrect, explanation.generalRule, explanation.whatIf, explanation.commonMistakes].join('\n\n') : '';
     try {
       return await this.prisma.$transaction(async (tx) => {
@@ -421,7 +616,7 @@ export class QuestionImportWorker {
             warnings: c.warnings as any,
             sourceLocator: { firstBlock: source.firstBlock, lastBlock: source.lastBlock, page: source.page },
             sourceNumber: source.sourceNumber,
-            globalOrder: Number(source.sourceNumber) || sequence,
+            globalOrder: ((batch.childSequence ?? 0) * 1_000_000) + (chunk.sequence * 1_000) + sequence,
             section: source.section,
             detectedType: c.type,
             answerOrigin: c.answer?.origin,

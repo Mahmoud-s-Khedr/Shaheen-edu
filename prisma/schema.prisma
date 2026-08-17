@@ -178,12 +178,27 @@ enum QuestionImportInputType {
 enum QuestionImportStatus {
   QUEUED
   EXTRACTING
+  TRANSCRIBING
   SEGMENTING
   AWAITING_REVIEW
   GENERATING
   COMPLETED
   COMPLETED_WITH_ERRORS
   FAILED
+}
+
+enum QuestionImportPageStatus {
+  PENDING
+  EXCLUDED
+  AI_TRANSCRIBED
+  REVIEW_REQUIRED
+  FAILED
+}
+
+enum QuestionImportPageKind {
+  COVER_OR_INDEX
+  QUESTION
+  ANSWER_FORM
 }
 
 enum QuestionImportChunkStatus {
@@ -868,6 +883,11 @@ model QuestionImportBatch {
   rawText             String?
   sourceAssetId       String?
   sourceAsset         Asset?                    @relation("QuestionImportSourceAsset", fields: [sourceAssetId], references: [id], onDelete: Restrict)
+  parentId            String?
+  parent              QuestionImportBatch?      @relation("QuestionImportChildren", fields: [parentId], references: [id], onDelete: Cascade)
+  children            QuestionImportBatch[]     @relation("QuestionImportChildren")
+  childSequence       Int?
+  pageScope           Json?
   bankId              String
   sourceId            String
   courseId            String
@@ -897,9 +917,44 @@ model QuestionImportBatch {
   chunks              QuestionImportChunk[]
   items               QuestionImportItem[]
   sourceBlocks        QuestionImportSourceBlock[]
+  skippedRanges       QuestionImportSkippedRange[]
+  pages               QuestionImportPage[]
 
   @@index([status, createdAt])
   @@index([createdById, createdAt])
+  @@index([parentId, childSequence])
+}
+
+/// The canonical, auditable transcription of one original PDF page.
+model QuestionImportPage {
+  id                  String                   @id @default(cuid())
+  batchId             String
+  batch               QuestionImportBatch      @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  pageNumber          Int
+  kind                QuestionImportPageKind @default(QUESTION)
+  status              QuestionImportPageStatus @default(PENDING)
+  aiText              String?
+  canonicalText       String?
+  confidence          Float?
+  uncertainSpans      Json?
+  warnings            Json?
+  attemptCount        Int                      @default(0)
+  providerFileId      String?
+  rawProviderResponse Json?
+  initialAiText       String?
+  initialCanonicalText String?
+  initialProviderResponse Json?
+  initialUsage        Json?
+  verificationProviderResponse Json?
+  verificationUsage   Json?
+  verifiedAt          DateTime?
+  usage               Json?
+  errorDetail         String?
+  createdAt           DateTime                 @default(now())
+  updatedAt           DateTime                 @updatedAt
+
+  @@unique([batchId, pageNumber])
+  @@index([batchId, status])
 }
 
 /// Neutral extracted source units. They are never assumed to be question
@@ -918,6 +973,21 @@ model QuestionImportSourceBlock {
 
   @@unique([batchId, sequence])
   @@unique([batchId, blockKey])
+  @@index([batchId])
+}
+
+model QuestionImportSkippedRange {
+  id          String              @id @default(cuid())
+  batchId     String
+  batch       QuestionImportBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  sequence    Int
+  firstBlock  String
+  lastBlock   String
+  reason      String
+  sourceLocator Json?
+  createdAt   DateTime            @default(now())
+
+  @@unique([batchId, sequence])
   @@index([batchId])
 }
 

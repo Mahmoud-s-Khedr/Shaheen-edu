@@ -24,15 +24,30 @@ export class DocumentTextExtractor {
   private async pdf(buffer: Buffer): Promise<ExtractedText> {
     const pdfjs: any = await import('pdfjs-dist/legacy/build/pdf.mjs');
     const document = await pdfjs.getDocument({ data: new Uint8Array(buffer), useWorkerFetch: false, isEvalSupported: false }).promise;
-    const pages: Array<{ page: number; text: string }> = [];
+    const pages: Array<{ page: number; lines: string[] }> = [];
     for (let page = 1; page <= document.numPages; page += 1) {
       const content = await (await document.getPage(page)).getTextContent();
-      const text = content.items.map((item: any) => item.str).join(' ');
-      pages.push({ page, text: this.normalize(text) });
+      pages.push({ page, lines: this.pdfLines(content.items) });
     }
-    const text = pages.map((page) => `\n\n[Page ${page.page}]\n${page.text}`).join('').trim();
+    const text = pages.map((page) => `\n\n[Page ${page.page}]\n${page.lines.join('\n')}`).join('').trim();
     this.assertQuality(text);
-    return { text, metadata: { format: 'PDF', pages: pages.map((page) => ({ page: page.page, characterCount: page.text.length })), characterCount: text.length } };
+    return { text, metadata: { format: 'PDF', pages: pages.map((page) => ({ page: page.page, lineCount: page.lines.length, characterCount: page.lines.join('\n').length })), characterCount: text.length } };
+  }
+
+  /** Reconstruct visual lines so boundary detection can address individual questions. */
+  private pdfLines(items: any[]): string[] {
+    const fragments = items
+      .filter((item) => typeof item.str === 'string' && item.str.trim())
+      .map((item, index) => ({ text: item.str.trim(), x: Number(item.transform?.[4] ?? index), y: Number(item.transform?.[5] ?? -index), dir: item.dir, index }));
+    const rows: Array<typeof fragments> = [];
+    for (const fragment of [...fragments].sort((a, b) => b.y - a.y || a.index - b.index)) {
+      const row = rows.find((candidate) => Math.abs(candidate[0].y - fragment.y) <= 2);
+      if (row) row.push(fragment); else rows.push([fragment]);
+    }
+    return rows.map((row) => {
+      const rtl = row.filter((fragment) => fragment.dir === 'rtl').length > row.length / 2;
+      return this.normalize(row.sort((a, b) => rtl ? b.x - a.x : a.x - b.x || a.index - b.index).map((fragment) => fragment.text).join(' '));
+    }).filter(Boolean);
   }
 
   private normalize(value: string): string { return value.normalize('NFKC').replace(/\r\n?/g, '\n').replace(/[ \t]+/g, ' ').replace(/\n{3,}/g, '\n\n').trim(); }

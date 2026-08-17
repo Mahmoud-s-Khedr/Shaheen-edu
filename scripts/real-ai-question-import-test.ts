@@ -14,11 +14,13 @@ const chapterId = process.env.AI_TEST_CHAPTER_ID;
 const inputDirectory = resolve(process.env.AI_TEST_INPUT_DIR ?? 'example-questions');
 const pollIntervalMs = Number(process.env.AI_TEST_POLL_INTERVAL_MS ?? 3000);
 const timeoutMs = Number(process.env.AI_TEST_TIMEOUT_MS ?? 900000);
+const requestedFile = process.env.AI_TEST_FILE;
 
 if (!email || !password || !bankId || !sourceId || !courseId || !chapterId)
   throw new Error('AI_TEST_ADMIN_EMAIL, AI_TEST_ADMIN_PASSWORD, AI_TEST_BANK_ID, AI_TEST_SOURCE_ID, AI_TEST_COURSE_ID, and AI_TEST_CHAPTER_ID are required');
 
 const supportedTextExtensions = new Set(['.md', '.txt', '.text']);
+const supportedExtensions = new Set([...supportedTextExtensions, '.pdf']);
 const terminalStatuses = new Set(['COMPLETED', 'COMPLETED_WITH_ERRORS', 'FAILED', 'AWAITING_REVIEW']);
 
 function sleep(ms: number) { return new Promise((resolveSleep) => setTimeout(resolveSleep, ms)); }
@@ -54,9 +56,20 @@ async function main() {
   const loginBody = await login.json();
   assertOk(login, loginBody);
   const token = loginBody.accessToken as string;
+  const uploadPdfAsset = async (filePath: string, filename: string) => {
+    const bytes = await readFile(filePath);
+    const form = new FormData();
+    form.append('file', new Blob([new Uint8Array(bytes)], { type: 'application/pdf' }), filename);
+    const authorized = await fetch(`${baseUrl}/api/v1/admin/assets/upload?kind=PDF`, { method: 'POST', headers: { authorization: `Bearer ${token}` }, body: form });
+    const authorizationBody = await authorized.json();
+    assertOk(authorized, authorizationBody);
+    const uploaded = await fetch(authorizationBody.upload.url, { method: authorizationBody.upload.method, headers: authorizationBody.upload.headers, body: bytes });
+    if (!uploaded.ok) throw new Error(`Asset upload failed: ${uploaded.status} ${await uploaded.text()}`);
+    return request('POST', `/admin/assets/${authorizationBody.asset.id}/complete`, token);
+  };
 
   const entries = (await readdir(inputDirectory, { withFileTypes: true }))
-    .filter((entry) => entry.isFile() && !entry.name.startsWith('.') && supportedTextExtensions.has(extname(entry.name).toLowerCase()))
+    .filter((entry) => entry.isFile() && !entry.name.startsWith('.') && supportedExtensions.has(extname(entry.name).toLowerCase()) && (!requestedFile || entry.name === requestedFile))
     .sort((a, b) => a.name.localeCompare(b.name));
   if (!entries.length) throw new Error(`No supported text files found in ${inputDirectory}`);
 
@@ -65,13 +78,15 @@ async function main() {
   try {
     for (const entry of entries) {
       const filePath = resolve(inputDirectory, entry.name);
-      const rawText = await readFile(filePath, 'utf8');
+      const isPdf = extname(entry.name).toLowerCase() === '.pdf';
+      const rawText = isPdf ? undefined : await readFile(filePath, 'utf8');
+      const asset = isPdf ? await uploadPdfAsset(filePath, entry.name) : null;
       const created = await request('POST', '/admin/ai/question-imports', token, {
         bankId,
         sourceId,
         courseId,
         placements: [{ chapterId }],
-        rawText,
+        ...(asset ? { sourceAssetId: asset.id } : { rawText }),
       });
       const importId = created.id as string;
       await logRaw({ kind: 'import-created', file: entry.name, importId, response: created });
@@ -85,6 +100,8 @@ async function main() {
         if (Date.now() - startedAt > timeoutMs) throw new Error(`Timed out waiting for ${entry.name} (${importId})`);
         await sleep(pollIntervalMs);
       }
+      if (detail.status === 'FAILED')
+        throw new Error(`Import ${entry.name} ended as ${detail.status}: ${detail.errorSummary ?? 'no error summary'}`);
 
       const itemsResponse = await request('GET', `/admin/ai/question-imports/${importId}/items?limit=100`, token);
       const sourceResponse = await request('GET', `/admin/ai/question-imports/${importId}/source-text`, token);
@@ -94,25 +111,24 @@ async function main() {
           chunks: { orderBy: { sequence: 'asc' } },
           items: { orderBy: { createdAt: 'asc' } },
           sourceBlocks: { orderBy: { sequence: 'asc' } },
+          pages: { orderBy: { pageNumber: 'asc' } },
+          children: { orderBy: { childSequence: 'asc' }, include: { chunks: { orderBy: { sequence: 'asc' } }, items: { orderBy: { createdAt: 'asc' } }, sourceBlocks: { orderBy: { sequence: 'asc' } } } },
         },
       });
       if (!stored) throw new Error(`Import ${importId} was not found in the database`);
 
-      await logRaw({
-        kind: 'segmentation-provider-response',
-        file: entry.name,
-        importId,
-        rawResponse: stored.segmentationRawOutput,
-        usage: stored.segmentationUsage,
-        warnings: stored.segmentationWarnings,
-      });
-      for (const chunk of stored.chunks) {
-        let input: unknown = chunk.text;
-        try { input = JSON.parse(chunk.text); } catch { /* Keep the original text if the stored chunk is not JSON. */ }
-        await logRaw({ kind: 'extraction-provider-response', file: entry.name, importId, chunkId: chunk.id, sequence: chunk.sequence, input, rawResponse: chunk.rawResponse, usage: chunk.usage, errorDetail: chunk.errorDetail });
+      for (const child of stored.children.length ? stored.children : [stored]) {
+        await logRaw({ kind: 'segmentation-provider-response', file: entry.name, importId, childImportId: child.id, pageScope: child.pageScope, rawResponse: child.segmentationRawOutput, usage: child.segmentationUsage, warnings: child.segmentationWarnings });
+        for (const chunk of child.chunks) {
+          let input: unknown = chunk.text;
+          try { input = JSON.parse(chunk.text); } catch { /* Keep the original text if the stored chunk is not JSON. */ }
+          await logRaw({ kind: 'extraction-provider-response', file: entry.name, importId, childImportId: child.id, chunkId: chunk.id, sequence: chunk.sequence, input, rawResponse: chunk.rawResponse, usage: chunk.usage, errorDetail: chunk.errorDetail });
+        }
+        for (const item of child.items)
+          await logRaw({ kind: 'candidate-response', file: entry.name, importId, childImportId: child.id, itemId: item.id, sequence: item.sequence, status: item.status, rawOutput: item.rawOutput, normalizedOutput: item.normalizedOutput, confidence: item.confidence, warnings: item.warnings, errorDetail: item.errorDetail });
       }
-      for (const item of stored.items)
-        await logRaw({ kind: 'candidate-response', file: entry.name, importId, itemId: item.id, sequence: item.sequence, status: item.status, rawOutput: item.rawOutput, normalizedOutput: item.normalizedOutput, confidence: item.confidence, warnings: item.warnings, errorDetail: item.errorDetail });
+      for (const page of stored.pages)
+        await logRaw({ kind: 'transcription-provider-response', file: entry.name, importId, pageNumber: page.pageNumber, status: page.status, confidence: page.confidence, warnings: page.warnings, uncertainSpans: page.uncertainSpans, providerFileId: page.providerFileId, rawResponse: page.rawProviderResponse, usage: page.usage, errorDetail: page.errorDetail });
       await logRaw({ kind: 'retained-source', file: entry.name, importId, source: sourceResponse });
 
       summaries.push({
@@ -121,8 +137,10 @@ async function main() {
         status: detail.status,
         model: detail.model,
         counts: { totalItems: detail.totalItems, createdQuestions: detail.createdQuestions, invalidItems: detail.invalidItems, failedItems: detail.failedItems },
-        sourceBlockCount: stored.sourceBlocks.length,
-        chunkCount: stored.chunks.length,
+        sourceBlockCount: (stored.children.length ? stored.children : [stored]).reduce((count, child) => count + child.sourceBlocks.length, 0),
+        chunkCount: (stored.children.length ? stored.children : [stored]).reduce((count, child) => count + child.chunks.length, 0),
+        childImports: stored.children.map((child) => ({ id: child.id, status: child.status, pageScope: child.pageScope, counts: { totalItems: child.totalItems, createdQuestions: child.createdQuestions, invalidItems: child.invalidItems, failedItems: child.failedItems } })),
+        transcriptionPages: stored.pages.map((page) => ({ pageNumber: page.pageNumber, status: page.status, confidence: page.confidence, warnings: page.warnings, uncertainSpans: page.uncertainSpans })),
         candidates: itemsResponse.data.map((item: any) => ({ id: item.id, sequence: item.sequence, status: item.status, questionId: item.questionId, sourceNumber: item.sourceNumber, globalOrder: item.globalOrder, section: item.section, detectedType: item.detectedType, confidence: item.confidence, answerOrigin: item.answerOrigin, warnings: item.warnings, errorDetail: item.errorDetail })),
       });
     }

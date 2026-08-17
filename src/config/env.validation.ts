@@ -123,8 +123,17 @@ export const envValidationSchema = Joi.object({
   PLATFORM_COMPARISON_MIN_SAMPLE: Joi.number().integer().min(1).default(10),
   OPENROUTER_API_KEY: Joi.string().min(1).optional(),
   AI_QUESTION_IMPORT_MODEL: Joi.string().min(1).optional(),
+  AI_PDF_TRANSCRIPTION_MODEL: Joi.string().min(1).optional(),
+  AI_PDF_TRANSCRIPTION_TIMEOUT_MS: Joi.number().integer().min(1000).max(300000).default(120000),
   AI_WORKER_CONCURRENCY: Joi.number().integer().min(1).max(10).default(2),
   AI_REQUEST_TIMEOUT_MS: Joi.number().integer().min(1000).max(300000).default(60000),
+  AI_SEGMENTATION_SPLIT_THRESHOLD_TOKENS: Joi.number().integer().min(1000).max(1000000).default(120000),
+  AI_SEGMENTATION_CHILD_TARGET_TOKENS: Joi.number().integer().min(1000).max(500000).default(12000),
+  AI_PDF_SPLIT_OVERLAP_PAGES: Joi.number().integer().min(0).max(20).default(2),
+  // Accepted during the configuration migration; token thresholds now control splitting.
   AI_SEGMENTATION_MAX_CHARACTERS: Joi.number().integer().min(1000).max(1000000).default(500000),
+  AI_EXTRACTION_TARGET_TOKENS: Joi.number().integer().min(1000).max(500000).default(30000),
+  AI_EXTRACTION_MAX_QUESTIONS: Joi.number().integer().min(1).max(25).default(10),
+  // Accepted during the extraction-budget migration; token budgets now control chunking.
   AI_EXTRACTION_MAX_CHARACTERS: Joi.number().integer().min(1000).max(500000).default(80000),
 });

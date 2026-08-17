@@ -59,7 +59,7 @@ export interface AppConfig {
     ip: { maxAttempts: number; windowSeconds: number };
   };
   platformComparisonMinSample: number;
-  ai: { openRouterApiKey: string; questionImportModel: string; workerConcurrency: number; requestTimeoutMs: number; segmentationMaxCharacters: number; extractionMaxCharacters: number };
+  ai: { openRouterApiKey: string; questionImportModel: string; pdfTranscriptionModel: string; workerConcurrency: number; requestTimeoutMs: number; pdfTranscriptionTimeoutMs: number; segmentationSplitThresholdTokens: number; segmentationChildTargetTokens: number; extractionTargetTokens: number; extractionMaxQuestions: number; pdfSplitOverlapPages: number };
 }
 
 const envInteger = (name: string, fallback: number): number =>
@@ -193,5 +193,5 @@ export default (): AppConfig => ({
     },
   },
   platformComparisonMinSample: envInteger('PLATFORM_COMPARISON_MIN_SAMPLE', 10),
-  ai: { openRouterApiKey: process.env.OPENROUTER_API_KEY ?? '', questionImportModel: process.env.AI_QUESTION_IMPORT_MODEL ?? '', workerConcurrency: envInteger('AI_WORKER_CONCURRENCY', 2), requestTimeoutMs: envInteger('AI_REQUEST_TIMEOUT_MS', 60_000), segmentationMaxCharacters: envInteger('AI_SEGMENTATION_MAX_CHARACTERS', 500_000), extractionMaxCharacters: envInteger('AI_EXTRACTION_MAX_CHARACTERS', 80_000) },
+  ai: { openRouterApiKey: process.env.OPENROUTER_API_KEY ?? '', questionImportModel: process.env.AI_QUESTION_IMPORT_MODEL ?? '', pdfTranscriptionModel: process.env.AI_PDF_TRANSCRIPTION_MODEL ?? '', workerConcurrency: envInteger('AI_WORKER_CONCURRENCY', 2), requestTimeoutMs: envInteger('AI_REQUEST_TIMEOUT_MS', 60_000), pdfTranscriptionTimeoutMs: envInteger('AI_PDF_TRANSCRIPTION_TIMEOUT_MS', 120_000), segmentationSplitThresholdTokens: envInteger('AI_SEGMENTATION_SPLIT_THRESHOLD_TOKENS', 120_000), segmentationChildTargetTokens: envInteger('AI_SEGMENTATION_CHILD_TARGET_TOKENS', 12_000), extractionTargetTokens: envInteger('AI_EXTRACTION_TARGET_TOKENS', 30_000), extractionMaxQuestions: envInteger('AI_EXTRACTION_MAX_QUESTIONS', 10), pdfSplitOverlapPages: envInteger('AI_PDF_SPLIT_OVERLAP_PAGES', 2) },
 });
