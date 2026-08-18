@@ -25,7 +25,7 @@ import type { RequestUser } from '../../common/types/request-with-user.types';
 import { ApiStandardErrors } from '../../common/decorators/api-standard-errors.decorator';
 import { AssessmentsService } from './assessments.service';
 import {
-  AdminAssessmentListItemDto,
+  AdminAssessmentDetailDto,
   AssessmentAttemptStateDto,
   AssessmentAnalyticsQueryDto,
   AssessmentAnalyticsResponseDto,
@@ -124,7 +124,9 @@ export class AssessmentsController {
   }
 
   @Put('question-notes/:questionId')
-  @ApiOperation({ summary: 'Create or update a private note for an accessible question' })
+  @ApiOperation({
+    summary: 'Create or update a private note for an accessible question',
+  })
   @ApiStandardErrors(400, 401, 403, 404)
   saveQuestionNote(
     @CurrentUser() user: RequestUser,
@@ -135,7 +137,9 @@ export class AssessmentsController {
   }
 
   @Delete('question-notes/:questionId')
-  @ApiOperation({ summary: 'Delete the current student’s private question note' })
+  @ApiOperation({
+    summary: 'Delete the current student’s private question note',
+  })
   @ApiStandardErrors(401, 403, 404)
   deleteQuestionNote(
     @CurrentUser() user: RequestUser,
@@ -210,7 +214,9 @@ export class AssessmentsController {
   }
 
   @Get(':id/questions/:questionId/assets/:assetId/access')
-  @ApiOperation({ summary: 'Get protected access to an assessment-question attachment' })
+  @ApiOperation({
+    summary: 'Get protected access to an assessment-question attachment',
+  })
   @ApiStandardErrors(401, 403, 404, 409)
   attachmentAccess(
     @CurrentUser() user: RequestUser,
@@ -218,7 +224,12 @@ export class AssessmentsController {
     @Param('questionId') questionId: string,
     @Param('assetId') assetId: string,
   ) {
-    return this.assessments.questionAttachmentAccess(user.id, id, questionId, assetId);
+    return this.assessments.questionAttachmentAccess(
+      user.id,
+      id,
+      questionId,
+      assetId,
+    );
   }
 
   @Post(':id/attempts/current/answers/:questionId')
@@ -280,18 +291,28 @@ export class AdminAssessmentsController {
   constructor(private readonly assessments: AssessmentsService) {}
 
   @Get('grading/pending')
-  @ApiOperation({ summary: 'List submitted long answers awaiting manual grading' })
-  pendingGrades(@CurrentUser() user: RequestUser) { return this.assessments.pendingGrades(user); }
+  @ApiOperation({
+    summary: 'List submitted long answers awaiting manual grading',
+  })
+  pendingGrades(@CurrentUser() user: RequestUser) {
+    return this.assessments.pendingGrades(user);
+  }
 
   @Post('grading/answers/:answerId')
   @ApiOperation({ summary: 'Award points to a submitted long answer' })
-  grade(@CurrentUser() user: RequestUser, @Param('answerId') answerId: string, @Body() dto: GradeLongAnswerDto) { return this.assessments.gradeLongAnswer(user, answerId, dto); }
+  grade(
+    @CurrentUser() user: RequestUser,
+    @Param('answerId') answerId: string,
+    @Body() dto: GradeLongAnswerDto,
+  ) {
+    return this.assessments.gradeLongAnswer(user, answerId, dto);
+  }
 
   @Post('standard')
   @ApiOperation({
     summary: 'Create a quiz/exam via random sample from the question bank',
   })
-  @ApiCreatedResponse({ type: AdminAssessmentListItemDto })
+  @ApiCreatedResponse({ type: AdminAssessmentDetailDto })
   @ApiStandardErrors(400, 401, 403)
   createStandard(
     @CurrentUser() user: RequestUser,
@@ -305,7 +326,7 @@ export class AdminAssessmentsController {
     summary:
       'Create a quiz/exam by hand-picking questions from the question bank',
   })
-  @ApiCreatedResponse({ type: AdminAssessmentListItemDto })
+  @ApiCreatedResponse({ type: AdminAssessmentDetailDto })
   @ApiStandardErrors(400, 401, 403)
   createCustom(
     @CurrentUser() user: RequestUser,
@@ -329,7 +350,7 @@ export class AdminAssessmentsController {
   @ApiOperation({
     summary: 'Get an admin-created assessment, including correct answers',
   })
-  @ApiOkResponse({ type: AdminAssessmentListItemDto })
+  @ApiOkResponse({ type: AdminAssessmentDetailDto })
   @ApiStandardErrors(401, 403, 404)
   get(@CurrentUser() user: RequestUser, @Param('id') id: string) {
     return this.assessments.getAdmin(user, id);
@@ -337,7 +358,7 @@ export class AdminAssessmentsController {
 
   @Patch(':id')
   @ApiOperation({ summary: 'Update a draft assessment (title, mode, timer)' })
-  @ApiOkResponse({ type: AdminAssessmentListItemDto })
+  @ApiOkResponse({ type: AdminAssessmentDetailDto })
   @ApiStandardErrors(400, 401, 403, 404, 409)
   update(
     @CurrentUser() user: RequestUser,
@@ -349,7 +370,7 @@ export class AdminAssessmentsController {
 
   @Post(':id/publish')
   @ApiOperation({ summary: 'Publish a draft assessment' })
-  @ApiCreatedResponse({ type: AdminAssessmentListItemDto })
+  @ApiCreatedResponse({ type: AdminAssessmentDetailDto })
   @ApiStandardErrors(401, 403, 404, 409)
   publish(@CurrentUser() user: RequestUser, @Param('id') id: string) {
     return this.assessments.publish(user, id);
@@ -357,7 +378,7 @@ export class AdminAssessmentsController {
 
   @Post(':id/archive')
   @ApiOperation({ summary: 'Archive a published assessment' })
-  @ApiCreatedResponse({ type: AdminAssessmentListItemDto })
+  @ApiCreatedResponse({ type: AdminAssessmentDetailDto })
   @ApiStandardErrors(401, 403, 404, 409)
   archive(@CurrentUser() user: RequestUser, @Param('id') id: string) {
     return this.assessments.archive(user, id);

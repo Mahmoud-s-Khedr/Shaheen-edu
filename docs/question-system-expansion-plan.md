@@ -77,7 +77,7 @@ Implemented decisions:
 
 ## Phase 3 — Ordered media and mixed-content model
 
-Status: `NOT STARTED`
+Status: `COMPLETED`
 
 Create the reusable representation for visual and rich content.
 
@@ -96,6 +96,12 @@ Exit criteria:
 - Shared contexts render correctly for multiple questions.
 - Media is available to students without exposing storage internals.
 - Existing question attachments continue to work during migration.
+
+Implemented decisions:
+
+- Canonical content is an ordered `contentBlocks` sequence with `TEXT`, `IMAGE`, `ASSET`, `TABLE`, and `EQUATION` block types. Tables use rectangular string-cell matrices with `headerRow`; equations retain LaTeX and/or MathML.
+- Legacy bodies and question attachments are backfilled and retained as synchronized compatibility projections. Existing body-only writes create a text block, while block writes atomically replace the sequence and derive `body`.
+- Assessment snapshots copy blocks for questions, options, and shared contexts. Student media remains asset-ID based and is delivered through the existing scoped protected-access endpoints.
 
 ## Phase 4 — PDF visual extraction and provenance
 

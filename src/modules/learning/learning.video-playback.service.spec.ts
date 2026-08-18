@@ -5,7 +5,9 @@ describe('LearningService video playback access', () => {
   function build() {
     const prisma: any = {
       contentItem: { findMany: jest.fn().mockResolvedValue([]) },
-      studentProfile: { findUnique: jest.fn().mockResolvedValue({ academicGradeId: 'grade-1' }) },
+      studentProfile: {
+        findUnique: jest.fn().mockResolvedValue({ academicGradeId: 'grade-1' }),
+      },
       question: { findMany: jest.fn().mockResolvedValue([]) },
     };
     const access = { assertContentItemAccess: jest.fn() };
@@ -72,9 +74,11 @@ describe('LearningService video playback access', () => {
     expect(videos.playback).not.toHaveBeenCalled();
   });
 
-  it('checks only questions linked to the requested video', async () => {
+  it('checks every question relationship that can contain the requested video', async () => {
     const { service, prisma, assessments, videos } = build();
-    prisma.question.findMany.mockResolvedValue([{ id: 'question-1', placements: [{ course: { id: 'course-1' } }] }]);
+    prisma.question.findMany.mockResolvedValue([
+      { id: 'question-1', placements: [{ course: { id: 'course-1' } }] },
+    ]);
     jest.spyOn(service as any, 'questionAccessible').mockResolvedValue(true);
 
     await service.videoPlaybackAccess('student-1', 'video-1');
@@ -82,7 +86,22 @@ describe('LearningService video playback access', () => {
     expect(prisma.question.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
-          videoLink: { is: { videoAssetId: 'video-1' } },
+          OR: expect.arrayContaining([
+            { videoLink: { is: { videoAssetId: 'video-1' } } },
+            { contentBlocks: { some: { assetId: 'video-1' } } },
+            {
+              options: {
+                some: { contentBlocks: { some: { assetId: 'video-1' } } },
+              },
+            },
+            {
+              contexts: {
+                some: {
+                  context: { contentBlocks: { some: { assetId: 'video-1' } } },
+                },
+              },
+            },
+          ]),
         }),
       }),
     );

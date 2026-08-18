@@ -147,10 +147,33 @@ export class QuestionBanksController {
 @Controller({ path: 'admin/questions', version: '1' })
 export class QuestionsController {
   constructor(private readonly service: QuestionBanksService) {}
-  @Post('contexts') @ApiOperation({ summary: 'Create reusable question context' }) createContext(@CurrentUser() a: RequestUser, @Body() d: CreateQuestionContextDto) { return this.service.createContext(a, d); }
-  @Get('contexts') @ApiOperation({ summary: 'List reusable question contexts' }) listContexts(@CurrentUser() a: RequestUser) { return this.service.listContexts(a); }
-  @Patch('contexts/:contextId') @ApiOperation({ summary: 'Update reusable question context' }) updateContext(@CurrentUser() a: RequestUser, @Param('contextId') id: string, @Body() d: UpdateQuestionContextDto) { return this.service.updateContext(a, id, d); }
-  @Delete('contexts/:contextId') @ApiOperation({ summary: 'Delete unreferenced question context' }) deleteContext(@CurrentUser() a: RequestUser, @Param('contextId') id: string) { return this.service.deleteContext(a, id); }
+  @Post('contexts')
+  @ApiOperation({ summary: 'Create reusable question context' })
+  createContext(
+    @CurrentUser() a: RequestUser,
+    @Body() d: CreateQuestionContextDto,
+  ) {
+    return this.service.createContext(a, d);
+  }
+  @Get('contexts')
+  @ApiOperation({ summary: 'List reusable question contexts' })
+  listContexts(@CurrentUser() a: RequestUser) {
+    return this.service.listContexts(a);
+  }
+  @Patch('contexts/:contextId')
+  @ApiOperation({ summary: 'Update reusable question context' })
+  updateContext(
+    @CurrentUser() a: RequestUser,
+    @Param('contextId') id: string,
+    @Body() d: UpdateQuestionContextDto,
+  ) {
+    return this.service.updateContext(a, id, d);
+  }
+  @Delete('contexts/:contextId')
+  @ApiOperation({ summary: 'Delete unreferenced question context' })
+  deleteContext(@CurrentUser() a: RequestUser, @Param('contextId') id: string) {
+    return this.service.deleteContext(a, id);
+  }
   @Post() @ApiOperation({ summary: 'Create a question' }) create(
     @CurrentUser() a: RequestUser,
     @Body() d: CreateQuestionDto,
@@ -244,7 +267,9 @@ export class QuestionsController {
     return this.service.reorderOptions(a, id, d.optionIds);
   }
   @Post(':id/assets')
-  @ApiOperation({ summary: 'Attach an asset to a question' })
+  @ApiOperation({
+    summary: 'Attach a legacy-compatible asset to a question content block',
+  })
   addAsset(
     @CurrentUser() a: RequestUser,
     @Param('id') id: string,
@@ -253,7 +278,7 @@ export class QuestionsController {
     return this.service.addAsset(a, id, assetId);
   }
   @Delete(':id/assets/:assetId')
-  @ApiOperation({ summary: 'Remove a question asset' })
+  @ApiOperation({ summary: 'Remove a legacy-compatible question asset block' })
   removeAsset(
     @CurrentUser() a: RequestUser,
     @Param('id') id: string,
@@ -262,7 +287,7 @@ export class QuestionsController {
     return this.service.removeAsset(a, id, assetId);
   }
   @Post(':id/assets/reorder')
-  @ApiOperation({ summary: 'Reorder question assets' })
+  @ApiOperation({ summary: 'Reorder legacy-compatible question asset blocks' })
   reorderAssets(
     @CurrentUser() a: RequestUser,
     @Param('id') id: string,

@@ -163,6 +163,17 @@ enum QuestionContextType {
   EQUATION
 }
 
+/// Ordered, typed fragments used by questions, answer options, and reusable
+/// contexts. IMAGE is intentionally image-only; ASSET is used for every other
+/// ready, student-deliverable asset kind.
+enum QuestionContentBlockType {
+  TEXT
+  IMAGE
+  ASSET
+  TABLE
+  EQUATION
+}
+
 enum QuestionExplanationOrigin {
   AI
   HUMAN
@@ -298,34 +309,34 @@ model User {
   publisherAgreementsCreated       PublisherAgreement[]         @relation("PublisherAgreementCreatedBy")
   earningsStatementsCreated        PublisherEarningsStatement[] @relation("EarningsStatementCreatedBy")
 
-  academicGradesCreated     AcademicGrade[]          @relation("AcademicGradeCreatedBy")
-  academicGradesUpdated     AcademicGrade[]          @relation("AcademicGradeUpdatedBy")
-  subjectsCreated           Subject[]                @relation("SubjectCreatedBy")
-  subjectsUpdated           Subject[]                @relation("SubjectUpdatedBy")
-  coursesCreated            Course[]                 @relation("CourseCreatedBy")
-  coursesUpdated            Course[]                 @relation("CourseUpdatedBy")
-  chaptersCreated           Chapter[]                @relation("ChapterCreatedBy")
-  chaptersUpdated           Chapter[]                @relation("ChapterUpdatedBy")
-  lessonsCreated            Lesson[]                 @relation("LessonCreatedBy")
-  lessonsUpdated            Lesson[]                 @relation("LessonUpdatedBy")
-  sectionsCreated           Section[]                @relation("SectionCreatedBy")
-  sectionsUpdated           Section[]                @relation("SectionUpdatedBy")
-  contentItemsCreated       ContentItem[]            @relation("ContentItemCreatedBy")
-  contentItemsUpdated       ContentItem[]            @relation("ContentItemUpdatedBy")
-  assetsUploaded            Asset[]                  @relation("AssetUploadedBy")
-  archivedAccessRevocations ArchivedAccessSnapshot[] @relation("ArchivedAccessRevokedBy")
-  questionSourcesCreated    QuestionSource[]         @relation("QuestionSourceCreatedBy")
-  questionSourcesUpdated    QuestionSource[]         @relation("QuestionSourceUpdatedBy")
-  questionBanksCreated      QuestionBank[]           @relation("QuestionBankCreatedBy")
-  questionBanksUpdated      QuestionBank[]           @relation("QuestionBankUpdatedBy")
-  questionsCreated          Question[]               @relation("QuestionCreatedBy")
-  questionsUpdated          Question[]               @relation("QuestionUpdatedBy")
-  questionsReviewed         Question[]               @relation("QuestionReviewedBy")
-  questionAnswersReviewed   Question[]               @relation("QuestionAnswerReviewedBy")
+  academicGradesCreated     AcademicGrade[]           @relation("AcademicGradeCreatedBy")
+  academicGradesUpdated     AcademicGrade[]           @relation("AcademicGradeUpdatedBy")
+  subjectsCreated           Subject[]                 @relation("SubjectCreatedBy")
+  subjectsUpdated           Subject[]                 @relation("SubjectUpdatedBy")
+  coursesCreated            Course[]                  @relation("CourseCreatedBy")
+  coursesUpdated            Course[]                  @relation("CourseUpdatedBy")
+  chaptersCreated           Chapter[]                 @relation("ChapterCreatedBy")
+  chaptersUpdated           Chapter[]                 @relation("ChapterUpdatedBy")
+  lessonsCreated            Lesson[]                  @relation("LessonCreatedBy")
+  lessonsUpdated            Lesson[]                  @relation("LessonUpdatedBy")
+  sectionsCreated           Section[]                 @relation("SectionCreatedBy")
+  sectionsUpdated           Section[]                 @relation("SectionUpdatedBy")
+  contentItemsCreated       ContentItem[]             @relation("ContentItemCreatedBy")
+  contentItemsUpdated       ContentItem[]             @relation("ContentItemUpdatedBy")
+  assetsUploaded            Asset[]                   @relation("AssetUploadedBy")
+  archivedAccessRevocations ArchivedAccessSnapshot[]  @relation("ArchivedAccessRevokedBy")
+  questionSourcesCreated    QuestionSource[]          @relation("QuestionSourceCreatedBy")
+  questionSourcesUpdated    QuestionSource[]          @relation("QuestionSourceUpdatedBy")
+  questionBanksCreated      QuestionBank[]            @relation("QuestionBankCreatedBy")
+  questionBanksUpdated      QuestionBank[]            @relation("QuestionBankUpdatedBy")
+  questionsCreated          Question[]                @relation("QuestionCreatedBy")
+  questionsUpdated          Question[]                @relation("QuestionUpdatedBy")
+  questionsReviewed         Question[]                @relation("QuestionReviewedBy")
+  questionAnswersReviewed   Question[]                @relation("QuestionAnswerReviewedBy")
   assessmentAnswersGraded   AssessmentAttemptAnswer[] @relation("AssessmentAnswerGradedBy")
-  questionImportsCreated    QuestionImportBatch[]    @relation("QuestionImportCreatedBy")
-  assessmentsCreated        Assessment[]             @relation("AssessmentCreatedByAdmin")
-  leaderboardWeeksFinalized LeaderboardWeek[]        @relation("LeaderboardWeekFinalizedBy")
+  questionImportsCreated    QuestionImportBatch[]     @relation("QuestionImportCreatedBy")
+  assessmentsCreated        Assessment[]              @relation("AssessmentCreatedByAdmin")
+  leaderboardWeeksFinalized LeaderboardWeek[]         @relation("LeaderboardWeekFinalizedBy")
 
   @@index([role])
   @@index([role, createdAt, id])
@@ -687,36 +698,39 @@ model ContentItem {
 }
 
 model Asset {
-  id               String                    @id @default(cuid())
-  provider         AssetProvider
-  kind             AssetKind
-  status           AssetStatus               @default(PENDING_UPLOAD)
-  originalFilename String
-  filename         String
-  storageKey       String?                   @unique
-  mimeType         String
-  sizeBytes        Int?
-  checksum         String?
-  metadata         Json?
-  createdAt        DateTime                  @default(now())
-  updatedAt        DateTime                  @updatedAt
-  readyAt          DateTime?
-  failedAt         DateTime?
-  archivedAt       DateTime?
-  uploadedById     String
-  uploadedBy       User                      @relation("AssetUploadedBy", fields: [uploadedById], references: [id], onDelete: Restrict)
-  primaryFor       ContentItem[]             @relation("ContentPrimaryAsset")
-  references       AssetReference[]
-  gradeCovers      AcademicGrade[]           @relation("AcademicGradeCover")
-  subjectCovers    Subject[]                 @relation("SubjectCover")
-  courseCovers     Course[]                  @relation("CourseCover")
-  chapterCovers    Chapter[]                 @relation("ChapterCover")
-  lessonCovers     Lesson[]                  @relation("LessonCover")
-  sectionCovers    Section[]                 @relation("SectionCover")
-  video            VideoAsset?
-  questionAssets   QuestionAsset[]           @relation("QuestionAttachmentAsset")
-  paymentProofFor  ManualPaymentSubmission[] @relation("ManualPaymentProof")
-  questionImportBatches QuestionImportBatch[] @relation("QuestionImportSourceAsset")
+  id                           String                        @id @default(cuid())
+  provider                     AssetProvider
+  kind                         AssetKind
+  status                       AssetStatus                   @default(PENDING_UPLOAD)
+  originalFilename             String
+  filename                     String
+  storageKey                   String?                       @unique
+  mimeType                     String
+  sizeBytes                    Int?
+  checksum                     String?
+  metadata                     Json?
+  createdAt                    DateTime                      @default(now())
+  updatedAt                    DateTime                      @updatedAt
+  readyAt                      DateTime?
+  failedAt                     DateTime?
+  archivedAt                   DateTime?
+  uploadedById                 String
+  uploadedBy                   User                          @relation("AssetUploadedBy", fields: [uploadedById], references: [id], onDelete: Restrict)
+  primaryFor                   ContentItem[]                 @relation("ContentPrimaryAsset")
+  references                   AssetReference[]
+  gradeCovers                  AcademicGrade[]               @relation("AcademicGradeCover")
+  subjectCovers                Subject[]                     @relation("SubjectCover")
+  courseCovers                 Course[]                      @relation("CourseCover")
+  chapterCovers                Chapter[]                     @relation("ChapterCover")
+  lessonCovers                 Lesson[]                      @relation("LessonCover")
+  sectionCovers                Section[]                     @relation("SectionCover")
+  video                        VideoAsset?
+  questionAssets               QuestionAsset[]               @relation("QuestionAttachmentAsset")
+  questionContentBlocks        QuestionContentBlock[]        @relation("QuestionContentBlockAsset")
+  questionOptionContentBlocks  QuestionOptionContentBlock[]  @relation("QuestionOptionContentBlockAsset")
+  questionContextContentBlocks QuestionContextContentBlock[] @relation("QuestionContextContentBlockAsset")
+  paymentProofFor              ManualPaymentSubmission[]     @relation("ManualPaymentProof")
+  questionImportBatches        QuestionImportBatch[]         @relation("QuestionImportSourceAsset")
 
   @@index([status, kind, createdAt])
 }
@@ -778,24 +792,24 @@ model QuestionSource {
 }
 
 model QuestionBank {
-  id          String        @id @default(cuid())
+  id                      String                   @id @default(cuid())
   /// Nullable only during the legacy-bank remediation rollout. New banks always
   /// receive a subject through the application API.
-  subjectId   String?
-  subject     Subject?      @relation(fields: [subjectId], references: [id], onDelete: Restrict)
-  title       String
-  description String?
-  status      ContentStatus @default(DRAFT)
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
-  publishedAt DateTime?
-  archivedAt  DateTime?
-  createdById String
-  updatedById String
-  createdBy   User          @relation("QuestionBankCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
-  updatedBy   User          @relation("QuestionBankUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
-  questions   Question[]
-  assessments Assessment[] @relation("AssessmentLegacyQuestionBank")
+  subjectId               String?
+  subject                 Subject?                 @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  title                   String
+  description             String?
+  status                  ContentStatus            @default(DRAFT)
+  createdAt               DateTime                 @default(now())
+  updatedAt               DateTime                 @updatedAt
+  publishedAt             DateTime?
+  archivedAt              DateTime?
+  createdById             String
+  updatedById             String
+  createdBy               User                     @relation("QuestionBankCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  updatedBy               User                     @relation("QuestionBankUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
+  questions               Question[]
+  assessments             Assessment[]             @relation("AssessmentLegacyQuestionBank")
   assessmentQuestionBanks AssessmentQuestionBank[]
 
   @@index([status, createdAt, id])
@@ -803,47 +817,48 @@ model QuestionBank {
 }
 
 model Question {
-  id              String                   @id @default(cuid())
-  bankId          String
-  sourceId        String
-  courseId        String
-  type            QuestionType             @default(SINGLE_CHOICE)
-  body            String
-  explanation     String?
-  maxPoints       Int                      @default(1)
-  acceptedAnswers Json?
-  gradingRubric   String?
-  answerOrigin    QuestionAnswerProvenance?
-  answerReviewedAt DateTime?
-  answerReviewedById String?
-  status          QuestionStatus           @default(DRAFT)
-  reviewNote      String?
-  reviewedAt      DateTime?
-  createdAt       DateTime                 @default(now())
-  updatedAt       DateTime                 @updatedAt
-  publishedAt     DateTime?
-  archivedAt      DateTime?
-  createdById     String
-  updatedById     String
-  reviewedById    String?
-  bank            QuestionBank             @relation(fields: [bankId], references: [id], onDelete: Restrict)
-  source          QuestionSource           @relation(fields: [sourceId], references: [id], onDelete: Restrict)
-  course          Course                   @relation(fields: [courseId], references: [id], onDelete: Restrict)
-  createdBy       User                     @relation("QuestionCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
-  updatedBy       User                     @relation("QuestionUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
-  reviewedBy      User?                    @relation("QuestionReviewedBy", fields: [reviewedById], references: [id], onDelete: Restrict)
-  answerReviewedBy User?                   @relation("QuestionAnswerReviewedBy", fields: [answerReviewedById], references: [id], onDelete: Restrict)
-  options         QuestionOption[]
-  assets          QuestionAsset[]
-  videoLink       QuestionVideoLink?
-  placements      QuestionPlacement[]
-  studentAttempts StudentQuestionAttempt[]
-  marks           StudentQuestionMark[]
-  notes           StudentQuestionNote[]
-  communityStats  QuestionCommunityStat?
-  importItem      QuestionImportItem?
-  contexts        QuestionContextQuestion[]
+  id                    String                    @id @default(cuid())
+  bankId                String
+  sourceId              String
+  courseId              String
+  type                  QuestionType              @default(SINGLE_CHOICE)
+  body                  String
+  explanation           String?
+  maxPoints             Int                       @default(1)
+  acceptedAnswers       Json?
+  gradingRubric         String?
+  answerOrigin          QuestionAnswerProvenance?
+  answerReviewedAt      DateTime?
+  answerReviewedById    String?
+  status                QuestionStatus            @default(DRAFT)
+  reviewNote            String?
+  reviewedAt            DateTime?
+  createdAt             DateTime                  @default(now())
+  updatedAt             DateTime                  @updatedAt
+  publishedAt           DateTime?
+  archivedAt            DateTime?
+  createdById           String
+  updatedById           String
+  reviewedById          String?
+  bank                  QuestionBank              @relation(fields: [bankId], references: [id], onDelete: Restrict)
+  source                QuestionSource            @relation(fields: [sourceId], references: [id], onDelete: Restrict)
+  course                Course                    @relation(fields: [courseId], references: [id], onDelete: Restrict)
+  createdBy             User                      @relation("QuestionCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  updatedBy             User                      @relation("QuestionUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
+  reviewedBy            User?                     @relation("QuestionReviewedBy", fields: [reviewedById], references: [id], onDelete: Restrict)
+  answerReviewedBy      User?                     @relation("QuestionAnswerReviewedBy", fields: [answerReviewedById], references: [id], onDelete: Restrict)
+  options               QuestionOption[]
+  assets                QuestionAsset[]
+  videoLink             QuestionVideoLink?
+  placements            QuestionPlacement[]
+  studentAttempts       StudentQuestionAttempt[]
+  marks                 StudentQuestionMark[]
+  notes                 StudentQuestionNote[]
+  communityStats        QuestionCommunityStat?
+  importItem            QuestionImportItem?
+  contexts              QuestionContextQuestion[]
   structuredExplanation QuestionExplanation?
+  contentBlocks         QuestionContentBlock[]
 
   @@index([status, createdAt, id])
   @@index([bankId, status])
@@ -852,15 +867,16 @@ model Question {
 }
 
 model QuestionContext {
-  id          String              @id @default(cuid())
-  type        QuestionContextType @default(TEXT)
-  title       String?
-  body        String
-  languageCode String              @default("ar")
+  id            String                        @id @default(cuid())
+  type          QuestionContextType           @default(TEXT)
+  title         String?
+  body          String
+  languageCode  String                        @default("ar")
   sourceLocator Json?
-  createdAt   DateTime            @default(now())
-  updatedAt   DateTime            @updatedAt
-  questions   QuestionContextQuestion[]
+  createdAt     DateTime                      @default(now())
+  updatedAt     DateTime                      @updatedAt
+  questions     QuestionContextQuestion[]
+  contentBlocks QuestionContextContentBlock[]
 
   @@index([type, createdAt])
 }
@@ -868,9 +884,9 @@ model QuestionContext {
 model QuestionContextQuestion {
   questionId String
   contextId  String
-  sortOrder  Int                 @default(1)
-  question   Question             @relation(fields: [questionId], references: [id], onDelete: Cascade)
-  context    QuestionContext      @relation(fields: [contextId], references: [id], onDelete: Restrict)
+  sortOrder  Int             @default(1)
+  question   Question        @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  context    QuestionContext @relation(fields: [contextId], references: [id], onDelete: Restrict)
 
   @@id([questionId, contextId])
   @@index([contextId])
@@ -899,47 +915,47 @@ model QuestionExplanation {
 }
 
 model QuestionImportBatch {
-  id                  String                    @id @default(cuid())
-  inputType           QuestionImportInputType
-  rawText             String?
-  sourceAssetId       String?
-  sourceAsset         Asset?                    @relation("QuestionImportSourceAsset", fields: [sourceAssetId], references: [id], onDelete: Restrict)
-  parentId            String?
-  parent              QuestionImportBatch?      @relation("QuestionImportChildren", fields: [parentId], references: [id], onDelete: Cascade)
-  children            QuestionImportBatch[]     @relation("QuestionImportChildren")
-  childSequence       Int?
-  pageScope           Json?
-  bankId              String
-  sourceId            String
-  courseId            String
-  placements          Json
-  status              QuestionImportStatus     @default(QUEUED)
-  normalizedText      String?
-  extractionMetadata  Json?
+  id                    String                       @id @default(cuid())
+  inputType             QuestionImportInputType
+  rawText               String?
+  sourceAssetId         String?
+  sourceAsset           Asset?                       @relation("QuestionImportSourceAsset", fields: [sourceAssetId], references: [id], onDelete: Restrict)
+  parentId              String?
+  parent                QuestionImportBatch?         @relation("QuestionImportChildren", fields: [parentId], references: [id], onDelete: Cascade)
+  children              QuestionImportBatch[]        @relation("QuestionImportChildren")
+  childSequence         Int?
+  pageScope             Json?
+  bankId                String
+  sourceId              String
+  courseId              String
+  placements            Json
+  status                QuestionImportStatus         @default(QUEUED)
+  normalizedText        String?
+  extractionMetadata    Json?
   segmentationRawOutput Json?
-  segmentationUsage   Json?
-  segmentationWarnings Json?
-  sourceTextEditedAt  DateTime?
-  errorSummary        String?
-  model               String
-  schemaVersion       String
-  totalChunks         Int                       @default(0)
-  completedChunks     Int                       @default(0)
-  totalItems          Int                       @default(0)
-  createdQuestions    Int                       @default(0)
-  invalidItems        Int                       @default(0)
-  failedItems         Int                       @default(0)
-  createdAt           DateTime                  @default(now())
-  updatedAt           DateTime                  @updatedAt
-  startedAt           DateTime?
-  completedAt         DateTime?
-  createdById         String
-  createdBy           User                      @relation("QuestionImportCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
-  chunks              QuestionImportChunk[]
-  items               QuestionImportItem[]
-  sourceBlocks        QuestionImportSourceBlock[]
-  skippedRanges       QuestionImportSkippedRange[]
-  pages               QuestionImportPage[]
+  segmentationUsage     Json?
+  segmentationWarnings  Json?
+  sourceTextEditedAt    DateTime?
+  errorSummary          String?
+  model                 String
+  schemaVersion         String
+  totalChunks           Int                          @default(0)
+  completedChunks       Int                          @default(0)
+  totalItems            Int                          @default(0)
+  createdQuestions      Int                          @default(0)
+  invalidItems          Int                          @default(0)
+  failedItems           Int                          @default(0)
+  createdAt             DateTime                     @default(now())
+  updatedAt             DateTime                     @updatedAt
+  startedAt             DateTime?
+  completedAt           DateTime?
+  createdById           String
+  createdBy             User                         @relation("QuestionImportCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  chunks                QuestionImportChunk[]
+  items                 QuestionImportItem[]
+  sourceBlocks          QuestionImportSourceBlock[]
+  skippedRanges         QuestionImportSkippedRange[]
+  pages                 QuestionImportPage[]
 
   @@index([status, createdAt])
   @@index([createdById, createdAt])
@@ -948,31 +964,31 @@ model QuestionImportBatch {
 
 /// The canonical, auditable transcription of one original PDF page.
 model QuestionImportPage {
-  id                  String                   @id @default(cuid())
-  batchId             String
-  batch               QuestionImportBatch      @relation(fields: [batchId], references: [id], onDelete: Cascade)
-  pageNumber          Int
-  kind                QuestionImportPageKind @default(QUESTION)
-  status              QuestionImportPageStatus @default(PENDING)
-  aiText              String?
-  canonicalText       String?
-  confidence          Float?
-  uncertainSpans      Json?
-  warnings            Json?
-  attemptCount        Int                      @default(0)
-  providerFileId      String?
-  rawProviderResponse Json?
-  initialAiText       String?
-  initialCanonicalText String?
-  initialProviderResponse Json?
-  initialUsage        Json?
+  id                           String                   @id @default(cuid())
+  batchId                      String
+  batch                        QuestionImportBatch      @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  pageNumber                   Int
+  kind                         QuestionImportPageKind   @default(QUESTION)
+  status                       QuestionImportPageStatus @default(PENDING)
+  aiText                       String?
+  canonicalText                String?
+  confidence                   Float?
+  uncertainSpans               Json?
+  warnings                     Json?
+  attemptCount                 Int                      @default(0)
+  providerFileId               String?
+  rawProviderResponse          Json?
+  initialAiText                String?
+  initialCanonicalText         String?
+  initialProviderResponse      Json?
+  initialUsage                 Json?
   verificationProviderResponse Json?
-  verificationUsage   Json?
-  verifiedAt          DateTime?
-  usage               Json?
-  errorDetail         String?
-  createdAt           DateTime                 @default(now())
-  updatedAt           DateTime                 @updatedAt
+  verificationUsage            Json?
+  verifiedAt                   DateTime?
+  usage                        Json?
+  errorDetail                  String?
+  createdAt                    DateTime                 @default(now())
+  updatedAt                    DateTime                 @updatedAt
 
   @@unique([batchId, pageNumber])
   @@index([batchId, status])
@@ -981,16 +997,16 @@ model QuestionImportPage {
 /// Neutral extracted source units. They are never assumed to be question
 /// boundaries; Gemini identifies the question ranges over these block IDs.
 model QuestionImportSourceBlock {
-  id          String              @id @default(cuid())
-  batchId     String
-  batch       QuestionImportBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
-  sequence    Int
-  blockKey    String
-  text        String
+  id            String              @id @default(cuid())
+  batchId       String
+  batch         QuestionImportBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  sequence      Int
+  blockKey      String
+  text          String
   sourceLocator Json?
-  assignment  Json?
-  createdAt   DateTime            @default(now())
-  updatedAt   DateTime            @updatedAt
+  assignment    Json?
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
 
   @@unique([batchId, sequence])
   @@unique([batchId, blockKey])
@@ -998,66 +1014,66 @@ model QuestionImportSourceBlock {
 }
 
 model QuestionImportSkippedRange {
-  id          String              @id @default(cuid())
-  batchId     String
-  batch       QuestionImportBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
-  sequence    Int
-  firstBlock  String
-  lastBlock   String
-  reason      String
+  id            String              @id @default(cuid())
+  batchId       String
+  batch         QuestionImportBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  sequence      Int
+  firstBlock    String
+  lastBlock     String
+  reason        String
   sourceLocator Json?
-  createdAt   DateTime            @default(now())
+  createdAt     DateTime            @default(now())
 
   @@unique([batchId, sequence])
   @@index([batchId])
 }
 
 model QuestionImportChunk {
-  id                 String                    @id @default(cuid())
-  batchId            String
-  batch              QuestionImportBatch       @relation(fields: [batchId], references: [id], onDelete: Cascade)
-  sequence           Int
-  text               String
-  sourceLocator      Json?
-  checksum           String
-  status             QuestionImportChunkStatus @default(PENDING)
-  attemptCount       Int                       @default(0)
-  rawResponse        Json?
-  usage              Json?
-  errorDetail        String?
-  createdAt          DateTime                  @default(now())
-  updatedAt          DateTime                  @updatedAt
-  completedAt        DateTime?
-  items              QuestionImportItem[]
+  id            String                    @id @default(cuid())
+  batchId       String
+  batch         QuestionImportBatch       @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  sequence      Int
+  text          String
+  sourceLocator Json?
+  checksum      String
+  status        QuestionImportChunkStatus @default(PENDING)
+  attemptCount  Int                       @default(0)
+  rawResponse   Json?
+  usage         Json?
+  errorDetail   String?
+  createdAt     DateTime                  @default(now())
+  updatedAt     DateTime                  @updatedAt
+  completedAt   DateTime?
+  items         QuestionImportItem[]
 
   @@unique([batchId, sequence])
   @@index([batchId, status])
 }
 
 model QuestionImportItem {
-  id                 String                   @id @default(cuid())
-  batchId            String
-  batch              QuestionImportBatch      @relation(fields: [batchId], references: [id], onDelete: Cascade)
-  chunkId            String?
-  chunk              QuestionImportChunk?     @relation(fields: [chunkId], references: [id], onDelete: Cascade)
-  sequence           Int
-  status             QuestionImportItemStatus
-  rawOutput          Json?
-  normalizedOutput   Json?
-  confidence         Float?
-  warnings           Json?
-  sourceLocator      Json?
-  errorDetail        String?
-  questionId         String?                  @unique
-  question           Question?                @relation(fields: [questionId], references: [id], onDelete: SetNull)
-  sourceNumber       String?
-  globalOrder        Int?
-  section            String?
-  detectedType       String?
-  exclusionReason    String?
-  answerOrigin       QuestionAnswerOrigin?
-  createdAt          DateTime                 @default(now())
-  updatedAt          DateTime                 @updatedAt
+  id               String                   @id @default(cuid())
+  batchId          String
+  batch            QuestionImportBatch      @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  chunkId          String?
+  chunk            QuestionImportChunk?     @relation(fields: [chunkId], references: [id], onDelete: Cascade)
+  sequence         Int
+  status           QuestionImportItemStatus
+  rawOutput        Json?
+  normalizedOutput Json?
+  confidence       Float?
+  warnings         Json?
+  sourceLocator    Json?
+  errorDetail      String?
+  questionId       String?                  @unique
+  question         Question?                @relation(fields: [questionId], references: [id], onDelete: SetNull)
+  sourceNumber     String?
+  globalOrder      Int?
+  section          String?
+  detectedType     String?
+  exclusionReason  String?
+  answerOrigin     QuestionAnswerOrigin?
+  createdAt        DateTime                 @default(now())
+  updatedAt        DateTime                 @updatedAt
 
   @@unique([chunkId, sequence])
   @@index([batchId, status])
@@ -1073,8 +1089,69 @@ model QuestionOption {
   updatedAt      DateTime                       @updatedAt
   question       Question                       @relation(fields: [questionId], references: [id], onDelete: Cascade)
   attemptAnswers StudentQuestionAttemptAnswer[]
+  contentBlocks  QuestionOptionContentBlock[]
 
   @@unique([questionId, sortOrder])
+}
+
+model QuestionContentBlock {
+  id           String                   @id @default(cuid())
+  questionId   String
+  type         QuestionContentBlockType
+  sortOrder    Int
+  text         String?
+  assetId      String?
+  tableData    Json?
+  latex        String?
+  mathml       String?
+  caption      String?
+  altText      String?
+  languageCode String?
+  question     Question                 @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  asset        Asset?                   @relation("QuestionContentBlockAsset", fields: [assetId], references: [id], onDelete: Restrict)
+
+  @@unique([questionId, sortOrder])
+  @@index([assetId])
+}
+
+model QuestionOptionContentBlock {
+  id               String                   @id @default(cuid())
+  questionOptionId String
+  type             QuestionContentBlockType
+  sortOrder        Int
+  text             String?
+  assetId          String?
+  tableData        Json?
+  latex            String?
+  mathml           String?
+  caption          String?
+  altText          String?
+  languageCode     String?
+  questionOption   QuestionOption           @relation(fields: [questionOptionId], references: [id], onDelete: Cascade)
+  asset            Asset?                   @relation("QuestionOptionContentBlockAsset", fields: [assetId], references: [id], onDelete: Restrict)
+
+  @@unique([questionOptionId, sortOrder])
+  @@index([assetId])
+}
+
+model QuestionContextContentBlock {
+  id                String                   @id @default(cuid())
+  questionContextId String
+  type              QuestionContentBlockType
+  sortOrder         Int
+  text              String?
+  assetId           String?
+  tableData         Json?
+  latex             String?
+  mathml            String?
+  caption           String?
+  altText           String?
+  languageCode      String?
+  questionContext   QuestionContext          @relation(fields: [questionContextId], references: [id], onDelete: Cascade)
+  asset             Asset?                   @relation("QuestionContextContentBlockAsset", fields: [assetId], references: [id], onDelete: Restrict)
+
+  @@unique([questionContextId, sortOrder])
+  @@index([assetId])
 }
 
 model QuestionAsset {
@@ -1152,11 +1229,11 @@ model Assessment {
   publishedAt DateTime?
   archivedAt  DateTime?
 
-  scopes    AssessmentScope[]
+  scopes        AssessmentScope[]
   questionBanks AssessmentQuestionBank[]
-  questions AssessmentQuestion[]
-  contexts  AssessmentContext[]
-  attempts  AssessmentAttempt[]
+  questions     AssessmentQuestion[]
+  contexts      AssessmentContext[]
+  attempts      AssessmentAttempt[]
 
   @@index([ownerType, studentUserId, status, createdAt, id])
   @@index([ownerType, createdByAdminId, status, createdAt, id])
@@ -1165,11 +1242,11 @@ model Assessment {
 }
 
 model AssessmentQuestionBank {
-  assessmentId  String
+  assessmentId   String
   questionBankId String
-  assessment    Assessment   @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
-  questionBank  QuestionBank @relation(fields: [questionBankId], references: [id], onDelete: Restrict)
-  createdAt     DateTime     @default(now())
+  assessment     Assessment   @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  questionBank   QuestionBank @relation(fields: [questionBankId], references: [id], onDelete: Restrict)
+  createdAt      DateTime     @default(now())
 
   @@id([assessmentId, questionBankId])
   @@index([questionBankId])
@@ -1204,27 +1281,28 @@ model AssessmentScope {
 /// archiving or hard-deleting the live Question can never alter or block
 /// deletion of history already generated from it.
 model AssessmentQuestion {
-  id               String                     @id @default(cuid())
-  assessmentId     String
-  assessment       Assessment                 @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
-  sourceQuestionId String
-  sortOrder        Int
-  type             QuestionType
-  body             String
-  explanation      String?
-  maxPoints        Int
-  acceptedAnswers  Json?
-  gradingRubric    String?
-  answerOrigin     QuestionAnswerProvenance?
-  videoAssetId     String?
-  videoAssetName   String?
-  timestampSeconds Int?
+  id                    String                           @id @default(cuid())
+  assessmentId          String
+  assessment            Assessment                       @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  sourceQuestionId      String
+  sortOrder             Int
+  type                  QuestionType
+  body                  String
+  explanation           String?
+  maxPoints             Int
+  acceptedAnswers       Json?
+  gradingRubric         String?
+  answerOrigin          QuestionAnswerProvenance?
+  videoAssetId          String?
+  videoAssetName        String?
+  timestampSeconds      Int?
   structuredExplanation Json?
-  options          AssessmentQuestionOption[]
-  answers          AssessmentAttemptAnswer[]
-  placements       AssessmentQuestionPlacement[]
-  contexts         AssessmentQuestionContext[]
-  attachments      AssessmentQuestionAsset[]
+  options               AssessmentQuestionOption[]
+  answers               AssessmentAttemptAnswer[]
+  placements            AssessmentQuestionPlacement[]
+  contexts              AssessmentQuestionContext[]
+  attachments           AssessmentQuestionAsset[]
+  contentBlocks         AssessmentQuestionContentBlock[]
 
   @@unique([assessmentId, sortOrder])
   @@index([assessmentId])
@@ -1247,18 +1325,40 @@ model AssessmentQuestionAsset {
   @@index([assetId])
 }
 
+model AssessmentQuestionContentBlock {
+  id                   String                   @id @default(cuid())
+  assessmentQuestionId String
+  type                 QuestionContentBlockType
+  sortOrder            Int
+  text                 String?
+  assetId              String?
+  assetKind            AssetKind?
+  assetName            String?
+  tableData            Json?
+  latex                String?
+  mathml               String?
+  caption              String?
+  altText              String?
+  languageCode         String?
+  assessmentQuestion   AssessmentQuestion       @relation(fields: [assessmentQuestionId], references: [id], onDelete: Cascade)
+
+  @@unique([assessmentQuestionId, sortOrder])
+  @@index([assetId])
+}
+
 model AssessmentContext {
-  id              String              @id @default(cuid())
+  id              String                          @id @default(cuid())
   assessmentId    String
-  assessment      Assessment          @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  assessment      Assessment                      @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
   sourceContextId String
   type            QuestionContextType
   title           String?
   body            String
   languageCode    String
   sourceLocator   Json?
-  createdAt       DateTime            @default(now())
+  createdAt       DateTime                        @default(now())
   questions       AssessmentQuestionContext[]
+  contentBlocks   AssessmentContextContentBlock[]
 
   @@unique([assessmentId, sourceContextId])
   @@index([assessmentId])
@@ -1267,12 +1367,33 @@ model AssessmentContext {
 model AssessmentQuestionContext {
   assessmentQuestionId String
   assessmentContextId  String
-  sortOrder            Int @default(1)
+  sortOrder            Int                @default(1)
   assessmentQuestion   AssessmentQuestion @relation(fields: [assessmentQuestionId], references: [id], onDelete: Cascade)
   assessmentContext    AssessmentContext  @relation(fields: [assessmentContextId], references: [id], onDelete: Cascade)
 
   @@id([assessmentQuestionId, assessmentContextId])
   @@index([assessmentContextId])
+}
+
+model AssessmentContextContentBlock {
+  id                  String                   @id @default(cuid())
+  assessmentContextId String
+  type                QuestionContentBlockType
+  sortOrder           Int
+  text                String?
+  assetId             String?
+  assetKind           AssetKind?
+  assetName           String?
+  tableData           Json?
+  latex               String?
+  mathml              String?
+  caption             String?
+  altText             String?
+  languageCode        String?
+  assessmentContext   AssessmentContext        @relation(fields: [assessmentContextId], references: [id], onDelete: Cascade)
+
+  @@unique([assessmentContextId, sortOrder])
+  @@index([assetId])
 }
 
 /// Immutable resolved hierarchy labels copied from the authored question when
@@ -1299,14 +1420,36 @@ model AssessmentQuestionPlacement {
 }
 
 model AssessmentQuestionOption {
-  id                   String             @id @default(cuid())
+  id                   String                                 @id @default(cuid())
   assessmentQuestionId String
-  assessmentQuestion   AssessmentQuestion @relation(fields: [assessmentQuestionId], references: [id], onDelete: Cascade)
+  assessmentQuestion   AssessmentQuestion                     @relation(fields: [assessmentQuestionId], references: [id], onDelete: Cascade)
   body                 String
   isCorrect            Boolean
   sortOrder            Int
+  contentBlocks        AssessmentQuestionOptionContentBlock[]
 
   @@unique([assessmentQuestionId, sortOrder])
+}
+
+model AssessmentQuestionOptionContentBlock {
+  id                         String                   @id @default(cuid())
+  assessmentQuestionOptionId String
+  type                       QuestionContentBlockType
+  sortOrder                  Int
+  text                       String?
+  assetId                    String?
+  assetKind                  AssetKind?
+  assetName                  String?
+  tableData                  Json?
+  latex                      String?
+  mathml                     String?
+  caption                    String?
+  altText                    String?
+  languageCode               String?
+  assessmentQuestionOption   AssessmentQuestionOption @relation(fields: [assessmentQuestionOptionId], references: [id], onDelete: Cascade)
+
+  @@unique([assessmentQuestionOptionId, sortOrder])
+  @@index([assetId])
 }
 
 /// One attempt per (assessment, student), enforced by the unique constraint
@@ -1349,7 +1492,7 @@ model AssessmentAttemptAnswer {
   awardedPoints        Int?
   gradedAt             DateTime?
   gradedById           String?
-  gradedBy             User?                       @relation("AssessmentAnswerGradedBy", fields: [gradedById], references: [id], onDelete: Restrict)
+  gradedBy             User?                      @relation("AssessmentAnswerGradedBy", fields: [gradedById], references: [id], onDelete: Restrict)
   graderFeedback       String?
   activeSeconds        Int                        @default(0)
   answeredAt           DateTime                   @default(now())
@@ -1361,16 +1504,16 @@ model AssessmentAttemptAnswer {
 }
 
 model AssessmentAnswerChange {
-  id              String                    @id @default(cuid())
-  attemptAnswerId String
-  attemptAnswer   AssessmentAttemptAnswer   @relation(fields: [attemptAnswerId], references: [id], onDelete: Cascade)
-  fromOptionIds   String[]
-  toOptionIds     String[]
+  id               String                    @id @default(cuid())
+  attemptAnswerId  String
+  attemptAnswer    AssessmentAttemptAnswer   @relation(fields: [attemptAnswerId], references: [id], onDelete: Cascade)
+  fromOptionIds    String[]
+  toOptionIds      String[]
   fromResponseText String?
   toResponseText   String?
-  fromOutcome     AssessmentQuestionOutcome
-  toOutcome       AssessmentQuestionOutcome
-  changedAt       DateTime                  @default(now())
+  fromOutcome      AssessmentQuestionOutcome
+  toOutcome        AssessmentQuestionOutcome
+  changedAt        DateTime                  @default(now())
 
   @@index([attemptAnswerId, changedAt])
 }

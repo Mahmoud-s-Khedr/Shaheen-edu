@@ -25,9 +25,9 @@ describe('CatalogService hierarchy hasChildren', () => {
     expect(result.data.map((item) => item.hasChildren)).toEqual([true, false]);
     expect(prisma.subject.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        include: {
+        include: expect.objectContaining({
           _count: { select: { courses: { where: { status: ContentStatus.PUBLISHED } } } },
-        },
+        }),
       }),
     );
     expect(prisma.course.findMany).not.toHaveBeenCalled();

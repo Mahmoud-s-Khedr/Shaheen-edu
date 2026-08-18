@@ -98,7 +98,8 @@ export class LearningController {
   }
   @Get('practice/questions/:questionId/assets/:assetId/access')
   @ApiOperation({
-    summary: 'Get protected access to an eligible practice-question asset',
+    summary:
+      'Get protected access to an eligible canonical content-block asset (legacy attachments are also supported)',
   })
   assetAccess(
     @CurrentUser() user: RequestUser,
@@ -109,7 +110,8 @@ export class LearningController {
   }
   @Get('video-assets/:assetId/playback')
   @ApiOperation({
-    summary: 'Get playback for a video reachable through student-authorized content',
+    summary:
+      'Get playback for a video reachable through student-authorized content',
   })
   videoPlayback(
     @CurrentUser() user: RequestUser,

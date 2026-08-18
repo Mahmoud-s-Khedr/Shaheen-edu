@@ -364,8 +364,32 @@ export class AssessmentsService {
       },
       include: {
         course: { include: { subject: true } },
-        options: { orderBy: { sortOrder: 'asc' } },
-        contexts: { include: { context: true }, orderBy: { sortOrder: 'asc' } },
+        contentBlocks: {
+          include: { asset: true },
+          orderBy: { sortOrder: 'asc' },
+        },
+        options: {
+          include: {
+            contentBlocks: {
+              include: { asset: true },
+              orderBy: { sortOrder: 'asc' },
+            },
+          },
+          orderBy: { sortOrder: 'asc' },
+        },
+        contexts: {
+          include: {
+            context: {
+              include: {
+                contentBlocks: {
+                  include: { asset: true },
+                  orderBy: { sortOrder: 'asc' },
+                },
+              },
+            },
+          },
+          orderBy: { sortOrder: 'asc' },
+        },
         structuredExplanation: true,
         communityStats: true,
         videoLink: { include: { videoAsset: { include: { asset: true } } } },
@@ -534,22 +558,72 @@ export class AssessmentsService {
           gradingRubric: question.gradingRubric,
           answerOrigin: question.answerOrigin,
           videoAssetId: question.videoLink?.videoAssetId ?? null,
-          videoAssetName: question.videoLink?.videoAsset?.asset?.filename ?? null,
+          videoAssetName:
+            question.videoLink?.videoAsset?.asset?.filename ?? null,
           timestampSeconds: question.videoLink?.timestampSeconds ?? null,
           attachments: {
-            create: (question.assets ?? []).map((attachment: any, index: number) => ({
-              assetId: attachment.assetId,
-              assetKind: attachment.asset.kind,
-              assetName: attachment.asset.filename,
-              sortOrder: index + 1,
+            create: (question.assets ?? []).map(
+              (attachment: any, index: number) => ({
+                assetId: attachment.assetId,
+                assetKind: attachment.asset.kind,
+                assetName: attachment.asset.filename,
+                sortOrder: index + 1,
+              }),
+            ),
+          },
+          contentBlocks: {
+            create: (question.contentBlocks ?? []).map((block: any) => ({
+              type: block.type,
+              sortOrder: block.sortOrder,
+              text: block.text,
+              assetId: block.assetId,
+              assetKind: block.asset?.kind,
+              assetName: block.asset?.filename,
+              tableData: block.tableData,
+              latex: block.latex,
+              mathml: block.mathml,
+              caption: block.caption,
+              altText: block.altText,
+              languageCode: block.languageCode,
             })),
           },
-          structuredExplanation: question.structuredExplanation ? { languageCode: question.structuredExplanation.languageCode, keywords: question.structuredExplanation.keywords, eliminationStrategy: question.structuredExplanation.eliminationStrategy, whyCorrect: question.structuredExplanation.whyCorrect, generalRule: question.structuredExplanation.generalRule, whatIf: question.structuredExplanation.whatIf, commonMistakes: question.structuredExplanation.commonMistakes, origin: question.structuredExplanation.origin, confidence: question.structuredExplanation.confidence, answerOrigin: question.structuredExplanation.answerOrigin, warnings: question.structuredExplanation.warnings } : undefined,
+          structuredExplanation: question.structuredExplanation
+            ? {
+                languageCode: question.structuredExplanation.languageCode,
+                keywords: question.structuredExplanation.keywords,
+                eliminationStrategy:
+                  question.structuredExplanation.eliminationStrategy,
+                whyCorrect: question.structuredExplanation.whyCorrect,
+                generalRule: question.structuredExplanation.generalRule,
+                whatIf: question.structuredExplanation.whatIf,
+                commonMistakes: question.structuredExplanation.commonMistakes,
+                origin: question.structuredExplanation.origin,
+                confidence: question.structuredExplanation.confidence,
+                answerOrigin: question.structuredExplanation.answerOrigin,
+                warnings: question.structuredExplanation.warnings,
+              }
+            : undefined,
           options: {
             create: question.options.map((option: any, index: number) => ({
               body: option.body,
               isCorrect: option.isCorrect,
               sortOrder: index + 1,
+              contentBlocks: {
+                create: (option.contentBlocks ?? []).map((block: any) => ({
+                  type: block.type,
+                  sortOrder: block.sortOrder,
+                  text: block.text,
+                  assetId: block.assetId,
+                  assetKind: block.asset?.kind,
+                  assetName: block.asset?.filename,
+                  tableData: block.tableData,
+                  latex: block.latex,
+                  mathml: block.mathml,
+                  caption: block.caption,
+                  altText: block.altText,
+                  languageCode: block.languageCode,
+                })),
+              },
             })),
           },
           placements: {
@@ -561,8 +635,47 @@ export class AssessmentsService {
       });
       for (const link of question.contexts ?? []) {
         const source = link.context;
-        const context = await tx.assessmentContext.upsert({ where: { assessmentId_sourceContextId: { assessmentId: assessment.id, sourceContextId: source.id } }, create: { assessmentId: assessment.id, sourceContextId: source.id, type: source.type, title: source.title, body: source.body, languageCode: source.languageCode, sourceLocator: source.sourceLocator }, update: {} });
-        await tx.assessmentQuestionContext.create({ data: { assessmentQuestionId: snapshotQuestion.id, assessmentContextId: context.id, sortOrder: link.sortOrder } });
+        const context = await tx.assessmentContext.upsert({
+          where: {
+            assessmentId_sourceContextId: {
+              assessmentId: assessment.id,
+              sourceContextId: source.id,
+            },
+          },
+          create: {
+            assessmentId: assessment.id,
+            sourceContextId: source.id,
+            type: source.type,
+            title: source.title,
+            body: source.body,
+            languageCode: source.languageCode,
+            sourceLocator: source.sourceLocator,
+            contentBlocks: {
+              create: (source.contentBlocks ?? []).map((block: any) => ({
+                type: block.type,
+                sortOrder: block.sortOrder,
+                text: block.text,
+                assetId: block.assetId,
+                assetKind: block.asset?.kind,
+                assetName: block.asset?.filename,
+                tableData: block.tableData,
+                latex: block.latex,
+                mathml: block.mathml,
+                caption: block.caption,
+                altText: block.altText,
+                languageCode: block.languageCode,
+              })),
+            },
+          },
+          update: {},
+        });
+        await tx.assessmentQuestionContext.create({
+          data: {
+            assessmentQuestionId: snapshotQuestion.id,
+            assessmentContextId: context.id,
+            sortOrder: link.sortOrder,
+          },
+        });
       }
     }
     return assessment;
@@ -834,9 +947,13 @@ export class AssessmentsService {
     return { questionId: markedQuestionId ?? questionId, marked: false };
   }
 
-  private async accessibleSourceQuestionId(studentId: string, questionId: string) {
+  private async accessibleSourceQuestionId(
+    studentId: string,
+    questionId: string,
+  ) {
     const sourceQuestionId = await this.resolveMarkedQuestionId(questionId);
-    if (!sourceQuestionId) throw new NotFoundException('Question is not accessible');
+    if (!sourceQuestionId)
+      throw new NotFoundException('Question is not accessible');
     const gradeId = await this.studentGrade(studentId);
     const accessible = await this.eligibleQuestions([], studentId, gradeId);
     if (!accessible.some((question) => question.id === sourceQuestionId))
@@ -845,22 +962,40 @@ export class AssessmentsService {
   }
 
   async saveQuestionNote(studentId: string, questionId: string, body: string) {
-    const sourceQuestionId = await this.accessibleSourceQuestionId(studentId, questionId);
+    const sourceQuestionId = await this.accessibleSourceQuestionId(
+      studentId,
+      questionId,
+    );
     const normalizedBody = body.trim();
     if (!normalizedBody)
       throw new BadRequestException('Note must not be blank');
     const note = await this.prisma.studentQuestionNote.upsert({
       where: {
-        studentUserId_questionId: { studentUserId: studentId, questionId: sourceQuestionId },
+        studentUserId_questionId: {
+          studentUserId: studentId,
+          questionId: sourceQuestionId,
+        },
       },
-      create: { studentUserId: studentId, questionId: sourceQuestionId, body: normalizedBody },
+      create: {
+        studentUserId: studentId,
+        questionId: sourceQuestionId,
+        body: normalizedBody,
+      },
       update: { body: normalizedBody },
     });
-    return { questionId: sourceQuestionId, body: note.body, createdAt: note.createdAt, updatedAt: note.updatedAt };
+    return {
+      questionId: sourceQuestionId,
+      body: note.body,
+      createdAt: note.createdAt,
+      updatedAt: note.updatedAt,
+    };
   }
 
   async deleteQuestionNote(studentId: string, questionId: string) {
-    const sourceQuestionId = await this.accessibleSourceQuestionId(studentId, questionId);
+    const sourceQuestionId = await this.accessibleSourceQuestionId(
+      studentId,
+      questionId,
+    );
     await this.prisma.studentQuestionNote.deleteMany({
       where: { studentUserId: studentId, questionId: sourceQuestionId },
     });
@@ -1068,7 +1203,9 @@ export class AssessmentsService {
       include: {
         scopes: { include: scopeInclude },
         questionBank: { select: { id: true, title: true } },
-        questionBanks: { include: { questionBank: { select: { id: true, title: true } } } },
+        questionBanks: {
+          include: { questionBank: { select: { id: true, title: true } } },
+        },
       },
     });
     if (!assessment) throw new NotFoundException('Assessment not found');
@@ -1118,9 +1255,17 @@ export class AssessmentsService {
           ? [assessment.questionBankId]
           : [],
       questionBanks: assessment.questionBanks?.length
-        ? assessment.questionBanks.map((bank: any) => ({ id: bank.questionBank.id, name: bank.questionBank.title }))
+        ? assessment.questionBanks.map((bank: any) => ({
+            id: bank.questionBank.id,
+            name: bank.questionBank.title,
+          }))
         : assessment.questionBank
-          ? [{ id: assessment.questionBank.id, name: assessment.questionBank.title }]
+          ? [
+              {
+                id: assessment.questionBank.id,
+                name: assessment.questionBank.title,
+              },
+            ]
           : [],
       generationFilters: assessment.generationFilters,
       scopes: assessment.scopes.map((s: any) => ({
@@ -1136,8 +1281,23 @@ export class AssessmentsService {
    */
   async assertSnapshotVideoAccess(studentId: string, assetId: string) {
     const snapshots = await this.prisma.assessmentQuestion.findMany({
-      where: { videoAssetId: assetId },
-      include: { assessment: { include: { scopes: { include: scopeInclude } } } },
+      where: {
+        OR: [
+          { videoAssetId: assetId },
+          { contentBlocks: { some: { assetId } } },
+          { options: { some: { contentBlocks: { some: { assetId } } } } },
+          {
+            contexts: {
+              some: {
+                assessmentContext: { contentBlocks: { some: { assetId } } },
+              },
+            },
+          },
+        ],
+      },
+      include: {
+        assessment: { include: { scopes: { include: scopeInclude } } },
+      },
     });
     for (const snapshot of snapshots) {
       try {
@@ -1155,7 +1315,8 @@ export class AssessmentsService {
         },
         select: { status: true },
       });
-      if (completedAttempt?.status === AssessmentAttemptStatus.COMPLETED) return;
+      if (completedAttempt?.status === AssessmentAttemptStatus.COMPLETED)
+        return;
     }
     throw new NotFoundException('Accessible assessment video not found');
   }
@@ -1170,17 +1331,36 @@ export class AssessmentsService {
       where: {
         id: questionId,
         assessmentId,
-        attachments: { some: { assetId } },
+        OR: [
+          { attachments: { some: { assetId } } },
+          { contentBlocks: { some: { assetId } } },
+          { options: { some: { contentBlocks: { some: { assetId } } } } },
+          {
+            contexts: {
+              some: {
+                assessmentContext: { contentBlocks: { some: { assetId } } },
+              },
+            },
+          },
+        ],
       },
-      include: { assessment: { include: { scopes: { include: scopeInclude } } } },
+      include: {
+        assessment: { include: { scopes: { include: scopeInclude } } },
+      },
     });
-    if (!snapshot) throw new NotFoundException('Assessment question attachment not found');
+    if (!snapshot)
+      throw new NotFoundException('Assessment question attachment not found');
     try {
       await this.assertViewable(studentId, snapshot.assessment);
     } catch (error) {
       if (!(error instanceof ForbiddenException)) throw error;
       const completedAttempt = await this.prisma.assessmentAttempt.findUnique({
-        where: { assessmentId_studentUserId: { assessmentId, studentUserId: studentId } },
+        where: {
+          assessmentId_studentUserId: {
+            assessmentId,
+            studentUserId: studentId,
+          },
+        },
         select: { status: true },
       });
       if (completedAttempt?.status !== AssessmentAttemptStatus.COMPLETED)
@@ -1221,9 +1401,62 @@ export class AssessmentsService {
   private async questionsForAssessment(id: string) {
     return this.prisma.assessmentQuestion.findMany({
       where: { assessmentId: id },
-      include: { options: { orderBy: { sortOrder: 'asc' } }, placements: true, contexts: { include: { assessmentContext: true }, orderBy: { sortOrder: 'asc' } }, attachments: { orderBy: { sortOrder: 'asc' } } },
+      include: {
+        contentBlocks: { orderBy: { sortOrder: 'asc' } },
+        options: {
+          include: { contentBlocks: { orderBy: { sortOrder: 'asc' } } },
+          orderBy: { sortOrder: 'asc' },
+        },
+        placements: true,
+        contexts: {
+          include: {
+            assessmentContext: {
+              include: { contentBlocks: { orderBy: { sortOrder: 'asc' } } },
+            },
+          },
+          orderBy: { sortOrder: 'asc' },
+        },
+        attachments: { orderBy: { sortOrder: 'asc' } },
+      },
       orderBy: { sortOrder: 'asc' },
     });
+  }
+
+  private snapshotBlockDto(block: any) {
+    return {
+      id: block.id,
+      type: block.type,
+      sortOrder: block.sortOrder,
+      text: block.text,
+      assetId: block.assetId,
+      tableData: block.tableData,
+      latex: block.latex,
+      mathml: block.mathml,
+      caption: block.caption,
+      altText: block.altText,
+      languageCode: block.languageCode,
+      asset: block.assetId
+        ? {
+            id: block.assetId,
+            kind: block.assetKind,
+            filename: block.assetName,
+          }
+        : undefined,
+    };
+  }
+
+  private snapshotContextDto(context: any) {
+    return {
+      id: context.id,
+      sourceContextId: context.sourceContextId,
+      type: context.type,
+      title: context.title,
+      body: context.body,
+      languageCode: context.languageCode,
+      contentBlocks: (context.contentBlocks ?? []).map((block: any) =>
+        this.snapshotBlockDto(block),
+      ),
+    };
   }
 
   private async markedQuestionIds(studentId: string, questionIds: string[]) {
@@ -1238,7 +1471,10 @@ export class AssessmentsService {
     return new Set(marks.map((mark) => mark.questionId));
   }
 
-  private async questionNotesByQuestionId(studentId: string, questionIds: string[]) {
+  private async questionNotesByQuestionId(
+    studentId: string,
+    questionIds: string[],
+  ) {
     if (!questionIds.length) return new Map<string, string>();
     const notes = await this.prisma.studentQuestionNote.findMany({
       where: { studentUserId: studentId, questionId: { in: questionIds } },
@@ -1281,7 +1517,10 @@ export class AssessmentsService {
     now: Date,
   ) {
     try {
-      const points = await this.prisma.assessmentQuestion.aggregate({ where: { assessmentId }, _sum: { maxPoints: true } });
+      const points = await this.prisma.assessmentQuestion.aggregate({
+        where: { assessmentId },
+        _sum: { maxPoints: true },
+      });
       return await this.prisma.assessmentAttempt.create({
         data: {
           assessmentId,
@@ -1370,7 +1609,12 @@ export class AssessmentsService {
       }
       const questions = await tx.assessmentQuestion.findMany({
         where: { assessmentId: attempt.assessmentId },
-        select: { id: true, sourceQuestionId: true, type: true, maxPoints: true },
+        select: {
+          id: true,
+          sourceQuestionId: true,
+          type: true,
+          maxPoints: true,
+        },
       });
       const answers = await tx.assessmentAttemptAnswer.findMany({
         where: { attemptId },
@@ -1380,14 +1624,34 @@ export class AssessmentsService {
       );
       for (const question of questions) {
         const answer = byQuestion.get(question.id);
-        const written = question.type === QuestionType.SHORT_ANSWER || question.type === QuestionType.FILL_IN_THE_BLANK || question.type === QuestionType.LONG_ANSWER;
-        const hasResponse = written ? Boolean(answer?.responseText?.trim()) : Boolean(answer?.selectedOptionIds.length);
-        const outcome = !hasResponse ? AssessmentQuestionOutcome.OMITTED : question.type === QuestionType.LONG_ANSWER ? AssessmentQuestionOutcome.PENDING_GRADING : answer?.isCorrect ? AssessmentQuestionOutcome.CORRECT : AssessmentQuestionOutcome.INCORRECT;
-        const awardedPoints = outcome === AssessmentQuestionOutcome.CORRECT ? question.maxPoints : 0;
+        const written =
+          question.type === QuestionType.SHORT_ANSWER ||
+          question.type === QuestionType.FILL_IN_THE_BLANK ||
+          question.type === QuestionType.LONG_ANSWER;
+        const hasResponse = written
+          ? Boolean(answer?.responseText?.trim())
+          : Boolean(answer?.selectedOptionIds.length);
+        const outcome = !hasResponse
+          ? AssessmentQuestionOutcome.OMITTED
+          : question.type === QuestionType.LONG_ANSWER
+            ? AssessmentQuestionOutcome.PENDING_GRADING
+            : answer?.isCorrect
+              ? AssessmentQuestionOutcome.CORRECT
+              : AssessmentQuestionOutcome.INCORRECT;
+        const awardedPoints =
+          outcome === AssessmentQuestionOutcome.CORRECT
+            ? question.maxPoints
+            : 0;
         if (answer)
           await tx.assessmentAttemptAnswer.update({
             where: { id: answer.id },
-            data: { outcome, awardedPoints: outcome === AssessmentQuestionOutcome.PENDING_GRADING ? null : awardedPoints },
+            data: {
+              outcome,
+              awardedPoints:
+                outcome === AssessmentQuestionOutcome.PENDING_GRADING
+                  ? null
+                  : awardedPoints,
+            },
           });
         else
           await tx.assessmentAttemptAnswer.create({
@@ -1400,15 +1664,24 @@ export class AssessmentsService {
               awardedPoints,
             },
           });
-        if (outcome === AssessmentQuestionOutcome.CORRECT || outcome === AssessmentQuestionOutcome.INCORRECT)
+        if (
+          outcome === AssessmentQuestionOutcome.CORRECT ||
+          outcome === AssessmentQuestionOutcome.INCORRECT
+        )
           await this.communityStats.recordResponse(
             tx,
             question.sourceQuestionId,
             outcome === AssessmentQuestionOutcome.CORRECT,
           );
       }
-      const finalized = await tx.assessmentAttemptAnswer.findMany({ where: { attemptId }, select: { awardedPoints: true } });
-      const score = finalized.reduce((sum, answer) => sum + (answer.awardedPoints ?? 0), 0);
+      const finalized = await tx.assessmentAttemptAnswer.findMany({
+        where: { attemptId },
+        select: { awardedPoints: true },
+      });
+      const score = finalized.reduce(
+        (sum, answer) => sum + (answer.awardedPoints ?? 0),
+        0,
+      );
       return tx.assessmentAttempt.update({
         where: { id: attemptId },
         data: { score },
@@ -1463,6 +1736,9 @@ export class AssessmentsService {
           sortOrder: q.sortOrder,
           type: q.type,
           body: q.body,
+          contentBlocks: (q.contentBlocks ?? []).map((block) =>
+            this.snapshotBlockDto(block),
+          ),
           video: q.videoAssetId
             ? {
                 assetId: q.videoAssetId,
@@ -1476,17 +1752,25 @@ export class AssessmentsService {
             assetName: attachment.assetName,
             sortOrder: attachment.sortOrder,
           })),
-          contexts: q.contexts.map((link) => link.assessmentContext),
-          options: q.options.map((o) => ({
+          contexts: (q.contexts ?? []).map((link) =>
+            this.snapshotContextDto(link.assessmentContext),
+          ),
+          options: (q.options ?? []).map((o) => ({
             id: o.id,
             body: o.body,
+            contentBlocks: (o.contentBlocks ?? []).map((block) =>
+              this.snapshotBlockDto(block),
+            ),
             sortOrder: o.sortOrder,
           })),
           selectedOptionIds: answer?.selectedOptionIds ?? [],
           responseText: answer?.responseText ?? null,
           maxPoints: q.maxPoints,
           awardedPoints: revealAnswers ? (answer?.awardedPoints ?? null) : null,
-          answered: Boolean(answer && (answer.selectedOptionIds.length || answer.responseText?.trim())),
+          answered: Boolean(
+            answer &&
+            (answer.selectedOptionIds.length || answer.responseText?.trim()),
+          ),
           isCorrect: showAnswer ? (answer?.isCorrect ?? false) : null,
           outcome: revealAnswers
             ? (answer?.outcome ?? AssessmentQuestionOutcome.OMITTED)
@@ -1521,14 +1805,26 @@ export class AssessmentsService {
       throw new ConflictException('Attempt is no longer in progress');
     const selectedOptionIds = dto.selectedOptionIds ?? [];
     const responseText = dto.responseText?.trim() ?? '';
-    if (new Set(selectedOptionIds).size !== selectedOptionIds.length) throw new BadRequestException('selectedOptionIds must not contain duplicates');
+    if (new Set(selectedOptionIds).size !== selectedOptionIds.length)
+      throw new BadRequestException(
+        'selectedOptionIds must not contain duplicates',
+      );
     const question = await this.prisma.assessmentQuestion.findFirst({
       where: { id: assessmentQuestionId, assessmentId: id },
       include: { options: true },
     });
     if (!question) throw new NotFoundException('Assessment question not found');
-    const written = question.type === QuestionType.SHORT_ANSWER || question.type === QuestionType.FILL_IN_THE_BLANK || question.type === QuestionType.LONG_ANSWER;
-    if ((written && dto.selectedOptionIds !== undefined) || (!written && dto.responseText !== undefined)) throw new BadRequestException('Response shape does not match question type');
+    const written =
+      question.type === QuestionType.SHORT_ANSWER ||
+      question.type === QuestionType.FILL_IN_THE_BLANK ||
+      question.type === QuestionType.LONG_ANSWER;
+    if (
+      (written && dto.selectedOptionIds !== undefined) ||
+      (!written && dto.responseText !== undefined)
+    )
+      throw new BadRequestException(
+        'Response shape does not match question type',
+      );
     if (
       !selectedOptionIds.every((optionId) =>
         question.options.some((o) => o.id === optionId),
@@ -1549,10 +1845,27 @@ export class AssessmentsService {
       .map((o) => o.id)
       .sort();
     const selected = [...selectedOptionIds].sort();
-    const normalize = (value: string) => value.normalize('NFKC').toLocaleLowerCase('ar').replace(/[\u064B-\u065F\u0670]/g, '').replace(/[إأآ]/g, 'ا').replace(/ى/g, 'ي').replace(/\s+/g, ' ').trim();
+    const normalize = (value: string) =>
+      value
+        .normalize('NFKC')
+        .toLocaleLowerCase('ar')
+        .replace(/[\u064B-\u065F\u0670]/g, '')
+        .replace(/[إأآ]/g, 'ا')
+        .replace(/ى/g, 'ي')
+        .replace(/\s+/g, ' ')
+        .trim();
     const isCorrect = written
-      ? question.type === QuestionType.LONG_ANSWER ? null : Boolean(responseText) && Array.isArray(question.acceptedAnswers) && question.acceptedAnswers.some((answer: any) => normalize(String(answer)) === normalize(responseText))
-      : selected.length > 0 && correct.length === selected.length && correct.every((id, index) => id === selected[index]);
+      ? question.type === QuestionType.LONG_ANSWER
+        ? null
+        : Boolean(responseText) &&
+          Array.isArray(question.acceptedAnswers) &&
+          question.acceptedAnswers.some(
+            (answer: any) =>
+              normalize(String(answer)) === normalize(responseText),
+          )
+      : selected.length > 0 &&
+        correct.length === selected.length &&
+        correct.every((id, index) => id === selected[index]);
     await this.prisma.$transaction(async (tx) => {
       const gate = await tx.assessmentAttempt.updateMany({
         where: { id: attempt.id, status: AssessmentAttemptStatus.SUSPENDED },
@@ -1568,7 +1881,13 @@ export class AssessmentsService {
           },
         },
       });
-      const sameSelection = existing && existing.selectedOptionIds.length === selected.length && existing.selectedOptionIds.every((optionId) => selected.includes(optionId)) && (existing.responseText ?? '') === responseText;
+      const sameSelection =
+        existing &&
+        existing.selectedOptionIds.length === selected.length &&
+        existing.selectedOptionIds.every((optionId) =>
+          selected.includes(optionId),
+        ) &&
+        (existing.responseText ?? '') === responseText;
       const answer = await tx.assessmentAttemptAnswer.upsert({
         where: {
           attemptId_assessmentQuestionId: {
@@ -1583,7 +1902,11 @@ export class AssessmentsService {
           responseText: written ? responseText || null : null,
           isCorrect,
         },
-        update: { selectedOptionIds: selected, responseText: written ? responseText || null : null, isCorrect },
+        update: {
+          selectedOptionIds: selected,
+          responseText: written ? responseText || null : null,
+          isCorrect,
+        },
       });
       if (existing && !sameSelection) {
         const outcome = (optionIds: string[], correctAnswer: boolean | null) =>
@@ -1600,10 +1923,17 @@ export class AssessmentsService {
             fromResponseText: existing.responseText,
             toResponseText: written ? responseText || null : null,
             fromOutcome: outcome(
-              written ? (existing.responseText ? ['written'] : []) : existing.selectedOptionIds,
+              written
+                ? existing.responseText
+                  ? ['written']
+                  : []
+                : existing.selectedOptionIds,
               existing.isCorrect,
             ),
-            toOutcome: outcome(written ? (responseText ? ['written'] : []) : selected, isCorrect),
+            toOutcome: outcome(
+              written ? (responseText ? ['written'] : []) : selected,
+              isCorrect,
+            ),
           },
         });
       }
@@ -1612,7 +1942,11 @@ export class AssessmentsService {
       assessmentQuestionId,
       selectedOptionIds,
       responseText: written ? responseText : null,
-      isCorrect: assessment.mode === AssessmentMode.TUTOR && question.type !== QuestionType.LONG_ANSWER ? isCorrect : null,
+      isCorrect:
+        assessment.mode === AssessmentMode.TUTOR &&
+        question.type !== QuestionType.LONG_ANSWER
+          ? isCorrect
+          : null,
       correctOptionIds:
         assessment.mode === AssessmentMode.TUTOR ? correct : null,
       explanation:
@@ -1624,20 +1958,49 @@ export class AssessmentsService {
     this.assertAdmin(actor);
     return this.prisma.assessmentAttemptAnswer.findMany({
       where: { outcome: AssessmentQuestionOutcome.PENDING_GRADING },
-      include: { attempt: { include: { assessment: { select: { id: true, title: true } }, student: { select: { fullName: true } } } }, assessmentQuestion: true },
+      include: {
+        attempt: {
+          include: {
+            assessment: { select: { id: true, title: true } },
+            student: { select: { fullName: true } },
+          },
+        },
+        assessmentQuestion: true,
+      },
       orderBy: { answeredAt: 'asc' },
     });
   }
 
-  async gradeLongAnswer(actor: RequestUser, answerId: string, dto: GradeLongAnswerDto) {
+  async gradeLongAnswer(
+    actor: RequestUser,
+    answerId: string,
+    dto: GradeLongAnswerDto,
+  ) {
     this.assertAdmin(actor);
-    const answer = await this.prisma.assessmentAttemptAnswer.findUnique({ where: { id: answerId }, include: { attempt: true, assessmentQuestion: true } });
-    if (!answer || answer.assessmentQuestion.type !== QuestionType.LONG_ANSWER || answer.outcome !== AssessmentQuestionOutcome.PENDING_GRADING) throw new ConflictException('Long answer is not awaiting grading');
-    if (dto.awardedPoints > answer.assessmentQuestion.maxPoints) throw new BadRequestException('awardedPoints cannot exceed maxPoints');
-    const outcome = dto.awardedPoints === answer.assessmentQuestion.maxPoints ? AssessmentQuestionOutcome.CORRECT : dto.awardedPoints === 0 ? AssessmentQuestionOutcome.INCORRECT : AssessmentQuestionOutcome.PARTIALLY_CORRECT;
+    const answer = await this.prisma.assessmentAttemptAnswer.findUnique({
+      where: { id: answerId },
+      include: { attempt: true, assessmentQuestion: true },
+    });
+    if (
+      !answer ||
+      answer.assessmentQuestion.type !== QuestionType.LONG_ANSWER ||
+      answer.outcome !== AssessmentQuestionOutcome.PENDING_GRADING
+    )
+      throw new ConflictException('Long answer is not awaiting grading');
+    if (dto.awardedPoints > answer.assessmentQuestion.maxPoints)
+      throw new BadRequestException('awardedPoints cannot exceed maxPoints');
+    const outcome =
+      dto.awardedPoints === answer.assessmentQuestion.maxPoints
+        ? AssessmentQuestionOutcome.CORRECT
+        : dto.awardedPoints === 0
+          ? AssessmentQuestionOutcome.INCORRECT
+          : AssessmentQuestionOutcome.PARTIALLY_CORRECT;
     await this.prisma.$transaction(async (tx) => {
       const graded = await tx.assessmentAttemptAnswer.updateMany({
-        where: { id: answerId, outcome: AssessmentQuestionOutcome.PENDING_GRADING },
+        where: {
+          id: answerId,
+          outcome: AssessmentQuestionOutcome.PENDING_GRADING,
+        },
         data: {
           awardedPoints: dto.awardedPoints,
           outcome,
@@ -1647,17 +2010,32 @@ export class AssessmentsService {
           graderFeedback: dto.feedback?.trim() ?? null,
         },
       });
-      if (!graded.count) throw new ConflictException('Long answer is not awaiting grading');
+      if (!graded.count)
+        throw new ConflictException('Long answer is not awaiting grading');
       await this.communityStats.recordResponse(
         tx,
         answer.assessmentQuestion.sourceQuestionId,
         outcome === AssessmentQuestionOutcome.CORRECT,
       );
-      const totals = await tx.assessmentAttemptAnswer.aggregate({ where: { attemptId: answer.attemptId }, _sum: { awardedPoints: true } });
-      await tx.assessmentAttempt.update({ where: { id: answer.attemptId }, data: { score: totals._sum.awardedPoints ?? 0 } });
+      const totals = await tx.assessmentAttemptAnswer.aggregate({
+        where: { attemptId: answer.attemptId },
+        _sum: { awardedPoints: true },
+      });
+      await tx.assessmentAttempt.update({
+        where: { id: answer.attemptId },
+        data: { score: totals._sum.awardedPoints ?? 0 },
+      });
     });
-    await this.audit.record({ actorUserId: actor.id, action: 'ASSESSMENT_LONG_ANSWER_GRADED', targetType: 'AssessmentAttemptAnswer', targetId: answerId, metadata: { awardedPoints: dto.awardedPoints } });
-    return this.prisma.assessmentAttemptAnswer.findUniqueOrThrow({ where: { id: answerId } });
+    await this.audit.record({
+      actorUserId: actor.id,
+      action: 'ASSESSMENT_LONG_ANSWER_GRADED',
+      targetType: 'AssessmentAttemptAnswer',
+      targetId: answerId,
+      metadata: { awardedPoints: dto.awardedPoints },
+    });
+    return this.prisma.assessmentAttemptAnswer.findUniqueOrThrow({
+      where: { id: answerId },
+    });
   }
 
   async reportActiveTime(
@@ -1928,8 +2306,12 @@ export class AssessmentsService {
     const omittedCount = outcomes.filter(
       (outcome) => outcome === AssessmentQuestionOutcome.OMITTED,
     ).length;
-    const pendingGradingCount = outcomes.filter((outcome) => outcome === AssessmentQuestionOutcome.PENDING_GRADING).length;
-    const percentage = this.round(((attempt.score ?? 0) / attempt.totalPoints) * 100);
+    const pendingGradingCount = outcomes.filter(
+      (outcome) => outcome === AssessmentQuestionOutcome.PENDING_GRADING,
+    ).length;
+    const percentage = this.round(
+      ((attempt.score ?? 0) / attempt.totalPoints) * 100,
+    );
     const stats = await this.prisma.questionCommunityStat.findMany({
       where: {
         questionId: {
@@ -1992,7 +2374,10 @@ export class AssessmentsService {
           maxPoints: q.maxPoints,
           awardedPoints: answer?.awardedPoints ?? null,
           isCorrect: answer?.isCorrect ?? false,
-          answered: Boolean(answer && (answer.selectedOptionIds.length || answer.responseText?.trim())),
+          answered: Boolean(
+            answer &&
+            (answer.selectedOptionIds.length || answer.responseText?.trim()),
+          ),
           outcome: answer?.outcome ?? AssessmentQuestionOutcome.OMITTED,
           activeSeconds: answer?.activeSeconds ?? null,
           placements: q.placements,
@@ -2234,8 +2619,32 @@ export class AssessmentsService {
       where: { id: { in: dto.questionIds }, status: QuestionStatus.PUBLISHED },
       include: {
         course: { include: { subject: true } },
-        options: { orderBy: { sortOrder: 'asc' } },
-        contexts: { include: { context: true }, orderBy: { sortOrder: 'asc' } },
+        contentBlocks: {
+          include: { asset: true },
+          orderBy: { sortOrder: 'asc' },
+        },
+        options: {
+          include: {
+            contentBlocks: {
+              include: { asset: true },
+              orderBy: { sortOrder: 'asc' },
+            },
+          },
+          orderBy: { sortOrder: 'asc' },
+        },
+        contexts: {
+          include: {
+            context: {
+              include: {
+                contentBlocks: {
+                  include: { asset: true },
+                  orderBy: { sortOrder: 'asc' },
+                },
+              },
+            },
+          },
+          orderBy: { sortOrder: 'asc' },
+        },
         structuredExplanation: true,
         videoLink: { include: { videoAsset: { include: { asset: true } } } },
         assets: { include: { asset: true }, orderBy: { sortOrder: 'asc' } },
@@ -2336,9 +2745,26 @@ export class AssessmentsService {
       include: {
         scopes: { include: scopeInclude },
         questionBank: { select: { id: true, title: true } },
-        questionBanks: { include: { questionBank: { select: { id: true, title: true } } } },
+        questionBanks: {
+          include: { questionBank: { select: { id: true, title: true } } },
+        },
         questions: {
-          include: { options: { orderBy: { sortOrder: 'asc' } }, attachments: { orderBy: { sortOrder: 'asc' } } },
+          include: {
+            contentBlocks: { orderBy: { sortOrder: 'asc' } },
+            options: {
+              include: { contentBlocks: { orderBy: { sortOrder: 'asc' } } },
+              orderBy: { sortOrder: 'asc' },
+            },
+            contexts: {
+              include: {
+                assessmentContext: {
+                  include: { contentBlocks: { orderBy: { sortOrder: 'asc' } } },
+                },
+              },
+              orderBy: { sortOrder: 'asc' },
+            },
+            attachments: { orderBy: { sortOrder: 'asc' } },
+          },
           orderBy: { sortOrder: 'asc' },
         },
       },
@@ -2361,9 +2787,17 @@ export class AssessmentsService {
           ? [assessment.questionBankId]
           : [],
       questionBanks: assessment.questionBanks?.length
-        ? assessment.questionBanks.map((bank: any) => ({ id: bank.questionBank.id, name: bank.questionBank.title }))
+        ? assessment.questionBanks.map((bank: any) => ({
+            id: bank.questionBank.id,
+            name: bank.questionBank.title,
+          }))
         : assessment.questionBank
-          ? [{ id: assessment.questionBank.id, name: assessment.questionBank.title }]
+          ? [
+              {
+                id: assessment.questionBank.id,
+                name: assessment.questionBank.title,
+              },
+            ]
           : [],
       scopes: assessment.scopes.map((s: any) => this.scopeDto(s)),
       questions: assessment.questions.map((q: any) => ({
@@ -2372,24 +2806,33 @@ export class AssessmentsService {
         type: q.type,
         body: q.body,
         explanation: q.explanation,
-          video: q.videoAssetId
+        video: q.videoAssetId
           ? {
               assetId: q.videoAssetId,
               assetName: q.videoAssetName,
               timestampSeconds: q.timestampSeconds,
             }
-            : null,
-          attachments: (q.attachments ?? []).map((attachment: any) => ({
-            assetId: attachment.assetId,
-            kind: attachment.assetKind,
-            assetName: attachment.assetName,
-            sortOrder: attachment.sortOrder,
-          })),
+          : null,
+        attachments: (q.attachments ?? []).map((attachment: any) => ({
+          assetId: attachment.assetId,
+          kind: attachment.assetKind,
+          assetName: attachment.assetName,
+          sortOrder: attachment.sortOrder,
+        })),
+        contentBlocks: (q.contentBlocks ?? []).map((block: any) =>
+          this.snapshotBlockDto(block),
+        ),
+        contexts: (q.contexts ?? []).map((link: any) =>
+          this.snapshotContextDto(link.assessmentContext),
+        ),
         options: q.options.map((o: any) => ({
           id: o.id,
           body: o.body,
           isCorrect: o.isCorrect,
           sortOrder: o.sortOrder,
+          contentBlocks: (o.contentBlocks ?? []).map((block: any) =>
+            this.snapshotBlockDto(block),
+          ),
         })),
       })),
     };

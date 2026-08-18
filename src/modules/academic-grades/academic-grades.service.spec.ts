@@ -48,7 +48,14 @@ describe('AcademicGradesService', () => {
 
   it('creates with an auto-derived slug and the next sortOrder', async () => {
     const { service, prisma, auditService } = buildService();
-    prisma.academicGrade.findUnique.mockResolvedValue(null);
+    prisma.academicGrade.findUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({
+        id: 'g1', titleAr: 'الصف العاشر', titleEn: 'Grade 10', slug: 'grade-10',
+        descriptionAr: null, descriptionEn: null, sortOrder: 5, status: 'DRAFT',
+        createdAt: new Date(), updatedAt: new Date(), publishedAt: null, archivedAt: null,
+        coverAsset: null, _count: { subjects: 0 },
+      });
     prisma.academicGrade.aggregate.mockResolvedValue({
       _max: { sortOrder: 4 },
     });
@@ -119,9 +126,9 @@ describe('AcademicGradesService', () => {
     expect(result.data.map((item) => item.hasChildren)).toEqual([true, false]);
     expect(prisma.academicGrade.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        include: {
+        include: expect.objectContaining({
           _count: { select: { subjects: { where: { status: { not: 'ARCHIVED' } } } } },
-        },
+        }),
       }),
     );
     expect(prisma.subject.count).not.toHaveBeenCalled();

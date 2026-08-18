@@ -21,6 +21,7 @@ import { SearchPaginationQueryDto } from '../../../common/dto/pagination-query.d
 import {
   AssessmentMode,
   AssessmentStatus,
+  QuestionContentBlockType,
   QuestionDifficultyBand,
   QuestionSourceType,
 } from '../../../common/types/roles.enum';
@@ -233,13 +234,32 @@ export class QueryAdminAssessmentDto extends SearchPaginationQueryDto {
 }
 
 export class AutosaveAnswerDto {
-  @ApiPropertyOptional({ type: [String] }) @IsOptional() @IsArray() @IsString({ each: true }) selectedOptionIds?: string[];
-  @ApiPropertyOptional({ description: 'Written response for short, fill-in, and long-answer questions' }) @IsOptional() @IsString() @MaxLength(100000) responseText?: string;
+  @ApiPropertyOptional({ type: [String] })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  selectedOptionIds?: string[];
+  @ApiPropertyOptional({
+    description:
+      'Written response for short, fill-in, and long-answer questions',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100000)
+  responseText?: string;
 }
 
 export class GradeLongAnswerDto {
-  @ApiProperty({ minimum: 0 }) @Type(() => Number) @IsInt() @Min(0) awardedPoints!: number;
-  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(10000) feedback?: string;
+  @ApiProperty({ minimum: 0 })
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  awardedPoints!: number;
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(10000)
+  feedback?: string;
 }
 export class ReportActiveTimeDto {
   @ApiProperty({
@@ -322,7 +342,10 @@ export class AssessmentDetailDto extends AssessmentListItemDto {
   @ApiPropertyOptional({ type: String, nullable: true }) questionBankName!:
     string | null;
   @ApiProperty({ type: [String] }) questionBankIds!: string[];
-  @ApiProperty({ type: [Object] }) questionBanks!: { id: string; name: string }[];
+  @ApiProperty({ type: [Object] }) questionBanks!: {
+    id: string;
+    name: string;
+  }[];
   @ApiPropertyOptional({ type: Object, nullable: true }) generationFilters!:
     object | null;
   @ApiProperty({ type: [AssessmentScopeResponseDto] })
@@ -343,6 +366,46 @@ export class AssessmentQuestionAttachmentDto {
   @ApiProperty() sortOrder!: number;
 }
 
+export class AssessmentContentBlockDto {
+  @ApiProperty() id!: string;
+  @ApiProperty({ enum: QuestionContentBlockType })
+  type!: QuestionContentBlockType;
+  @ApiProperty() sortOrder!: number;
+  @ApiPropertyOptional({ nullable: true }) text?: string | null;
+  @ApiPropertyOptional({ nullable: true }) assetId?: string | null;
+  @ApiPropertyOptional({ nullable: true }) tableData?: object | null;
+  @ApiPropertyOptional({ nullable: true }) latex?: string | null;
+  @ApiPropertyOptional({ nullable: true }) mathml?: string | null;
+  @ApiPropertyOptional({ nullable: true }) caption?: string | null;
+  @ApiPropertyOptional({ nullable: true }) altText?: string | null;
+  @ApiPropertyOptional({ nullable: true }) languageCode?: string | null;
+  @ApiPropertyOptional({ type: Object, nullable: true }) asset?: {
+    id: string;
+    kind: string | null;
+    filename: string | null;
+  } | null;
+}
+
+export class AssessmentQuestionOptionDto {
+  @ApiProperty() id!: string;
+  @ApiProperty() body!: string;
+  @ApiProperty() sortOrder!: number;
+  @ApiPropertyOptional() isCorrect?: boolean;
+  @ApiProperty({ type: [AssessmentContentBlockDto] })
+  contentBlocks!: AssessmentContentBlockDto[];
+}
+
+export class AssessmentQuestionContextDto {
+  @ApiProperty() id!: string;
+  @ApiProperty() sourceContextId!: string;
+  @ApiProperty() type!: string;
+  @ApiPropertyOptional({ nullable: true }) title!: string | null;
+  @ApiProperty() body!: string;
+  @ApiProperty() languageCode!: string;
+  @ApiProperty({ type: [AssessmentContentBlockDto] })
+  contentBlocks!: AssessmentContentBlockDto[];
+}
+
 export class AssessmentAttemptQuestionDto {
   @ApiProperty() id!: string;
   @ApiProperty() isMarked!: boolean;
@@ -354,18 +417,28 @@ export class AssessmentAttemptQuestionDto {
   video!: AssessmentQuestionVideoDto | null;
   @ApiProperty({ type: [AssessmentQuestionAttachmentDto] })
   attachments!: AssessmentQuestionAttachmentDto[];
-  @ApiProperty({ type: [Object] }) options!: {
-    id: string;
-    body: string;
-    sortOrder: number;
-  }[];
+  @ApiProperty({ type: [AssessmentContentBlockDto] })
+  contentBlocks!: AssessmentContentBlockDto[];
+  @ApiProperty({ type: [AssessmentQuestionContextDto] })
+  contexts!: AssessmentQuestionContextDto[];
+  @ApiProperty({ type: [AssessmentQuestionOptionDto] })
+  options!: AssessmentQuestionOptionDto[];
   @ApiProperty({ type: [String] }) selectedOptionIds!: string[];
+  @ApiPropertyOptional({ type: String, nullable: true }) responseText!:
+    string | null;
+  @ApiProperty() maxPoints!: number;
+  @ApiPropertyOptional({ type: Number, nullable: true }) awardedPoints!:
+    number | null;
   @ApiProperty() answered!: boolean;
   @ApiPropertyOptional({ type: Boolean, nullable: true }) isCorrect!:
     boolean | null;
   @ApiPropertyOptional({ type: [String], nullable: true }) correctOptionIds!:
     string[] | null;
   @ApiPropertyOptional({ type: String, nullable: true }) explanation!:
+    string | null;
+  @ApiPropertyOptional({ type: Object, nullable: true })
+  structuredExplanation!: object | null;
+  @ApiPropertyOptional({ type: String, nullable: true }) outcome!:
     string | null;
 }
 
@@ -379,6 +452,7 @@ export class AssessmentAttemptStateDto {
   submittedAt!: Date | null;
   @ApiPropertyOptional({ type: Number, nullable: true }) score!: number | null;
   @ApiProperty() totalQuestions!: number;
+  @ApiProperty() totalPoints!: number;
   @ApiProperty() mode!: string;
   @ApiProperty({ type: [AssessmentAttemptQuestionDto] })
   questions!: AssessmentAttemptQuestionDto[];
@@ -413,6 +487,38 @@ export class AdminAssessmentListItemDto {
   publishedAt!: Date | null;
   @ApiPropertyOptional({ type: String, format: 'date-time', nullable: true })
   archivedAt!: Date | null;
+}
+
+export class AdminAssessmentQuestionDto {
+  @ApiProperty() id!: string;
+  @ApiProperty() sortOrder!: number;
+  @ApiProperty() type!: string;
+  @ApiProperty() body!: string;
+  @ApiPropertyOptional({ nullable: true }) explanation!: string | null;
+  @ApiPropertyOptional({ type: AssessmentQuestionVideoDto, nullable: true })
+  video!: AssessmentQuestionVideoDto | null;
+  @ApiProperty({ type: [AssessmentQuestionAttachmentDto] })
+  attachments!: AssessmentQuestionAttachmentDto[];
+  @ApiProperty({ type: [AssessmentContentBlockDto] })
+  contentBlocks!: AssessmentContentBlockDto[];
+  @ApiProperty({ type: [AssessmentQuestionContextDto] })
+  contexts!: AssessmentQuestionContextDto[];
+  @ApiProperty({ type: [AssessmentQuestionOptionDto] })
+  options!: AssessmentQuestionOptionDto[];
+}
+
+export class AdminAssessmentDetailDto extends AdminAssessmentListItemDto {
+  @ApiPropertyOptional({ nullable: true }) questionBankId!: string | null;
+  @ApiPropertyOptional({ nullable: true }) questionBankName!: string | null;
+  @ApiProperty({ type: [String] }) questionBankIds!: string[];
+  @ApiProperty({ type: [Object] }) questionBanks!: {
+    id: string;
+    name: string;
+  }[];
+  @ApiProperty({ type: [AssessmentScopeResponseDto] })
+  scopes!: AssessmentScopeResponseDto[];
+  @ApiProperty({ type: [AdminAssessmentQuestionDto] })
+  questions!: AdminAssessmentQuestionDto[];
 }
 
 export class PaginatedAdminAssessmentsResponseDto {

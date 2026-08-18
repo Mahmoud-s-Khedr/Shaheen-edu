@@ -23,6 +23,7 @@ export {
   QuestionStatus,
   QuestionType,
   QuestionContextType,
+  QuestionContentBlockType,
   QuestionExplanationOrigin,
   QuestionAnswerOrigin,
   QuestionAnswerProvenance,

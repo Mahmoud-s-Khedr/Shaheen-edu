@@ -627,8 +627,9 @@ describe('AssessmentsService', () => {
           sourceQuestionId: 'source-question-1',
         },
       };
-      prisma.assessmentAttemptAnswer.findUnique
-        .mockResolvedValueOnce(pendingAnswer);
+      prisma.assessmentAttemptAnswer.findUnique.mockResolvedValueOnce(
+        pendingAnswer,
+      );
       prisma.assessmentAttemptAnswer.findUniqueOrThrow.mockResolvedValue({
         ...pendingAnswer,
         isCorrect: true,
@@ -679,8 +680,9 @@ describe('AssessmentsService', () => {
           sourceQuestionId: 'source-question-1',
         },
       };
-      prisma.assessmentAttemptAnswer.findUnique
-        .mockResolvedValueOnce(pendingAnswer);
+      prisma.assessmentAttemptAnswer.findUnique.mockResolvedValueOnce(
+        pendingAnswer,
+      );
       prisma.assessmentAttemptAnswer.findUniqueOrThrow.mockResolvedValue({
         ...pendingAnswer,
         isCorrect: false,
@@ -751,6 +753,21 @@ describe('AssessmentsService', () => {
       await expect(
         service.assertSnapshotVideoAccess(studentUserId, 'video-1'),
       ).resolves.toBeUndefined();
+      expect(prisma.assessmentQuestion.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            OR: expect.arrayContaining([
+              { videoAssetId: 'video-1' },
+              { contentBlocks: { some: { assetId: 'video-1' } } },
+              {
+                options: {
+                  some: { contentBlocks: { some: { assetId: 'video-1' } } },
+                },
+              },
+            ]),
+          },
+        }),
+      );
     });
 
     it('returns protected access only for an attachment in an accessible assessment snapshot', async () => {
@@ -766,7 +783,9 @@ describe('AssessmentsService', () => {
         },
       });
       assets.getReady.mockResolvedValue({ id: 'attachment-1', kind: 'PDF' });
-      assets.protectedAccess.mockReturnValue({ url: 'https://cdn.example.test/attachment-1' });
+      assets.protectedAccess.mockReturnValue({
+        url: 'https://cdn.example.test/attachment-1',
+      });
 
       await expect(
         service.questionAttachmentAccess(
@@ -779,7 +798,9 @@ describe('AssessmentsService', () => {
       expect(prisma.assessmentQuestion.findFirst).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
-            attachments: { some: { assetId: 'attachment-1' } },
+            OR: expect.arrayContaining([
+              { attachments: { some: { assetId: 'attachment-1' } } },
+            ]),
           }),
         }),
       );

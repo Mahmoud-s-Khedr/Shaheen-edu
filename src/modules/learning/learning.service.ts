@@ -497,8 +497,32 @@ export class LearningService {
         },
       },
       include: {
-        options: { orderBy: { sortOrder: 'asc' } },
-        contexts: { include: { context: true }, orderBy: { sortOrder: 'asc' } },
+        contentBlocks: {
+          include: { asset: true },
+          orderBy: { sortOrder: 'asc' },
+        },
+        options: {
+          include: {
+            contentBlocks: {
+              include: { asset: true },
+              orderBy: { sortOrder: 'asc' },
+            },
+          },
+          orderBy: { sortOrder: 'asc' },
+        },
+        contexts: {
+          include: {
+            context: {
+              include: {
+                contentBlocks: {
+                  include: { asset: true },
+                  orderBy: { sortOrder: 'asc' },
+                },
+              },
+            },
+          },
+          orderBy: { sortOrder: 'asc' },
+        },
         structuredExplanation: true,
         assets: { include: { asset: true }, orderBy: { sortOrder: 'asc' } },
         videoLink: { include: { videoAsset: { include: { asset: true } } } },
@@ -565,11 +589,19 @@ export class LearningService {
       note,
       type: question.type,
       body: question.body,
-      contexts: question.contexts.map((link: any) => link.context),
+      contentBlocks: question.contentBlocks.map((block: any) =>
+        this.learnerBlock(block),
+      ),
+      contexts: question.contexts.map((link: any) =>
+        this.learnerContext(link.context),
+      ),
       placements: question.placements.map((p: any) => this.placementNode(p)),
       options: question.options.map((x: any) => ({
         id: x.id,
         body: x.body,
+        contentBlocks: x.contentBlocks.map((block: any) =>
+          this.learnerBlock(block),
+        ),
         sortOrder: x.sortOrder,
       })),
       attachments: question.assets.map((x: any) => ({
@@ -588,6 +620,42 @@ export class LearningService {
       attemptCount: attempts.length,
       solved: attempts.some((x) => x.isCorrect),
       lastAttemptAt: last?.submittedAt ?? null,
+    };
+  }
+
+  private learnerBlock(block: any) {
+    return {
+      id: block.id,
+      type: block.type,
+      sortOrder: block.sortOrder,
+      text: block.text,
+      assetId: block.assetId,
+      tableData: block.tableData,
+      latex: block.latex,
+      mathml: block.mathml,
+      caption: block.caption,
+      altText: block.altText,
+      languageCode: block.languageCode,
+      asset: block.asset
+        ? {
+            id: block.asset.id,
+            kind: block.asset.kind,
+            filename: block.asset.filename,
+          }
+        : undefined,
+    };
+  }
+
+  private learnerContext(context: any) {
+    return {
+      id: context.id,
+      type: context.type,
+      title: context.title,
+      body: context.body,
+      languageCode: context.languageCode,
+      contentBlocks: (context.contentBlocks ?? []).map((block: any) =>
+        this.learnerBlock(block),
+      ),
     };
   }
 
@@ -715,6 +783,13 @@ export class LearningService {
     if (
       !question ||
       (!question.assets.some((x: any) => x.assetId === assetId) &&
+        !question.contentBlocks.some((x: any) => x.assetId === assetId) &&
+        !question.options.some((x: any) =>
+          x.contentBlocks.some((b: any) => b.assetId === assetId),
+        ) &&
+        !question.contexts.some((x: any) =>
+          x.context.contentBlocks.some((b: any) => b.assetId === assetId),
+        ) &&
         question.videoLink?.videoAssetId !== assetId)
     )
       throw new NotFoundException('Eligible question asset not found');
@@ -744,12 +819,10 @@ export class LearningService {
         await this.access.assertContentItemAccess(item.id, studentId);
         return this.videos.playback(assetId);
       } catch (error) {
-        if (
-          !(
-            error instanceof ForbiddenException ||
-            error instanceof NotFoundException
-          )
-        )
+        if (!(
+          error instanceof ForbiddenException ||
+          error instanceof NotFoundException
+        ))
           throw error;
       }
     }
@@ -761,7 +834,18 @@ export class LearningService {
     const practiceQuestions = await this.prisma.question.findMany({
       where: {
         status: QuestionStatus.PUBLISHED,
-        videoLink: { is: { videoAssetId: assetId } },
+        OR: [
+          { videoLink: { is: { videoAssetId: assetId } } },
+          { contentBlocks: { some: { assetId } } },
+          { options: { some: { contentBlocks: { some: { assetId } } } } },
+          {
+            contexts: {
+              some: {
+                context: { contentBlocks: { some: { assetId } } },
+              },
+            },
+          },
+        ],
         bank: { status: ContentStatus.PUBLISHED },
         source: { status: ContentStatus.PUBLISHED },
         course: {
@@ -779,7 +863,11 @@ export class LearningService {
             course: true,
             chapter: { include: { course: true } },
             lesson: { include: { chapter: { include: { course: true } } } },
-            section: { include: { lesson: { include: { chapter: { include: { course: true } } } } } },
+            section: {
+              include: {
+                lesson: { include: { chapter: { include: { course: true } } } },
+              },
+            },
           },
         },
       },
@@ -792,12 +880,10 @@ export class LearningService {
       await this.assessments.assertSnapshotVideoAccess(studentId, assetId);
       return this.videos.playback(assetId);
     } catch (error) {
-      if (
-        !(
-          error instanceof ForbiddenException ||
-          error instanceof NotFoundException
-        )
-      )
+      if (!(
+        error instanceof ForbiddenException ||
+        error instanceof NotFoundException
+      ))
         throw error;
     }
     throw new NotFoundException('Accessible video not found');
