@@ -16,6 +16,7 @@ export const questionBankAuthoringJourney: JourneyDefinition = {
     let sourceId = '';
     let bankId = '';
     let questionId = '';
+    let writtenQuestionId = '';
 
     await step(
       'Creating a publisher-backed source and a question bank',
@@ -228,6 +229,55 @@ export const questionBankAuthoringJourney: JourneyDefinition = {
     );
 
     await step(
+      'Authoring and reviewing a written question without fake options',
+      async () => {
+        const written = await admin.request<any>('POST', '/admin/questions', {
+          bankId,
+          sourceId,
+          courseId,
+          placements: [{ chapterId }],
+          type: 'SHORT_ANSWER',
+          body: 'Write the synthetic keyword.',
+          explanation: 'The expected keyword is synthetic.',
+          maxPoints: 2,
+        });
+        expectStatus(written, 201);
+        writtenQuestionId = written.body.id;
+        context.created.questions.push(writtenQuestionId);
+        assert(
+          written.body.type === 'SHORT_ANSWER' &&
+            written.body.options.length === 0 &&
+            written.body.maxPoints === 2,
+          'Written drafts must persist without fake choice options',
+        );
+        expectStatus(
+          await admin.request<any>('POST', `/admin/questions/${writtenQuestionId}/submit`),
+          409,
+        );
+        const revised = await admin.request<any>(
+          'PATCH',
+          `/admin/questions/${writtenQuestionId}`,
+          { acceptedAnswers: ['Synthetic'], answerOrigin: 'HUMAN_REVIEWED' },
+        );
+        expectStatus(revised, 200);
+        expectStatus(
+          await admin.request<any>('POST', `/admin/questions/${writtenQuestionId}/submit`),
+          201,
+        );
+        const published = await admin.request<any>(
+          'POST',
+          `/admin/questions/${writtenQuestionId}/publish`,
+        );
+        expectStatus(published, 201);
+        assert(
+          published.body.status === 'PUBLISHED' &&
+            published.body.answerOrigin === 'HUMAN_REVIEWED',
+          'Reviewed written answers must be publishable with explicit provenance',
+        );
+      },
+    );
+
+    await step(
       'Protecting published dependencies and archiving the question',
       async () => {
         expectStatus(
@@ -264,6 +314,10 @@ export const questionBankAuthoringJourney: JourneyDefinition = {
         );
         expectStatus(archived, 201);
         assert(archived.body.status === 'ARCHIVED', 'Question must archive');
+        expectStatus(
+          await admin.request<any>('POST', `/admin/questions/${writtenQuestionId}/archive`),
+          201,
+        );
         const listed = await admin.request<any>(
           'GET',
           `/admin/questions?chapterId=${chapterId}&q=${encodeURIComponent('revised')}`,

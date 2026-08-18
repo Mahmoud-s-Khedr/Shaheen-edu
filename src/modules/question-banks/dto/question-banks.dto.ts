@@ -2,7 +2,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { ArrayMinSize, IsArray, IsBoolean, IsEnum, IsInt, IsOptional, IsString, MaxLength, Min, MinLength, ValidateNested } from 'class-validator';
 import { SearchPaginationQueryDto } from '../../../common/dto/pagination-query.dto';
-import { ContentStatus, QuestionContextType, QuestionSourceType, QuestionStatus, QuestionType } from '../../../common/types/roles.enum';
+import { ContentStatus, QuestionAnswerProvenance, QuestionContextType, QuestionSourceType, QuestionStatus, QuestionType } from '../../../common/types/roles.enum';
 import { LocalizedOptionalTextDto, LocalizedTextDto } from '../../../common/dto/localized-text.dto';
 
 export class CreateQuestionSourceDto {
@@ -54,6 +54,10 @@ export class CreateQuestionDto {
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(100000) explanation?: string;
   @ApiPropertyOptional({ type: [String] }) @IsOptional() @IsArray() @IsString({ each: true }) contextIds?: string[];
   @ApiPropertyOptional({ type: QuestionExplanationDto }) @IsOptional() @ValidateNested() @Type(() => QuestionExplanationDto) structuredExplanation?: QuestionExplanationDto;
+  @ApiPropertyOptional({ minimum: 1, default: 1 }) @IsOptional() @Type(() => Number) @IsInt() @Min(1) maxPoints?: number;
+  @ApiPropertyOptional({ type: [String], description: 'Accepted text answers for short-answer and fill-in-the-blank questions' }) @IsOptional() @IsArray() @ArrayMinSize(1) @IsString({ each: true }) @MaxLength(10000, { each: true }) acceptedAnswers?: string[];
+  @ApiPropertyOptional({ description: 'Required for long-answer questions before review' }) @IsOptional() @IsString() @MaxLength(100000) gradingRubric?: string;
+  @ApiPropertyOptional({ enum: QuestionAnswerProvenance }) @IsOptional() @IsEnum(QuestionAnswerProvenance) answerOrigin?: QuestionAnswerProvenance;
 }
 export class UpdateQuestionDto {
   @ApiPropertyOptional() @IsOptional() @IsString() bankId?: string; @ApiPropertyOptional() @IsOptional() @IsString() sourceId?: string; @ApiPropertyOptional() @IsOptional() @IsString() courseId?: string;
@@ -63,6 +67,10 @@ export class UpdateQuestionDto {
   @ApiPropertyOptional({ nullable: true }) @IsOptional() @IsString() @MaxLength(100000) explanation?: string | null;
   @ApiPropertyOptional({ type: [String] }) @IsOptional() @IsArray() @IsString({ each: true }) contextIds?: string[];
   @ApiPropertyOptional({ type: QuestionExplanationDto }) @IsOptional() @ValidateNested() @Type(() => QuestionExplanationDto) structuredExplanation?: QuestionExplanationDto;
+  @ApiPropertyOptional({ minimum: 1 }) @IsOptional() @Type(() => Number) @IsInt() @Min(1) maxPoints?: number;
+  @ApiPropertyOptional({ type: [String], nullable: true }) @IsOptional() @IsArray() @ArrayMinSize(1) @IsString({ each: true }) @MaxLength(10000, { each: true }) acceptedAnswers?: string[] | null;
+  @ApiPropertyOptional({ nullable: true }) @IsOptional() @IsString() @MaxLength(100000) gradingRubric?: string | null;
+  @ApiPropertyOptional({ enum: QuestionAnswerProvenance, nullable: true }) @IsOptional() @IsEnum(QuestionAnswerProvenance) answerOrigin?: QuestionAnswerProvenance | null;
 }
 export class CreateQuestionOptionDto { @ApiProperty() @IsString() @MinLength(1) @MaxLength(10000) body!: string; @ApiPropertyOptional() @IsOptional() @IsBoolean() isCorrect?: boolean; }
 export class UpdateQuestionOptionDto { @ApiPropertyOptional() @IsOptional() @IsString() @MinLength(1) @MaxLength(10000) body?: string; @ApiPropertyOptional() @IsOptional() @IsBoolean() isCorrect?: boolean; }

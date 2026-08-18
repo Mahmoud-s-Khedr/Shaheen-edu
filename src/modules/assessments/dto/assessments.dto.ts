@@ -233,10 +233,13 @@ export class QueryAdminAssessmentDto extends SearchPaginationQueryDto {
 }
 
 export class AutosaveAnswerDto {
-  @ApiProperty({ type: [String] })
-  @IsArray()
-  @IsString({ each: true })
-  selectedOptionIds!: string[];
+  @ApiPropertyOptional({ type: [String] }) @IsOptional() @IsArray() @IsString({ each: true }) selectedOptionIds?: string[];
+  @ApiPropertyOptional({ description: 'Written response for short, fill-in, and long-answer questions' }) @IsOptional() @IsString() @MaxLength(100000) responseText?: string;
+}
+
+export class GradeLongAnswerDto {
+  @ApiProperty({ minimum: 0 }) @Type(() => Number) @IsInt() @Min(0) awardedPoints!: number;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(10000) feedback?: string;
 }
 export class ReportActiveTimeDto {
   @ApiProperty({

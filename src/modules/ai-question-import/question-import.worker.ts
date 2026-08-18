@@ -627,7 +627,7 @@ export class QuestionImportWorker {
         if (reviewRequired) return tx.questionImportItem.update({ where: { id: item.id }, data: { status: QuestionImportItemStatus.REVIEW_REQUIRED, errorDetail: 'AI answer requires admin review before a draft can be created' } });
         const q = await this.questions.createImportedDraftWithClient(
           { id: batch.createdById, role: Role.ADMIN, sessionId: 'ai-import-worker' },
-          { bankId: batch.bankId, sourceId: batch.sourceId, courseId: batch.courseId, placements: batch.placements, body: c.body, explanation: plainExplanation, type: c.type, options, contextIds: source.contextIds, aiExplanation: explanation, answerOrigin: c.answer.origin, confidence: c.answer.confidence, warnings: c.warnings, model: batch.model },
+          { bankId: batch.bankId, sourceId: batch.sourceId, courseId: batch.courseId, placements: batch.placements, body: c.body, explanation: plainExplanation, type: c.type, options, contextIds: source.contextIds, aiExplanation: explanation, aiAnswerOrigin: c.answer.origin, confidence: c.answer.confidence, warnings: c.warnings, model: batch.model },
           tx,
         );
         return tx.questionImportItem.update({ where: { id: item.id }, data: { status: QuestionImportItemStatus.CREATED, questionId: q.id } });

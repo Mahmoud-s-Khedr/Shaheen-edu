@@ -25,6 +25,7 @@ export {
   QuestionContextType,
   QuestionExplanationOrigin,
   QuestionAnswerOrigin,
+  QuestionAnswerProvenance,
   QuestionImportInputType,
   QuestionImportStatus,
   QuestionImportPageStatus,

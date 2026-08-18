@@ -35,6 +35,7 @@ import {
   AutosaveAnswerDto,
   ReportActiveTimeDto,
   CreateCustomAssessmentDto,
+  GradeLongAnswerDto,
   GenerateAdminStandardAssessmentDto,
   GenerateStudentAssessmentDto,
   IdDeletedResponseDto,
@@ -277,6 +278,14 @@ export class AssessmentsController {
 @Controller({ path: 'admin/assessments', version: '1' })
 export class AdminAssessmentsController {
   constructor(private readonly assessments: AssessmentsService) {}
+
+  @Get('grading/pending')
+  @ApiOperation({ summary: 'List submitted long answers awaiting manual grading' })
+  pendingGrades(@CurrentUser() user: RequestUser) { return this.assessments.pendingGrades(user); }
+
+  @Post('grading/answers/:answerId')
+  @ApiOperation({ summary: 'Award points to a submitted long answer' })
+  grade(@CurrentUser() user: RequestUser, @Param('answerId') answerId: string, @Body() dto: GradeLongAnswerDto) { return this.assessments.gradeLongAnswer(user, answerId, dto); }
 
   @Post('standard')
   @ApiOperation({

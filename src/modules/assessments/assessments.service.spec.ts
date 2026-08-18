@@ -12,6 +12,7 @@ import {
   AssessmentStatus,
   ContentStatus,
   QuestionType,
+  Role,
 } from '../../common/types/roles.enum';
 import { ContentAccessPolicyService } from '../entitlements/content-access-policy.service';
 import { AssessmentsService } from './assessments.service';
@@ -58,7 +59,10 @@ describe('AssessmentsService', () => {
       assessmentAttemptAnswer: {
         findMany: jest.fn().mockResolvedValue([]),
         findUnique: jest.fn().mockResolvedValue(null),
+        findUniqueOrThrow: jest.fn(),
         upsert: jest.fn().mockResolvedValue({ id: 'answer-1' }),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        aggregate: jest.fn().mockResolvedValue({ _sum: { awardedPoints: 0 } }),
       },
       studentQuestionMark: {
         findMany: jest.fn().mockResolvedValue([]),
@@ -611,6 +615,125 @@ describe('AssessmentsService', () => {
   });
 
   describe('attempt lifecycle', () => {
+    it('records a fully credited long answer as correct and includes it in community stats', async () => {
+      const { service, prisma, communityStats } = build();
+      const pendingAnswer = {
+        id: 'answer-1',
+        attemptId: 'attempt-1',
+        outcome: 'PENDING_GRADING',
+        assessmentQuestion: {
+          type: QuestionType.LONG_ANSWER,
+          maxPoints: 5,
+          sourceQuestionId: 'source-question-1',
+        },
+      };
+      prisma.assessmentAttemptAnswer.findUnique
+        .mockResolvedValueOnce(pendingAnswer);
+      prisma.assessmentAttemptAnswer.findUniqueOrThrow.mockResolvedValue({
+        ...pendingAnswer,
+        isCorrect: true,
+        outcome: 'CORRECT',
+        awardedPoints: 5,
+      });
+      prisma.assessmentAttemptAnswer.aggregate.mockResolvedValue({
+        _sum: { awardedPoints: 8 },
+      });
+
+      const result = await service.gradeLongAnswer(
+        { id: 'admin-1', role: Role.ADMIN } as any,
+        'answer-1',
+        { awardedPoints: 5, feedback: 'Complete answer' },
+      );
+
+      expect(prisma.assessmentAttemptAnswer.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'answer-1', outcome: 'PENDING_GRADING' },
+          data: expect.objectContaining({
+            awardedPoints: 5,
+            outcome: 'CORRECT',
+            isCorrect: true,
+          }),
+        }),
+      );
+      expect(communityStats.recordResponse).toHaveBeenCalledWith(
+        prisma,
+        'source-question-1',
+        true,
+      );
+      expect(prisma.assessmentAttempt.update).toHaveBeenCalledWith({
+        where: { id: 'attempt-1' },
+        data: { score: 8 },
+      });
+      expect(result).toMatchObject({ isCorrect: true, outcome: 'CORRECT' });
+    });
+
+    it('records partial-credit long answers as incorrect in binary community stats', async () => {
+      const { service, prisma, communityStats } = build();
+      const pendingAnswer = {
+        id: 'answer-1',
+        attemptId: 'attempt-1',
+        outcome: 'PENDING_GRADING',
+        assessmentQuestion: {
+          type: QuestionType.LONG_ANSWER,
+          maxPoints: 5,
+          sourceQuestionId: 'source-question-1',
+        },
+      };
+      prisma.assessmentAttemptAnswer.findUnique
+        .mockResolvedValueOnce(pendingAnswer);
+      prisma.assessmentAttemptAnswer.findUniqueOrThrow.mockResolvedValue({
+        ...pendingAnswer,
+        isCorrect: false,
+        outcome: 'PARTIALLY_CORRECT',
+        awardedPoints: 3,
+      });
+
+      await service.gradeLongAnswer(
+        { id: 'admin-1', role: Role.ADMIN } as any,
+        'answer-1',
+        { awardedPoints: 3 },
+      );
+
+      expect(prisma.assessmentAttemptAnswer.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            outcome: 'PARTIALLY_CORRECT',
+            isCorrect: false,
+          }),
+        }),
+      );
+      expect(communityStats.recordResponse).toHaveBeenCalledWith(
+        prisma,
+        'source-question-1',
+        false,
+      );
+    });
+
+    it('does not record community stats when another grader has already graded the answer', async () => {
+      const { service, prisma, communityStats } = build();
+      prisma.assessmentAttemptAnswer.findUnique.mockResolvedValue({
+        id: 'answer-1',
+        attemptId: 'attempt-1',
+        outcome: 'PENDING_GRADING',
+        assessmentQuestion: {
+          type: QuestionType.LONG_ANSWER,
+          maxPoints: 5,
+          sourceQuestionId: 'source-question-1',
+        },
+      });
+      prisma.assessmentAttemptAnswer.updateMany.mockResolvedValue({ count: 0 });
+
+      await expect(
+        service.gradeLongAnswer(
+          { id: 'admin-1', role: Role.ADMIN } as any,
+          'answer-1',
+          { awardedPoints: 5 },
+        ),
+      ).rejects.toBeInstanceOf(ConflictException);
+      expect(communityStats.recordResponse).not.toHaveBeenCalled();
+      expect(prisma.assessmentAttempt.update).not.toHaveBeenCalled();
+    });
+
     it('authorizes a video retained by the student-owned assessment snapshot', async () => {
       const { service, prisma } = build();
       prisma.assessmentQuestion.findMany.mockResolvedValue([

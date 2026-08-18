@@ -151,6 +151,9 @@ enum QuestionStatus {
 enum QuestionType {
   SINGLE_CHOICE
   MULTIPLE_CHOICE
+  SHORT_ANSWER
+  FILL_IN_THE_BLANK
+  LONG_ANSWER
 }
 
 enum QuestionContextType {
@@ -168,6 +171,13 @@ enum QuestionExplanationOrigin {
 enum QuestionAnswerOrigin {
   EXPLICIT
   INFERRED
+}
+
+enum QuestionAnswerProvenance {
+  OFFICIAL
+  SOURCE_MARKED
+  AI_INFERRED
+  HUMAN_REVIEWED
 }
 
 enum QuestionImportInputType {
@@ -245,8 +255,10 @@ enum AssessmentAttemptStatus {
 
 enum AssessmentQuestionOutcome {
   CORRECT
+  PARTIALLY_CORRECT
   INCORRECT
   OMITTED
+  PENDING_GRADING
 }
 
 enum QuestionDifficultyBand {
@@ -309,6 +321,8 @@ model User {
   questionsCreated          Question[]               @relation("QuestionCreatedBy")
   questionsUpdated          Question[]               @relation("QuestionUpdatedBy")
   questionsReviewed         Question[]               @relation("QuestionReviewedBy")
+  questionAnswersReviewed   Question[]               @relation("QuestionAnswerReviewedBy")
+  assessmentAnswersGraded   AssessmentAttemptAnswer[] @relation("AssessmentAnswerGradedBy")
   questionImportsCreated    QuestionImportBatch[]    @relation("QuestionImportCreatedBy")
   assessmentsCreated        Assessment[]             @relation("AssessmentCreatedByAdmin")
   leaderboardWeeksFinalized LeaderboardWeek[]        @relation("LeaderboardWeekFinalizedBy")
@@ -796,6 +810,12 @@ model Question {
   type            QuestionType             @default(SINGLE_CHOICE)
   body            String
   explanation     String?
+  maxPoints       Int                      @default(1)
+  acceptedAnswers Json?
+  gradingRubric   String?
+  answerOrigin    QuestionAnswerProvenance?
+  answerReviewedAt DateTime?
+  answerReviewedById String?
   status          QuestionStatus           @default(DRAFT)
   reviewNote      String?
   reviewedAt      DateTime?
@@ -812,6 +832,7 @@ model Question {
   createdBy       User                     @relation("QuestionCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
   updatedBy       User                     @relation("QuestionUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
   reviewedBy      User?                    @relation("QuestionReviewedBy", fields: [reviewedById], references: [id], onDelete: Restrict)
+  answerReviewedBy User?                   @relation("QuestionAnswerReviewedBy", fields: [answerReviewedById], references: [id], onDelete: Restrict)
   options         QuestionOption[]
   assets          QuestionAsset[]
   videoLink       QuestionVideoLink?
@@ -1191,6 +1212,10 @@ model AssessmentQuestion {
   type             QuestionType
   body             String
   explanation      String?
+  maxPoints        Int
+  acceptedAnswers  Json?
+  gradingRubric    String?
+  answerOrigin     QuestionAnswerProvenance?
   videoAssetId     String?
   videoAssetName   String?
   timestampSeconds Int?
@@ -1299,6 +1324,7 @@ model AssessmentAttempt {
   lastActivityAt DateTime                  @default(now())
   submittedAt    DateTime?
   score          Int?
+  totalPoints    Int
   totalQuestions Int
   answers        AssessmentAttemptAnswer[]
 
@@ -1317,8 +1343,14 @@ model AssessmentAttemptAnswer {
   assessmentQuestionId String
   assessmentQuestion   AssessmentQuestion         @relation(fields: [assessmentQuestionId], references: [id], onDelete: Cascade)
   selectedOptionIds    String[]
+  responseText         String?
   isCorrect            Boolean?
   outcome              AssessmentQuestionOutcome?
+  awardedPoints        Int?
+  gradedAt             DateTime?
+  gradedById           String?
+  gradedBy             User?                       @relation("AssessmentAnswerGradedBy", fields: [gradedById], references: [id], onDelete: Restrict)
+  graderFeedback       String?
   activeSeconds        Int                        @default(0)
   answeredAt           DateTime                   @default(now())
   updatedAt            DateTime                   @updatedAt
@@ -1334,6 +1366,8 @@ model AssessmentAnswerChange {
   attemptAnswer   AssessmentAttemptAnswer   @relation(fields: [attemptAnswerId], references: [id], onDelete: Cascade)
   fromOptionIds   String[]
   toOptionIds     String[]
+  fromResponseText String?
+  toResponseText   String?
   fromOutcome     AssessmentQuestionOutcome
   toOutcome       AssessmentQuestionOutcome
   changedAt       DateTime                  @default(now())
