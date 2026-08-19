@@ -8,6 +8,7 @@ import {
   QuestionImportChunkStatus,
   QuestionImportItemStatus,
   QuestionImportStatus,
+  QuestionAnswerProvenance,
   Role,
 } from '../../common/types/roles.enum';
 import { PrismaService } from '../../database/prisma.service';
@@ -20,7 +21,9 @@ import {
   OpenRouterQuestionImportClient,
   OpenRouterQuestionImportError,
   type ImportedCandidate,
+  type ImportedCandidateV3,
   type SegmentationResult,
+  type SegmentationResultV3,
 } from './openrouter-question-import.client';
 import { QUESTION_IMPORT_MAX_ATTEMPTS, QUESTION_IMPORT_QUEUE, QuestionImportQueue } from './question-import.queue';
 
@@ -76,7 +79,8 @@ export class QuestionImportWorker {
       where: { id: batchId },
       include: { sourceAsset: true, children: { select: { id: true } } },
     });
-    if (!batch || batch.schemaVersion !== 'question-import-v2') return;
+    if (!batch || !['question-import-v2', 'question-import-v3'].includes(batch.schemaVersion)) return;
+    const v3 = batch.schemaVersion === 'question-import-v3';
     try {
       if (!batch.normalizedText) {
         await this.prisma.questionImportBatch.update({
@@ -154,10 +158,13 @@ export class QuestionImportWorker {
           data: { status: QuestionImportStatus.SEGMENTING },
         });
         const scope = current.pageScope as any;
-        const response = await this.client.segmentSource(
+        const response = await (v3 ? this.client.segmentSourceV3(
           blocks.map((b: any) => ({ key: b.blockKey, text: b.text })),
           scope ? { corePageStart: scope.corePageStart, corePageEnd: scope.corePageEnd } : undefined,
-        );
+        ) : this.client.segmentSource(
+          blocks.map((b: any) => ({ key: b.blockKey, text: b.text })),
+          scope ? { corePageStart: scope.corePageStart, corePageEnd: scope.corePageEnd } : undefined,
+        ));
         response.result = this.limitToOwnedPages(blocks, response.result, scope);
         const issue = this.validateSegmentation(blocks, response.result);
         if (issue) {
@@ -165,7 +172,7 @@ export class QuestionImportWorker {
           if (batch.parentId) await this.refreshParent(batch.parentId);
           return;
         }
-        await this.persistSegmentationAndChunks(batchId, blocks, response);
+        await this.persistSegmentationAndChunks(batchId, blocks, response, v3);
       }
       await this.reclaimStaleProcessingChunks(batchId);
       const pending = await this.prisma.questionImportChunk.findMany({
@@ -397,14 +404,22 @@ export class QuestionImportWorker {
       const page = this.pageForBlock(blocks, firstBlock);
       return page !== null && page >= scope.corePageStart && page <= scope.corePageEnd;
     };
-    return { ...result, questions: result.questions.filter((question) => {
+    const questions = result.questions.filter((question) => {
       const page = this.pageForBlock(blocks, question.firstBlock);
       if (!owned(question.firstBlock)) return false;
       question.page = page;
       return true;
-    }), excluded: result.excluded.filter((item) => owned(item.firstBlock)), skippedRanges: (result.skippedRanges ?? []).filter((item) => owned(item.firstBlock)) };
+    });
+    if ('answerEvidence' in result) {
+      const typed = result as SegmentationResultV3;
+      const questionIds = new Set(questions.map((question) => question.id));
+      const answerEvidence = typed.answerEvidence.map((item) => ({ ...item, questionIds: item.questionIds.filter((id: string) => questionIds.has(id)) })).filter((item) => item.questionIds.length);
+      const keys = new Set(answerEvidence.map((item) => item.evidenceKey));
+      return { ...typed, questions: questions.map((question: any) => ({ ...question, evidenceKeys: question.evidenceKeys.filter((key: string) => keys.has(key)) })), answerEvidence, excluded: typed.excluded.filter((item) => owned(item.firstBlock)), skippedRanges: (typed.skippedRanges ?? []).filter((item) => owned(item.firstBlock)) };
+    }
+    return { ...result, questions, excluded: result.excluded.filter((item) => owned(item.firstBlock)), skippedRanges: (result.skippedRanges ?? []).filter((item) => owned(item.firstBlock)) };
   }
-  private validateSegmentation(blocks: any[], result: SegmentationResult) {
+  private validateSegmentation(blocks: any[], result: SegmentationResult | SegmentationResultV3) {
     if (result.warnings.some((warning) => /(?:continues|additional).{0,80}(?:beyond|omitted)|only the extracted/i.test(warning))) {
       return 'AI reported incomplete source coverage; reduce the segmentation range and retry.';
     }
@@ -425,6 +440,21 @@ export class QuestionImportWorker {
       if (!r || r.first <= previous || !question.sourceNumber || question.contextIds.some((id) => !contextIds.has(id))) return 'AI returned invalid question boundaries or context references.';
       for (let i = r.first; i <= r.last; i += 1) { if (questionRanges.has(keys[i])) return 'AI returned overlapping question boundaries.'; questionRanges.add(keys[i]); }
       previous = r.last;
+    }
+    if ('answerEvidence' in result) {
+      const questionIds = new Set(result.questions.map((question) => question.id));
+      const evidenceKeys = new Set<string>();
+      for (const evidence of result.answerEvidence) {
+        if (!evidence.evidenceKey || evidenceKeys.has(evidence.evidenceKey) || !range(evidence.firstBlock, evidence.lastBlock) || !evidence.questionIds.length || evidence.questionIds.some((id) => !questionIds.has(id)))
+          return 'AI returned invalid answer-evidence metadata.';
+        evidenceKeys.add(evidence.evidenceKey);
+      }
+      if (result.questions.some((question) => question.evidenceKeys.some((key) => !evidenceKeys.has(key)))) return 'AI returned an unknown answer-evidence reference.';
+      if (result.questions.some((question) => {
+        const declared = new Set(question.evidenceKeys);
+        const indexed = result.answerEvidence.filter((evidence) => evidence.questionIds.includes(question.id)).map((evidence) => evidence.evidenceKey);
+        return declared.size !== indexed.length || indexed.some((key) => !declared.has(key));
+      })) return 'AI returned inconsistent question answer-evidence references.';
     }
     if (!result.excluded.every((item) => Boolean(range(item.firstBlock, item.lastBlock)))) return 'AI returned invalid excluded-source metadata.';
     return (result.skippedRanges ?? []).every((item) => Boolean(range(item.firstBlock, item.lastBlock))) ? null : 'AI returned invalid skipped-source metadata.';
@@ -456,9 +486,10 @@ export class QuestionImportWorker {
       const first = keys.indexOf(context.firstBlock), last = keys.indexOf(context.lastBlock);
       return [context.id, { id: contextIdMap.get(context.id)!, title: context.title ?? null, type: context.type, text: blocks.slice(first, last + 1).map((b: any) => b.text).join('\n') }];
     }));
-    const complete = result.questions.filter((question) => ['SINGLE_CHOICE', 'MULTIPLE_CHOICE'].includes(question.detectedType)).map((question) => {
+    const complete = result.questions.filter((question) => ['SINGLE_CHOICE', 'MULTIPLE_CHOICE', 'SHORT_ANSWER', 'FILL_IN_THE_BLANK', 'LONG_ANSWER'].includes(question.detectedType)).map((question: any) => {
       const first = keys.indexOf(question.firstBlock), last = keys.indexOf(question.lastBlock);
       return {
+        id: question.id,
         firstBlock: question.firstBlock,
         lastBlock: question.lastBlock,
         text: blocks
@@ -468,8 +499,10 @@ export class QuestionImportWorker {
         sourceNumber: question.sourceNumber,
         section: question.section,
         page: question.page,
-        contextIds: question.contextIds.map((id) => contextIdMap.get(id)!),
-        contexts: question.contextIds.map((id) => contexts.get(id)).filter(Boolean),
+        contextIds: question.contextIds.map((id: string) => contextIdMap.get(id)!),
+        contexts: question.contextIds.map((id: string) => contexts.get(id)).filter(Boolean),
+        evidenceKeys: question.evidenceKeys ?? [],
+        answerEvidence: question.answerEvidence ?? [],
         locator: question,
       };
     });
@@ -502,12 +535,23 @@ export class QuestionImportWorker {
     const contexts = new Map<string, any>();
     for (const question of questions) for (const context of question.contexts ?? []) contexts.set(context.id, context);
     // Contexts were attached above only long enough to build a chunk; strip them from every question payload.
-    return { contexts: [...contexts.values()], questions: questions.map(({ contexts: _contexts, locator: _locator, ...question }) => question) };
+    const evidence = new Map<string, any>();
+    for (const question of questions)
+      for (const item of question.answerEvidence ?? []) evidence.set(item.evidenceKey, item);
+    return {
+      contexts: [...contexts.values()],
+      answerEvidence: [...evidence.values()],
+      questions: questions.map(({ contexts: _contexts, locator: _locator, answerEvidence, ...question }) => ({
+        ...question,
+        allowedEvidenceKeys: answerEvidence.map((item: any) => item.evidenceKey),
+      })),
+    };
   }
   private async persistSegmentationAndChunks(
     batchId: string,
     blocks: any[],
-    response: { result: SegmentationResult; raw: unknown; usage: unknown },
+    response: { result: SegmentationResult | SegmentationResultV3; raw: unknown; usage: unknown },
+    v3 = false,
   ) {
     await this.prisma.$transaction(async (tx: any) => {
       const contextIdMap = new Map<string, string>();
@@ -516,7 +560,24 @@ export class QuestionImportWorker {
         const created = await tx.questionContext.create({ data: { type: context.type, title: context.title, body: blocks.slice(first, last + 1).map((b: any) => b.text).join('\n'), sourceLocator: { firstBlock: context.firstBlock, lastBlock: context.lastBlock } } });
         contextIdMap.set(context.id, created.id);
       }
-      const chunks = this.extractionChunks(batchId, blocks, response.result, contextIdMap);
+      const result: any = response.result;
+      const evidence = v3 ? (result.answerEvidence ?? []) : [];
+      const evidenceByQuestion = new Map<string, any[]>();
+      for (const item of evidence) {
+        for (const questionId of item.questionIds ?? []) {
+          const rows = evidenceByQuestion.get(questionId) ?? [];
+          rows.push(item);
+          evidenceByQuestion.set(questionId, rows);
+        }
+      }
+      const chunks = this.extractionChunks(batchId, blocks, {
+        ...result,
+        questions: result.questions.map((question: any) => ({ ...question, answerEvidence: (evidenceByQuestion.get(question.id) ?? []).map((item) => {
+          const keys = blocks.map((block: any) => block.blockKey);
+          const first = keys.indexOf(item.firstBlock), last = keys.indexOf(item.lastBlock);
+          return { ...item, text: blocks.slice(first, last + 1).map((block: any) => block.text).join('\n') };
+        }) })),
+      }, contextIdMap);
       await tx.questionImportBatch.update({
         where: { id: batchId },
         data: {
@@ -528,6 +589,11 @@ export class QuestionImportWorker {
         },
       });
       if ((response.result.skippedRanges ?? []).length) await tx.questionImportSkippedRange.createMany({ data: (response.result.skippedRanges ?? []).map((range: any, index: number) => ({ batchId, sequence: index + 1, firstBlock: range.firstBlock, lastBlock: range.lastBlock, reason: range.reason, sourceLocator: { firstBlock: range.firstBlock, lastBlock: range.lastBlock, first: blocks.find((block: any) => block.blockKey === range.firstBlock)?.sourceLocator, last: blocks.find((block: any) => block.blockKey === range.lastBlock)?.sourceLocator } })) });
+      if (evidence.length) await tx.questionImportAnswerEvidence.createMany({ data: evidence.map((item: any) => {
+        const keys = blocks.map((block: any) => block.blockKey);
+        const first = keys.indexOf(item.firstBlock), last = keys.indexOf(item.lastBlock);
+        return { batchId, evidenceKey: item.evidenceKey, firstBlock: item.firstBlock, lastBlock: item.lastBlock, text: blocks.slice(first, last + 1).map((block: any) => block.text).join('\n'), questionIds: item.questionIds, sourceLocator: { firstBlock: item.firstBlock, lastBlock: item.lastBlock, first: blocks[first]?.sourceLocator, last: blocks[last]?.sourceLocator } };
+      }) });
       await tx.questionImportChunk.createMany({ data: chunks });
     });
   }
@@ -543,7 +609,10 @@ export class QuestionImportWorker {
     try {
       const input = JSON.parse(chunk.text);
       const questions = Array.isArray(input) ? input : input.questions;
-      const r = await this.client.extractQuestions(Array.isArray(input) ? { contexts: [], questions } : input);
+      const v3 = batch.schemaVersion === 'question-import-v3';
+      const r = await (v3
+        ? this.client.extractQuestionsV3(Array.isArray(input) ? { contexts: [], answerEvidence: [], questions } : input)
+        : this.client.extractQuestions(Array.isArray(input) ? { contexts: [], questions } : input));
       if (r.items.length !== questions.length)
         throw new Error(
           'AI did not return exactly one structured item for each identified question',
@@ -555,7 +624,7 @@ export class QuestionImportWorker {
       const completedSequences = new Set((await this.prisma.questionImportItem.findMany({ where: { chunkId: chunk.id, questionId: { not: null } }, select: { sequence: true } })).map((item) => item.sequence));
       for (let i = 0; i < r.items.length; i += 1)
         if (!completedSequences.has(i + 1))
-          await this.createItem(batch, chunk, i + 1, r.items[i], questions[i]);
+          await this.createItem(batch, chunk, i + 1, r.items[i] as any, questions[i], v3);
       await this.prisma.questionImportChunk.update({
         where: { id: chunk.id },
         data: {
@@ -581,7 +650,9 @@ export class QuestionImportWorker {
     sequence: number,
     c: ImportedCandidate,
     source: any,
+    v3 = false,
   ) {
+    if (v3) return this.createV3Item(batch, chunk, sequence, c as unknown as ImportedCandidateV3, source);
     const selected = new Set(c.answer?.selectedOptionIndexes ?? []);
     const options = c.options?.map((option, index) => ({ ...option, isCorrect: selected.has(index) })) ?? [];
     const explanation = c.explanation;
@@ -619,7 +690,7 @@ export class QuestionImportWorker {
             globalOrder: ((batch.childSequence ?? 0) * 1_000_000) + (chunk.sequence * 1_000) + sequence,
             section: source.section,
             detectedType: c.type,
-            answerOrigin: c.answer?.origin,
+            answerOrigin: c.answer?.origin === 'EXPLICIT' ? QuestionAnswerProvenance.SOURCE_MARKED : QuestionAnswerProvenance.AI_INFERRED,
           },
         });
         if (!valid)
@@ -649,6 +720,50 @@ export class QuestionImportWorker {
           errorDetail: e.message.slice(0, 2000),
         },
       });
+    }
+  }
+  private async createV3Item(batch: any, chunk: any, sequence: number, c: ImportedCandidateV3, source: any) {
+    const type = c?.type;
+    const choice = type === 'SINGLE_CHOICE' || type === 'MULTIPLE_CHOICE';
+    const written = type === 'SHORT_ANSWER' || type === 'FILL_IN_THE_BLANK';
+    const options = choice ? (c as any).options?.map((option: any, index: number) => ({ body: option.body?.trim(), isCorrect: new Set((c as any).selectedOptionIndexes ?? []).has(index) })) ?? [] : [];
+    const acceptedAnswers = written ? ((c as any).acceptedAnswers ?? []).map((answer: any) => typeof answer === 'string' ? answer.trim() : '') : [];
+    const gradingRubric = type === 'LONG_ANSWER' ? (c as any).gradingRubric?.trim() : undefined;
+    const confidence = c?.confidence;
+    const warnings = c?.warnings ?? [];
+    const citations = [...new Set(c?.citedEvidenceKeys ?? [])];
+    const allowedEvidence = new Set((source.answerEvidence ?? []).map((evidence: any) => evidence.evidenceKey));
+    const citationValid = citations.every((key) => allowedEvidence.has(key));
+    const corruptionWarning = /ambiguous|uncertain|incomplete|missing|absent|no\s+answer|garbl|corrupt|illegible|مشوش|تشوش|غير\s*واضح|محرّف|محرف|مقطوع|غير\s*مقروء/i;
+    const validType = choice || written || type === 'LONG_ANSWER';
+    const structuralValid = validType && typeof c?.body === 'string' && Boolean(c.body.trim()) && typeof c?.explanation === 'string' && Boolean(c.explanation.trim()) && ['SOURCE_MARKED', 'AI_INFERRED'].includes(c?.answerOrigin);
+    const choiceComplete = choice && options.length >= 2 && options.every((option: any) => option.body) && new Set(options.map((option: any) => option.body)).size === options.length && options.some((option: any) => option.isCorrect) && (type !== 'SINGLE_CHOICE' || options.filter((option: any) => option.isCorrect).length === 1) && (type !== 'MULTIPLE_CHOICE' || options.filter((option: any) => option.isCorrect).length >= 2);
+    const writtenComplete = written && acceptedAnswers.length > 0 && acceptedAnswers.every(Boolean) && new Set(acceptedAnswers).size === acceptedAnswers.length;
+    const longComplete = type === 'LONG_ANSWER' && Boolean(gradingRubric);
+    const completeAnswer = choice ? choiceComplete : written ? writtenComplete : longComplete;
+    const reviewRequired = !completeAnswer || !citationValid || !Number.isFinite(confidence) || confidence < 0 || confidence > 1 || confidence < 0.9 || c.answerOrigin !== 'SOURCE_MARKED' || !citations.length || warnings.some((warning) => corruptionWarning.test(warning));
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        const item = await tx.questionImportItem.create({ data: {
+          batchId: batch.id, chunkId: chunk.id, sequence, status: QuestionImportItemStatus.PROCESSING,
+          rawOutput: c as any, normalizedOutput: { ...c, options, acceptedAnswers, gradingRubric } as any,
+          confidence, warnings: warnings as any, citedEvidenceKeys: citations as any,
+          sourceLocator: { firstBlock: source.firstBlock, lastBlock: source.lastBlock, page: source.page }, sourceNumber: source.sourceNumber,
+          globalOrder: ((batch.childSequence ?? 0) * 1_000_000) + (chunk.sequence * 1_000) + sequence,
+          section: source.section, detectedType: type, answerOrigin: c.answerOrigin as QuestionAnswerProvenance,
+        } });
+        if (!structuralValid) return tx.questionImportItem.update({ where: { id: item.id }, data: { status: QuestionImportItemStatus.INVALID, errorDetail: 'Candidate does not satisfy typed question rules' } });
+        if (reviewRequired) return tx.questionImportItem.update({ where: { id: item.id }, data: { status: QuestionImportItemStatus.REVIEW_REQUIRED, errorDetail: !citationValid || !citations.length ? 'Answer has no relevant retained source evidence' : 'AI answer requires admin review before a draft can be created' } });
+        const q = await this.questions.createImportedDraftWithClient(
+          { id: batch.createdById, role: Role.ADMIN, sessionId: 'ai-import-worker' },
+          { bankId: batch.bankId, sourceId: batch.sourceId, courseId: batch.courseId, placements: batch.placements, body: c.body, explanation: c.explanation, type, options, acceptedAnswers, gradingRubric, contextIds: source.contextIds, answerOrigin: QuestionAnswerProvenance.SOURCE_MARKED },
+          tx,
+        );
+        return tx.questionImportItem.update({ where: { id: item.id }, data: { status: QuestionImportItemStatus.CREATED, questionId: q.id } });
+      });
+    } catch (e: any) {
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') return;
+      return this.prisma.questionImportItem.create({ data: { batchId: batch.id, chunkId: chunk.id, sequence, status: QuestionImportItemStatus.INVALID, rawOutput: c as any, normalizedOutput: c as any, sourceLocator: { firstBlock: source.firstBlock, lastBlock: source.lastBlock }, errorDetail: e.message.slice(0, 2000) } });
     }
   }
 }

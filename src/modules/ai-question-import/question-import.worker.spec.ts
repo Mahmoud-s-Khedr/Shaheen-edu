@@ -476,4 +476,37 @@ describe('QuestionImportWorker', () => {
     );
     expect(issue).toBeNull();
   });
+
+  it('creates a source-marked short-answer draft only when its cited evidence is relevant', async () => {
+    const { worker, questions, tx } = workerWith();
+    await (worker as any).createV3Item(
+      { id: 'batch-1', createdById: 'admin-1', bankId: 'bank-1', sourceId: 'source-1', courseId: 'course-1', placements: [], model: 'test' },
+      { id: 'chunk-1', sequence: 1 }, 1,
+      { body: 'Name the capital.', type: 'SHORT_ANSWER', acceptedAnswers: ['Cairo'], explanation: 'The marked key gives Cairo.', confidence: 0.98, answerOrigin: 'SOURCE_MARKED', warnings: [], citedEvidenceKeys: ['E001'] },
+      { firstBlock: 'B1', lastBlock: 'B1', sourceNumber: '1', contextIds: [], answerEvidence: [{ evidenceKey: 'E001' }] },
+    );
+    expect(questions.createImportedDraftWithClient).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ type: 'SHORT_ANSWER', acceptedAnswers: ['Cairo'], answerOrigin: 'SOURCE_MARKED' }), tx);
+  });
+
+  it('passes each V3 question its stable id and evidence allowlist', () => {
+    const { worker } = workerWith();
+    const input = (worker as any).extractionInput([{
+      id: 'Q-1', firstBlock: 'B1', lastBlock: 'B1', text: 'Name the capital.', sourceNumber: '1', contextIds: [], contexts: [], locator: {},
+      answerEvidence: [{ evidenceKey: 'E001', questionIds: ['Q-1'], text: 'Cairo' }],
+    }]);
+
+    expect(input.questions).toEqual([expect.objectContaining({ id: 'Q-1', allowedEvidenceKeys: ['E001'] })]);
+  });
+
+  it('keeps inferred and incomplete typed answers reviewable instead of creating drafts', async () => {
+    const { worker, questions, tx } = workerWith();
+    await (worker as any).createV3Item(
+      { id: 'batch-1', createdById: 'admin-1', bankId: 'bank-1', sourceId: 'source-1', courseId: 'course-1', placements: [] },
+      { id: 'chunk-1', sequence: 1 }, 1,
+      { body: 'Explain the result.', type: 'LONG_ANSWER', gradingRubric: '', explanation: 'No rubric was supplied.', confidence: 0.99, answerOrigin: 'AI_INFERRED', warnings: [], citedEvidenceKeys: [] },
+      { firstBlock: 'B1', lastBlock: 'B1', sourceNumber: '1', contextIds: [], answerEvidence: [] },
+    );
+    expect(questions.createImportedDraftWithClient).not.toHaveBeenCalled();
+    expect(tx.questionImportItem.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: 'REVIEW_REQUIRED' }) }));
+  });
 });

@@ -5,7 +5,7 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Role } from '../../common/types/roles.enum';
 import type { RequestUser } from '../../common/types/request-with-user.types';
-import { CreateQuestionImportDto, QueryQuestionImportDto, UpdateQuestionImportSourceTextDto } from './dto/question-import.dto';
+import { AcceptQuestionImportItemDto, CreateQuestionImportDto, QueryQuestionImportDto, RejectQuestionImportItemDto, UpdateQuestionImportSourceTextDto } from './dto/question-import.dto';
 import { QuestionImportService } from './question-import.service';
 
 @ApiTags('admin/ai/question-imports') @ApiBearerAuth() @UseGuards(RolesGuard) @Roles(Role.ADMIN, Role.SUPER_ADMIN)
@@ -22,4 +22,6 @@ export class QuestionImportController {
   @Post(':id/pages/:pageNumber/retry') @ApiOperation({ summary: 'Retry one failed or review-required PDF transcription page' }) retryPage(@CurrentUser() actor: RequestUser, @Param('id') id: string, @Param('pageNumber') pageNumber: string) { return this.service.retryPage(actor, id, Number(pageNumber)); }
   @Post(':id/children/:childId/retry') @ApiOperation({ summary: 'Retry one failed page-range import' }) retryChild(@CurrentUser() actor: RequestUser, @Param('id') id: string, @Param('childId') childId: string) { return this.service.retryChild(actor, id, childId); }
   @Post(':id/items/:itemId/retry') @ApiOperation({ summary: 'Retry one failed import item' }) retryItem(@CurrentUser() actor: RequestUser, @Param('id') id: string, @Param('itemId') itemId: string) { return this.service.retry(actor, id, itemId); }
+  @Post(':id/items/:itemId/accept') @ApiOperation({ summary: 'Accept a corrected review candidate and create one draft question' }) acceptItem(@CurrentUser() actor: RequestUser, @Param('id') id: string, @Param('itemId') itemId: string, @Body() dto: AcceptQuestionImportItemDto) { return this.service.acceptItem(actor, id, itemId, dto); }
+  @Post(':id/items/:itemId/reject') @ApiOperation({ summary: 'Reject an unresolved review candidate' }) rejectItem(@CurrentUser() actor: RequestUser, @Param('id') id: string, @Param('itemId') itemId: string, @Body() dto: RejectQuestionImportItemDto) { return this.service.rejectItem(actor, id, itemId, dto); }
 }

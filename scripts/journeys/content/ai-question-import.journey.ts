@@ -149,6 +149,22 @@ export const aiQuestionImportJourney: JourneyDefinition = {
           409,
         );
         expectStatus(
+          await admin.request(
+            'POST',
+            `/admin/ai/question-imports/${importId}/items/missing-item/accept`,
+            { candidate: {} },
+          ),
+          404,
+        );
+        expectStatus(
+          await admin.request(
+            'POST',
+            `/admin/ai/question-imports/${importId}/items/missing-item/reject`,
+            { reason: 'Not a review candidate' },
+          ),
+          409,
+        );
+        expectStatus(
           await clients.partner.request('GET', '/admin/ai/question-imports'),
           403,
         );
@@ -157,6 +173,14 @@ export const aiQuestionImportJourney: JourneyDefinition = {
             'POST',
             '/admin/ai/question-imports',
             {},
+          ),
+          403,
+        );
+        expectStatus(
+          await clients.partner.request(
+            'POST',
+            `/admin/ai/question-imports/${importId}/items/missing-item/accept`,
+            { candidate: {} },
           ),
           403,
         );

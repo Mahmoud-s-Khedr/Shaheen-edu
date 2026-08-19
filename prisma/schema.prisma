@@ -954,6 +954,7 @@ model QuestionImportBatch {
   chunks                QuestionImportChunk[]
   items                 QuestionImportItem[]
   sourceBlocks          QuestionImportSourceBlock[]
+  answerEvidence        QuestionImportAnswerEvidence[]
   skippedRanges         QuestionImportSkippedRange[]
   pages                 QuestionImportPage[]
 
@@ -1010,6 +1011,27 @@ model QuestionImportSourceBlock {
 
   @@unique([batchId, sequence])
   @@unique([batchId, blockKey])
+  @@index([batchId])
+}
+
+/// A batch-local range containing an answer key, marking scheme, or other
+/// source material that supports an imported answer.  It is intentionally
+/// separate from a question range because answer keys commonly live elsewhere
+/// in a paper.
+model QuestionImportAnswerEvidence {
+  id            String              @id @default(cuid())
+  batchId       String
+  batch         QuestionImportBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  evidenceKey   String
+  firstBlock    String
+  lastBlock     String
+  text          String
+  sourceLocator Json?
+  questionIds   Json
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+
+  @@unique([batchId, evidenceKey])
   @@index([batchId])
 }
 
@@ -1071,7 +1093,12 @@ model QuestionImportItem {
   section          String?
   detectedType     String?
   exclusionReason  String?
-  answerOrigin     QuestionAnswerOrigin?
+  answerOrigin     QuestionAnswerProvenance?
+  citedEvidenceKeys Json?
+  reviewerCandidate Json?
+  reviewedAt        DateTime?
+  reviewedById      String?
+  reviewNote        String?
   createdAt        DateTime                 @default(now())
   updatedAt        DateTime                 @updatedAt
 

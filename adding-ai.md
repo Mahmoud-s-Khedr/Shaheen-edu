@@ -76,7 +76,7 @@ The delivered persistence model contains:
 
 Items retain raw/normalized model output, confidence, warnings, source location, errors, and the created `questionId`; batches and chunks also retain statuses, model/schema version, usage, diagnostics, and counters.
 
-The API is mounted under `/api/v1/admin/ai/question-imports` and is limited to `ADMIN` and `SUPER_ADMIN`. `CONTENT-019` covers the queue API contract without calling OpenRouter; run it with `pnpm journey:content:ai-question-import`. Unit coverage covers text extraction and worker behavior.
+The API is mounted under `/api/v1/admin/ai/question-imports` and is limited to `ADMIN` and `SUPER_ADMIN`. New batches use the typed `question-import-v3` contract for choice, short-answer, fill-in-the-blank, and long-answer candidates; v2 batches remain supported for safe replay. V3 retains batch-local answer evidence and only auto-creates source-marked drafts with complete, relevant evidence. Review-required candidates can be accepted or rejected through protected item endpoints. `CONTENT-019` covers the queue API contract without calling OpenRouter; run it with `pnpm journey:content:ai-question-import`. Unit coverage covers text extraction and worker behavior.
 
 ### Remaining import work
 

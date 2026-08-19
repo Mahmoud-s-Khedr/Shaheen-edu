@@ -12110,7 +12110,7 @@
             "bearer": []
           }
         ],
-        "summary": "Attach an asset to a question",
+        "summary": "Attach a legacy-compatible asset to a question content block",
         "tags": [
           "admin/questions"
         ]
@@ -12147,7 +12147,7 @@
             "bearer": []
           }
         ],
-        "summary": "Remove a question asset",
+        "summary": "Remove a legacy-compatible question asset block",
         "tags": [
           "admin/questions"
         ]
@@ -12186,7 +12186,7 @@
             "bearer": []
           }
         ],
-        "summary": "Reorder question assets",
+        "summary": "Reorder legacy-compatible question asset blocks",
         "tags": [
           "admin/questions"
         ]
@@ -14602,7 +14602,7 @@
             "bearer": []
           }
         ],
-        "summary": "Get protected access to an eligible practice-question asset",
+        "summary": "Get protected access to an eligible canonical content-block asset (legacy attachments are also supported)",
         "tags": [
           "student/learning"
         ]
@@ -16343,6 +16343,65 @@
         ]
       }
     },
+    "/api/v1/admin/assessments/grading/pending": {
+      "get": {
+        "operationId": "AdminAssessmentsController_pendingGrades_v1",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List submitted long answers awaiting manual grading",
+        "tags": [
+          "admin/assessments"
+        ]
+      }
+    },
+    "/api/v1/admin/assessments/grading/answers/{answerId}": {
+      "post": {
+        "operationId": "AdminAssessmentsController_grade_v1",
+        "parameters": [
+          {
+            "name": "answerId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GradeLongAnswerDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Award points to a submitted long answer",
+        "tags": [
+          "admin/assessments"
+        ]
+      }
+    },
     "/api/v1/admin/assessments/standard": {
       "post": {
         "operationId": "AdminAssessmentsController_createStandard_v1",
@@ -16363,7 +16422,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AdminAssessmentListItemDto"
+                  "$ref": "#/components/schemas/AdminAssessmentDetailDto"
                 }
               }
             }
@@ -16430,7 +16489,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AdminAssessmentListItemDto"
+                  "$ref": "#/components/schemas/AdminAssessmentDetailDto"
                 }
               }
             }
@@ -16599,7 +16658,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AdminAssessmentListItemDto"
+                  "$ref": "#/components/schemas/AdminAssessmentDetailDto"
                 }
               }
             }
@@ -16673,7 +16732,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AdminAssessmentListItemDto"
+                  "$ref": "#/components/schemas/AdminAssessmentDetailDto"
                 }
               }
             }
@@ -16833,7 +16892,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AdminAssessmentListItemDto"
+                  "$ref": "#/components/schemas/AdminAssessmentDetailDto"
                 }
               }
             }
@@ -16909,7 +16968,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AdminAssessmentListItemDto"
+                  "$ref": "#/components/schemas/AdminAssessmentDetailDto"
                 }
               }
             }
@@ -17592,6 +17651,7 @@
               "enum": [
                 "QUEUED",
                 "EXTRACTING",
+                "TRANSCRIBING",
                 "SEGMENTING",
                 "AWAITING_REVIEW",
                 "GENERATING",
@@ -17768,6 +17828,7 @@
               "enum": [
                 "QUEUED",
                 "EXTRACTING",
+                "TRANSCRIBING",
                 "SEGMENTING",
                 "AWAITING_REVIEW",
                 "GENERATING",
@@ -17823,6 +17884,80 @@
         ]
       }
     },
+    "/api/v1/admin/ai/question-imports/{id}/pages/{pageNumber}/retry": {
+      "post": {
+        "operationId": "QuestionImportController_retryPage_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "pageNumber",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Retry one failed or review-required PDF transcription page",
+        "tags": [
+          "admin/ai/question-imports"
+        ]
+      }
+    },
+    "/api/v1/admin/ai/question-imports/{id}/children/{childId}/retry": {
+      "post": {
+        "operationId": "QuestionImportController_retryChild_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "childId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Retry one failed page-range import",
+        "tags": [
+          "admin/ai/question-imports"
+        ]
+      }
+    },
     "/api/v1/admin/ai/question-imports/{id}/items/{itemId}/retry": {
       "post": {
         "operationId": "QuestionImportController_retryItem_v1",
@@ -17855,6 +17990,100 @@
           }
         ],
         "summary": "Retry one failed import item",
+        "tags": [
+          "admin/ai/question-imports"
+        ]
+      }
+    },
+    "/api/v1/admin/ai/question-imports/{id}/items/{itemId}/accept": {
+      "post": {
+        "operationId": "QuestionImportController_acceptItem_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "itemId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AcceptQuestionImportItemDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Accept a corrected review candidate and create one draft question",
+        "tags": [
+          "admin/ai/question-imports"
+        ]
+      }
+    },
+    "/api/v1/admin/ai/question-imports/{id}/items/{itemId}/reject": {
+      "post": {
+        "operationId": "QuestionImportController_rejectItem_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "itemId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RejectQuestionImportItemDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Reject an unresolved review candidate",
         "tags": [
           "admin/ai/question-imports"
         ]
@@ -21813,6 +22042,49 @@
           }
         }
       },
+      "QuestionContentBlockDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "TEXT",
+              "IMAGE",
+              "ASSET",
+              "TABLE",
+              "EQUATION"
+            ]
+          },
+          "text": {
+            "type": "string"
+          },
+          "assetId": {
+            "type": "string"
+          },
+          "tableData": {
+            "type": "object",
+            "description": "A rectangular string-cell matrix with a headerRow boolean"
+          },
+          "latex": {
+            "type": "string"
+          },
+          "mathml": {
+            "type": "string"
+          },
+          "caption": {
+            "type": "string"
+          },
+          "altText": {
+            "type": "string"
+          },
+          "languageCode": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
       "CreateQuestionContextDto": {
         "type": "object",
         "properties": {
@@ -21831,13 +22103,16 @@
           "body": {
             "type": "string"
           },
+          "contentBlocks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QuestionContentBlockDto"
+            }
+          },
           "languageCode": {
             "type": "string"
           }
-        },
-        "required": [
-          "body"
-        ]
+        }
       },
       "UpdateQuestionContextDto": {
         "type": "object",
@@ -21856,6 +22131,13 @@
           },
           "body": {
             "type": "string"
+          },
+          "contentBlocks": {
+            "description": "An empty array explicitly clears the context content",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QuestionContentBlockDto"
+            }
           },
           "languageCode": {
             "type": "string"
@@ -21926,7 +22208,10 @@
             "type": "string",
             "enum": [
               "SINGLE_CHOICE",
-              "MULTIPLE_CHOICE"
+              "MULTIPLE_CHOICE",
+              "SHORT_ANSWER",
+              "FILL_IN_THE_BLANK",
+              "LONG_ANSWER"
             ]
           },
           "placements": {
@@ -21937,6 +22222,12 @@
           },
           "body": {
             "type": "string"
+          },
+          "contentBlocks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QuestionContentBlockDto"
+            }
           },
           "explanation": {
             "type": "string"
@@ -21949,14 +22240,38 @@
           },
           "structuredExplanation": {
             "$ref": "#/components/schemas/QuestionExplanationDto"
+          },
+          "maxPoints": {
+            "type": "number",
+            "minimum": 1,
+            "default": 1
+          },
+          "acceptedAnswers": {
+            "description": "Accepted text answers for short-answer and fill-in-the-blank questions",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "gradingRubric": {
+            "type": "string",
+            "description": "Required for long-answer questions before review"
+          },
+          "answerOrigin": {
+            "type": "string",
+            "enum": [
+              "OFFICIAL",
+              "SOURCE_MARKED",
+              "AI_INFERRED",
+              "HUMAN_REVIEWED"
+            ]
           }
         },
         "required": [
           "bankId",
           "sourceId",
           "courseId",
-          "placements",
-          "body"
+          "placements"
         ]
       },
       "UpdateQuestionDto": {
@@ -21975,7 +22290,10 @@
             "type": "string",
             "enum": [
               "SINGLE_CHOICE",
-              "MULTIPLE_CHOICE"
+              "MULTIPLE_CHOICE",
+              "SHORT_ANSWER",
+              "FILL_IN_THE_BLANK",
+              "LONG_ANSWER"
             ]
           },
           "placements": {
@@ -21986,6 +22304,13 @@
           },
           "body": {
             "type": "string"
+          },
+          "contentBlocks": {
+            "description": "An empty array explicitly clears the question content",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QuestionContentBlockDto"
+            }
           },
           "explanation": {
             "type": "object",
@@ -21999,6 +22324,31 @@
           },
           "structuredExplanation": {
             "$ref": "#/components/schemas/QuestionExplanationDto"
+          },
+          "maxPoints": {
+            "type": "number",
+            "minimum": 1
+          },
+          "acceptedAnswers": {
+            "nullable": true,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "gradingRubric": {
+            "type": "object",
+            "nullable": true
+          },
+          "answerOrigin": {
+            "type": "string",
+            "enum": [
+              "OFFICIAL",
+              "SOURCE_MARKED",
+              "AI_INFERRED",
+              "HUMAN_REVIEWED"
+            ],
+            "nullable": true
           }
         }
       },
@@ -22019,19 +22369,29 @@
           "body": {
             "type": "string"
           },
+          "contentBlocks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QuestionContentBlockDto"
+            }
+          },
           "isCorrect": {
             "type": "boolean"
           }
-        },
-        "required": [
-          "body"
-        ]
+        }
       },
       "UpdateQuestionOptionDto": {
         "type": "object",
         "properties": {
           "body": {
             "type": "string"
+          },
+          "contentBlocks": {
+            "description": "An empty array explicitly clears the option content",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QuestionContentBlockDto"
+            }
           },
           "isCorrect": {
             "type": "boolean"
@@ -23470,6 +23830,135 @@
           "sortOrder"
         ]
       },
+      "AssessmentContentBlockDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "TEXT",
+              "IMAGE",
+              "ASSET",
+              "TABLE",
+              "EQUATION"
+            ]
+          },
+          "sortOrder": {
+            "type": "number"
+          },
+          "text": {
+            "type": "object",
+            "nullable": true
+          },
+          "assetId": {
+            "type": "object",
+            "nullable": true
+          },
+          "tableData": {
+            "type": "object",
+            "nullable": true
+          },
+          "latex": {
+            "type": "object",
+            "nullable": true
+          },
+          "mathml": {
+            "type": "object",
+            "nullable": true
+          },
+          "caption": {
+            "type": "object",
+            "nullable": true
+          },
+          "altText": {
+            "type": "object",
+            "nullable": true
+          },
+          "languageCode": {
+            "type": "object",
+            "nullable": true
+          },
+          "asset": {
+            "type": "object",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "sortOrder"
+        ]
+      },
+      "AssessmentQuestionContextDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "sourceContextId": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "title": {
+            "type": "object",
+            "nullable": true
+          },
+          "body": {
+            "type": "string"
+          },
+          "languageCode": {
+            "type": "string"
+          },
+          "contentBlocks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AssessmentContentBlockDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "sourceContextId",
+          "type",
+          "body",
+          "languageCode",
+          "contentBlocks"
+        ]
+      },
+      "AssessmentQuestionOptionDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          },
+          "sortOrder": {
+            "type": "number"
+          },
+          "isCorrect": {
+            "type": "boolean"
+          },
+          "contentBlocks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AssessmentContentBlockDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "body",
+          "sortOrder",
+          "contentBlocks"
+        ]
+      },
       "AssessmentAttemptQuestionDto": {
         "type": "object",
         "properties": {
@@ -23507,10 +23996,22 @@
               "$ref": "#/components/schemas/AssessmentQuestionAttachmentDto"
             }
           },
+          "contentBlocks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AssessmentContentBlockDto"
+            }
+          },
+          "contexts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AssessmentQuestionContextDto"
+            }
+          },
           "options": {
             "type": "array",
             "items": {
-              "type": "object"
+              "$ref": "#/components/schemas/AssessmentQuestionOptionDto"
             }
           },
           "selectedOptionIds": {
@@ -23518,6 +24019,17 @@
             "items": {
               "type": "string"
             }
+          },
+          "responseText": {
+            "type": "string",
+            "nullable": true
+          },
+          "maxPoints": {
+            "type": "number"
+          },
+          "awardedPoints": {
+            "type": "number",
+            "nullable": true
           },
           "answered": {
             "type": "boolean"
@@ -23536,6 +24048,14 @@
           "explanation": {
             "type": "string",
             "nullable": true
+          },
+          "structuredExplanation": {
+            "type": "object",
+            "nullable": true
+          },
+          "outcome": {
+            "type": "string",
+            "nullable": true
           }
         },
         "required": [
@@ -23545,8 +24065,11 @@
           "type",
           "body",
           "attachments",
+          "contentBlocks",
+          "contexts",
           "options",
           "selectedOptionIds",
+          "maxPoints",
           "answered"
         ]
       },
@@ -23580,6 +24103,9 @@
           "totalQuestions": {
             "type": "number"
           },
+          "totalPoints": {
+            "type": "number"
+          },
           "mode": {
             "type": "string"
           },
@@ -23595,6 +24121,7 @@
           "status",
           "startedAt",
           "totalQuestions",
+          "totalPoints",
           "mode",
           "questions"
         ]
@@ -23607,11 +24134,12 @@
             "items": {
               "type": "string"
             }
+          },
+          "responseText": {
+            "type": "string",
+            "description": "Written response for short, fill-in, and long-answer questions"
           }
-        },
-        "required": [
-          "selectedOptionIds"
-        ]
+        }
       },
       "ReportActiveTimeDto": {
         "type": "object",
@@ -23678,6 +24206,21 @@
           "questions"
         ]
       },
+      "GradeLongAnswerDto": {
+        "type": "object",
+        "properties": {
+          "awardedPoints": {
+            "type": "number",
+            "minimum": 0
+          },
+          "feedback": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "awardedPoints"
+        ]
+      },
       "AssessmentScopeDto": {
         "type": "object",
         "properties": {
@@ -23734,6 +24277,200 @@
           "scopes"
         ]
       },
+      "AdminAssessmentQuestionDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "sortOrder": {
+            "type": "number"
+          },
+          "type": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          },
+          "explanation": {
+            "type": "object",
+            "nullable": true
+          },
+          "video": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AssessmentQuestionVideoDto"
+              }
+            ]
+          },
+          "attachments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AssessmentQuestionAttachmentDto"
+            }
+          },
+          "contentBlocks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AssessmentContentBlockDto"
+            }
+          },
+          "contexts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AssessmentQuestionContextDto"
+            }
+          },
+          "options": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AssessmentQuestionOptionDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "sortOrder",
+          "type",
+          "body",
+          "attachments",
+          "contentBlocks",
+          "contexts",
+          "options"
+        ]
+      },
+      "AdminAssessmentDetailDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "generationType": {
+            "type": "string"
+          },
+          "mode": {
+            "type": "string"
+          },
+          "isTimed": {
+            "type": "boolean"
+          },
+          "durationSeconds": {
+            "type": "number",
+            "nullable": true
+          },
+          "questionCount": {
+            "type": "number"
+          },
+          "status": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "publishedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "archivedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "questionBankId": {
+            "type": "object",
+            "nullable": true
+          },
+          "questionBankName": {
+            "type": "object",
+            "nullable": true
+          },
+          "questionBankIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "questionBanks": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AssessmentScopeResponseDto"
+            }
+          },
+          "questions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminAssessmentQuestionDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "generationType",
+          "mode",
+          "isTimed",
+          "questionCount",
+          "status",
+          "createdAt",
+          "questionBankIds",
+          "questionBanks",
+          "scopes",
+          "questions"
+        ]
+      },
+      "CreateCustomAssessmentDto": {
+        "type": "object",
+        "properties": {
+          "questionIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AssessmentScopeDto"
+            }
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "TUTOR",
+              "EXAM"
+            ],
+            "default": "EXAM"
+          },
+          "isTimed": {
+            "type": "boolean",
+            "default": false
+          },
+          "durationSeconds": {
+            "type": "number",
+            "description": "Required when isTimed is true"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "questionIds",
+          "scopes"
+        ]
+      },
       "AdminAssessmentListItemDto": {
         "type": "object",
         "properties": {
@@ -23786,46 +24523,6 @@
           "questionCount",
           "status",
           "createdAt"
-        ]
-      },
-      "CreateCustomAssessmentDto": {
-        "type": "object",
-        "properties": {
-          "questionIds": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "scopes": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/AssessmentScopeDto"
-            }
-          },
-          "mode": {
-            "type": "string",
-            "enum": [
-              "TUTOR",
-              "EXAM"
-            ],
-            "default": "EXAM"
-          },
-          "isTimed": {
-            "type": "boolean",
-            "default": false
-          },
-          "durationSeconds": {
-            "type": "number",
-            "description": "Required when isTimed is true"
-          },
-          "title": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "questionIds",
-          "scopes"
         ]
       },
       "PaginatedAdminAssessmentsResponseDto": {
@@ -23910,6 +24607,32 @@
         },
         "required": [
           "normalizedText"
+        ]
+      },
+      "AcceptQuestionImportItemDto": {
+        "type": "object",
+        "properties": {
+          "candidate": {
+            "type": "object",
+            "description": "Corrected typed candidate. It must use one supported question type and batch-local evidence keys."
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "candidate"
+        ]
+      },
+      "RejectQuestionImportItemDto": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
         ]
       }
     }

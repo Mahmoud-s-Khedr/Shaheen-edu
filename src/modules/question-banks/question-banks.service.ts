@@ -862,7 +862,7 @@ export class QuestionBanksService {
   async createImportedDraft(
     actor: RequestUser,
     dto: CreateQuestionDto & {
-      options: Array<{ body: string; isCorrect: boolean }>;
+      options?: Array<{ body: string; isCorrect: boolean }>;
     },
   ) {
     this.admin(actor);
@@ -881,7 +881,7 @@ export class QuestionBanksService {
   async createImportedDraftWithClient(
     actor: RequestUser,
     dto: CreateQuestionDto & {
-      options: Array<{ body: string; isCorrect: boolean }>;
+      options?: Array<{ body: string; isCorrect: boolean }>;
       contextIds?: string[];
       aiExplanation?: any;
       aiAnswerOrigin?: any;
@@ -898,15 +898,19 @@ export class QuestionBanksService {
     }>,
   ) {
     this.admin(actor);
-    const correct = dto.options.filter((option) => option.isCorrect).length;
+    const options = dto.options ?? [];
+    const choice = dto.type === QuestionType.SINGLE_CHOICE || dto.type === QuestionType.MULTIPLE_CHOICE;
+    const correct = options.filter((option) => option.isCorrect).length;
     if (
-      dto.options.length < 2 ||
-      correct < 1 ||
+      (choice && (options.length < 2 || correct < 1 ||
       (dto.type === QuestionType.SINGLE_CHOICE && correct !== 1) ||
-      (dto.type === QuestionType.MULTIPLE_CHOICE && correct < 2)
+      (dto.type === QuestionType.MULTIPLE_CHOICE && correct < 2))) ||
+      (!choice && options.length) ||
+      ((dto.type === QuestionType.SHORT_ANSWER || dto.type === QuestionType.FILL_IN_THE_BLANK) && !dto.acceptedAnswers?.length) ||
+      (dto.type === QuestionType.LONG_ANSWER && !dto.gradingRubric?.trim())
     )
       throw new BadRequestException(
-        'Imported question options do not satisfy its answer type',
+        'Imported question does not satisfy its answer type',
       );
     const resolvedPlacements =
       placements ?? (await this.placementData(dto.courseId, dto.placements));
@@ -929,12 +933,17 @@ export class QuestionBanksService {
           ],
         },
         explanation: dto.explanation?.trim(),
+        acceptedAnswers: dto.acceptedAnswers?.map((answer) => answer.trim()) as any,
+        gradingRubric: dto.gradingRubric?.trim(),
+        answerOrigin: dto.answerOrigin,
+        answerReviewedAt: dto.answerOrigin === QuestionAnswerProvenance.HUMAN_REVIEWED ? new Date() : null,
+        answerReviewedById: dto.answerOrigin === QuestionAnswerProvenance.HUMAN_REVIEWED ? actor.id : null,
         createdById: actor.id,
         updatedById: actor.id,
         placements: { create: resolvedPlacements },
         contexts: { create: contexts },
-        options: {
-          create: dto.options.map((option, index) => ({
+        options: choice ? {
+          create: options.map((option, index) => ({
             body: option.body.trim(),
             contentBlocks: {
               create: [
@@ -948,7 +957,7 @@ export class QuestionBanksService {
             isCorrect: option.isCorrect,
             sortOrder: index + 1,
           })),
-        },
+        } : undefined,
         structuredExplanation: dto.aiExplanation
           ? {
               create: {

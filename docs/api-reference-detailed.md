@@ -599,6 +599,18 @@ No response body.
 }
 ```
 
+### `GET /api/v1/admin/assessments/grading/pending`
+
+**Authorization:** Bearer token; role must be `ADMIN` or `SUPER_ADMIN`
+
+Lists submitted long-answer responses that require manual grading (HTTP 200).
+
+### `POST /api/v1/admin/assessments/grading/answers/{answerId}`
+
+**Authorization:** Bearer token; role must be `ADMIN` or `SUPER_ADMIN`
+
+Awards points to one submitted long-answer response using `GradeLongAnswerDto` (HTTP 201).
+
 ### `POST /api/v1/admin/assessments/standard`
 
 **Authorization:** Bearer token; role must be `ADMIN` or `SUPER_ADMIN`
@@ -6567,6 +6579,22 @@ Lists candidate question items (HTTP 200). Supports the same optional `page`, `l
 
 Retries failed import chunks and returns the restarted import (HTTP 201).
 
+### `POST /api/v1/admin/ai/question-imports/{id}/pages/{pageNumber}/retry`
+
+Retries one failed or review-required PDF transcription page (HTTP 201).
+
+### `POST /api/v1/admin/ai/question-imports/{id}/children/{childId}/retry`
+
+Retries one failed page-range child import (HTTP 201).
+
 ### `POST /api/v1/admin/ai/question-imports/{id}/items/{itemId}/retry`
 
 Retries one failed import item and returns the restarted item (HTTP 201).
+
+### `POST /api/v1/admin/ai/question-imports/{id}/items/{itemId}/accept`
+
+Creates a `HUMAN_REVIEWED` draft question from a corrected `AcceptQuestionImportItemDto` review candidate (HTTP 201).
+
+### `POST /api/v1/admin/ai/question-imports/{id}/items/{itemId}/reject`
+
+Records the required rejection reason from `RejectQuestionImportItemDto` and excludes the review candidate (HTTP 201).
