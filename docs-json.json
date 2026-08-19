@@ -17855,6 +17855,156 @@
         ]
       }
     },
+    "/api/v1/admin/ai/question-imports/{id}/media": {
+      "get": {
+        "operationId": "QuestionImportController_media_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List extracted PDF visual regions and protected previews",
+        "tags": [
+          "admin/ai/question-imports"
+        ]
+      },
+      "post": {
+        "operationId": "QuestionImportController_createMedia_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateQuestionImportMediaDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Add and materialize a manual PDF visual region",
+        "tags": [
+          "admin/ai/question-imports"
+        ]
+      }
+    },
+    "/api/v1/admin/ai/question-imports/{id}/media/{mediaKey}": {
+      "patch": {
+        "operationId": "QuestionImportController_updateMedia_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "mediaKey",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateQuestionImportMediaDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Review, reclassify, or resize an extracted visual region",
+        "tags": [
+          "admin/ai/question-imports"
+        ]
+      }
+    },
+    "/api/v1/admin/ai/question-imports/{id}/media/{mediaKey}/retry": {
+      "post": {
+        "operationId": "QuestionImportController_retryMedia_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "mediaKey",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Retry a failed PDF visual crop",
+        "tags": [
+          "admin/ai/question-imports"
+        ]
+      }
+    },
     "/api/v1/admin/ai/question-imports/{id}/retry": {
       "post": {
         "operationId": "QuestionImportController_retry_v1",
@@ -24608,6 +24758,106 @@
         "required": [
           "normalizedText"
         ]
+      },
+      "QuestionImportMediaBoundsDto": {
+        "type": "object",
+        "properties": {
+          "left": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1000
+          },
+          "top": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1000
+          },
+          "right": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1000
+          },
+          "bottom": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1000
+          }
+        },
+        "required": [
+          "left",
+          "top",
+          "right",
+          "bottom"
+        ]
+      },
+      "CreateQuestionImportMediaDto": {
+        "type": "object",
+        "properties": {
+          "pageNumber": {
+            "type": "number"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "DIAGRAM",
+              "CHART",
+              "MAP",
+              "TABLE",
+              "EQUATION",
+              "PHOTO",
+              "OPTION_IMAGE",
+              "OTHER_INSTRUCTIONAL"
+            ]
+          },
+          "bounds": {
+            "$ref": "#/components/schemas/QuestionImportMediaBoundsDto"
+          },
+          "description": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "pageNumber",
+          "type",
+          "bounds",
+          "description"
+        ]
+      },
+      "UpdateQuestionImportMediaDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "REVIEW_REQUIRED",
+              "ELIGIBLE",
+              "REJECTED",
+              "FAILED"
+            ]
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "DIAGRAM",
+              "CHART",
+              "MAP",
+              "TABLE",
+              "EQUATION",
+              "PHOTO",
+              "OPTION_IMAGE",
+              "OTHER_INSTRUCTIONAL"
+            ]
+          },
+          "bounds": {
+            "$ref": "#/components/schemas/QuestionImportMediaBoundsDto"
+          },
+          "description": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          }
+        }
       },
       "AcceptQuestionImportItemDto": {
         "type": "object",

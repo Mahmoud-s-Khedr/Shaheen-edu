@@ -238,6 +238,29 @@ enum QuestionImportItemStatus {
   FAILED
 }
 
+enum QuestionImportMediaStatus {
+  REVIEW_REQUIRED
+  ELIGIBLE
+  REJECTED
+  FAILED
+}
+
+enum QuestionImportMediaType {
+  DIAGRAM
+  CHART
+  MAP
+  TABLE
+  EQUATION
+  PHOTO
+  OPTION_IMAGE
+  OTHER_INSTRUCTIONAL
+}
+
+enum QuestionImportMediaDetectionSource {
+  AI
+  MANUAL
+}
+
 enum AssessmentOwnerType {
   STUDENT
   ADMIN
@@ -731,6 +754,7 @@ model Asset {
   questionContextContentBlocks QuestionContextContentBlock[] @relation("QuestionContextContentBlockAsset")
   paymentProofFor              ManualPaymentSubmission[]     @relation("ManualPaymentProof")
   questionImportBatches        QuestionImportBatch[]         @relation("QuestionImportSourceAsset")
+  questionImportMedia          QuestionImportMedia[]         @relation("QuestionImportMediaAsset")
 
   @@index([status, kind, createdAt])
 }
@@ -957,6 +981,7 @@ model QuestionImportBatch {
   answerEvidence        QuestionImportAnswerEvidence[]
   skippedRanges         QuestionImportSkippedRange[]
   pages                 QuestionImportPage[]
+  media                 QuestionImportMedia[]
 
   @@index([status, createdAt])
   @@index([createdById, createdAt])
@@ -993,6 +1018,63 @@ model QuestionImportPage {
 
   @@unique([batchId, pageNumber])
   @@index([batchId, status])
+}
+
+/// A durable, batch-local visual crop from a physical PDF page.  It remains
+/// unassigned until the visual ownership phase validates an attachment.
+model QuestionImportMedia {
+  id                 String                    @id @default(cuid())
+  batchId            String
+  batch              QuestionImportBatch       @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  mediaKey           String
+  pageNumber         Int
+  normalizedBounds   Json
+  renderedBounds     Json
+  pageDimensions     Json
+  rotation           Int                       @default(0)
+  renderDpi          Int
+  type               QuestionImportMediaType
+  confidence         Float
+  description        String
+  warnings           Json?
+  validationFlags    Json?
+  checksum           String?
+  assetId            String?                   @unique
+  asset              Asset?                    @relation("QuestionImportMediaAsset", fields: [assetId], references: [id], onDelete: SetNull)
+  status             QuestionImportMediaStatus @default(REVIEW_REQUIRED)
+  materializedAt     DateTime?
+  reviewedAt         DateTime?
+  reviewedById       String?
+  reviewNote         String?
+  errorDetail        String?
+  createdAt          DateTime                  @default(now())
+  updatedAt          DateTime                  @updatedAt
+  detections         QuestionImportMediaDetection[]
+
+  @@unique([batchId, mediaKey])
+  @@index([batchId, pageNumber, status])
+  @@index([batchId, checksum])
+}
+
+/// Keeps all model proposals and manual corrections even when they collapse
+/// into a single canonical crop.
+model QuestionImportMediaDetection {
+  id              String                            @id @default(cuid())
+  mediaId         String
+  media           QuestionImportMedia               @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+  source          QuestionImportMediaDetectionSource
+  normalizedBounds Json
+  type            QuestionImportMediaType
+  confidence      Float?
+  description     String?
+  warnings        Json?
+  rawEvidence     Json?
+  validationFlags Json?
+  accepted        Boolean                           @default(false)
+  createdById     String?
+  createdAt       DateTime                          @default(now())
+
+  @@index([mediaId, createdAt])
 }
 
 /// Neutral extracted source units. They are never assumed to be question

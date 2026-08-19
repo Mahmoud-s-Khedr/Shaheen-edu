@@ -46,6 +46,7 @@ function build() {
     assessmentQuestionContentBlock: { count: jest.fn() },
     assessmentQuestionOptionContentBlock: { count: jest.fn() },
     assessmentContextContentBlock: { count: jest.fn() },
+    questionImportMedia: { count: jest.fn() },
     $transaction: jest.fn(),
   };
   const storage: any = {
@@ -71,7 +72,7 @@ describe('AssetsService direct uploads', () => {
   it('keeps an asset referenced by an assessment video snapshot', async () => {
     const { service, prisma } = build();
     prisma.$transaction.mockResolvedValue([
-      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0,
     ]);
 
     await expect(service.isReferenced('video-1')).resolves.toBe(true);
@@ -83,7 +84,7 @@ describe('AssetsService direct uploads', () => {
   it('keeps an asset referenced by an assessment attachment snapshot', async () => {
     const { service, prisma } = build();
     prisma.$transaction.mockResolvedValue([
-      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0,
     ]);
 
     await expect(service.isReferenced('attachment-1')).resolves.toBe(true);
@@ -95,12 +96,24 @@ describe('AssetsService direct uploads', () => {
   it('keeps an asset referenced by a live question content block', async () => {
     const { service, prisma } = build();
     prisma.$transaction.mockResolvedValue([
-      0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     ]);
 
     await expect(service.isReferenced('block-asset-1')).resolves.toBe(true);
     expect(prisma.questionContentBlock.count).toHaveBeenCalledWith({
       where: { assetId: 'block-asset-1' },
+    });
+  });
+
+  it('keeps an asset referenced by extracted question-import media', async () => {
+    const { service, prisma } = build();
+    prisma.$transaction.mockResolvedValue([
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
+    ]);
+
+    await expect(service.isReferenced('media-asset-1')).resolves.toBe(true);
+    expect(prisma.questionImportMedia.count).toHaveBeenCalledWith({
+      where: { assetId: 'media-asset-1' },
     });
   });
 

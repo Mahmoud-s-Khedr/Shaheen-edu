@@ -357,7 +357,7 @@ export class AssetsService {
     return { id, deleted: true };
   }
   /** Archives an asset displaced by a replacement, but only once nothing else references it. */
-  async archiveIfUnreferenced(actor: RequestUser, id: string) {
+  async archiveIfUnreferenced(actor: Pick<RequestUser, 'id'>, id: string) {
     const asset = await this.prisma.asset.findUnique({ where: { id } });
     if (!asset || asset.status === AssetStatus.ARCHIVED) return;
     if (await this.isReferenced(id)) return;
@@ -405,6 +405,7 @@ export class AssetsService {
       snapshotBlocks,
       snapshotOptionBlocks,
       snapshotContextBlocks,
+      questionImportMedia,
     ] = await this.prisma.$transaction([
       this.prisma.contentItem.count({ where: { primaryAssetId: id } }),
       this.prisma.assetReference.count({ where: { assetId: id } }),
@@ -430,6 +431,7 @@ export class AssetsService {
       this.prisma.assessmentContextContentBlock.count({
         where: { assetId: id },
       }),
+      this.prisma.questionImportMedia.count({ where: { assetId: id } }),
     ]);
     const paymentProofs = (this.prisma as any).manualPaymentSubmission
       ? await (this.prisma as any).manualPaymentSubmission.count({
@@ -455,6 +457,7 @@ export class AssetsService {
         snapshotBlocks +
         snapshotOptionBlocks +
         snapshotContextBlocks +
+        questionImportMedia +
         paymentProofs >
       0
     );

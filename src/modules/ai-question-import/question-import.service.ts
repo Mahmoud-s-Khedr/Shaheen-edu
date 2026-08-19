@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
-import { AssetKind, AssetStatus, QuestionAnswerProvenance, QuestionImportInputType, QuestionImportItemStatus, QuestionImportStatus, Role } from '../../common/types/roles.enum';
+import { AssetKind, AssetStatus, QuestionAnswerProvenance, QuestionImportInputType, QuestionImportItemStatus, QuestionImportMediaStatus, QuestionImportStatus, Role } from '../../common/types/roles.enum';
 import type { RequestUser } from '../../common/types/request-with-user.types';
 import { toPaginationMeta } from '../../common/dto/pagination-query.dto';
 import { PrismaService } from '../../database/prisma.service';
@@ -10,12 +10,16 @@ import type { AcceptQuestionImportItemDto, CreateQuestionImportDto, QueryQuestio
 import { QuestionBanksService } from '../question-banks/question-banks.service';
 import { ConfigService } from '@nestjs/config';
 import type { AppConfig } from '../../config/configuration';
+import { AssetsService } from '../assets/assets.service';
+import { BunnyStorageProvider } from '../assets/bunny-storage.provider';
+import { PdfPageRangeService } from './pdf-page-range.service';
+import { QuestionImportMediaService } from './question-import-media.service';
 
 @Injectable()
 export class QuestionImportService {
   private readonly model: string;
   private readonly ai: AppConfig['ai'];
-  constructor(private readonly prisma: PrismaService, private readonly queue: QuestionImportQueue, private readonly audit: AuditService, private readonly questions: QuestionBanksService, config: ConfigService<AppConfig, true>) { this.ai = config.get('ai', { infer: true }); this.model = this.ai.questionImportModel; }
+  constructor(private readonly prisma: PrismaService, private readonly queue: QuestionImportQueue, private readonly audit: AuditService, private readonly questions: QuestionBanksService, private readonly assets: AssetsService, private readonly storage: BunnyStorageProvider, private readonly pdfRanges: PdfPageRangeService, private readonly mediaExtraction: QuestionImportMediaService, config: ConfigService<AppConfig, true>) { this.ai = config.get('ai', { infer: true }); this.model = this.ai.questionImportModel; }
   private admin(actor: RequestUser) { if (actor.role !== Role.ADMIN && actor.role !== Role.SUPER_ADMIN) throw new ForbiddenException('Forbidden'); }
   private assertConfigured() { if (!this.ai.openRouterApiKey || !this.ai.questionImportModel) throw new ServiceUnavailableException('AI question import is not configured'); }
   async create(actor: RequestUser, dto: CreateQuestionImportDto) {
@@ -36,6 +40,61 @@ export class QuestionImportService {
   async sourceText(actor: RequestUser, id: string) { this.admin(actor); const batch = await this.batch(id); return { id, normalizedText: batch.normalizedText, extractionMetadata: batch.extractionMetadata, errorSummary: batch.errorSummary, segmentationWarnings: batch.segmentationWarnings, pages: batch.pages.map((page: any) => ({ pageNumber: page.pageNumber, status: page.status, canonicalText: page.canonicalText, confidence: page.confidence, uncertainSpans: page.uncertainSpans, warnings: page.warnings })) }; }
   async updateSourceText(actor: RequestUser, id: string, dto: UpdateQuestionImportSourceTextDto) { this.admin(actor); this.assertConfigured(); const batch = await this.batch(id); if (batch.status !== QuestionImportStatus.AWAITING_REVIEW || batch._count.items) throw new ConflictException('Source text can be changed only for a review-required import with no created items'); const normalizedText = dto.normalizedText.normalize('NFKC').replace(/\r\n?/g, '\n').replace(/[ \t]+/g, ' ').replace(/\n{3,}/g, '\n\n').trim(); if (normalizedText.length < 20) throw new BadRequestException('Source text is too short'); await this.prisma.$transaction([this.prisma.questionImportSkippedRange.deleteMany({ where: { batchId: id } }), this.prisma.questionImportAnswerEvidence.deleteMany({ where: { batchId: id } }), this.prisma.questionImportSourceBlock.deleteMany({ where: { batchId: id } }), this.prisma.questionImportChunk.deleteMany({ where: { batchId: id } }), this.prisma.questionImportBatch.update({ where: { id }, data: { normalizedText, sourceTextEditedAt: new Date(), segmentationRawOutput: Prisma.JsonNull, segmentationUsage: Prisma.JsonNull, segmentationWarnings: Prisma.JsonNull, errorSummary: null, status: QuestionImportStatus.QUEUED, totalChunks: 0, completedChunks: 0 } })]); await this.queue.enqueue(id); await this.audit.record({ actorUserId: actor.id, action: 'AI_QUESTION_IMPORT_SOURCE_TEXT_UPDATED', targetType: 'QuestionImportBatch', targetId: id }); return this.get(actor, id); }
   async items(actor: RequestUser, id: string, query: QueryQuestionImportDto) { this.admin(actor); const batch = await this.batch(id); const batchIds = batch.children.length ? batch.children.map((child: any) => child.id) : [id]; const where: any = { batchId: { in: batchIds }, ...(query.status ? { status: query.status } : {}) }; const [data, total] = await this.prisma.$transaction([this.prisma.questionImportItem.findMany({ where, orderBy: [{ batch: { childSequence: 'asc' } }, { chunk: { sequence: 'asc' } }, { sequence: 'asc' }], skip: (query.page - 1) * query.limit, take: query.limit }), this.prisma.questionImportItem.count({ where })]); return { data, meta: toPaginationMeta(query.page, query.limit, total) }; }
+  async media(actor: RequestUser, id: string) {
+    this.admin(actor);
+    const batch = await this.rootPdfImport(id);
+    const data: any[] = await this.prisma.questionImportMedia.findMany({ where: { batchId: batch.id }, include: { asset: true, detections: { orderBy: { createdAt: 'asc' } } }, orderBy: [{ pageNumber: 'asc' }, { mediaKey: 'asc' }] });
+    return {
+      importId: batch.id,
+      sourcePdf: this.assets.protectedAccess(batch.sourceAsset),
+      data: data.map((media) => this.mediaSummary(media)),
+    };
+  }
+  async createMedia(actor: RequestUser, id: string, dto: import('./dto/question-import.dto').CreateQuestionImportMediaDto) {
+    this.admin(actor);
+    const batch = await this.rootPdfImport(id);
+    const pdf = await this.storage.download(batch.sourceAsset.storageKey!);
+    const image = await this.pdfRanges.renderPage(pdf, dto.pageNumber, 350);
+    const media = await this.mediaExtraction.createManualRegion(batch, dto.pageNumber, image, { type: dto.type, bounds: dto.bounds, confidence: 1, description: dto.description.trim(), warnings: [] }, actor.id);
+    await this.audit.record({ actorUserId: actor.id, action: 'AI_QUESTION_IMPORT_MEDIA_CREATED', targetType: 'QuestionImportMedia', targetId: media.id, metadata: { importId: batch.id, mediaKey: media.mediaKey, pageNumber: dto.pageNumber } });
+    return this.mediaSummary(media);
+  }
+  async updateMedia(actor: RequestUser, id: string, mediaKey: string, dto: import('./dto/question-import.dto').UpdateQuestionImportMediaDto) {
+    this.admin(actor);
+    const batch = await this.rootPdfImport(id);
+    const media: any = await this.prisma.questionImportMedia.findUnique({ where: { batchId_mediaKey: { batchId: batch.id, mediaKey } }, include: { asset: true, detections: true } });
+    if (!media) throw new NotFoundException('Question import media not found');
+    if (dto.status === QuestionImportMediaStatus.FAILED) throw new BadRequestException('FAILED is reserved for materialization errors');
+    let updated: any;
+    if (dto.bounds) {
+      const pdf = await this.storage.download(batch.sourceAsset.storageKey!);
+      const image = await this.pdfRanges.renderPage(pdf, media.pageNumber, 350);
+      updated = await this.mediaExtraction.replaceCanonicalRegion(media, batch, image, { type: dto.type ?? media.type, bounds: dto.bounds, confidence: 1, description: dto.description?.trim() || media.description, warnings: [] }, actor.id);
+      if (dto.status) updated = await this.prisma.questionImportMedia.update({ where: { id: media.id }, data: { status: dto.status, reviewedAt: new Date(), reviewedById: actor.id, reviewNote: dto.note?.trim() ?? null }, include: { asset: true, detections: { orderBy: { createdAt: 'asc' } } } });
+    } else {
+      updated = await this.prisma.$transaction(async (tx: any) => {
+        if (dto.type || dto.description) {
+          await tx.questionImportMediaDetection.updateMany({ where: { mediaId: media.id }, data: { accepted: false } });
+          await tx.questionImportMediaDetection.create({ data: { mediaId: media.id, source: 'MANUAL', normalizedBounds: media.normalizedBounds, type: dto.type ?? media.type, confidence: null, description: dto.description?.trim() ?? media.description, warnings: [], validationFlags: media.validationFlags, accepted: true, createdById: actor.id } });
+        }
+        return tx.questionImportMedia.update({ where: { id: media.id }, data: { ...(dto.status ? { status: dto.status, reviewedAt: new Date(), reviewedById: actor.id } : {}), ...(dto.type ? { type: dto.type } : {}), ...(dto.description ? { description: dto.description.trim() } : {}), ...(dto.note !== undefined ? { reviewNote: dto.note.trim() } : {}) }, include: { asset: true, detections: { orderBy: { createdAt: 'asc' } } } });
+      });
+    }
+    await this.audit.record({ actorUserId: actor.id, action: 'AI_QUESTION_IMPORT_MEDIA_REVIEWED', targetType: 'QuestionImportMedia', targetId: media.id, metadata: { importId: batch.id, mediaKey, status: updated.status } });
+    return this.mediaSummary(updated);
+  }
+  async retryMedia(actor: RequestUser, id: string, mediaKey: string) {
+    this.admin(actor);
+    const batch = await this.rootPdfImport(id);
+    const media: any = await this.prisma.questionImportMedia.findUnique({ where: { batchId_mediaKey: { batchId: batch.id, mediaKey } } });
+    if (!media) throw new NotFoundException('Question import media not found');
+    if (media.status !== QuestionImportMediaStatus.FAILED) throw new ConflictException('Only failed media can be retried');
+    const pdf = await this.storage.download(batch.sourceAsset.storageKey!);
+    const image = await this.pdfRanges.renderPage(pdf, media.pageNumber, 350);
+    const updated = await this.mediaExtraction.replaceCanonicalRegion(media, batch, image, { type: media.type, bounds: media.normalizedBounds, confidence: media.confidence, description: media.description, warnings: media.warnings ?? [] }, actor.id);
+    await this.audit.record({ actorUserId: actor.id, action: 'AI_QUESTION_IMPORT_MEDIA_RETRIED', targetType: 'QuestionImportMedia', targetId: media.id, metadata: { importId: batch.id, mediaKey } });
+    return this.mediaSummary(updated);
+  }
   async acceptItem(actor: RequestUser, id: string, itemId: string, dto: AcceptQuestionImportItemDto) {
     this.admin(actor);
     const created = await this.prisma.$transaction(async (tx: any) => {
@@ -190,7 +249,24 @@ export class QuestionImportService {
       errorSummary: failed ? `${failed} page range(s) require review or retry` : null,
     } });
   }
-  private async batch(id: string) { const batch = await this.prisma.questionImportBatch.findUnique({ where: { id }, include: { chunks: { orderBy: { sequence: 'asc' } }, sourceBlocks: { orderBy: { sequence: 'asc' } }, answerEvidence: { orderBy: { evidenceKey: 'asc' } }, skippedRanges: { orderBy: { sequence: 'asc' } }, pages: { orderBy: { pageNumber: 'asc' } }, children: { orderBy: { childSequence: 'asc' }, include: { chunks: { orderBy: { sequence: 'asc' } }, skippedRanges: { orderBy: { sequence: 'asc' } }, _count: { select: { items: true } } } }, _count: { select: { items: true } } } }); if (!batch) throw new NotFoundException('Question import not found'); return batch; }
+  private async rootPdfImport(id: string) {
+    const requested = await this.prisma.questionImportBatch.findUnique({ where: { id }, select: { id: true, parentId: true } });
+    if (!requested) throw new NotFoundException('Question import not found');
+    const batch: any = await this.prisma.questionImportBatch.findUnique({ where: { id: requested.parentId ?? requested.id }, include: { sourceAsset: true } });
+    if (!batch?.sourceAsset || batch.sourceAsset.mimeType !== 'application/pdf' || !batch.sourceAsset.storageKey) throw new ConflictException('Visual media is available only for root PDF imports');
+    return batch;
+  }
+  private mediaSummary(media: any) {
+    return {
+      id: media.id, mediaKey: media.mediaKey, pageNumber: media.pageNumber, type: media.type, confidence: media.confidence, description: media.description,
+      normalizedBounds: media.normalizedBounds, renderedBounds: media.renderedBounds, pageDimensions: media.pageDimensions, rotation: media.rotation, renderDpi: media.renderDpi,
+      status: media.status, warnings: media.warnings, validationFlags: media.validationFlags, checksum: media.checksum, errorDetail: media.errorDetail,
+      review: { reviewedAt: media.reviewedAt, reviewedById: media.reviewedById, note: media.reviewNote },
+      preview: media.asset ? this.assets.protectedAccess(media.asset) : null,
+      detections: (media.detections ?? []).map((detection: any) => ({ source: detection.source, normalizedBounds: detection.normalizedBounds, type: detection.type, confidence: detection.confidence, description: detection.description, warnings: detection.warnings, validationFlags: detection.validationFlags, accepted: detection.accepted, createdAt: detection.createdAt })),
+    };
+  }
+  private async batch(id: string) { const batch = await this.prisma.questionImportBatch.findUnique({ where: { id }, include: { chunks: { orderBy: { sequence: 'asc' } }, sourceBlocks: { orderBy: { sequence: 'asc' } }, answerEvidence: { orderBy: { evidenceKey: 'asc' } }, skippedRanges: { orderBy: { sequence: 'asc' } }, pages: { orderBy: { pageNumber: 'asc' } }, media: { select: { status: true } }, children: { orderBy: { childSequence: 'asc' }, include: { chunks: { orderBy: { sequence: 'asc' } }, skippedRanges: { orderBy: { sequence: 'asc' } }, _count: { select: { items: true } } } }, _count: { select: { items: true } } } }); if (!batch) throw new NotFoundException('Question import not found'); return batch; }
   private summary(batch: any) { const { rawText, normalizedText, extractionMetadata, ...summary } = batch; return summary; }
-  private detail(batch: any) { const skippedRanges = (ranges: any[]) => ranges.map((range) => ({ firstBlock: range.firstBlock, lastBlock: range.lastBlock, reason: range.reason, sourceLocator: range.sourceLocator })); const children = batch.children.map((child: any) => ({ ...this.summary(child), pageScope: child.pageScope, skippedRanges: skippedRanges(child.skippedRanges), chunks: child.chunks.map((chunk: any) => ({ id: chunk.id, sequence: chunk.sequence, status: chunk.status, errorDetail: chunk.errorDetail })) })); return { ...this.summary(batch), extractionMetadata: batch.extractionMetadata, segmentationWarnings: batch.segmentationWarnings, transcriptionPages: batch.pages.map((page: any) => ({ pageNumber: page.pageNumber, status: page.status, confidence: page.confidence, uncertainSpans: page.uncertainSpans, warnings: page.warnings, attemptCount: page.attemptCount, verificationPerformed: Boolean(page.verifiedAt), errorDetail: page.errorDetail })), skippedRanges: skippedRanges(batch.skippedRanges), answerEvidence: batch.answerEvidence.map((item: any) => ({ evidenceKey: item.evidenceKey, firstBlock: item.firstBlock, lastBlock: item.lastBlock, text: item.text, sourceLocator: item.sourceLocator, questionIds: item.questionIds })), skippedRangeCount: batch.skippedRanges.length + children.reduce((count: number, child: any) => count + child.skippedRanges.length, 0), sourceBlocks: batch.sourceBlocks.map((block: any) => ({ blockKey: block.blockKey, sequence: block.sequence, sourceLocator: block.sourceLocator, text: block.text })), chunks: batch.chunks.map((chunk: any) => ({ id: chunk.id, sequence: chunk.sequence, sourceLocator: chunk.sourceLocator, status: chunk.status, attemptCount: chunk.attemptCount, errorDetail: chunk.errorDetail })), children }; }
+  private detail(batch: any) { const skippedRanges = (ranges: any[]) => ranges.map((range) => ({ firstBlock: range.firstBlock, lastBlock: range.lastBlock, reason: range.reason, sourceLocator: range.sourceLocator })); const children = batch.children.map((child: any) => ({ ...this.summary(child), pageScope: child.pageScope, skippedRanges: skippedRanges(child.skippedRanges), chunks: child.chunks.map((chunk: any) => ({ id: chunk.id, sequence: chunk.sequence, status: chunk.status, errorDetail: chunk.errorDetail })) })); const mediaCounts = batch.media.reduce((counts: Record<string, number>, media: any) => { counts[media.status] = (counts[media.status] ?? 0) + 1; return counts; }, {}); return { ...this.summary(batch), extractionMetadata: batch.extractionMetadata, segmentationWarnings: batch.segmentationWarnings, visualMedia: { total: batch.media.length, byStatus: mediaCounts }, transcriptionPages: batch.pages.map((page: any) => ({ pageNumber: page.pageNumber, status: page.status, confidence: page.confidence, uncertainSpans: page.uncertainSpans, warnings: page.warnings, attemptCount: page.attemptCount, verificationPerformed: Boolean(page.verifiedAt), errorDetail: page.errorDetail })), skippedRanges: skippedRanges(batch.skippedRanges), answerEvidence: batch.answerEvidence.map((item: any) => ({ evidenceKey: item.evidenceKey, firstBlock: item.firstBlock, lastBlock: item.lastBlock, text: item.text, sourceLocator: item.sourceLocator, questionIds: item.questionIds })), skippedRangeCount: batch.skippedRanges.length + children.reduce((count: number, child: any) => count + child.skippedRanges.length, 0), sourceBlocks: batch.sourceBlocks.map((block: any) => ({ blockKey: block.blockKey, sequence: block.sequence, sourceLocator: block.sourceLocator, text: block.text })), chunks: batch.chunks.map((chunk: any) => ({ id: chunk.id, sequence: chunk.sequence, sourceLocator: chunk.sourceLocator, status: chunk.status, attemptCount: chunk.attemptCount, errorDetail: chunk.errorDetail })), children }; }
 }

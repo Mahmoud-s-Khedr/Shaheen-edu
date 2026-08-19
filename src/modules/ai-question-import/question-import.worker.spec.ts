@@ -58,6 +58,7 @@ describe('QuestionImportWorker', () => {
     const storage = { download: jest.fn() };
     const pdfRanges = { pageCount: jest.fn(), extract: jest.fn(), renderPage: jest.fn() };
     const transcriber = { transcribeImage: jest.fn(), verifyImage: jest.fn() };
+    const media = { materializePage: jest.fn().mockResolvedValue([]) };
     return {
       worker: new QuestionImportWorker(
         prisma as any,
@@ -65,6 +66,7 @@ describe('QuestionImportWorker', () => {
         {} as any,
         pdfRanges as any,
         transcriber as any,
+        media as any,
         client as any,
         questions as any,
         { enqueue: jest.fn() } as any,
@@ -77,6 +79,7 @@ describe('QuestionImportWorker', () => {
       storage,
       pdfRanges,
       transcriber,
+      media,
     };
   }
 
@@ -168,7 +171,7 @@ describe('QuestionImportWorker', () => {
   });
 
   it('stores raw page content and a normalized canonical transcription', async () => {
-    const { worker, prisma, storage, pdfRanges, transcriber } = workerWith();
+    const { worker, prisma, storage, pdfRanges, transcriber, media } = workerWith();
     const content = '  السؤال\u00a0الأول\r\nأ.\tالاختيار الأول  ';
     storage.download.mockResolvedValue(Buffer.from('pdf'));
     pdfRanges.pageCount.mockResolvedValue(3);
@@ -194,6 +197,13 @@ describe('QuestionImportWorker', () => {
         canonicalText: 'السؤال الأول\nأ. الاختيار الأول',
       }),
     }));
+    expect(media.materializePage).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'batch-1' }),
+      3,
+      Buffer.from('page-3'),
+      [],
+      { response: true },
+    );
     expect(result).toEqual({
       text: '[Page 1]\nالغلاف\n\n[Page 2]\nالفهرس\n\n[Page 3]\nالسؤال الأول\nأ. الاختيار الأول',
       metadata: expect.objectContaining({ format: 'VISUAL_PDF_OCR', pages: expect.arrayContaining([{ page: 1, confidence: 0.99, lineCount: 1 }, { page: 3, confidence: 0.99, lineCount: 2 }]) }),

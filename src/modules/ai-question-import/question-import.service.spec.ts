@@ -8,6 +8,10 @@ describe('QuestionImportService review summaries', () => {
       {} as any,
       {} as any,
       {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
       { get: jest.fn().mockReturnValue({ questionImportModel: 'test-model' }) } as any,
     );
   }

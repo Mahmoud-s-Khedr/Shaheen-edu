@@ -5,7 +5,7 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Role } from '../../common/types/roles.enum';
 import type { RequestUser } from '../../common/types/request-with-user.types';
-import { AcceptQuestionImportItemDto, CreateQuestionImportDto, QueryQuestionImportDto, RejectQuestionImportItemDto, UpdateQuestionImportSourceTextDto } from './dto/question-import.dto';
+import { AcceptQuestionImportItemDto, CreateQuestionImportMediaDto, CreateQuestionImportDto, QueryQuestionImportDto, RejectQuestionImportItemDto, UpdateQuestionImportMediaDto, UpdateQuestionImportSourceTextDto } from './dto/question-import.dto';
 import { QuestionImportService } from './question-import.service';
 
 @ApiTags('admin/ai/question-imports') @ApiBearerAuth() @UseGuards(RolesGuard) @Roles(Role.ADMIN, Role.SUPER_ADMIN)
@@ -18,6 +18,10 @@ export class QuestionImportController {
   @Get(':id/source-text') @ApiOperation({ summary: 'Get retained normalized source text for review' }) sourceText(@CurrentUser() actor: RequestUser, @Param('id') id: string) { return this.service.sourceText(actor, id); }
   @Patch(':id/source-text') @ApiOperation({ summary: 'Correct source text and rerun AI boundary identification' }) updateSourceText(@CurrentUser() actor: RequestUser, @Param('id') id: string, @Body() dto: UpdateQuestionImportSourceTextDto) { return this.service.updateSourceText(actor, id, dto); }
   @Get(':id/items') @ApiOperation({ summary: 'List AI question import candidates' }) items(@CurrentUser() actor: RequestUser, @Param('id') id: string, @Query() query: QueryQuestionImportDto) { return this.service.items(actor, id, query); }
+  @Get(':id/media') @ApiOperation({ summary: 'List extracted PDF visual regions and protected previews' }) media(@CurrentUser() actor: RequestUser, @Param('id') id: string) { return this.service.media(actor, id); }
+  @Post(':id/media') @ApiOperation({ summary: 'Add and materialize a manual PDF visual region' }) createMedia(@CurrentUser() actor: RequestUser, @Param('id') id: string, @Body() dto: CreateQuestionImportMediaDto) { return this.service.createMedia(actor, id, dto); }
+  @Patch(':id/media/:mediaKey') @ApiOperation({ summary: 'Review, reclassify, or resize an extracted visual region' }) updateMedia(@CurrentUser() actor: RequestUser, @Param('id') id: string, @Param('mediaKey') mediaKey: string, @Body() dto: UpdateQuestionImportMediaDto) { return this.service.updateMedia(actor, id, mediaKey, dto); }
+  @Post(':id/media/:mediaKey/retry') @ApiOperation({ summary: 'Retry a failed PDF visual crop' }) retryMedia(@CurrentUser() actor: RequestUser, @Param('id') id: string, @Param('mediaKey') mediaKey: string) { return this.service.retryMedia(actor, id, mediaKey); }
   @Post(':id/retry') @ApiOperation({ summary: 'Retry failed import chunks' }) retry(@CurrentUser() actor: RequestUser, @Param('id') id: string) { return this.service.retry(actor, id); }
   @Post(':id/pages/:pageNumber/retry') @ApiOperation({ summary: 'Retry one failed or review-required PDF transcription page' }) retryPage(@CurrentUser() actor: RequestUser, @Param('id') id: string, @Param('pageNumber') pageNumber: string) { return this.service.retryPage(actor, id, Number(pageNumber)); }
   @Post(':id/children/:childId/retry') @ApiOperation({ summary: 'Retry one failed page-range import' }) retryChild(@CurrentUser() actor: RequestUser, @Param('id') id: string, @Param('childId') childId: string) { return this.service.retryChild(actor, id, childId); }

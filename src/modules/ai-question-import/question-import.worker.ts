@@ -17,6 +17,7 @@ import { QuestionBanksService } from '../question-banks/question-banks.service';
 import { DocumentTextExtractor } from './document-text-extractor.service';
 import { PdfPageRangeService } from './pdf-page-range.service';
 import { PdfTranscriptionClient } from './pdf-transcription.client';
+import { QuestionImportMediaService } from './question-import-media.service';
 import {
   OpenRouterQuestionImportClient,
   OpenRouterQuestionImportError,
@@ -46,6 +47,7 @@ export class QuestionImportWorker {
     private readonly extractor: DocumentTextExtractor,
     private readonly pdfRanges: PdfPageRangeService,
     private readonly transcriber: PdfTranscriptionClient,
+    private readonly media: QuestionImportMediaService,
     private readonly client: OpenRouterQuestionImportClient,
     private readonly questions: QuestionBanksService,
     private readonly queue: QuestionImportQueue,
@@ -269,7 +271,16 @@ export class QuestionImportWorker {
         const verified = suspicious ? await this.transcriber.verifyImage(image, initial.page) : null;
         const finalPage = verified?.page ?? initial.page;
         const canonicalText = this.canonicalPageText(finalPage.content);
-        const warnings = finalPage.warnings;
+        let visualFailure: string | null = null;
+        try {
+          await this.media.materializePage(batch, stored.pageNumber, image, finalPage.visualRegions ?? [], verified?.raw ?? initial.raw);
+        } catch (error: any) {
+          // A visual crop failure must never discard an otherwise usable OCR
+          // page.  It remains visible in page review and can be retried from
+          // the media API without regenerating text candidates.
+          visualFailure = error.message.slice(0, 500);
+        }
+        const warnings = visualFailure ? [...finalPage.warnings, `Visual extraction failed: ${visualFailure}`] : finalPage.warnings;
         const review = finalPage.uncertainSpans.length > 0 || warnings.length > 0 || !canonicalText;
         await this.prisma.questionImportPage.update({ where: { batchId_pageNumber: { batchId: batch.id, pageNumber: stored.pageNumber } }, data: {
           status: review ? 'REVIEW_REQUIRED' : 'AI_TRANSCRIBED', aiText: finalPage.content, canonicalText, confidence: finalPage.confidence,

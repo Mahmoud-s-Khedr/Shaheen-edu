@@ -139,7 +139,7 @@ Implementation notes:
 
 ## Phase 5 — PDF visual extraction and provenance
 
-Status: `NOT STARTED`
+Status: `IMPLEMENTED` (2026-08-19)
 
 Create reviewable, durable visual assets from PDFs without yet deciding which
 question, option, or context owns them.
@@ -166,6 +166,13 @@ Exit criteria:
 - Low-confidence, malformed, or manually corrected regions remain reviewable with their original evidence intact.
 - Retries do not duplicate media records or assets.
 - Media remains unassigned at the end of this phase; no student-visible question attachment is created yet.
+
+Implementation decisions:
+
+- `QuestionImportMedia` is rooted at the original PDF batch (rather than a page-split child) and has a stable `M0001`-style media key. `QuestionImportMediaDetection` retains every AI proposal and manual correction, including duplicate proposals collapsed into one canonical crop.
+- Vision OCR proposes only instructional diagrams, charts, maps, tables, equations, photos, and image-based options using `left/top/right/bottom` normalized `0..1000` bounds. Server validation pads valid bounds, flags edge-touching/warning-bearing regions, and collapses near-duplicates.
+- Crops are rendered from the existing 350-DPI page PNG, encoded with `sharp`, stored as protected generated `IMAGE` assets, and checksum-recorded. Valid proposals with confidence at least `0.90` and no warnings/flags are `ELIGIBLE`; every other crop is `REVIEW_REQUIRED`.
+- Admin-only media APIs provide the protected source PDF/crop preview metadata and support manual creation, approval/rejection, reclassification, resizing, and failed-crop retry. These APIs never create question, option, context, or student-visible attachments.
 
 ## Phase 6 — Visual AI extraction and ownership
 
