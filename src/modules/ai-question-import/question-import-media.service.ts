@@ -243,7 +243,7 @@ export class QuestionImportMediaService {
       });
       return duplicate;
     }
-    const mediaKey = `M${String((await this.prisma.questionImportMedia.count({ where: { batchId: batch.id } })) + 1).padStart(4, '0')}`;
+    const mediaKey = this.nextMediaKey();
     const image = await this.crop(pageImage, checked.renderedBounds!);
     const checksum = createHash('sha256').update(image).digest('hex');
     const asset = await this.createAsset(
@@ -336,7 +336,7 @@ export class QuestionImportMediaService {
           where: { id: existing.id },
           data: { errorDetail: error.message.slice(0, 2000) },
         });
-      const mediaKey = `M${String((await this.prisma.questionImportMedia.count({ where: { batchId: batch.id } })) + 1).padStart(4, '0')}`;
+      const mediaKey = this.nextMediaKey();
       return this.prisma.$transaction(async (tx: any) => {
         const media = await tx.questionImportMedia.create({
           data: {
@@ -393,6 +393,17 @@ export class QuestionImportMediaService {
       !region.warnings.length
       ? QuestionImportMediaStatus.ELIGIBLE
       : QuestionImportMediaStatus.REVIEW_REQUIRED;
+  }
+
+  /**
+   * Crop extraction runs concurrently across PDF pages. A count-based key can
+   * be observed by more than one worker before either insert commits, which
+   * leaves one crop without an asset after the unique constraint rejects it.
+   * A UUID keeps the batch-local key stable for the rest of the import while
+   * making allocation independent of transaction timing.
+   */
+  private nextMediaKey() {
+    return `M-${randomUUID()}`;
   }
 
   /** Deterministic first-pass crop verification. Vision confirmation can later

@@ -7,7 +7,7 @@ describe('QuestionImportMediaService', () => {
       questionImportMedia: {
         create: jest
           .fn()
-          .mockResolvedValue({ id: 'media-1', mediaKey: 'M0001' }),
+          .mockResolvedValue({ id: 'media-1', mediaKey: 'M-test' }),
         update: jest.fn(),
       },
       questionImportMediaDetection: {
@@ -18,7 +18,6 @@ describe('QuestionImportMediaService', () => {
     const prisma = {
       questionImportMedia: {
         findMany: jest.fn().mockResolvedValue([]),
-        count: jest.fn().mockResolvedValue(0),
         findFirst: jest.fn().mockResolvedValue(null),
         findUniqueOrThrow: jest.fn().mockResolvedValue({ id: 'media-1' }),
       },
@@ -112,7 +111,7 @@ describe('QuestionImportMediaService', () => {
     expect(tx.questionImportMedia.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
-          mediaKey: 'M0001',
+          mediaKey: expect.stringMatching(/^M-[0-9a-f-]{36}$/),
           status: 'ELIGIBLE',
           pageNumber: 1,
         }),
@@ -227,11 +226,26 @@ describe('QuestionImportMediaService', () => {
     expect(tx.questionImportMedia.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
+          mediaKey: expect.stringMatching(/^M-[0-9a-f-]{36}$/),
           status: 'FAILED',
           errorDetail: 'crop upload failed',
         }),
       }),
     );
+  });
+
+  it('allocates a unique media key without reading the current batch count', () => {
+    const { service, prisma } = serviceWith();
+
+    const keys = new Set(
+      Array.from({ length: 100 }, () => (service as any).nextMediaKey()),
+    );
+
+    expect(keys.size).toBe(100);
+    expect([...keys]).toEqual(
+      expect.arrayContaining([expect.stringMatching(/^M-[0-9a-f-]{36}$/)]),
+    );
+    expect(prisma.questionImportMedia.count).toBeUndefined();
   });
 
   it('retains the original crop error if failure persistence also fails', async () => {

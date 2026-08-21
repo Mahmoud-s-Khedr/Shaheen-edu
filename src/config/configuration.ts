@@ -235,11 +235,11 @@ export default (): AppConfig => ({
     ),
     segmentationSplitThresholdTokens: envInteger(
       'AI_SEGMENTATION_SPLIT_THRESHOLD_TOKENS',
-      120_000,
+      8_000,
     ),
     segmentationChildTargetTokens: envInteger(
       'AI_SEGMENTATION_CHILD_TARGET_TOKENS',
-      12_000,
+      4_000,
     ),
     extractionTargetTokens: envInteger('AI_EXTRACTION_TARGET_TOKENS', 30_000),
     extractionMaxQuestions: envInteger('AI_EXTRACTION_MAX_QUESTIONS', 10),

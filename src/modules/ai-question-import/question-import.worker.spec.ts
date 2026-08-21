@@ -800,6 +800,75 @@ describe('QuestionImportWorker', () => {
     );
   });
 
+  it('rejects a structurally valid response that omits a later numbered question', () => {
+    const { worker } = workerWith();
+
+    expect(
+      (worker as any).validateSegmentation(
+        [
+          { blockKey: 'B00001', text: '[Page 4]' },
+          { blockKey: 'B00002', text: '1 What is the first answer?' },
+          { blockKey: 'B00003', text: 'A first B second' },
+          { blockKey: 'B00004', text: '[Page 26]' },
+          { blockKey: 'B00005', text: '2 What is the later answer?' },
+          { blockKey: 'B00006', text: 'A first B second' },
+        ],
+        {
+          contexts: [],
+          questions: [
+            {
+              id: 'Q1',
+              sourceNumber: '1',
+              firstBlock: 'B00002',
+              lastBlock: 'B00003',
+              contextIds: [],
+              detectedType: 'SINGLE_CHOICE',
+            },
+          ],
+          excluded: [],
+          skippedRanges: [],
+          warnings: [],
+        },
+      ),
+    ).toBe(
+      'AI returned incomplete source coverage; missing question starts: B00005.',
+    );
+  });
+
+  it('checks coverage only on a child window’s owned pages', () => {
+    const { worker } = workerWith();
+
+    expect(
+      (worker as any).validateSegmentation(
+        [
+          { blockKey: 'B00001', text: '[Page 4]' },
+          { blockKey: 'B00002', text: '1 Overlap question?' },
+          { blockKey: 'B00003', text: 'A first B second' },
+          { blockKey: 'B00004', text: '[Page 5]' },
+          { blockKey: 'B00005', text: '2 Owned question?' },
+          { blockKey: 'B00006', text: 'A first B second' },
+        ],
+        {
+          contexts: [],
+          questions: [
+            {
+              id: 'Q2',
+              sourceNumber: '2',
+              firstBlock: 'B00005',
+              lastBlock: 'B00006',
+              contextIds: [],
+              detectedType: 'SINGLE_CHOICE',
+            },
+          ],
+          excluded: [],
+          skippedRanges: [],
+          warnings: [],
+        },
+        { corePageStart: 5, corePageEnd: 5 },
+      ),
+    ).toBeNull();
+  });
+
   it('deduplicates a shared context before applying the extraction token budget', () => {
     const { worker } = workerWith();
     const chunks = (worker as any).extractionChunks(

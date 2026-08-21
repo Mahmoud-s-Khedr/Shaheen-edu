@@ -200,7 +200,17 @@ export class QuestionImportWorker {
         const rootBatchId = batch.parentId ?? batch.id;
         const segmentationMedia: any[] = v4
           ? await this.prisma.questionImportMedia.findMany({
-              where: { batchId: rootBatchId },
+              where: {
+                batchId: rootBatchId,
+                ...(scope
+                  ? {
+                      pageNumber: {
+                        gte: scope.includedPageStart,
+                        lte: scope.includedPageEnd,
+                      },
+                    }
+                  : {}),
+              },
               select: {
                 mediaKey: true,
                 pageNumber: true,
@@ -259,7 +269,7 @@ export class QuestionImportWorker {
           ...response.result.warnings,
           ...normalized.diagnostics,
         ];
-        const issue = this.validateSegmentation(blocks, response.result);
+        const issue = this.validateSegmentation(blocks, response.result, scope);
         if (issue) {
           await this.prisma.questionImportBatch.update({
             where: { id: batchId },
@@ -269,6 +279,20 @@ export class QuestionImportWorker {
               segmentationWarnings: response.result.warnings as any,
             },
           });
+          // A whole-PDF response can be internally well-formed while omitting
+          // a trailing range. Split the root into bounded page windows and
+          // retry before exposing a partial import to reviewers.
+          if (
+            this.isIncompleteCoverageIssue(issue) &&
+            !batch.parentId &&
+            !batch.children.length
+          ) {
+            const children = this.pageChildren(current.normalizedText);
+            if (children) {
+              await this.createChildren(batch, children, blocks);
+              return;
+            }
+          }
           throw new Error(issue);
         }
         await this.persistSegmentationAndChunks(
@@ -1158,14 +1182,22 @@ export class QuestionImportWorker {
       )
     )
       return;
-    const failed = children.filter(
-      (child) => child.status !== QuestionImportStatus.COMPLETED,
+    const failed = children.filter((child) =>
+      [
+        QuestionImportStatus.COMPLETED_WITH_ERRORS,
+        QuestionImportStatus.FAILED,
+      ].includes(child.status),
     ).length;
+    const review = children.some(
+      (child) => child.status === QuestionImportStatus.AWAITING_REVIEW,
+    );
     await this.prisma.questionImportBatch.update({
       where: { id: parentId },
       data: {
         status: failed
           ? QuestionImportStatus.COMPLETED_WITH_ERRORS
+          : review
+            ? QuestionImportStatus.AWAITING_REVIEW
           : QuestionImportStatus.COMPLETED,
         completedAt: new Date(),
         completedChunks: children.length,
@@ -1506,6 +1538,7 @@ export class QuestionImportWorker {
   private validateSegmentation(
     blocks: any[],
     result: SegmentationResult | SegmentationResultV3,
+    scope?: { corePageStart: number; corePageEnd: number },
   ) {
     if (
       result.warnings.some((warning) =>
@@ -1595,11 +1628,63 @@ export class QuestionImportWorker {
       )
     )
       return 'AI returned invalid excluded-source metadata.';
-    return (result.skippedRanges ?? []).every((item) =>
+    if (!(result.skippedRanges ?? []).every((item) =>
       Boolean(range(item.firstBlock, item.lastBlock)),
-    )
-      ? null
-      : 'AI returned invalid skipped-source metadata.';
+    )) return 'AI returned invalid skipped-source metadata.';
+
+    const represented = [
+      ...result.questions,
+      ...result.excluded,
+    ].flatMap((item) => {
+      const itemRange = range(item.firstBlock, item.lastBlock);
+      return itemRange ? [itemRange] : [];
+    });
+    const missing = this.questionStartBlocks(blocks, scope).filter((index) =>
+      !represented.some(
+        (itemRange) =>
+          itemRange.first <= index && index <= itemRange.last,
+      ),
+    );
+    return missing.length
+      ? `AI returned incomplete source coverage; missing question starts: ${missing
+          .map((index) => keys[index])
+          .join(', ')}.`
+      : null;
+  }
+
+  private isIncompleteCoverageIssue(issue: string) {
+    return issue.startsWith('AI reported incomplete source coverage') ||
+      issue.startsWith('AI returned incomplete source coverage');
+  }
+
+  /** Identifies numbered question stems while excluding page numbers/footers.
+   * A stem must be interrogative, a constructed-response directive, or be
+   * followed shortly by an answer option on the same page. */
+  private questionStartBlocks(
+    blocks: any[],
+    scope?: { corePageStart: number; corePageEnd: number },
+  ) {
+    const numberedStem = /^\s*(?:[0-9٠-٩]+)\s*(?:[.)]|\s+)/;
+    const directive = /(?:[؟?]|\b(?:قارن|ادرس|حدد|وضح|فسر|علل)\b)/;
+    const option = /^\s*[أبجدهـ]\s+/;
+    return blocks.flatMap((block, index) => {
+      const page = this.pageForBlock(blocks, block.blockKey);
+      if (
+        !numberedStem.test(block.text) ||
+        !block.text.replace(numberedStem, '').trim() ||
+        (scope &&
+          (page === null ||
+            page < scope.corePageStart ||
+            page > scope.corePageEnd))
+      )
+        return [];
+      const nearby = blocks.slice(index + 1, index + 8).filter(
+        (candidate) => this.pageForBlock(blocks, candidate.blockKey) === page,
+      );
+      return directive.test(block.text) || nearby.some((candidate) => option.test(candidate.text))
+        ? [index]
+        : [];
+    });
   }
   private extractionChunks(
     batchId: string,

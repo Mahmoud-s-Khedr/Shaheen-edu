@@ -155,12 +155,12 @@ export const envValidationSchema = Joi.object({
     .integer()
     .min(1000)
     .max(1000000)
-    .default(120000),
+    .default(8000),
   AI_SEGMENTATION_CHILD_TARGET_TOKENS: Joi.number()
     .integer()
     .min(1000)
     .max(500000)
-    .default(12000),
+    .default(4000),
   AI_PDF_SPLIT_OVERLAP_PAGES: Joi.number().integer().min(0).max(20).default(2),
   // Accepted during the configuration migration; token thresholds now control splitting.
   AI_SEGMENTATION_MAX_CHARACTERS: Joi.number()
