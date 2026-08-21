@@ -16,3 +16,4 @@ reports/dev-seed/
 .claude/
 .pnpm-store/
 reports/ai-question-import
+tmp/

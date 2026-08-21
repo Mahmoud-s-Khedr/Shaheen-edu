@@ -13,7 +13,10 @@ const courseId = process.env.AI_TEST_COURSE_ID;
 const chapterId = process.env.AI_TEST_CHAPTER_ID;
 const inputDirectory = resolve(process.env.AI_TEST_INPUT_DIR ?? 'example-questions');
 const pollIntervalMs = Number(process.env.AI_TEST_POLL_INTERVAL_MS ?? 3000);
-const timeoutMs = Number(process.env.AI_TEST_TIMEOUT_MS ?? 900000);
+// PDF imports first transcribe every page and may then issue one real-AI
+// extraction request per source chunk.  The former 15-minute default routinely
+// expired for large visual fixtures while healthy work was still progressing.
+const timeoutMs = Number(process.env.AI_TEST_TIMEOUT_MS ?? 3_600_000);
 const requestedFile = process.env.AI_TEST_FILE;
 
 if (!email || !password || !bankId || !sourceId || !courseId || !chapterId)
