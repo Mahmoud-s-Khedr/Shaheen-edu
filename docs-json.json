@@ -18145,6 +18145,53 @@
         ]
       }
     },
+    "/api/v1/admin/ai/question-imports/{id}/items/{itemId}/media": {
+      "patch": {
+        "operationId": "QuestionImportController_updateItemMedia_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "itemId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateQuestionImportItemMediaAssignmentsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Approve, reject, move, or reorder visual ownership assignments",
+        "tags": [
+          "admin/ai/question-imports"
+        ]
+      }
+    },
     "/api/v1/admin/ai/question-imports/{id}/items/{itemId}/accept": {
       "post": {
         "operationId": "QuestionImportController_acceptItem_v1",
@@ -24858,6 +24905,67 @@
             "type": "string"
           }
         }
+      },
+      "QuestionImportItemMediaAssignmentDto": {
+        "type": "object",
+        "properties": {
+          "mediaKey": {
+            "type": "string"
+          },
+          "owner": {
+            "type": "string",
+            "enum": [
+              "QUESTION",
+              "OPTION",
+              "CONTEXT"
+            ]
+          },
+          "ownerReference": {
+            "type": "string"
+          },
+          "placementAnchor": {
+            "type": "string",
+            "description": "START, END, or AFTER:B00001"
+          },
+          "confidence": {
+            "type": "number"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PROPOSED",
+              "VERIFIED",
+              "APPROVED",
+              "REJECTED"
+            ]
+          }
+        },
+        "required": [
+          "mediaKey",
+          "owner",
+          "ownerReference",
+          "status"
+        ]
+      },
+      "UpdateQuestionImportItemMediaAssignmentsDto": {
+        "type": "object",
+        "properties": {
+          "assignments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QuestionImportItemMediaAssignmentDto"
+            }
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "assignments"
+        ]
       },
       "AcceptQuestionImportItemDto": {
         "type": "object",

@@ -6575,6 +6575,26 @@ Corrects retained source text with `UpdateQuestionImportSourceTextDto` and rerun
 
 Lists candidate question items (HTTP 200). Supports the same optional `page`, `limit`, `q`, and `status` filters as the import list.
 
+### `GET /api/v1/admin/ai/question-imports/{id}/media`
+
+Lists the extracted PDF visual regions with their review status and protected previews (HTTP 200).
+
+### `POST /api/v1/admin/ai/question-imports/{id}/media`
+
+Adds and materializes a manual visual region from `CreateQuestionImportMediaDto` (HTTP 201).
+
+### `PATCH /api/v1/admin/ai/question-imports/{id}/media/{mediaKey}`
+
+Reviews, reclassifies, or resizes an extracted visual region with `UpdateQuestionImportMediaDto` (HTTP 200).
+
+### `POST /api/v1/admin/ai/question-imports/{id}/media/{mediaKey}/retry`
+
+Retries a failed visual crop without retranscribing the page (HTTP 201).
+
+### `PATCH /api/v1/admin/ai/question-imports/{id}/items/{itemId}/media`
+
+Approves, rejects, moves, or reorders visual ownership assignments with `UpdateQuestionImportItemMediaAssignmentsDto` (HTTP 200).
+
 ### `POST /api/v1/admin/ai/question-imports/{id}/retry`
 
 Retries failed import chunks and returns the restarted import (HTTP 201).

@@ -881,8 +881,9 @@ export class QuestionBanksService {
   async createImportedDraftWithClient(
     actor: RequestUser,
     dto: CreateQuestionDto & {
-      options?: Array<{ body: string; isCorrect: boolean }>;
+      options?: Array<{ body: string; isCorrect: boolean; contentBlocks?: any[] }>;
       contextIds?: string[];
+      contentBlocks?: any[];
       aiExplanation?: any;
       aiAnswerOrigin?: any;
       confidence?: number;
@@ -915,7 +916,13 @@ export class QuestionBanksService {
     const resolvedPlacements =
       placements ?? (await this.placementData(dto.courseId, dto.placements));
     const contexts = await this.contextLinks(dto.contextIds);
-    const importedBody = dto.body?.trim() || '[Content]';
+    const importedBlocks = dto.contentBlocks?.length
+      ? dto.contentBlocks
+      : [{ type: QuestionContentBlockType.TEXT, text: dto.body?.trim() || '[Content]' }];
+    const bodyProjection = (blocks: any[]) => blocks
+      .map((block) => block.type === QuestionContentBlockType.TEXT ? block.text?.trim() : block.caption?.trim() || block.altText?.trim() || `[${block.type}]`)
+      .filter(Boolean).join('\n\n') || '[Content]';
+    const importedBody = bodyProjection(importedBlocks);
     const item = await client.question.create({
       data: {
         bankId: dto.bankId,
@@ -923,15 +930,7 @@ export class QuestionBanksService {
         courseId: dto.courseId,
         type: dto.type ?? QuestionType.SINGLE_CHOICE,
         body: importedBody,
-        contentBlocks: {
-          create: [
-            {
-              type: QuestionContentBlockType.TEXT,
-              text: importedBody,
-              sortOrder: 1,
-            },
-          ],
-        },
+        contentBlocks: { create: importedBlocks.map((block, index) => ({ ...block, sortOrder: index + 1 })) },
         explanation: dto.explanation?.trim(),
         acceptedAnswers: dto.acceptedAnswers?.map((answer) => answer.trim()) as any,
         gradingRubric: dto.gradingRubric?.trim(),
@@ -943,20 +942,14 @@ export class QuestionBanksService {
         placements: { create: resolvedPlacements },
         contexts: { create: contexts },
         options: choice ? {
-          create: options.map((option, index) => ({
-            body: option.body.trim(),
-            contentBlocks: {
-              create: [
-                {
-                  type: QuestionContentBlockType.TEXT,
-                  text: option.body.trim(),
-                  sortOrder: 1,
-                },
-              ],
-            },
+          create: options.map((option, index) => {
+            const blocks = option.contentBlocks?.length ? option.contentBlocks : [{ type: QuestionContentBlockType.TEXT, text: option.body.trim() }];
+            return ({
+            body: bodyProjection(blocks),
+            contentBlocks: { create: blocks.map((block, blockIndex) => ({ ...block, sortOrder: blockIndex + 1 })) },
             isCorrect: option.isCorrect,
             sortOrder: index + 1,
-          })),
+          }); }),
         } : undefined,
         structuredExplanation: dto.aiExplanation
           ? {
@@ -971,6 +964,7 @@ export class QuestionBanksService {
             }
           : undefined,
       },
+      include: { contentBlocks: true, options: { include: { contentBlocks: true } } },
     });
     await this.audit.recordWithClient(client, {
       actorUserId: actor.id,

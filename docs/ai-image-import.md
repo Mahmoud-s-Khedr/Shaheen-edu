@@ -1,5 +1,11 @@
 • # Final plan: image-aware AI question import
 
+> **Implementation note (2026-08-19):** This historical design predates
+> ordered content blocks and Phase 7 input simplification. Phase 6 uses
+> `QuestionImportMediaAssignment` plus question/option/context `IMAGE` content
+> blocks instead of separate attachment tables, and new visual imports are PDF
+> based. `question-system-expansion-plan.md` is authoritative.
+
   ## 1. Goal
 
   The importer must correctly identify:

@@ -7,6 +7,7 @@ import {
   AssetProvider,
   AssetStatus,
   QuestionImportMediaDetectionSource,
+  QuestionImportMediaCropCompleteness,
   QuestionImportMediaStatus,
 } from '../../common/types/roles.enum';
 import { PrismaService } from '../../database/prisma.service';
@@ -177,6 +178,8 @@ export class QuestionImportMediaService {
             description: region.description,
             warnings: region.warnings,
             validationFlags: checked.flags,
+            cropCompleteness: this.completenessFor(checked.flags, region.warnings),
+            cropVerification: this.cropVerification(checked.flags, region.warnings),
             checksum,
             assetId: asset.id,
             status: this.statusFor(region, checked.flags),
@@ -265,6 +268,8 @@ export class QuestionImportMediaService {
             description: region.description.trim(),
             warnings: region.warnings,
             validationFlags: checked.flags,
+            cropCompleteness: this.completenessFor(checked.flags, region.warnings),
+            cropVerification: this.cropVerification(checked.flags, region.warnings),
             checksum,
             assetId: asset.id,
             status: this.statusFor(region, checked.flags),
@@ -307,55 +312,79 @@ export class QuestionImportMediaService {
     rawEvidence: unknown,
     error: Error,
   ) {
-    const existing = await this.prisma.questionImportMedia.findFirst({
-      where: {
-        batchId: batch.id,
-        pageNumber,
-        normalizedBounds: checked.bounds as any,
-        status: QuestionImportMediaStatus.FAILED,
-      },
-    });
-    if (existing)
-      return this.prisma.questionImportMedia.update({
-        where: { id: existing.id },
-        data: { errorDetail: error.message.slice(0, 2000) },
-      });
-    const mediaKey = `M${String((await this.prisma.questionImportMedia.count({ where: { batchId: batch.id } })) + 1).padStart(4, '0')}`;
-    return this.prisma.$transaction(async (tx: any) => {
-      const media = await tx.questionImportMedia.create({
-        data: {
+    try {
+      // Prisma's JSON equality filter is not portable across generated client
+      // versions. Use the same in-memory overlap matching as successful crop
+      // materialization, scoped to failed proposals on this page.
+      const failedMedia: any[] = await this.prisma.questionImportMedia.findMany({
+        where: {
           batchId: batch.id,
-          mediaKey,
           pageNumber,
-          normalizedBounds: checked.bounds,
-          renderedBounds: checked.renderedBounds,
-          pageDimensions: { width: pageWidth, height: pageHeight },
-          renderDpi: 350,
-          type: region.type,
-          confidence: region.confidence,
-          description: region.description.trim(),
-          warnings: region.warnings,
-          validationFlags: checked.flags,
           status: QuestionImportMediaStatus.FAILED,
-          errorDetail: error.message.slice(0, 2000),
         },
       });
-      await tx.questionImportMediaDetection.create({
-        data: {
-          mediaId: media.id,
-          source: QuestionImportMediaDetectionSource.AI,
-          normalizedBounds: checked.bounds,
-          type: region.type,
-          confidence: region.confidence,
-          description: region.description,
-          warnings: region.warnings,
-          rawEvidence: rawEvidence as any,
-          validationFlags: checked.flags,
-          accepted: true,
-        },
+      const existing = failedMedia.find(
+        (media) =>
+          media.normalizedBounds &&
+          this.nearDuplicate(
+            media.normalizedBounds as NormalizedBounds,
+            checked.bounds!,
+          ),
+      );
+      if (existing)
+        return this.prisma.questionImportMedia.update({
+          where: { id: existing.id },
+          data: { errorDetail: error.message.slice(0, 2000) },
+        });
+      const mediaKey = `M${String((await this.prisma.questionImportMedia.count({ where: { batchId: batch.id } })) + 1).padStart(4, '0')}`;
+      return this.prisma.$transaction(async (tx: any) => {
+        const media = await tx.questionImportMedia.create({
+          data: {
+            batchId: batch.id,
+            mediaKey,
+            pageNumber,
+            normalizedBounds: checked.bounds,
+            renderedBounds: checked.renderedBounds,
+            pageDimensions: { width: pageWidth, height: pageHeight },
+            renderDpi: 350,
+            type: region.type,
+            confidence: region.confidence,
+            description: region.description.trim(),
+            warnings: region.warnings,
+            validationFlags: checked.flags,
+            cropCompleteness: this.completenessFor(checked.flags, region.warnings),
+            cropVerification: this.cropVerification(checked.flags, region.warnings),
+            status: QuestionImportMediaStatus.FAILED,
+            errorDetail: error.message.slice(0, 2000),
+          },
+        });
+        await tx.questionImportMediaDetection.create({
+          data: {
+            mediaId: media.id,
+            source: QuestionImportMediaDetectionSource.AI,
+            normalizedBounds: checked.bounds,
+            type: region.type,
+            confidence: region.confidence,
+            description: region.description,
+            warnings: region.warnings,
+            rawEvidence: rawEvidence as any,
+            validationFlags: checked.flags,
+            accepted: true,
+          },
+        });
+        return media;
       });
-      return media;
-    });
+    } catch (recoveryError: any) {
+      const recoveryMessage = recoveryError instanceof Error
+        ? recoveryError.message
+        : String(recoveryError);
+      const combined = new Error(
+        `Visual crop materialization failed: ${error.message}; failure persistence also failed: ${recoveryMessage}`,
+      );
+      (combined as any).cause = error;
+      (combined as any).recoveryCause = recoveryError;
+      throw combined;
+    }
   }
 
   private statusFor(region: PdfVisualRegion, flags: string[]) {
@@ -364,6 +393,25 @@ export class QuestionImportMediaService {
       !region.warnings.length
       ? QuestionImportMediaStatus.ELIGIBLE
       : QuestionImportMediaStatus.REVIEW_REQUIRED;
+  }
+
+  /** Deterministic first-pass crop verification. Vision confirmation can later
+   * replace this provenance, but a risky crop is never auto-accepted. */
+  private completenessFor(flags: string[], warnings: string[]) {
+    if (flags.includes('touches_page_edge'))
+      return QuestionImportMediaCropCompleteness.POSSIBLY_CLIPPED;
+    const joined = [...warnings, ...flags].join(' ').toLowerCase();
+    if (/(clip|cropp|cut off|truncated|label|axis|arrow|leader)/.test(joined))
+      return QuestionImportMediaCropCompleteness.POSSIBLY_CLIPPED;
+    return QuestionImportMediaCropCompleteness.COMPLETE;
+  }
+
+  private cropVerification(flags: string[], warnings: string[]) {
+    return {
+      verifier: 'deterministic-v1',
+      signals: [...flags, ...warnings],
+      checkedAt: new Date().toISOString(),
+    };
   }
 
   private validate(

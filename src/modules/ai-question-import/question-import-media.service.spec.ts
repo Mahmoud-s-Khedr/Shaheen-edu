@@ -190,4 +190,81 @@ describe('QuestionImportMediaService', () => {
       'old-asset',
     );
   });
+
+  it('records a failed crop without using a Prisma JSON equality filter', async () => {
+    const { service, prisma, tx } = serviceWith();
+    const checked = (service as any).validate(
+      { left: 100, top: 100, right: 500, bottom: 500 },
+      1000,
+      1000,
+      [],
+    );
+
+    await (service as any).recordFailedProposal(
+      { id: 'batch-1' },
+      1,
+      1000,
+      1000,
+      {
+        type: 'DIAGRAM',
+        bounds: checked.bounds,
+        confidence: 0.96,
+        description: 'A diagram',
+        warnings: [],
+      },
+      checked,
+      { response: true },
+      new Error('crop upload failed'),
+    );
+
+    expect(prisma.questionImportMedia.findMany).toHaveBeenCalledWith({
+      where: {
+        batchId: 'batch-1',
+        pageNumber: 1,
+        status: 'FAILED',
+      },
+    });
+    expect(tx.questionImportMedia.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          status: 'FAILED',
+          errorDetail: 'crop upload failed',
+        }),
+      }),
+    );
+  });
+
+  it('retains the original crop error if failure persistence also fails', async () => {
+    const { service, prisma } = serviceWith();
+    prisma.questionImportMedia.findMany.mockRejectedValue(
+      new Error('database unavailable'),
+    );
+    const checked = (service as any).validate(
+      { left: 100, top: 100, right: 500, bottom: 500 },
+      1000,
+      1000,
+      [],
+    );
+
+    await expect(
+      (service as any).recordFailedProposal(
+        { id: 'batch-1' },
+        1,
+        1000,
+        1000,
+        {
+          type: 'DIAGRAM',
+          bounds: checked.bounds,
+          confidence: 0.96,
+          description: 'A diagram',
+          warnings: [],
+        },
+        checked,
+        { response: true },
+        new Error('crop upload failed'),
+      ),
+    ).rejects.toThrow(
+      'Visual crop materialization failed: crop upload failed; failure persistence also failed: database unavailable',
+    );
+  });
 });

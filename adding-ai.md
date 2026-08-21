@@ -23,10 +23,10 @@ Admins can create a queued import from pasted raw text or a ready Bunny asset, t
 3. The worker extracts and normalizes text:
    - TXT: direct text extraction.
    - DOCX: DOCX-to-text extraction.
-   - PDF: embedded text extraction only; scanned/image-only PDFs are rejected when too little readable text is available.
-4. The worker creates neutral source blocks, then asks the configured OpenRouter model to identify complete, ordered question boundaries. Ambiguous, overlapping, or incomplete boundary output moves the batch to `AWAITING_REVIEW`.
+   - PDF: every rendered page is transcribed and retained with its confidence, warnings, and raw provider evidence. Review-required pages do not pause the pipeline; usable retained text continues to segmentation and extraction, while pages with no usable text are omitted and recorded as diagnostics.
+4. The worker creates neutral source blocks, then asks the configured OpenRouter model to identify complete, ordered question boundaries. Segmentation failures are recorded as failed/retryable imports; `AWAITING_REVIEW` is reserved for question candidates that need admin review.
 5. It groups identified questions into extraction chunks, asks OpenRouter for strict JSON-schema output, validates each candidate, and creates ordinary draft questions plus their options atomically.
-6. Valid imports remain drafts: nothing is submitted, reviewed, or published automatically. Invalid candidates and failed chunks retain diagnostics; admins can inspect status, source text, blocks, chunks, items, and retry failed work. 
+6. Valid imports remain drafts: nothing is submitted or published automatically. The admin review boundary is the candidate-question stage; after review, the normal question lifecycle controls submission and publication. Invalid candidates and failed chunks retain diagnostics; admins can inspect status, source text, blocks, chunks, items, and retry failed work.
 
 The client uses OpenRouter structured JSON schemas, provider `require_parameters`, and `data_collection: "deny"`. It also treats all document text as untrusted data, not instructions.
 

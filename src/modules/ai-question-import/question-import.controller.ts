@@ -5,7 +5,7 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Role } from '../../common/types/roles.enum';
 import type { RequestUser } from '../../common/types/request-with-user.types';
-import { AcceptQuestionImportItemDto, CreateQuestionImportMediaDto, CreateQuestionImportDto, QueryQuestionImportDto, RejectQuestionImportItemDto, UpdateQuestionImportMediaDto, UpdateQuestionImportSourceTextDto } from './dto/question-import.dto';
+import { AcceptQuestionImportItemDto, CreateQuestionImportMediaDto, CreateQuestionImportDto, QueryQuestionImportDto, RejectQuestionImportItemDto, UpdateQuestionImportItemMediaAssignmentsDto, UpdateQuestionImportMediaDto, UpdateQuestionImportSourceTextDto } from './dto/question-import.dto';
 import { QuestionImportService } from './question-import.service';
 
 @ApiTags('admin/ai/question-imports') @ApiBearerAuth() @UseGuards(RolesGuard) @Roles(Role.ADMIN, Role.SUPER_ADMIN)
@@ -23,9 +23,11 @@ export class QuestionImportController {
   @Patch(':id/media/:mediaKey') @ApiOperation({ summary: 'Review, reclassify, or resize an extracted visual region' }) updateMedia(@CurrentUser() actor: RequestUser, @Param('id') id: string, @Param('mediaKey') mediaKey: string, @Body() dto: UpdateQuestionImportMediaDto) { return this.service.updateMedia(actor, id, mediaKey, dto); }
   @Post(':id/media/:mediaKey/retry') @ApiOperation({ summary: 'Retry a failed PDF visual crop' }) retryMedia(@CurrentUser() actor: RequestUser, @Param('id') id: string, @Param('mediaKey') mediaKey: string) { return this.service.retryMedia(actor, id, mediaKey); }
   @Post(':id/retry') @ApiOperation({ summary: 'Retry failed import chunks' }) retry(@CurrentUser() actor: RequestUser, @Param('id') id: string) { return this.service.retry(actor, id); }
+  @Post(':id/chunks/:chunkId/retry') @ApiOperation({ summary: 'Retry one failed import chunk' }) retryChunk(@CurrentUser() actor: RequestUser, @Param('id') id: string, @Param('chunkId') chunkId: string) { return this.service.retryChunk(actor, id, chunkId); }
   @Post(':id/pages/:pageNumber/retry') @ApiOperation({ summary: 'Retry one failed or review-required PDF transcription page' }) retryPage(@CurrentUser() actor: RequestUser, @Param('id') id: string, @Param('pageNumber') pageNumber: string) { return this.service.retryPage(actor, id, Number(pageNumber)); }
   @Post(':id/children/:childId/retry') @ApiOperation({ summary: 'Retry one failed page-range import' }) retryChild(@CurrentUser() actor: RequestUser, @Param('id') id: string, @Param('childId') childId: string) { return this.service.retryChild(actor, id, childId); }
   @Post(':id/items/:itemId/retry') @ApiOperation({ summary: 'Retry one failed import item' }) retryItem(@CurrentUser() actor: RequestUser, @Param('id') id: string, @Param('itemId') itemId: string) { return this.service.retry(actor, id, itemId); }
+  @Patch(':id/items/:itemId/media') @ApiOperation({ summary: 'Approve, reject, move, or reorder visual ownership assignments' }) updateItemMedia(@CurrentUser() actor: RequestUser, @Param('id') id: string, @Param('itemId') itemId: string, @Body() dto: UpdateQuestionImportItemMediaAssignmentsDto) { return this.service.updateItemMedia(actor, id, itemId, dto); }
   @Post(':id/items/:itemId/accept') @ApiOperation({ summary: 'Accept a corrected review candidate and create one draft question' }) acceptItem(@CurrentUser() actor: RequestUser, @Param('id') id: string, @Param('itemId') itemId: string, @Body() dto: AcceptQuestionImportItemDto) { return this.service.acceptItem(actor, id, itemId, dto); }
   @Post(':id/items/:itemId/reject') @ApiOperation({ summary: 'Reject an unresolved review candidate' }) rejectItem(@CurrentUser() actor: RequestUser, @Param('id') id: string, @Param('itemId') itemId: string, @Body() dto: RejectQuestionImportItemDto) { return this.service.rejectItem(actor, id, itemId, dto); }
 }

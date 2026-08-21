@@ -261,6 +261,48 @@ enum QuestionImportMediaDetectionSource {
   MANUAL
 }
 
+/// Ownership is separate from crop readiness: an ELIGIBLE crop still needs a
+/// validated decision before it becomes student-visible content.
+enum QuestionImportMediaAssignmentOwner {
+  QUESTION
+  OPTION
+  CONTEXT
+}
+
+enum QuestionImportMediaAssignmentStatus {
+  PROPOSED
+  VERIFIED
+  APPROVED
+  REJECTED
+}
+
+/// The role a visual must satisfy before a candidate can be answered or
+/// materialized.  Requirements are deliberately separate from assignments:
+/// assignments are evidence, requirements are the acceptance contract.
+enum QuestionImportVisualRequirementKind {
+  NONE
+  QUESTION_FIGURE
+  COMPOSITE_OPTION_FIGURE
+  OPTION_IMAGE_SET
+  SHARED_STIMULUS
+}
+
+enum QuestionImportVisualResolutionState {
+  NOT_REQUIRED
+  PENDING
+  RESOLVED
+  UNRESOLVED
+  AMBIGUOUS
+  INCOMPLETE_CROP
+}
+
+enum QuestionImportMediaCropCompleteness {
+  UNKNOWN
+  COMPLETE
+  POSSIBLY_CLIPPED
+  INCOMPLETE
+}
+
 enum AssessmentOwnerType {
   STUDENT
   ADMIN
@@ -901,6 +943,7 @@ model QuestionContext {
   updatedAt     DateTime                      @updatedAt
   questions     QuestionContextQuestion[]
   contentBlocks QuestionContextContentBlock[]
+  importContexts QuestionImportContext[]
 
   @@index([type, createdAt])
 }
@@ -982,6 +1025,7 @@ model QuestionImportBatch {
   skippedRanges         QuestionImportSkippedRange[]
   pages                 QuestionImportPage[]
   media                 QuestionImportMedia[]
+  importContexts        QuestionImportContext[]
 
   @@index([status, createdAt])
   @@index([createdById, createdAt])
@@ -1001,6 +1045,7 @@ model QuestionImportPage {
   confidence                   Float?
   uncertainSpans               Json?
   warnings                     Json?
+  layoutEnvelopes              Json?
   attemptCount                 Int                      @default(0)
   providerFileId               String?
   rawProviderResponse          Json?
@@ -1038,6 +1083,8 @@ model QuestionImportMedia {
   description        String
   warnings           Json?
   validationFlags    Json?
+  cropCompleteness   QuestionImportMediaCropCompleteness @default(UNKNOWN)
+  cropVerification   Json?
   checksum           String?
   assetId            String?                   @unique
   asset              Asset?                    @relation("QuestionImportMediaAsset", fields: [assetId], references: [id], onDelete: SetNull)
@@ -1050,10 +1097,90 @@ model QuestionImportMedia {
   createdAt          DateTime                  @default(now())
   updatedAt          DateTime                  @updatedAt
   detections         QuestionImportMediaDetection[]
+  assignments        QuestionImportMediaAssignment[]
 
   @@unique([batchId, mediaKey])
   @@index([batchId, pageNumber, status])
   @@index([batchId, checksum])
+}
+
+/// Stable, batch-local context identities used by visual extraction.  The
+/// external model sees contextKey, never the database QuestionContext id.
+model QuestionImportContext {
+  id          String              @id @default(cuid())
+  batchId     String
+  batch       QuestionImportBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  contextKey  String
+  contextId   String
+  context     QuestionContext     @relation(fields: [contextId], references: [id], onDelete: Cascade)
+  firstBlock  String
+  lastBlock   String
+  createdAt   DateTime            @default(now())
+
+  @@unique([batchId, contextKey])
+  @@unique([batchId, contextId])
+  @@index([contextId])
+}
+
+/// An auditable proposal/review record which maps one materialized crop to a
+/// question, option, or shared context. finalContentBlockId is intentionally a
+/// polymorphic reference because the final block can live in three tables.
+model QuestionImportMediaAssignment {
+  id                  String                              @id @default(cuid())
+  importItemId        String
+  importItem          QuestionImportItem                  @relation(fields: [importItemId], references: [id], onDelete: Cascade)
+  mediaId             String
+  media               QuestionImportMedia                 @relation(fields: [mediaId], references: [id], onDelete: Restrict)
+  assignmentKey       String
+  /// Set only for QUESTION/OPTION ownership. A nullable unique key lets a
+  /// shared context reuse its visual while making non-context ownership safe
+  /// even when chunks are processed concurrently.
+  exclusiveOwnershipKey String?
+  owner               QuestionImportMediaAssignmentOwner
+  ownerReference      String
+  placementAnchor     String?
+  confidence          Float?
+  reason              String?
+  status              QuestionImportMediaAssignmentStatus @default(PROPOSED)
+  scoreComponents     Json?
+  evidenceVersion     String?
+  reviewNote          String?
+  reviewedAt          DateTime?
+  reviewedById        String?
+  finalContentBlockId String?
+  createdAt           DateTime                            @default(now())
+  updatedAt           DateTime                            @updatedAt
+
+  @@unique([importItemId, assignmentKey])
+  @@unique([exclusiveOwnershipKey])
+  @@index([mediaId, status])
+  @@index([importItemId, status])
+}
+
+/// A deterministic, reviewable visual contract for one imported candidate.
+/// A candidate cannot create answer content until every requirement resolves.
+model QuestionImportVisualRequirement {
+  id                  String                               @id @default(cuid())
+  importItemId        String
+  importItem          QuestionImportItem                   @relation(fields: [importItemId], references: [id], onDelete: Cascade)
+  requirementKey      String
+  kind                QuestionImportVisualRequirementKind
+  sourcePage          Int?
+  sourceEnvelope      Json?
+  owner               QuestionImportMediaAssignmentOwner?
+  ownerReference      String?
+  optionIndexes       Json?
+  expectedCardinality Int                                  @default(0)
+  interpretationRequired Boolean                           @default(true)
+  resolutionState     QuestionImportVisualResolutionState @default(PENDING)
+  unresolvedReason    String?
+  candidateRankings   Json?
+  evidenceVersion     String?
+  createdAt           DateTime                             @default(now())
+  updatedAt           DateTime                             @updatedAt
+
+  @@unique([importItemId, requirementKey])
+  @@index([importItemId, resolutionState])
 }
 
 /// Keeps all model proposals and manual corrections even when they collapse
@@ -1087,6 +1214,7 @@ model QuestionImportSourceBlock {
   blockKey      String
   text          String
   sourceLocator Json?
+  envelope      Json?
   assignment    Json?
   createdAt     DateTime            @default(now())
   updatedAt     DateTime            @updatedAt
@@ -1181,8 +1309,13 @@ model QuestionImportItem {
   reviewedAt        DateTime?
   reviewedById      String?
   reviewNote        String?
+  visualState       QuestionImportVisualResolutionState @default(NOT_REQUIRED)
+  visualEvidenceVersion String?
+  answerContentValid Boolean @default(true)
   createdAt        DateTime                 @default(now())
   updatedAt        DateTime                 @updatedAt
+  mediaAssignments QuestionImportMediaAssignment[]
+  visualRequirements QuestionImportVisualRequirement[]
 
   @@unique([chunkId, sequence])
   @@index([batchId, status])

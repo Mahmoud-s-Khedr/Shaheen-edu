@@ -176,7 +176,7 @@ Implementation decisions:
 
 ## Phase 6 — Visual AI extraction and ownership
 
-Status: `NOT STARTED`
+Status: `IMPLEMENTED` (2026-08-19)
 
 Use the Phase 5 media manifest to create visual questions, visual options, and
 shared visual contexts safely.
@@ -188,7 +188,7 @@ Scope:
 - Return proposed media assignments with `mediaKey`, owner (`QUESTION`, `OPTION`, or `CONTEXT`), owner reference, placement anchor, confidence, and reason. A shared visual may have multiple approved context/question relationships; an option image may be image-only.
 - Validate that every referenced media key belongs to the current batch and is approved, that the proposed owner exists in the candidate, and that no unauthorized or duplicate attachment is created. Convert approved assignments into canonical `IMAGE` content blocks using the materialized asset IDs.
 - Pass visual crops to the model only when visual interpretation is needed; keep text-only extraction requests text-only. Keep visual calls small and page/range scoped rather than resending the whole document.
-- Route uncertain ownership, unsupported media placement, inferred answers, and incomplete grading data to `REVIEW_REQUIRED`. Reviewers can accept, reject, or reassign media before draft creation.
+- Retain uncertain ownership, unsupported media placement, inferred answers, and incomplete grading data on the candidate. Candidate review is the only human approval boundary before the normal draft submission/publication lifecycle; page transcription and media extraction do not pause the AI pipeline.
 - Preserve import item diagnostics, provenance, source citations, and retry behavior. Retrying an item must reuse Phase 5 assets and must not duplicate questions, assignments, or media.
 
 Exit criteria:
@@ -197,6 +197,13 @@ Exit criteria:
 - Every attached visual can be traced from source PDF page and crop through import-media evidence, assignment/review decision, final content block, assessment snapshot, and student delivery.
 - Ambiguous candidates remain reviewable rather than being discarded or published.
 - Retries do not duplicate questions, media, or attachments.
+
+Implementation decisions:
+
+- New PDF imports use `question-import-v4`; text and historical imports remain on their existing V3/V2 paths. V4 uses the root PDF batch as the media namespace, including for page-split child batches.
+- `QuestionImportContext` keeps model-facing context keys separate from database IDs. `QuestionImportMediaAssignment` records every proposed, approved, or rejected ownership decision and the final polymorphic content-block reference.
+- The extraction call receives only page-scoped eligible crop bytes and batch-local `M0001` media keys. It returns source-block citations and typed ownership assignments; asset IDs and signed URLs are never supplied to the model.
+- Candidate diagnostics retain source evidence, media-confidence warnings, and ownership conflicts. The import continues through candidate generation; admin review resolves candidate issues before the question enters the normal submit/publish lifecycle.
 
 ## Phase 7 — Input-format simplification
 

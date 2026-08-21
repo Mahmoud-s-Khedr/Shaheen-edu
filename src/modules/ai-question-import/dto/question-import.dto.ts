@@ -1,8 +1,8 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { ArrayMinSize, IsArray, IsEnum, IsInt, IsObject, IsOptional, IsString, MaxLength, Min, MinLength, ValidateNested } from 'class-validator';
+import { ArrayMinSize, IsArray, IsEnum, IsInt, IsNumber, IsObject, IsOptional, IsString, Max, MaxLength, Min, MinLength, ValidateNested } from 'class-validator';
 import { SearchPaginationQueryDto } from '../../../common/dto/pagination-query.dto';
-import { QuestionImportMediaStatus, QuestionImportMediaType, QuestionImportStatus } from '../../../common/types/roles.enum';
+import { QuestionImportMediaAssignmentOwner, QuestionImportMediaAssignmentStatus, QuestionImportMediaStatus, QuestionImportMediaType, QuestionImportStatus } from '../../../common/types/roles.enum';
 import { QuestionPlacementDto } from '../../question-banks/dto/question-banks.dto';
 
 export class CreateQuestionImportDto {
@@ -26,6 +26,19 @@ export class AcceptQuestionImportItemDto {
 }
 export class RejectQuestionImportItemDto {
   @ApiProperty() @IsString() @MinLength(1) @MaxLength(2000) reason!: string;
+}
+export class QuestionImportItemMediaAssignmentDto {
+  @ApiProperty() @IsString() mediaKey!: string;
+  @ApiProperty({ enum: QuestionImportMediaAssignmentOwner }) @IsEnum(QuestionImportMediaAssignmentOwner) owner!: QuestionImportMediaAssignmentOwner;
+  @ApiProperty() @IsString() @MaxLength(100) ownerReference!: string;
+  @ApiPropertyOptional({ description: 'START, END, or AFTER:B00001' }) @IsOptional() @IsString() @MaxLength(30) placementAnchor?: string;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() @Min(0) @Max(1) confidence?: number;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(2000) reason?: string;
+  @ApiProperty({ enum: QuestionImportMediaAssignmentStatus }) @IsEnum(QuestionImportMediaAssignmentStatus) status!: QuestionImportMediaAssignmentStatus;
+}
+export class UpdateQuestionImportItemMediaAssignmentsDto {
+  @ApiProperty({ type: [QuestionImportItemMediaAssignmentDto] }) @IsArray() @ValidateNested({ each: true }) @Type(() => QuestionImportItemMediaAssignmentDto) assignments!: QuestionImportItemMediaAssignmentDto[];
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(2000) note?: string;
 }
 
 export class QuestionImportMediaBoundsDto {
