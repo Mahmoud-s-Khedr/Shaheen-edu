@@ -104,19 +104,17 @@ describe('QuestionImportService review summaries', () => {
         update: batchUpdate,
       },
       questionImportChunk: {
-        findFirst: jest
-          .fn()
-          .mockResolvedValue({
-            id: 'chunk-109',
-            batchId: 'batch-1',
-            sequence: 109,
-            status: 'FAILED',
-          }),
+        findFirst: jest.fn().mockResolvedValue({
+          id: 'chunk-109',
+          batchId: 'batch-1',
+          sequence: 109,
+          status: 'FAILED',
+        }),
         update: chunkUpdate,
       },
       $transaction: jest.fn().mockResolvedValue([]),
     };
-    const queue = { enqueue: jest.fn() };
+    const queue = { enqueue: jest.fn(), enqueueChunk: jest.fn() };
     const audit = { record: jest.fn() };
     const service = new QuestionImportService(
       prisma as any,
@@ -128,12 +126,10 @@ describe('QuestionImportService review summaries', () => {
       {} as any,
       {} as any,
       {
-        get: jest
-          .fn()
-          .mockReturnValue({
-            questionImportModel: 'test-model',
-            openRouterApiKey: 'test-key',
-          }),
+        get: jest.fn().mockReturnValue({
+          questionImportModel: 'test-model',
+          openRouterApiKey: 'test-key',
+        }),
       } as any,
     );
     jest.spyOn(service, 'get').mockResolvedValue({ id: 'batch-1' } as any);
@@ -154,7 +150,7 @@ describe('QuestionImportService review summaries', () => {
         data: expect.objectContaining({ status: QuestionImportStatus.QUEUED }),
       }),
     );
-    expect(queue.enqueue).toHaveBeenCalledWith('batch-1');
+    expect(queue.enqueueChunk).toHaveBeenCalledWith('batch-1', 'chunk-109');
   });
 
   function mediaReviewService() {

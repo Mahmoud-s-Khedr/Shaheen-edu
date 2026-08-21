@@ -34,22 +34,15 @@ import {
   type SegmentationResultV3,
 } from './openrouter-question-import.client';
 import {
-  QUESTION_IMPORT_MAX_ATTEMPTS,
+  QUESTION_IMPORT_CHUNK_MAX_ATTEMPTS,
+  QUESTION_IMPORT_CHUNK_QUEUE,
+  QUESTION_IMPORT_PAGE_QUEUE,
   QUESTION_IMPORT_QUEUE,
   QuestionImportQueue,
 } from './question-import.queue';
-
-/** One automatic retry prevents a transient model response from permanently losing a question. */
-const QUESTION_IMPORT_CHUNK_MAX_ATTEMPTS = 2;
-
-class IncompleteImportError extends Error {
-  constructor(readonly incompleteChunks: number) {
-    super(`Waiting to recover ${incompleteChunks} unfinished import chunk(s)`);
-  }
-}
 @Injectable()
 export class QuestionImportWorker {
-  private worker?: Worker;
+  private workers: Worker[] = [];
   private readonly config: AppConfig['ai'];
   private readonly redisUrl: string;
   private readonly processingLeaseMs: number;
@@ -77,21 +70,43 @@ export class QuestionImportWorker {
       throw new Error(
         'AI question import worker requires OPENROUTER_API_KEY and AI_QUESTION_IMPORT_MODEL',
       );
-    if (!this.worker)
-      this.worker = new Worker(
+    if (this.workers.length) return;
+    const options = (concurrency: number) => ({
+      connection: { url: this.redisUrl } as any,
+      concurrency,
+      lockDuration: this.processingLeaseMs,
+    });
+    this.workers = [
+      new Worker(
         QUESTION_IMPORT_QUEUE,
-        async (job) => this.process(job.data.batchId, job.attemptsMade),
-        {
-          connection: { url: this.redisUrl } as any,
-          concurrency: this.config.workerConcurrency,
-          lockDuration: this.processingLeaseMs,
-        },
-      );
+        async (job) => this.process(job.data.batchId),
+        // Control jobs only coordinate dependencies and the one global
+        // segmentation request. Serializing them prevents duplicate control
+        // deliveries from creating the same source blocks or chunks twice.
+        options(1),
+      ),
+      new Worker(
+        QUESTION_IMPORT_PAGE_QUEUE,
+        async (job) =>
+          this.processPage(
+            job.data.batchId,
+            job.data.pageNumber,
+            job.attemptsMade,
+          ),
+        options(this.config.questionImportOcrConcurrency ?? 8),
+      ),
+      new Worker(
+        QUESTION_IMPORT_CHUNK_QUEUE,
+        async (job) => this.processChunkJob(job.data.batchId, job.data.chunkId),
+        options(this.config.questionImportExtractionConcurrency ?? 6),
+      ),
+    ];
   }
   async stop() {
-    await this.worker?.close();
+    await Promise.all(this.workers.map((worker) => worker.close()));
+    this.workers = [];
   }
-  private async process(batchId: string, attemptsMade = 0) {
+  private async process(batchId: string) {
     const batch: any = await this.prisma.questionImportBatch.findUnique({
       where: { id: batchId },
       include: { sourceAsset: true, children: { select: { id: true } } },
@@ -119,11 +134,23 @@ export class QuestionImportWorker {
             startedAt: new Date(),
           },
         });
-        const x =
+        if (
           batch.inputType === 'ASSET' &&
           batch.sourceAsset.mimeType === 'application/pdf'
-            ? await this.transcribePdf(batch)
-            : batch.inputType === 'RAW_TEXT'
+        ) {
+          await this.schedulePdfPages(batch);
+          const ready = await this.collectPdfTranscription(batch);
+          if (!ready) return;
+          await this.prisma.questionImportBatch.update({
+            where: { id: batchId },
+            data: {
+              normalizedText: ready.text,
+              extractionMetadata: ready.metadata,
+            },
+          });
+        } else {
+          const x =
+            batch.inputType === 'RAW_TEXT'
               ? { text: batch.rawText, metadata: { format: 'RAW_TEXT' } }
               : await this.extractor.extract({
                   mimeType: batch.sourceAsset.mimeType,
@@ -132,13 +159,14 @@ export class QuestionImportWorker {
                     batch.sourceAsset.storageKey,
                   ),
                 });
-        await this.prisma.questionImportBatch.update({
-          where: { id: batchId },
-          data: {
-            normalizedText: x.text,
-            extractionMetadata: x.metadata as any,
-          },
-        });
+          await this.prisma.questionImportBatch.update({
+            where: { id: batchId },
+            data: {
+              normalizedText: x.text,
+              extractionMetadata: x.metadata as any,
+            },
+          });
+        }
       }
       const current: any = await this.prisma.questionImportBatch.findUnique({
         where: { id: batchId },
@@ -256,7 +284,12 @@ export class QuestionImportWorker {
         where: { batchId, status: QuestionImportChunkStatus.PENDING },
         orderBy: { sequence: 'asc' },
       });
-      for (const chunk of pending) await this.processChunk(batch, chunk);
+      if (pending.length) {
+        await Promise.all(
+          pending.map((chunk) => this.queue.enqueueChunk(batchId, chunk.id)),
+        );
+        return;
+      }
       const incompleteChunks = await this.prisma.questionImportChunk.count({
         where: {
           batchId,
@@ -268,7 +301,7 @@ export class QuestionImportWorker {
           },
         },
       });
-      if (incompleteChunks) throw new IncompleteImportError(incompleteChunks);
+      if (incompleteChunks) return;
       const created = await this.prisma.questionImportItem.count({
         where: { batchId, status: QuestionImportItemStatus.CREATED },
       });
@@ -303,19 +336,6 @@ export class QuestionImportWorker {
       });
       if (batch.parentId) await this.refreshParent(batch.parentId);
     } catch (error: any) {
-      if (error instanceof IncompleteImportError) {
-        if (attemptsMade + 1 < QUESTION_IMPORT_MAX_ATTEMPTS) throw error;
-        await this.prisma.questionImportBatch.update({
-          where: { id: batchId },
-          data: {
-            status: QuestionImportStatus.FAILED,
-            errorSummary: `Import stopped with ${error.incompleteChunks} unfinished chunk(s) after recovery retries were exhausted`,
-            completedAt: new Date(),
-          },
-        });
-        if (batch.parentId) await this.refreshParent(batch.parentId);
-        throw error;
-      }
       await this.prisma.questionImportBatch.update({
         where: { id: batchId },
         data: {
@@ -398,9 +418,244 @@ export class QuestionImportWorker {
         : null,
     );
   }
-  private async transcribePdf(
+  /**
+   * Page creation is the only serial PDF setup step. Every physical page is
+   * then queued separately, so a slow or failed page never holds the other
+   * OCR work hostage.
+   */
+  private async schedulePdfPages(batch: any) {
+    if (!this.config.pdfTranscriptionModel)
+      throw new Error('PDF imports require AI_PDF_TRANSCRIPTION_MODEL');
+    const existing: any[] = await this.prisma.questionImportPage.findMany({
+      where: { batchId: batch.id },
+      select: { pageNumber: true },
+    });
+    await this.prisma.questionImportBatch.update({
+      where: { id: batch.id },
+      data: { status: QuestionImportStatus.TRANSCRIBING },
+    });
+    if (!existing.length) {
+      const original = await this.storage.download(
+        batch.sourceAsset.storageKey,
+      );
+      const totalPages = await this.pdfRanges.pageCount(original);
+      await this.prisma.questionImportPage.createMany({
+        data: Array.from({ length: totalPages }, (_, index) => ({
+          batchId: batch.id,
+          pageNumber: index + 1,
+        })),
+        skipDuplicates: true,
+      });
+    }
+    await this.reclaimStaleProcessingPages(batch.id);
+    const pending = await this.prisma.questionImportPage.findMany({
+      where: { batchId: batch.id, status: 'PENDING' },
+      select: { pageNumber: true },
+    });
+    await Promise.all(
+      pending.map((page: any) =>
+        this.queue.enqueuePage(batch.id, page.pageNumber),
+      ),
+    );
+  }
+  /** Returns null until every independently queued OCR page is terminal. */
+  private async collectPdfTranscription(
     batch: any,
-  ): Promise<{ text: string; metadata: any }> {
+  ): Promise<{ text: string; metadata: any } | null> {
+    const pages: any[] = await this.prisma.questionImportPage.findMany({
+      where: { batchId: batch.id },
+      orderBy: { pageNumber: 'asc' },
+    });
+    if (
+      !pages.length ||
+      pages.some((page) => ['PENDING', 'PROCESSING'].includes(page.status))
+    )
+      return null;
+    const unresolved = pages.filter((page) => page.status !== 'AI_TRANSCRIBED');
+    const usablePages = pages.filter((page) =>
+      Boolean((page.canonicalText ?? page.aiText)?.trim()),
+    );
+    if (!usablePages.length)
+      throw new Error('PDF transcription produced no usable page text');
+    return {
+      text: usablePages
+        .map(
+          (page) =>
+            `[Page ${page.pageNumber}]\n${(page.canonicalText ?? page.aiText).trim()}`,
+        )
+        .join('\n\n'),
+      metadata: {
+        format: 'VISUAL_PDF_OCR',
+        unresolvedPages: unresolved.map((page) => page.pageNumber),
+        omittedPages: pages
+          .filter((page) => !(page.canonicalText ?? page.aiText)?.trim())
+          .map((page) => page.pageNumber),
+        pages: pages.map((page) => ({
+          page: page.pageNumber,
+          confidence: page.confidence,
+          status: page.status,
+          lineCount: (page.canonicalText ?? page.aiText ?? '')
+            .split('\n')
+            .filter(Boolean).length,
+        })),
+      },
+    };
+  }
+  private async reclaimStaleProcessingPages(batchId: string) {
+    await this.prisma.questionImportPage.updateMany({
+      where: {
+        batchId,
+        status: 'PROCESSING',
+        updatedAt: { lt: new Date(Date.now() - this.processingLeaseMs) },
+      },
+      data: {
+        status: 'PENDING',
+        errorDetail:
+          'Recovered after the worker lease expired before page completion',
+      },
+    });
+  }
+  private async processPage(
+    batchId: string,
+    pageNumber: number,
+    attemptsMade = 0,
+  ) {
+    const batch: any = await this.prisma.questionImportBatch.findUnique({
+      where: { id: batchId },
+      include: { sourceAsset: true },
+    });
+    if (!batch || batch.sourceAsset?.mimeType !== 'application/pdf') return;
+    const claimed = await this.prisma.questionImportPage.updateMany({
+      where: { batchId, pageNumber, status: 'PENDING' },
+      data: { status: 'PROCESSING', attemptCount: { increment: 1 } },
+    });
+    if (!claimed.count) return;
+    // Queue jobs can be redelivered or scheduled by the coordinator more than
+    // once. The page row, not an individual BullMQ job, is the retry budget.
+    let persistedAttemptCount = attemptsMade + 1;
+    let stored: any;
+    try {
+      stored = await this.prisma.questionImportPage.findUniqueOrThrow({
+        where: { batchId_pageNumber: { batchId, pageNumber } },
+      });
+      persistedAttemptCount = stored.attemptCount;
+      const original = await this.storage.download(
+        batch.sourceAsset.storageKey,
+      );
+      const recovered = await this.transcribePageWithRecovery(
+        original,
+        pageNumber,
+      );
+      const image = recovered.image;
+      const initial = recovered.initial;
+      const initialCanonicalText = this.canonicalPageText(initial.page.content);
+      const suspicious =
+        initial.page.confidence < 0.9 ||
+        initial.page.uncertainSpans.length > 0 ||
+        initial.page.warnings.length > 0 ||
+        !initialCanonicalText;
+      let verified: any = null;
+      let verificationFailure: any = null;
+      if (suspicious) {
+        try {
+          verified = await this.transcriber.verifyImage(image, initial.page);
+        } catch (error: any) {
+          verificationFailure = this.transcriptionFailure(
+            error,
+            'VERIFICATION',
+          );
+        }
+      }
+      const finalPage = verified?.page ?? initial.page;
+      const canonicalText = this.canonicalPageText(finalPage.content);
+      const priorAttemptTrace = Array.isArray(
+        (stored.rawProviderResponse as any)?.attempts,
+      )
+        ? (stored.rawProviderResponse as any).attempts
+        : stored.rawProviderResponse
+          ? [{ mode: 'PREVIOUS_ATTEMPT', raw: stored.rawProviderResponse }]
+          : [];
+      let visualFailure: string | null = null;
+      try {
+        await this.media.materializePage(
+          batch,
+          pageNumber,
+          image,
+          finalPage.visualRegions ?? [],
+          verified?.raw ?? initial.raw,
+        );
+      } catch (error: any) {
+        visualFailure = error.message.slice(0, 500);
+      }
+      const warnings = [
+        ...finalPage.warnings,
+        ...(verificationFailure
+          ? [
+              'OCR verification failed; retained the initial transcription for review.',
+            ]
+          : []),
+        ...(visualFailure
+          ? [`Visual extraction failed: ${visualFailure}`]
+          : []),
+      ];
+      const review =
+        finalPage.uncertainSpans.length > 0 ||
+        warnings.length > 0 ||
+        !canonicalText;
+      await this.prisma.questionImportPage.update({
+        where: { batchId_pageNumber: { batchId, pageNumber } },
+        data: {
+          status: review ? 'REVIEW_REQUIRED' : 'AI_TRANSCRIBED',
+          aiText: finalPage.content,
+          canonicalText,
+          confidence: finalPage.confidence,
+          uncertainSpans: finalPage.uncertainSpans as any,
+          warnings: warnings as any,
+          layoutEnvelopes: (finalPage.layoutEnvelopes ?? []) as any,
+          rawProviderResponse: {
+            attempts: [...priorAttemptTrace, ...recovered.attempts],
+            verification:
+              verificationFailure ??
+              (verified ? { raw: verified.raw, usage: verified.usage } : null),
+          } as any,
+          usage: {
+            initial: initial.usage,
+            verification: verified?.usage ?? null,
+          } as any,
+          initialAiText: initial.page.content,
+          initialCanonicalText,
+          initialProviderResponse: initial.raw as any,
+          initialUsage: initial.usage as any,
+          verificationProviderResponse: verified?.raw as any,
+          verificationUsage: verified?.usage as any,
+          verifiedAt: verified ? new Date() : null,
+          errorDetail: review
+            ? 'Visual OCR transcription requires admin review'
+            : null,
+        },
+      });
+    } catch (error: any) {
+      const retrying = persistedAttemptCount < 3;
+      const failure = this.transcriptionFailure(error, 'PRIMARY');
+      await this.prisma.questionImportPage.update({
+        where: { batchId_pageNumber: { batchId, pageNumber } },
+        data: {
+          status: retrying ? 'PENDING' : 'REVIEW_REQUIRED',
+          warnings: [`OCR transcription failed: ${failure.message}`] as any,
+          rawProviderResponse: (error instanceof OpenRouterQuestionImportError
+            ? error.rawResponse
+            : failure) as any,
+          usage: failure.usage as any,
+          errorDetail: error.message.slice(0, 2000),
+        },
+      });
+      if (retrying) throw error;
+    } finally {
+      await this.queue.enqueue(batchId);
+    }
+  }
+  /** @deprecated The active PDF path uses independently queued page jobs. */
+  async transcribePdf(batch: any): Promise<{ text: string; metadata: any }> {
     if (!this.config.pdfTranscriptionModel)
       throw new Error('PDF imports require AI_PDF_TRANSCRIPTION_MODEL');
     const original = await this.storage.download(batch.sourceAsset.storageKey);
@@ -1490,10 +1745,12 @@ export class QuestionImportWorker {
         normalizedBounds: item.normalizedBounds,
         proximity: Math.min(
           ...questions
-            .filter((question) =>
-              !question.page || question.page === item.pageNumber,
+            .filter(
+              (question) => !question.page || question.page === item.pageNumber,
             )
-            .map((question) => this.visualProximity(question.envelope, item.normalizedBounds)),
+            .map((question) =>
+              this.visualProximity(question.envelope, item.normalizedBounds),
+            ),
           Number.MAX_SAFE_INTEGER,
         ),
       }));
@@ -1563,12 +1820,15 @@ export class QuestionImportWorker {
       altText: assignment.reason.trim(),
     });
     const matching = assignments.filter(matches);
-    const starts = matching.filter((assignment) => assignment.placementAnchor === 'START');
+    const starts = matching.filter(
+      (assignment) => assignment.placementAnchor === 'START',
+    );
     const after = matching
       .filter((assignment) => assignment.placementAnchor?.startsWith('AFTER:'))
       .sort((a, b) => a.placementAnchor.localeCompare(b.placementAnchor));
     const ends = matching.filter(
-      (assignment) => !assignment.placementAnchor || assignment.placementAnchor === 'END',
+      (assignment) =>
+        !assignment.placementAnchor || assignment.placementAnchor === 'END',
     );
     return [
       ...starts.map(image),
@@ -1796,6 +2056,33 @@ export class QuestionImportWorker {
       await tx.questionImportChunk.createMany({ data: chunks });
     });
   }
+  private async processChunkJob(batchId: string, chunkId: string) {
+    const [batch, chunk] = await Promise.all([
+      this.prisma.questionImportBatch.findUnique({ where: { id: batchId } }),
+      this.prisma.questionImportChunk.findFirst({
+        where: { id: chunkId, batchId },
+      }),
+    ]);
+    if (!batch || !chunk) return;
+    await this.processChunk(batch, chunk);
+  }
+  private async parallelMap<T>(
+    values: T[],
+    concurrency: number,
+    work: (value: T) => Promise<unknown>,
+  ) {
+    let next = 0;
+    const workers = Array.from(
+      { length: Math.min(values.length, concurrency) },
+      async () => {
+        while (next < values.length) {
+          const index = next++;
+          await work(values[index]);
+        }
+      },
+    );
+    await Promise.all(workers);
+  }
   private async processChunk(batch: any, chunk: any) {
     const claim = await this.prisma.questionImportChunk.updateMany({
       where: { id: chunk.id, status: QuestionImportChunkStatus.PENDING },
@@ -1844,17 +2131,22 @@ export class QuestionImportWorker {
           })
         ).map((item) => item.sequence),
       );
-      for (let i = 0; i < r.items.length; i += 1)
-        if (!completedSequences.has(i + 1))
+      await this.parallelMap(
+        r.items.map((item, index) => ({ item, index })),
+        this.config.questionImportCandidateConcurrency ?? 6,
+        async ({ item, index }) => {
+          if (completedSequences.has(index + 1)) return;
           await this.createItem(
             batch,
             chunk,
-            i + 1,
-            r.items[i] as any,
-            questions[i],
+            index + 1,
+            item as any,
+            questions[index],
             v3,
             v4,
           );
+        },
+      );
       await this.prisma.questionImportChunk.update({
         where: { id: chunk.id },
         data: {
@@ -1882,16 +2174,27 @@ export class QuestionImportWorker {
           errorDetail: e.message.slice(0, 2000),
         },
       });
+      if (attemptCount < QUESTION_IMPORT_CHUNK_MAX_ATTEMPTS)
+        await this.queue.enqueueChunk(batch.id, chunk.id);
+    } finally {
+      // A terminal chunk, including a failed one, is what advances the batch
+      // aggregator. The persisted sequence remains the only ordering signal.
+      await this.queue.enqueue(batch.id);
     }
   }
   private async extractV4(batch: any, input: any) {
     const rootBatchId = batch.parentId ?? batch.id;
     const keys = (input.media ?? []).map((item: any) => item.mediaKey);
     const proximityByKey = new Map<string, number>(
-      (input.media ?? []).map((item: any) => [
-        item.mediaKey,
-        Number.isFinite(item.proximity) ? item.proximity : Number.MAX_SAFE_INTEGER,
-      ] as [string, number]),
+      (input.media ?? []).map(
+        (item: any) =>
+          [
+            item.mediaKey,
+            Number.isFinite(item.proximity)
+              ? item.proximity
+              : Number.MAX_SAFE_INTEGER,
+          ] as [string, number],
+      ),
     );
     const rows: any[] = keys.length
       ? await this.prisma.questionImportMedia.findMany({
@@ -1911,13 +2214,14 @@ export class QuestionImportWorker {
     );
     const selected = rows
       .filter((row) => row.asset?.storageKey)
-      .sort((a, b) =>
-        proximityByKey.get(a.mediaKey)! - proximityByKey.get(b.mediaKey)! ||
-        (questionPages.has(a.pageNumber) === questionPages.has(b.pageNumber)
-          ? a.mediaKey.localeCompare(b.mediaKey)
-          : questionPages.has(a.pageNumber)
-            ? -1
-            : 1),
+      .sort(
+        (a, b) =>
+          proximityByKey.get(a.mediaKey)! - proximityByKey.get(b.mediaKey)! ||
+          (questionPages.has(a.pageNumber) === questionPages.has(b.pageNumber)
+            ? a.mediaKey.localeCompare(b.mediaKey)
+            : questionPages.has(a.pageNumber)
+              ? -1
+              : 1),
       )
       .slice(0, 12);
     const sentKeys = new Set(selected.map((row) => row.mediaKey));
@@ -2527,7 +2831,8 @@ export class QuestionImportWorker {
             assignments
               .filter(
                 (assignment) =>
-                  assignment.owner === 'QUESTION' || assignment.owner === 'OPTION',
+                  assignment.owner === 'QUESTION' ||
+                  assignment.owner === 'OPTION',
               )
               .map((assignment) => mediaByKey.get(assignment.mediaKey).id),
           ),
@@ -2572,7 +2877,8 @@ export class QuestionImportWorker {
                 mediaId: mediaByKey.get(assignment.mediaKey).id,
                 assignmentKey: `${assignment.mediaKey}:${assignment.owner}:${assignment.ownerReference}`,
                 exclusiveOwnershipKey:
-                  assignment.owner === 'QUESTION' || assignment.owner === 'OPTION'
+                  assignment.owner === 'QUESTION' ||
+                  assignment.owner === 'OPTION'
                     ? conflictingMediaIds.has(
                         mediaByKey.get(assignment.mediaKey).id,
                       )
@@ -2611,7 +2917,8 @@ export class QuestionImportWorker {
             status: QuestionImportMediaAssignmentStatus.PROPOSED,
             media: mediaByKey.get(assignment.mediaKey),
             conflicting:
-              (assignment.owner === 'QUESTION' || assignment.owner === 'OPTION') &&
+              (assignment.owner === 'QUESTION' ||
+                assignment.owner === 'OPTION') &&
               conflictingMediaIds.has(mediaByKey.get(assignment.mediaKey).id),
           }));
           const outcomes = requirementSpecs.map((requirement) => ({

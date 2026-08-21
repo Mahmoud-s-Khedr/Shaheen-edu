@@ -55,6 +55,7 @@ describe('QuestionImportWorker', () => {
       questionImportPage: {
         createMany: jest.fn(),
         findMany: jest.fn().mockResolvedValue([]),
+        findUniqueOrThrow: jest.fn(),
         update: jest.fn(),
         updateMany: jest.fn(),
       },
@@ -82,6 +83,7 @@ describe('QuestionImportWorker', () => {
     };
     const transcriber = { transcribeImage: jest.fn(), verifyImage: jest.fn() };
     const media = { materializePage: jest.fn().mockResolvedValue([]) };
+    const queue = { enqueue: jest.fn(), enqueueChunk: jest.fn() };
     return {
       worker: new QuestionImportWorker(
         prisma as any,
@@ -92,7 +94,7 @@ describe('QuestionImportWorker', () => {
         media as any,
         client as any,
         questions as any,
-        { enqueue: jest.fn() } as any,
+        queue as any,
         config as any,
       ),
       prisma,
@@ -103,6 +105,7 @@ describe('QuestionImportWorker', () => {
       pdfRanges,
       transcriber,
       media,
+      queue,
     };
   }
 
@@ -187,34 +190,50 @@ describe('QuestionImportWorker', () => {
 
   it('automatically leaves a failed first extraction attempt pending for one retry', async () => {
     const { worker, prisma, client } = workerWith();
-    client.extractQuestions.mockRejectedValue(new Error('temporary provider failure'));
+    client.extractQuestions.mockRejectedValue(
+      new Error('temporary provider failure'),
+    );
 
     await (worker as any).processChunk(
       { id: 'batch-1', createdById: 'admin-1' },
-      { id: 'chunk-1', attemptCount: 0, text: JSON.stringify([{ text: 'Question' }]) },
+      {
+        id: 'chunk-1',
+        attemptCount: 0,
+        text: JSON.stringify([{ text: 'Question' }]),
+      },
     );
 
     expect(prisma.questionImportChunk.update).toHaveBeenLastCalledWith(
       expect.objectContaining({
         where: { id: 'chunk-1' },
-        data: expect.objectContaining({ status: QuestionImportChunkStatus.PENDING }),
+        data: expect.objectContaining({
+          status: QuestionImportChunkStatus.PENDING,
+        }),
       }),
     );
   });
 
   it('marks a chunk failed after its automatic retry is exhausted', async () => {
     const { worker, prisma, client } = workerWith();
-    client.extractQuestions.mockRejectedValue(new Error('persistent provider failure'));
+    client.extractQuestions.mockRejectedValue(
+      new Error('persistent provider failure'),
+    );
 
     await (worker as any).processChunk(
       { id: 'batch-1', createdById: 'admin-1' },
-      { id: 'chunk-1', attemptCount: 1, text: JSON.stringify([{ text: 'Question' }]) },
+      {
+        id: 'chunk-1',
+        attemptCount: 1,
+        text: JSON.stringify([{ text: 'Question' }]),
+      },
     );
 
     expect(prisma.questionImportChunk.update).toHaveBeenLastCalledWith(
       expect.objectContaining({
         where: { id: 'chunk-1' },
-        data: expect.objectContaining({ status: QuestionImportChunkStatus.FAILED }),
+        data: expect.objectContaining({
+          status: QuestionImportChunkStatus.FAILED,
+        }),
       }),
     );
   });
@@ -236,6 +255,39 @@ describe('QuestionImportWorker', () => {
         }),
       }),
     );
+  });
+
+  it('caps page failures from duplicate fresh jobs using the persisted attempt count', async () => {
+    const { worker, prisma, storage, queue } = workerWith();
+    let attemptCount = 0;
+    prisma.questionImportBatch.findUnique = jest.fn().mockResolvedValue({
+      id: 'batch-1',
+      sourceAsset: { mimeType: 'application/pdf', storageKey: 'asset-1' },
+    });
+    prisma.questionImportPage.updateMany.mockImplementation((input: any) => {
+      if (input.data.attemptCount?.increment) attemptCount += 1;
+      return Promise.resolve({ count: 1 });
+    });
+    prisma.questionImportPage.findUniqueOrThrow.mockImplementation(() =>
+      Promise.resolve({ attemptCount }),
+    );
+    storage.download.mockRejectedValue(new Error('temporary storage failure'));
+
+    await expect((worker as any).processPage('batch-1', 1, 0)).rejects.toThrow(
+      'temporary storage failure',
+    );
+    await expect((worker as any).processPage('batch-1', 1, 0)).rejects.toThrow(
+      'temporary storage failure',
+    );
+    await expect((worker as any).processPage('batch-1', 1, 0)).resolves.toBe(
+      undefined,
+    );
+
+    const statuses = prisma.questionImportPage.update.mock.calls.map(
+      ([input]: any[]) => input.data.status,
+    );
+    expect(statuses).toEqual(['PENDING', 'PENDING', 'REVIEW_REQUIRED']);
+    expect(queue.enqueue).toHaveBeenCalledTimes(3);
   });
 
   it('stores raw page content and a normalized canonical transcription', async () => {
@@ -1261,8 +1313,20 @@ describe('QuestionImportWorker', () => {
         },
       ],
       [
-        { mediaKey: 'M-near', pageNumber: 3, type: 'DIAGRAM', description: 'near', normalizedBounds: { left: 50, top: 620, right: 400, bottom: 760 } },
-        { mediaKey: 'M-far', pageNumber: 3, type: 'DIAGRAM', description: 'far', normalizedBounds: { left: 50, top: 100, right: 400, bottom: 240 } },
+        {
+          mediaKey: 'M-near',
+          pageNumber: 3,
+          type: 'DIAGRAM',
+          description: 'near',
+          normalizedBounds: { left: 50, top: 620, right: 400, bottom: 760 },
+        },
+        {
+          mediaKey: 'M-far',
+          pageNumber: 3,
+          type: 'DIAGRAM',
+          description: 'far',
+          normalizedBounds: { left: 50, top: 100, right: 400, bottom: 240 },
+        },
       ],
       true,
     );
@@ -1271,7 +1335,9 @@ describe('QuestionImportWorker', () => {
         envelope: expect.objectContaining({ top: 600, bottom: 760 }),
       }),
     );
-    expect(input.media.find((item: any) => item.mediaKey === 'M-near').proximity).toBeLessThan(
+    expect(
+      input.media.find((item: any) => item.mediaKey === 'M-near').proximity,
+    ).toBeLessThan(
       input.media.find((item: any) => item.mediaKey === 'M-far').proximity,
     );
   });

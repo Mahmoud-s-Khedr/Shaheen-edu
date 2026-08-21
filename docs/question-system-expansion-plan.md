@@ -207,7 +207,7 @@ Implementation decisions:
 
 ## Phase 7 — Input-format simplification
 
-Status: `NOT STARTED`
+Status: `IMPLEMENTED` (2026-08-21)
 
 Simplify and document supported question-import inputs.
 
@@ -225,6 +225,26 @@ Exit criteria:
 - TXT and PDF imports work through the documented paths.
 - DOCX imports fail early with an actionable conversion message.
 - No existing historical import data is corrupted.
+
+Implementation decisions:
+
+- New question-import creation accepts only raw text, TXT assets, and PDF assets. DOCX is rejected before a batch is created with an instruction to export to PDF; historical import records and unrelated document assets are unchanged.
+
+## Phase 8 — Parallel import execution
+
+Status: `IMPLEMENTED` (2026-08-21)
+
+Keep the global segmentation pass ordered and complete, while running every
+independent unit around it concurrently.
+
+Pipeline:
+
+`create import → queue PDF page OCR jobs → wait for terminal pages → global segmentation → queue extraction chunks → validate/persist candidates → aggregate status`
+
+Implementation decisions:
+
+- OCR pages, extraction chunks, and candidate persistence run as independent queue jobs. OCR defaults to 8 concurrent jobs, extraction to 6, and candidate persistence to 6; each can be configured independently. Segmentation remains one global, ordered request after every page has reached a terminal transcription state.
+- Page and chunk status records remain the retry/idempotency boundary. Queue completion order never affects candidate `globalOrder`, which continues to derive from the original child/chunk/item sequence.
 
 ## Test and release requirements
 

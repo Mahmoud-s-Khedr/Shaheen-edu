@@ -65,6 +65,9 @@ export interface AppConfig {
     pdfTranscriptionModel: string;
     pdfTranscriptionFallbackModel: string;
     workerConcurrency: number;
+    questionImportOcrConcurrency: number;
+    questionImportExtractionConcurrency: number;
+    questionImportCandidateConcurrency: number;
     requestTimeoutMs: number;
     pdfTranscriptionTimeoutMs: number;
     segmentationSplitThresholdTokens: number;
@@ -213,6 +216,18 @@ export default (): AppConfig => ({
     pdfTranscriptionFallbackModel:
       process.env.AI_PDF_TRANSCRIPTION_FALLBACK_MODEL ?? '',
     workerConcurrency: envInteger('AI_WORKER_CONCURRENCY', 2),
+    questionImportOcrConcurrency: envInteger(
+      'AI_QUESTION_IMPORT_OCR_CONCURRENCY',
+      8,
+    ),
+    questionImportExtractionConcurrency: envInteger(
+      'AI_QUESTION_IMPORT_EXTRACTION_CONCURRENCY',
+      6,
+    ),
+    questionImportCandidateConcurrency: envInteger(
+      'AI_QUESTION_IMPORT_CANDIDATE_CONCURRENCY',
+      6,
+    ),
     requestTimeoutMs: envInteger('AI_REQUEST_TIMEOUT_MS', 60_000),
     pdfTranscriptionTimeoutMs: envInteger(
       'AI_PDF_TRANSCRIPTION_TIMEOUT_MS',

@@ -116,19 +116,11 @@ export class QuestionImportService {
       if (
         !asset ||
         asset.status !== AssetStatus.READY ||
-        ![
-          AssetKind.PDF,
-          AssetKind.DOCUMENT,
-          AssetKind.DOWNLOADABLE_FILE,
-        ].includes(asset.kind) ||
-        ![
-          'application/pdf',
-          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-          'text/plain',
-        ].includes(asset.mimeType)
+        ![AssetKind.PDF, AssetKind.DOWNLOADABLE_FILE].includes(asset.kind) ||
+        !['application/pdf', 'text/plain'].includes(asset.mimeType)
       )
         throw new BadRequestException(
-          'Source asset must be a ready PDF, DOCX, or TXT asset',
+          'Source asset must be a ready PDF or TXT asset. Export DOCX files to PDF first.',
         );
     }
     if (asset?.mimeType === 'application/pdf' && !this.ai.pdfTranscriptionModel)
@@ -1143,7 +1135,7 @@ export class QuestionImportService {
         },
       }),
     ]);
-    await this.queue.enqueue(chunk.batchId);
+    await this.queue.enqueueChunk(chunk.batchId, chunk.id);
     await this.audit.record({
       actorUserId: actor.id,
       action: 'AI_QUESTION_IMPORT_CHUNK_RETRIED',
@@ -1203,7 +1195,7 @@ export class QuestionImportService {
         },
       }),
     ]);
-    await this.queue.enqueue(id);
+    await this.queue.enqueuePage(id, pageNumber);
     return this.get(actor, id);
   }
   private itemSource(item: any) {

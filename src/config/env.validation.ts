@@ -131,6 +131,21 @@ export const envValidationSchema = Joi.object({
     .max(300000)
     .default(120000),
   AI_WORKER_CONCURRENCY: Joi.number().integer().min(1).max(10).default(2),
+  AI_QUESTION_IMPORT_OCR_CONCURRENCY: Joi.number()
+    .integer()
+    .min(1)
+    .max(10)
+    .default(8),
+  AI_QUESTION_IMPORT_EXTRACTION_CONCURRENCY: Joi.number()
+    .integer()
+    .min(1)
+    .max(10)
+    .default(6),
+  AI_QUESTION_IMPORT_CANDIDATE_CONCURRENCY: Joi.number()
+    .integer()
+    .min(1)
+    .max(10)
+    .default(6),
   AI_REQUEST_TIMEOUT_MS: Joi.number()
     .integer()
     .min(1000)
