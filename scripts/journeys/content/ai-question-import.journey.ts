@@ -148,6 +148,75 @@ export const aiQuestionImportJourney: JourneyDefinition = {
           ),
           409,
         );
+        // These media/page/chunk endpoints are intentionally exercised against
+        // the raw-text fixture: they must reject non-PDF imports without
+        // touching storage or queue state. This still covers the documented
+        // route contracts while the full visual-import fixture remains
+        // deployment-dependent.
+        expectStatus(
+          await admin.request(
+            'GET',
+            `/admin/ai/question-imports/${importId}/media`,
+          ),
+          409,
+        );
+        expectStatus(
+          await admin.request(
+            'POST',
+            `/admin/ai/question-imports/${importId}/media`,
+            {
+              pageNumber: 1,
+              type: 'DIAGRAM',
+              bounds: { left: 0, top: 0, right: 100, bottom: 100 },
+              description: 'Invalid raw-text media fixture',
+            },
+          ),
+          409,
+        );
+        expectStatus(
+          await admin.request(
+            'PATCH',
+            `/admin/ai/question-imports/${importId}/media/MISSING`,
+            { description: 'Invalid raw-text media fixture' },
+          ),
+          409,
+        );
+        expectStatus(
+          await admin.request(
+            'POST',
+            `/admin/ai/question-imports/${importId}/media/MISSING/retry`,
+          ),
+          409,
+        );
+        expectStatus(
+          await admin.request(
+            'PATCH',
+            `/admin/ai/question-imports/${importId}/items/missing-item/media`,
+            { assignments: [] },
+          ),
+          409,
+        );
+        expectStatus(
+          await admin.request(
+            'POST',
+            `/admin/ai/question-imports/${importId}/children/missing-child/retry`,
+          ),
+          404,
+        );
+        expectStatus(
+          await admin.request(
+            'POST',
+            `/admin/ai/question-imports/${importId}/chunks/missing-chunk/retry`,
+          ),
+          404,
+        );
+        expectStatus(
+          await admin.request(
+            'POST',
+            `/admin/ai/question-imports/${importId}/pages/1/retry`,
+          ),
+          409,
+        );
         expectStatus(
           await admin.request(
             'POST',

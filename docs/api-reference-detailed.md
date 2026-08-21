@@ -6599,6 +6599,10 @@ Approves, rejects, moves, or reorders visual ownership assignments with `UpdateQ
 
 Retries failed import chunks and returns the restarted import (HTTP 201).
 
+### `POST /api/v1/admin/ai/question-imports/{id}/chunks/{chunkId}/retry`
+
+Retries one failed import chunk and returns the restarted chunk (HTTP 201).
+
 ### `POST /api/v1/admin/ai/question-imports/{id}/pages/{pageNumber}/retry`
 
 Retries one failed or review-required PDF transcription page (HTTP 201).

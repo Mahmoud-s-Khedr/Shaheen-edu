@@ -18034,6 +18034,43 @@
         ]
       }
     },
+    "/api/v1/admin/ai/question-imports/{id}/chunks/{chunkId}/retry": {
+      "post": {
+        "operationId": "QuestionImportController_retryChunk_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "chunkId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Retry one failed import chunk",
+        "tags": [
+          "admin/ai/question-imports"
+        ]
+      }
+    },
     "/api/v1/admin/ai/question-imports/{id}/pages/{pageNumber}/retry": {
       "post": {
         "operationId": "QuestionImportController_retryPage_v1",
@@ -24047,11 +24084,11 @@
             "type": "number"
           },
           "text": {
-            "type": "object",
+            "type": "string",
             "nullable": true
           },
           "assetId": {
-            "type": "object",
+            "type": "string",
             "nullable": true
           },
           "tableData": {
@@ -24059,23 +24096,23 @@
             "nullable": true
           },
           "latex": {
-            "type": "object",
+            "type": "string",
             "nullable": true
           },
           "mathml": {
-            "type": "object",
+            "type": "string",
             "nullable": true
           },
           "caption": {
-            "type": "object",
+            "type": "string",
             "nullable": true
           },
           "altText": {
-            "type": "object",
+            "type": "string",
             "nullable": true
           },
           "languageCode": {
-            "type": "object",
+            "type": "string",
             "nullable": true
           },
           "asset": {
@@ -24102,7 +24139,7 @@
             "type": "string"
           },
           "title": {
-            "type": "object",
+            "type": "string",
             "nullable": true
           },
           "body": {
@@ -24490,7 +24527,7 @@
             "type": "string"
           },
           "explanation": {
-            "type": "object",
+            "type": "string",
             "nullable": true
           },
           "video": {
@@ -24785,7 +24822,7 @@
           },
           "sourceAssetId": {
             "type": "string",
-            "description": "A ready DOCX, text, or text-based PDF asset."
+            "description": "A ready PDF or TXT asset. Export DOCX files to PDF first."
           }
         },
         "required": [

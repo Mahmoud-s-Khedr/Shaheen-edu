@@ -371,14 +371,14 @@ export class AssessmentContentBlockDto {
   @ApiProperty({ enum: QuestionContentBlockType })
   type!: QuestionContentBlockType;
   @ApiProperty() sortOrder!: number;
-  @ApiPropertyOptional({ nullable: true }) text?: string | null;
-  @ApiPropertyOptional({ nullable: true }) assetId?: string | null;
+  @ApiPropertyOptional({ type: String, nullable: true }) text?: string | null;
+  @ApiPropertyOptional({ type: String, nullable: true }) assetId?: string | null;
   @ApiPropertyOptional({ nullable: true }) tableData?: object | null;
-  @ApiPropertyOptional({ nullable: true }) latex?: string | null;
-  @ApiPropertyOptional({ nullable: true }) mathml?: string | null;
-  @ApiPropertyOptional({ nullable: true }) caption?: string | null;
-  @ApiPropertyOptional({ nullable: true }) altText?: string | null;
-  @ApiPropertyOptional({ nullable: true }) languageCode?: string | null;
+  @ApiPropertyOptional({ type: String, nullable: true }) latex?: string | null;
+  @ApiPropertyOptional({ type: String, nullable: true }) mathml?: string | null;
+  @ApiPropertyOptional({ type: String, nullable: true }) caption?: string | null;
+  @ApiPropertyOptional({ type: String, nullable: true }) altText?: string | null;
+  @ApiPropertyOptional({ type: String, nullable: true }) languageCode?: string | null;
   @ApiPropertyOptional({ type: Object, nullable: true }) asset?: {
     id: string;
     kind: string | null;
@@ -399,7 +399,7 @@ export class AssessmentQuestionContextDto {
   @ApiProperty() id!: string;
   @ApiProperty() sourceContextId!: string;
   @ApiProperty() type!: string;
-  @ApiPropertyOptional({ nullable: true }) title!: string | null;
+  @ApiPropertyOptional({ type: String, nullable: true }) title!: string | null;
   @ApiProperty() body!: string;
   @ApiProperty() languageCode!: string;
   @ApiProperty({ type: [AssessmentContentBlockDto] })
@@ -494,7 +494,7 @@ export class AdminAssessmentQuestionDto {
   @ApiProperty() sortOrder!: number;
   @ApiProperty() type!: string;
   @ApiProperty() body!: string;
-  @ApiPropertyOptional({ nullable: true }) explanation!: string | null;
+  @ApiPropertyOptional({ type: String, nullable: true }) explanation!: string | null;
   @ApiPropertyOptional({ type: AssessmentQuestionVideoDto, nullable: true })
   video!: AssessmentQuestionVideoDto | null;
   @ApiProperty({ type: [AssessmentQuestionAttachmentDto] })
