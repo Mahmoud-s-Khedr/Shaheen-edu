@@ -11,6 +11,8 @@ import { Prisma } from '@prisma/client';
 import {
   AssessmentAttemptStatus,
   AssessmentQuestionOutcome,
+  AnswerInputMethod,
+  AiRunStatus,
   AssetKind,
   AssessmentGenerationType,
   AssessmentMode,
@@ -20,6 +22,8 @@ import {
   QuestionStatus,
   QuestionDifficultyBand,
   QuestionType,
+  QuestionReportStatus,
+  QuestionReportType,
   Role,
 } from '../../common/types/roles.enum';
 import { toPaginationMeta } from '../../common/dto/pagination-query.dto';
@@ -48,6 +52,12 @@ import type {
   CreateCustomAssessmentDto,
   GenerateAdminStandardAssessmentDto,
   GenerateStudentAssessmentDto,
+  GenerateAiPromptAssessmentDto,
+  CreateSelectedTutorAssessmentDto,
+  CommunityIncorrectQueryDto,
+  CreateQuestionReportDto,
+  QueryQuestionReportDto,
+  ReviewQuestionReportDto,
   GradeLongAnswerDto,
   QueryAdminAssessmentDto,
   QueryAssessmentDto,
@@ -55,6 +65,10 @@ import type {
   UpdateAdminAssessmentDto,
   ReportActiveTimeDto,
 } from './dto/assessments.dto';
+import {
+  AssessmentAiClient,
+  type AnswerGradeOutput,
+} from './assessment-ai.client';
 
 type ScopeField = 'courseId' | 'chapterId' | 'lessonId' | 'sectionId';
 type ScopeRow = {
@@ -95,6 +109,7 @@ export class AssessmentsService {
     private readonly config: ConfigService<AppConfig, true>,
     private readonly assets: AssetsService,
     private readonly videos: VideosService,
+    private readonly ai: AssessmentAiClient,
   ) {}
 
   private assertAdmin(actor: RequestUser) {
@@ -787,6 +802,213 @@ export class AssessmentsService {
     return this.get(studentId, assessment.id);
   }
 
+  async generateAiPrompt(
+    studentId: string,
+    dto: GenerateAiPromptAssessmentDto,
+  ) {
+    if (dto.isTimed && !dto.durationSeconds)
+      throw new BadRequestException(
+        'durationSeconds is required when isTimed is true',
+      );
+    const gradeId = await this.studentGrade(studentId);
+    const scopes = await this.resolveScopes(dto.scopes);
+    const eligible = await this.eligibleQuestions(scopes, studentId, gradeId);
+    if (eligible.length < dto.questionCount)
+      throw new BadRequestException(
+        'Not enough eligible questions in the selected scope',
+      );
+    const history = await this.studentQuestionStatuses(
+      studentId,
+      eligible.map((q) => q.id),
+    );
+    const marked = new Set(
+      (
+        await this.prisma.studentQuestionMark.findMany({
+          where: {
+            studentUserId: studentId,
+            questionId: { in: eligible.map((q) => q.id) },
+          },
+          select: { questionId: true },
+        })
+      ).map((x) => x.questionId),
+    );
+    const candidates = eligible.slice(0, 250).map((question) => ({
+      id: question.id,
+      body: question.body.slice(0, 1000),
+      placements: question.placements.map((p: any) =>
+        [p.course?.title, p.chapter?.title, p.lesson?.title, p.section?.title]
+          .filter(Boolean)
+          .join(' / '),
+      ),
+      personalState: marked.has(question.id)
+        ? 'MARKED'
+        : (history.get(question.id) ?? 'UNUSED'),
+    }));
+    const run = await this.prisma.aiQuizGenerationRun.create({
+      data: {
+        studentUserId: studentId,
+        prompt: dto.prompt.trim(),
+        requestedFilters: {
+          scopes: dto.scopes as any,
+          questionCount: dto.questionCount,
+          mode: dto.mode ?? AssessmentMode.EXAM,
+          isTimed: dto.isTimed ?? false,
+          durationSeconds: dto.durationSeconds ?? null,
+        } as any,
+        promptVersion: 'student-ai-quiz-v1',
+        eligibleQuestionIds: eligible.map((q) => q.id),
+      },
+    });
+    try {
+      const response = await this.ai.planQuiz({
+        prompt: dto.prompt.trim(),
+        candidates,
+        questionCount: dto.questionCount,
+      });
+      const ids = response.result?.questionIds;
+      if (
+        !Array.isArray(ids) ||
+        ids.length !== dto.questionCount ||
+        new Set(ids).size !== ids.length ||
+        !ids.every(
+          (id) => typeof id === 'string' && eligible.some((q) => q.id === id),
+        )
+      )
+        throw new BadRequestException('AI returned an invalid quiz selection');
+      const selected = ids.map((id) => eligible.find((q) => q.id === id)!);
+      const assessment = await this.prisma.$transaction((tx) =>
+        this.freezeSnapshot(tx, {
+          ownerType: AssessmentOwnerType.STUDENT,
+          studentUserId: studentId,
+          title:
+            dto.title?.trim() ||
+            this.defaultTitle(dto.mode ?? AssessmentMode.EXAM),
+          generationType: AssessmentGenerationType.AI_PROMPT,
+          mode: dto.mode ?? AssessmentMode.EXAM,
+          isTimed: dto.isTimed ?? false,
+          durationSeconds: dto.durationSeconds,
+          status: AssessmentStatus.READY,
+          scopes,
+          questions: selected,
+          generationFilters: {
+            aiPromptRunId: run.id,
+            scopes: dto.scopes,
+            personalHistoryUsed: true,
+          },
+        }),
+      );
+      await this.prisma.aiQuizGenerationRun.update({
+        where: { id: run.id },
+        data: {
+          assessmentId: assessment.id,
+          status: AiRunStatus.COMPLETED,
+          normalizedPlan: { questionIds: ids },
+          selectedQuestionIds: ids,
+          rationale: String(response.result.rationale ?? '').slice(0, 2000),
+          model: response.model,
+          rawResponse: response.raw,
+          usage: response.usage,
+          completedAt: new Date(),
+        },
+      });
+      return this.get(studentId, assessment.id);
+    } catch (error) {
+      await this.prisma.aiQuizGenerationRun.update({
+        where: { id: run.id },
+        data: {
+          status: AiRunStatus.FAILED,
+          error:
+            error instanceof Error
+              ? error.message.slice(0, 2000)
+              : 'AI request failed',
+          completedAt: new Date(),
+        },
+      });
+      throw error;
+    }
+  }
+
+  async communityMostIncorrect(
+    studentId: string,
+    query: CommunityIncorrectQueryDto,
+  ) {
+    const gradeId = await this.studentGrade(studentId);
+    const scopes = await this.resolveScopes(
+      [
+        query.courseId && { courseId: query.courseId },
+        query.chapterId && { chapterId: query.chapterId },
+        query.lessonId && { lessonId: query.lessonId },
+        query.sectionId && { sectionId: query.sectionId },
+      ].filter(Boolean) as AssessmentScopeDto[],
+    );
+    const eligible = await this.eligibleQuestions(scopes, studentId, gradeId);
+    const subjectFiltered = query.subjectId
+      ? eligible.filter((q) => q.course.subjectId === query.subjectId)
+      : eligible;
+    const ranked = subjectFiltered
+      .filter((q) => (q.communityStats?.totalResponses ?? 0) >= 20)
+      .map((q) => {
+        const stat = q.communityStats!;
+        // Laplace smoothing prevents tiny samples from dominating the rank.
+        const score = (stat.incorrectResponses + 1) / (stat.totalResponses + 2);
+        return { q, stat, score };
+      })
+      .sort(
+        (a, b) =>
+          b.score - a.score ||
+          b.stat.incorrectResponses - a.stat.incorrectResponses ||
+          a.q.id.localeCompare(b.q.id),
+      );
+    const start = (query.page - 1) * query.limit;
+    return {
+      data: ranked.slice(start, start + query.limit).map(({ q, stat }) => ({
+        questionId: q.id,
+        body: q.body,
+        type: q.type,
+        maxPoints: q.maxPoints,
+        totalResponses: stat.totalResponses,
+        incorrectResponses: stat.incorrectResponses,
+        incorrectRate: stat.incorrectRate,
+        difficultyBand: stat.difficultyBand,
+        placements: q.placements.map((p: any) => this.snapshotPlacement(q, p)),
+      })),
+      meta: toPaginationMeta(query.page, query.limit, ranked.length),
+    };
+  }
+
+  async createSelectedTutorAssessment(
+    studentId: string,
+    dto: CreateSelectedTutorAssessmentDto,
+  ) {
+    const gradeId = await this.studentGrade(studentId);
+    const scopes = await this.resolveScopes(dto.scopes);
+    const eligible = await this.eligibleQuestions(scopes, studentId, gradeId);
+    const byId = new Map(eligible.map((q) => [q.id, q]));
+    const selected = dto.questionIds.map((id) => byId.get(id));
+    if (selected.some((q) => !q))
+      throw new NotFoundException(
+        'One or more questions are not accessible in the selected scope',
+      );
+    const assessment = await this.prisma.$transaction((tx) =>
+      this.freezeSnapshot(tx, {
+        ownerType: AssessmentOwnerType.STUDENT,
+        studentUserId: studentId,
+        title: dto.title?.trim() || this.defaultTitle(AssessmentMode.TUTOR),
+        generationType: AssessmentGenerationType.CUSTOM,
+        mode: AssessmentMode.TUTOR,
+        isTimed: false,
+        status: AssessmentStatus.READY,
+        scopes,
+        questions: selected,
+        generationFilters: {
+          selectedQuestionIds: dto.questionIds,
+          source: 'COMMUNITY_RANKING',
+        },
+      }),
+    );
+    return this.get(studentId, assessment.id);
+  }
+
   async listStudentQuestionBanks(studentId: string, subjectId?: string) {
     const gradeId = await this.studentGrade(studentId);
     const questions = await this.eligibleQuestions([], studentId, gradeId);
@@ -1000,6 +1222,195 @@ export class AssessmentsService {
       where: { studentUserId: studentId, questionId: sourceQuestionId },
     });
     return { questionId: sourceQuestionId, deleted: true };
+  }
+
+  async createQuestionReport(
+    studentId: string,
+    questionId: string,
+    dto: CreateQuestionReportDto,
+  ) {
+    if (dto.type === QuestionReportType.OTHER && !dto.note?.trim())
+      throw new BadRequestException('A note is required for OTHER reports');
+    const sourceQuestionId = await this.accessibleSourceQuestionId(
+      studentId,
+      questionId,
+    );
+    const active = await this.prisma.questionReport.findFirst({
+      where: {
+        studentUserId: studentId,
+        questionId: sourceQuestionId,
+        type: dto.type,
+        status: {
+          in: [QuestionReportStatus.OPEN, QuestionReportStatus.UNDER_REVIEW],
+        },
+      },
+      select: { id: true },
+    });
+    if (active)
+      throw new ConflictException(
+        'An active report of this type already exists',
+      );
+    const question = await this.prisma.question.findUniqueOrThrow({
+      where: { id: sourceQuestionId },
+      select: {
+        id: true,
+        body: true,
+        type: true,
+        explanation: true,
+        updatedAt: true,
+      },
+    });
+    const report = await this.prisma.questionReport.create({
+      data: {
+        studentUserId: studentId,
+        questionId: sourceQuestionId,
+        type: dto.type,
+        note: dto.note?.trim() || null,
+        questionSnapshot: question as any,
+        actions: {
+          create: {
+            actorUserId: studentId,
+            toStatus: QuestionReportStatus.OPEN,
+            note: dto.note?.trim() || null,
+          },
+        },
+      },
+    });
+    await this.audit.record({
+      actorUserId: studentId,
+      action: 'QUESTION_REPORTED',
+      targetType: 'QuestionReport',
+      targetId: report.id,
+      metadata: { questionId: sourceQuestionId, type: dto.type },
+    });
+    return report;
+  }
+
+  async transcribeStudentAudio(
+    studentId: string,
+    input: { bytes: Buffer; mimeType: string; language?: string },
+  ) {
+    const formats: Record<string, string> = {
+      'audio/wav': 'wav',
+      'audio/x-wav': 'wav',
+      'audio/mpeg': 'mp3',
+      'audio/mp4': 'm4a',
+      'audio/aac': 'aac',
+      'audio/ogg': 'ogg',
+      'audio/flac': 'flac',
+    };
+    const format = formats[input.mimeType.toLowerCase()];
+    if (!format) throw new BadRequestException('Unsupported audio format');
+    const aiConfig = this.config.get('ai', { infer: true });
+    if (
+      !input.bytes.length ||
+      input.bytes.length > aiConfig.speechToTextMaxBytes
+    )
+      throw new BadRequestException(
+        'Audio file exceeds the transcription limit',
+      );
+    const language = input.language?.trim().toLowerCase();
+    if (language && !/^[a-z]{2,3}$/.test(language))
+      throw new BadRequestException('language must be an ISO language code');
+    const result = await this.ai.transcribeAudio({
+      bytes: input.bytes,
+      format,
+      language,
+    });
+    await this.audit.record({
+      actorUserId: studentId,
+      action: 'STUDENT_AUDIO_TRANSCRIBED',
+      targetType: 'SpeechToText',
+      targetId: randomUUID(),
+      metadata: {
+        format,
+        bytes: input.bytes.length,
+        model: result.model,
+        language: language ?? 'auto',
+      },
+    });
+    return {
+      text: result.text,
+      language: language ?? null,
+      provider: 'openrouter',
+      model: result.model,
+    };
+  }
+
+  async listQuestionReports(actor: RequestUser, query: QueryQuestionReportDto) {
+    this.assertAdmin(actor);
+    const where = query.status ? { status: query.status } : {};
+    const [data, total] = await Promise.all([
+      this.prisma.questionReport.findMany({
+        where,
+        include: {
+          question: { select: { id: true, body: true } },
+          student: { select: { fullName: true } },
+          assignedTo: { select: { id: true, loginIdentifier: true } },
+          _count: { select: { actions: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip: (query.page - 1) * query.limit,
+        take: query.limit,
+      }),
+      this.prisma.questionReport.count({ where }),
+    ]);
+    return { data, meta: toPaginationMeta(query.page, query.limit, total) };
+  }
+
+  async reviewQuestionReport(
+    actor: RequestUser,
+    reportId: string,
+    dto: ReviewQuestionReportDto,
+  ) {
+    this.assertAdmin(actor);
+    const report = await this.prisma.questionReport.findUnique({
+      where: { id: reportId },
+    });
+    if (!report) throw new NotFoundException('Question report not found');
+    if (
+      (dto.status === QuestionReportStatus.RESOLVED ||
+        dto.status === QuestionReportStatus.REJECTED) &&
+      !dto.note?.trim()
+    )
+      throw new BadRequestException('A resolution note is required');
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const result = await tx.questionReport.update({
+        where: { id: reportId },
+        data: {
+          status: dto.status,
+          assignedToId: actor.id,
+          resolutionNote:
+            dto.status === QuestionReportStatus.RESOLVED ||
+            dto.status === QuestionReportStatus.REJECTED
+              ? dto.note!.trim()
+              : null,
+          resolvedAt:
+            dto.status === QuestionReportStatus.RESOLVED ||
+            dto.status === QuestionReportStatus.REJECTED
+              ? new Date()
+              : null,
+        },
+      });
+      await tx.questionReportAction.create({
+        data: {
+          reportId,
+          actorUserId: actor.id,
+          fromStatus: report.status,
+          toStatus: dto.status,
+          note: dto.note?.trim() || null,
+        },
+      });
+      return result;
+    });
+    await this.audit.record({
+      actorUserId: actor.id,
+      action: 'QUESTION_REPORT_REVIEWED',
+      targetType: 'QuestionReport',
+      targetId: reportId,
+      metadata: { fromStatus: report.status, toStatus: dto.status },
+    });
+    return updated;
   }
 
   // --- Student: list/get ----------------------------------------------
@@ -1583,7 +1994,8 @@ export class AssessmentsService {
    * winner's already-committed row — and it just returns the winner's final
    * state instead of re-scoring or clobbering it. */
   private async finalizeAttempt(attemptId: string) {
-    return this.prisma.$transaction(async (tx) => {
+    let finalizedByThisCall = false;
+    const finalizedAttempt = await this.prisma.$transaction(async (tx) => {
       const gate = await tx.assessmentAttempt.updateMany({
         where: { id: attemptId, status: AssessmentAttemptStatus.SUSPENDED },
         data: {
@@ -1595,6 +2007,7 @@ export class AssessmentsService {
         return tx.assessmentAttempt.findUniqueOrThrow({
           where: { id: attemptId },
         });
+      finalizedByThisCall = true;
       const attempt = await tx.assessmentAttempt.findUniqueOrThrow({
         where: { id: attemptId },
       });
@@ -1614,6 +2027,8 @@ export class AssessmentsService {
           sourceQuestionId: true,
           type: true,
           maxPoints: true,
+          body: true,
+          gradingRubric: true,
         },
       });
       const answers = await tx.assessmentAttemptAnswer.findMany({
@@ -1634,7 +2049,9 @@ export class AssessmentsService {
         const outcome = !hasResponse
           ? AssessmentQuestionOutcome.OMITTED
           : question.type === QuestionType.LONG_ANSWER
-            ? AssessmentQuestionOutcome.PENDING_GRADING
+            ? question.gradingRubric?.trim()
+              ? AssessmentQuestionOutcome.PENDING_AI_GRADING
+              : AssessmentQuestionOutcome.PENDING_GRADING
             : answer?.isCorrect
               ? AssessmentQuestionOutcome.CORRECT
               : AssessmentQuestionOutcome.INCORRECT;
@@ -1648,7 +2065,8 @@ export class AssessmentsService {
             data: {
               outcome,
               awardedPoints:
-                outcome === AssessmentQuestionOutcome.PENDING_GRADING
+                outcome === AssessmentQuestionOutcome.PENDING_GRADING ||
+                outcome === AssessmentQuestionOutcome.PENDING_AI_GRADING
                   ? null
                   : awardedPoints,
             },
@@ -1687,12 +2105,198 @@ export class AssessmentsService {
         data: { score },
       });
     });
+    // Runs are deliberately outside the finalization transaction: provider
+    // latency never holds database locks or prevents a completed submission.
+    const hadPendingAiAnswers = finalizedByThisCall
+      ? await this.gradePendingAiAnswers(attemptId)
+      : false;
+    return hadPendingAiAnswers
+      ? await this.prisma.assessmentAttempt.findUniqueOrThrow({
+          where: { id: finalizedAttempt.id },
+        })
+      : finalizedAttempt;
   }
 
   private async ensureNotExpired(attempt: any) {
     if (attempt.status === AssessmentAttemptStatus.COMPLETED) return attempt;
     if (!attempt.expiresAt || attempt.expiresAt > new Date()) return attempt;
     return this.finalizeAttempt(attempt.id);
+  }
+
+  private responseLanguage(text: string) {
+    // Arabic is the safe default for mixed/ambiguous Egyptian curriculum text.
+    const arabic = (text.match(/[\u0600-\u06ff]/g) ?? []).length;
+    const latin = (text.match(/[A-Za-z]/g) ?? []).length;
+    return latin > arabic ? 'en' : 'ar';
+  }
+
+  private validateAiGrade(
+    value: AnswerGradeOutput,
+    maxPoints: number,
+    response: string,
+  ) {
+    if (
+      !value ||
+      !Number.isInteger(value.awardedPoints) ||
+      value.awardedPoints < 0 ||
+      value.awardedPoints > maxPoints ||
+      typeof value.feedback !== 'string' ||
+      !value.feedback.trim() ||
+      value.feedback.length > 10000 ||
+      !Array.isArray(value.highlights)
+    )
+      throw new BadRequestException('AI returned an invalid answer grade');
+    const highlights = value.highlights.map((highlight) => ({
+      ...highlight,
+      note: String(highlight.note ?? '').trim(),
+    }));
+    let previousEnd = 0;
+    for (const highlight of highlights) {
+      if (
+        !['CORRECT', 'LANGUAGE', 'FACTUAL_ERROR'].includes(
+          highlight.category,
+        ) ||
+        !Number.isInteger(highlight.start) ||
+        !Number.isInteger(highlight.end) ||
+        highlight.start < previousEnd ||
+        highlight.start < 0 ||
+        highlight.end <= highlight.start ||
+        highlight.end > response.length ||
+        !highlight.note ||
+        highlight.note.length > 1000
+      )
+        throw new BadRequestException('AI returned invalid answer highlights');
+      previousEnd = highlight.end;
+    }
+    return {
+      awardedPoints: value.awardedPoints,
+      feedback: value.feedback.trim(),
+      highlights,
+    };
+  }
+
+  private aiOutcome(points: number, maxPoints: number) {
+    return points === maxPoints
+      ? AssessmentQuestionOutcome.CORRECT
+      : points === 0
+        ? AssessmentQuestionOutcome.INCORRECT
+        : AssessmentQuestionOutcome.PARTIALLY_CORRECT;
+  }
+
+  private async gradePendingAiAnswers(attemptId: string) {
+    const answers = await this.prisma.assessmentAttemptAnswer.findMany({
+      where: {
+        attemptId,
+        outcome: AssessmentQuestionOutcome.PENDING_AI_GRADING,
+      },
+      include: { assessmentQuestion: true },
+    });
+    let attempted = false;
+    for (const answer of answers) {
+      if (
+        !answer.responseText?.trim() ||
+        !answer.assessmentQuestion.gradingRubric?.trim()
+      )
+        continue;
+      const running = await this.prisma.assessmentAnswerAiGradingRun.findFirst({
+        where: { attemptAnswerId: answer.id, status: AiRunStatus.PENDING },
+      });
+      if (running) continue;
+      attempted = true;
+      const languageCode =
+        answer.responseLanguageCode === 'en' ||
+        answer.responseLanguageCode === 'ar'
+          ? answer.responseLanguageCode
+          : this.responseLanguage(answer.responseText);
+      const run = await this.prisma.assessmentAnswerAiGradingRun.create({
+        data: {
+          attemptAnswerId: answer.id,
+          questionSnapshot: {
+            id: answer.assessmentQuestion.id,
+            body: answer.assessmentQuestion.body,
+            rubric: answer.assessmentQuestion.gradingRubric,
+            maxPoints: answer.assessmentQuestion.maxPoints,
+          },
+          responseSnapshot: answer.responseText,
+          responseLanguageCode: languageCode,
+          promptVersion: 'assessment-answer-grade-v1',
+        },
+      });
+      try {
+        const response = await this.ai.gradeAnswer({
+          question: answer.assessmentQuestion.body,
+          rubric: answer.assessmentQuestion.gradingRubric,
+          maxPoints: answer.assessmentQuestion.maxPoints,
+          response: answer.responseText,
+          languageCode,
+        });
+        const grade = this.validateAiGrade(
+          response.result,
+          answer.assessmentQuestion.maxPoints,
+          answer.responseText,
+        );
+        const outcome = this.aiOutcome(
+          grade.awardedPoints,
+          answer.assessmentQuestion.maxPoints,
+        );
+        await this.prisma.$transaction(async (tx) => {
+          const updated = await tx.assessmentAttemptAnswer.updateMany({
+            where: {
+              id: answer.id,
+              outcome: AssessmentQuestionOutcome.PENDING_AI_GRADING,
+            },
+            data: {
+              awardedPoints: grade.awardedPoints,
+              outcome,
+              isCorrect: outcome === AssessmentQuestionOutcome.CORRECT,
+              gradedAt: new Date(),
+              graderFeedback: grade.feedback,
+            },
+          });
+          if (!updated.count) return;
+          await tx.assessmentAnswerAiGradingRun.update({
+            where: { id: run.id },
+            data: {
+              status: AiRunStatus.COMPLETED,
+              proposedPoints: grade.awardedPoints,
+              proposedOutcome: outcome,
+              feedback: grade.feedback,
+              highlights: grade.highlights as any,
+              model: response.model,
+              rawResponse: response.raw,
+              usage: response.usage,
+              completedAt: new Date(),
+            },
+          });
+          await this.communityStats.recordResponse(
+            tx,
+            answer.assessmentQuestion.sourceQuestionId,
+            outcome === AssessmentQuestionOutcome.CORRECT,
+          );
+          const totals = await tx.assessmentAttemptAnswer.aggregate({
+            where: { attemptId },
+            _sum: { awardedPoints: true },
+          });
+          await tx.assessmentAttempt.update({
+            where: { id: attemptId },
+            data: { score: totals._sum.awardedPoints ?? 0 },
+          });
+        });
+      } catch (error) {
+        await this.prisma.assessmentAnswerAiGradingRun.update({
+          where: { id: run.id },
+          data: {
+            status: AiRunStatus.FAILED,
+            error:
+              error instanceof Error
+                ? error.message.slice(0, 2000)
+                : 'AI grading failed',
+            completedAt: new Date(),
+          },
+        });
+      }
+    }
+    return attempted;
   }
 
   private async attemptStateDto(attempt: any, assessment: any) {
@@ -1900,11 +2504,39 @@ export class AssessmentsService {
           assessmentQuestionId,
           selectedOptionIds: selected,
           responseText: written ? responseText || null : null,
+          inputMethod: written
+            ? (dto.inputMethod ?? AnswerInputMethod.TEXT)
+            : AnswerInputMethod.TEXT,
+          responseLanguageCode: written
+            ? dto.responseLanguageCode?.trim() || null
+            : null,
+          transcriptionProvider:
+            written && dto.inputMethod === AnswerInputMethod.VOICE_TRANSCRIPT
+              ? dto.transcriptionProvider?.trim() || null
+              : null,
+          transcriptionConfidence:
+            written && dto.inputMethod === AnswerInputMethod.VOICE_TRANSCRIPT
+              ? (dto.transcriptionConfidence ?? null)
+              : null,
           isCorrect,
         },
         update: {
           selectedOptionIds: selected,
           responseText: written ? responseText || null : null,
+          inputMethod: written
+            ? (dto.inputMethod ?? AnswerInputMethod.TEXT)
+            : AnswerInputMethod.TEXT,
+          responseLanguageCode: written
+            ? dto.responseLanguageCode?.trim() || null
+            : null,
+          transcriptionProvider:
+            written && dto.inputMethod === AnswerInputMethod.VOICE_TRANSCRIPT
+              ? dto.transcriptionProvider?.trim() || null
+              : null,
+          transcriptionConfidence:
+            written && dto.inputMethod === AnswerInputMethod.VOICE_TRANSCRIPT
+              ? (dto.transcriptionConfidence ?? null)
+              : null,
           isCorrect,
         },
       });
@@ -1984,7 +2616,15 @@ export class AssessmentsService {
     if (
       !answer ||
       answer.assessmentQuestion.type !== QuestionType.LONG_ANSWER ||
-      answer.outcome !== AssessmentQuestionOutcome.PENDING_GRADING
+      !(
+        [
+          AssessmentQuestionOutcome.PENDING_GRADING,
+          AssessmentQuestionOutcome.PENDING_AI_GRADING,
+          AssessmentQuestionOutcome.CORRECT,
+          AssessmentQuestionOutcome.PARTIALLY_CORRECT,
+          AssessmentQuestionOutcome.INCORRECT,
+        ] as AssessmentQuestionOutcome[]
+      ).includes(answer.outcome as AssessmentQuestionOutcome)
     )
       throw new ConflictException('Long answer is not awaiting grading');
     if (dto.awardedPoints > answer.assessmentQuestion.maxPoints)
@@ -2008,7 +2648,17 @@ export class AssessmentsService {
       const graded = await tx.assessmentAttemptAnswer.updateMany({
         where: {
           id: answerId,
-          outcome: AssessmentQuestionOutcome.PENDING_GRADING,
+          outcome:
+            answer.outcome === AssessmentQuestionOutcome.PENDING_GRADING
+              ? AssessmentQuestionOutcome.PENDING_GRADING
+              : {
+                  in: [
+                    AssessmentQuestionOutcome.PENDING_AI_GRADING,
+                    AssessmentQuestionOutcome.CORRECT,
+                    AssessmentQuestionOutcome.PARTIALLY_CORRECT,
+                    AssessmentQuestionOutcome.INCORRECT,
+                  ],
+                },
         },
         data: {
           awardedPoints: dto.awardedPoints,
@@ -2021,11 +2671,15 @@ export class AssessmentsService {
       });
       if (!graded.count)
         throw new ConflictException('Long answer is not awaiting grading');
-      await this.communityStats.recordResponse(
-        tx,
-        answer.assessmentQuestion.sourceQuestionId,
-        outcome === AssessmentQuestionOutcome.CORRECT,
-      );
+      if (
+        answer.outcome === AssessmentQuestionOutcome.PENDING_GRADING ||
+        answer.outcome === AssessmentQuestionOutcome.PENDING_AI_GRADING
+      )
+        await this.communityStats.recordResponse(
+          tx,
+          answer.assessmentQuestion.sourceQuestionId,
+          outcome === AssessmentQuestionOutcome.CORRECT,
+        );
       const totals = await tx.assessmentAttemptAnswer.aggregate({
         where: { attemptId: answer.attemptId },
         _sum: { awardedPoints: true },
@@ -2037,7 +2691,7 @@ export class AssessmentsService {
     });
     await this.audit.record({
       actorUserId: actor.id,
-      action: 'ASSESSMENT_LONG_ANSWER_GRADED',
+      action: 'ASSESSMENT_LONG_ANSWER_GRADED_OR_OVERRIDDEN',
       targetType: 'AssessmentAttemptAnswer',
       targetId: answerId,
       metadata: { awardedPoints: dto.awardedPoints },
@@ -2292,6 +2946,11 @@ export class AssessmentsService {
     const attempt = await this.ownAttempt(studentId, id);
     if (attempt.status !== AssessmentAttemptStatus.COMPLETED)
       throw new ConflictException('Attempt has not been submitted yet');
+    await this.gradePendingAiAnswers(attempt.id);
+    const currentAttempt =
+      (await this.prisma.assessmentAttempt.findUnique({
+        where: { id: attempt.id },
+      })) ?? attempt;
     const questions = await this.questionsForAssessment(id);
     const markedQuestionIds = await this.markedQuestionIds(
       studentId,
@@ -2303,6 +2962,7 @@ export class AssessmentsService {
     );
     const answers = await this.prisma.assessmentAttemptAnswer.findMany({
       where: { attemptId: attempt.id },
+      include: { aiGradingRuns: { orderBy: { createdAt: 'desc' }, take: 1 } },
     });
     const byQuestion = new Map(answers.map((a) => [a.assessmentQuestionId, a]));
     const outcomes = answers.map((answer) => answer.outcome);
@@ -2318,8 +2978,11 @@ export class AssessmentsService {
     const pendingGradingCount = outcomes.filter(
       (outcome) => outcome === AssessmentQuestionOutcome.PENDING_GRADING,
     ).length;
+    const pendingAiGradingCount = outcomes.filter(
+      (outcome) => outcome === AssessmentQuestionOutcome.PENDING_AI_GRADING,
+    ).length;
     const percentage = this.round(
-      ((attempt.score ?? 0) / attempt.totalPoints) * 100,
+      ((currentAttempt.score ?? 0) / currentAttempt.totalPoints) * 100,
     );
     const stats = await this.prisma.questionCommunityStat.findMany({
       where: {
@@ -2338,14 +3001,15 @@ export class AssessmentsService {
     );
     const result: any = {
       attemptId: attempt.id,
-      score: attempt.score,
-      totalQuestions: attempt.totalQuestions,
-      totalPoints: attempt.totalPoints,
+      score: currentAttempt.score,
+      totalQuestions: currentAttempt.totalQuestions,
+      totalPoints: currentAttempt.totalPoints,
       percentage,
       correctCount,
       incorrectCount,
       omittedCount,
       pendingGradingCount,
+      pendingAiGradingCount,
       answeredCount: correctCount + incorrectCount,
       submittedAt: attempt.submittedAt,
       questions: questions.map((q) => {
@@ -2389,6 +3053,20 @@ export class AssessmentsService {
           ),
           outcome: answer?.outcome ?? AssessmentQuestionOutcome.OMITTED,
           activeSeconds: answer?.activeSeconds ?? null,
+          inputMethod: answer?.inputMethod ?? null,
+          responseLanguageCode: answer?.responseLanguageCode ?? null,
+          graderFeedback: answer?.graderFeedback ?? null,
+          aiGrading: answer?.aiGradingRuns?.[0]
+            ? {
+                status: answer.aiGradingRuns[0].status,
+                feedback: answer.aiGradingRuns[0].feedback,
+                highlights: answer.aiGradingRuns[0].highlights,
+                error:
+                  answer.aiGradingRuns[0].status === AiRunStatus.FAILED
+                    ? 'PENDING_RETRY'
+                    : null,
+              }
+            : null,
           placements: q.placements,
           platformSuccessRate: stat?.totalResponses
             ? this.round((stat.correctResponses / stat.totalResponses) * 100)

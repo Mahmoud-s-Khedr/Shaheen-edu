@@ -200,6 +200,28 @@ export const assessmentsJourney: JourneyDefinition = {
     });
 
     await step(
+      'Rejecting unsupported student voice uploads before transcription',
+      async () => {
+        const upload = await clients.public.upload<any>(
+          '/student/voice/transcriptions',
+          {
+            buffer: Buffer.from('not an audio recording'),
+            filename: 'answer.webm',
+            contentType: 'audio/webm',
+          },
+          { accessToken: student1Token, expected: 400 },
+        );
+        expectStatus(upload, 400);
+        assert(
+          String((upload.body as any)?.message ?? '').includes(
+            'Unsupported audio format',
+          ),
+          'Student voice transcription must reject unsupported recording formats without calling AI',
+        );
+      },
+    );
+
+    await step(
       'Discovering banks and generating optional/multi-bank private assessments',
       async () => {
         const banks = await student<any>(
@@ -302,6 +324,30 @@ export const assessmentsJourney: JourneyDefinition = {
           deletedNote.body.questionId === questionIds[0] &&
             deletedNote.body.deleted === true,
           'A student must be able to delete their private question note',
+        );
+        const report = await student<any>(
+          student1Token,
+          'POST',
+          `/student/questions/${questionIds[0]}/reports`,
+          { type: 'TYPO_LANGUAGE' },
+        );
+        expectStatus(report, 201);
+        const reports = await admin.request<any>(
+          'GET',
+          '/admin/question-reports?status=OPEN',
+        );
+        expectStatus(reports, 200);
+        assert(
+          reports.body.data.some((item: any) => item.id === report.body.id),
+          'Admins must be able to moderate student question reports',
+        );
+        expectStatus(
+          await admin.request<any>(
+            'POST',
+            `/admin/question-reports/${report.body.id}/review`,
+            { status: 'RESOLVED', note: 'Reviewed and corrected.' },
+          ),
+          201,
         );
         const allBanksGenerated = await student<any>(
           student1Token,
@@ -553,71 +599,178 @@ export const assessmentsJourney: JourneyDefinition = {
           type: 'LONG_ANSWER',
           body: 'Explain the synthetic concept in one sentence.',
           explanation: 'A reviewer will assess the explanation.',
-          gradingRubric: 'Award one point for the concept and one for a clear explanation.',
+          gradingRubric:
+            'Award one point for the concept and one for a clear explanation.',
           answerOrigin: 'HUMAN_REVIEWED',
           maxPoints: 2,
         });
         for (const question of [short, long]) {
-          expectStatus(await admin.request<any>('POST', `/admin/questions/${question.id}/submit`), 201);
-          expectStatus(await admin.request<any>('POST', `/admin/questions/${question.id}/publish`), 201);
+          expectStatus(
+            await admin.request<any>(
+              'POST',
+              `/admin/questions/${question.id}/submit`,
+            ),
+            201,
+          );
+          expectStatus(
+            await admin.request<any>(
+              'POST',
+              `/admin/questions/${question.id}/publish`,
+            ),
+            201,
+          );
           context.created.questions.push(question.id);
         }
-        const assessment = await admin.request<any>('POST', '/admin/assessments/custom', {
-          questionIds: [short.id, long.id],
-          scopes: [{ courseId }],
-          mode: 'EXAM',
-          title: factory.title('Written response assessment'),
-        });
+        const assessment = await admin.request<any>(
+          'POST',
+          '/admin/assessments/custom',
+          {
+            questionIds: [short.id, long.id],
+            scopes: [{ courseId }],
+            mode: 'EXAM',
+            title: factory.title('Written response assessment'),
+          },
+        );
         expectStatus(assessment, 201);
         writtenAssessmentId = assessment.body.id;
         context.created.assessments.push(writtenAssessmentId);
-        expectStatus(await admin.request<any>('POST', `/admin/assessments/${writtenAssessmentId}/publish`), 201);
+        expectStatus(
+          await admin.request<any>(
+            'POST',
+            `/admin/assessments/${writtenAssessmentId}/publish`,
+          ),
+          201,
+        );
 
-        const started = await student<any>(student1Token, 'POST', `/student/assessments/${writtenAssessmentId}/attempts/start`);
+        const started = await student<any>(
+          student1Token,
+          'POST',
+          `/student/assessments/${writtenAssessmentId}/attempts/start`,
+        );
         expectStatus(started, 201);
-        const shortSnapshot = started.body.questions.find((question: any) => question.type === 'SHORT_ANSWER');
-        const longSnapshot = started.body.questions.find((question: any) => question.type === 'LONG_ANSWER');
+        const shortSnapshot = started.body.questions.find(
+          (question: any) => question.type === 'SHORT_ANSWER',
+        );
+        const longSnapshot = started.body.questions.find(
+          (question: any) => question.type === 'LONG_ANSWER',
+        );
         assert(
-          shortSnapshot && longSnapshot &&
+          shortSnapshot &&
+            longSnapshot &&
             shortSnapshot.acceptedAnswers === undefined &&
             longSnapshot.gradingRubric === undefined,
           'Student assessment delivery must not expose written answer keys or rubrics',
         );
         expectStatus(
-          await student<any>(student1Token, 'POST', `/student/assessments/${writtenAssessmentId}/attempts/current/answers/${shortSnapshot.id}`, { responseText: ' SYNTHETIC ' }),
+          await student<any>(
+            student1Token,
+            'POST',
+            `/student/assessments/${writtenAssessmentId}/attempts/current/answers/${shortSnapshot.id}`,
+            { responseText: ' SYNTHETIC ' },
+          ),
           201,
         );
         expectStatus(
-          await student<any>(student1Token, 'POST', `/student/assessments/${writtenAssessmentId}/attempts/current/answers/${longSnapshot.id}`, { responseText: 'A clear synthetic explanation.' }),
+          await student<any>(
+            student1Token,
+            'POST',
+            `/student/assessments/${writtenAssessmentId}/attempts/current/answers/${longSnapshot.id}`,
+            {
+              responseText: 'A clear synthetic explanation.',
+              inputMethod: 'VOICE_TRANSCRIPT',
+              responseLanguageCode: 'en',
+              transcriptionProvider: 'openrouter',
+              transcriptionConfidence: 1,
+            },
+          ),
           201,
         );
-        const resumed = await student<any>(student1Token, 'GET', `/student/assessments/${writtenAssessmentId}/attempts/current`);
+        const resumed = await student<any>(
+          student1Token,
+          'GET',
+          `/student/assessments/${writtenAssessmentId}/attempts/current`,
+        );
         expectStatus(resumed, 200);
         assert(
-          resumed.body.questions.find((question: any) => question.id === longSnapshot.id)?.responseText === 'A clear synthetic explanation.',
+          resumed.body.questions.find(
+            (question: any) => question.id === longSnapshot.id,
+          )?.responseText === 'A clear synthetic explanation.',
           'Written autosaves must be available when an attempt is resumed',
         );
-        expectStatus(await student<any>(student1Token, 'POST', `/student/assessments/${writtenAssessmentId}/attempts/current/submit`), 201);
-        const result = await student<any>(student1Token, 'GET', `/student/assessments/${writtenAssessmentId}/attempts/current/result`);
+        expectStatus(
+          await student<any>(
+            student1Token,
+            'POST',
+            `/student/assessments/${writtenAssessmentId}/attempts/current/submit`,
+          ),
+          201,
+        );
+        const result = await student<any>(
+          student1Token,
+          'GET',
+          `/student/assessments/${writtenAssessmentId}/attempts/current/result`,
+        );
         expectStatus(result, 200);
-        assert(
-          result.body.score === 2 && result.body.totalPoints === 4 && result.body.pendingGradingCount === 1 &&
-            result.body.questions.find((question: any) => question.id === longSnapshot.id)?.outcome === 'PENDING_GRADING',
-          'Submitted long answers must remain pending while automatic written answers contribute provisional points',
+        const longResult = result.body.questions.find(
+          (question: any) => question.id === longSnapshot.id,
         );
-        const pending = await admin.request<any>('GET', '/admin/assessments/grading/pending');
-        expectStatus(pending, 200);
-        const pendingAnswer = pending.body.find((answer: any) => answer.assessmentQuestionId === longSnapshot.id);
-        assert(pendingAnswer?.gradingRubric === undefined && pendingAnswer?.assessmentQuestion?.gradingRubric, 'Graders must receive the frozen rubric only through the grading queue');
-        const graded = await admin.request<any>('POST', `/admin/assessments/grading/answers/${pendingAnswer.id}`, { awardedPoints: 1, feedback: 'Concept is present; expand the explanation.' });
-        expectStatus(graded, 201);
-        const gradedResult = await student<any>(student1Token, 'GET', `/student/assessments/${writtenAssessmentId}/attempts/current/result`);
-        expectStatus(gradedResult, 200);
         assert(
-          gradedResult.body.score === 3 && gradedResult.body.pendingGradingCount === 0 &&
-            gradedResult.body.questions.find((question: any) => question.id === longSnapshot.id)?.outcome === 'PARTIALLY_CORRECT',
-          'Manual grading must apply partial credit and remove the pending state',
+          result.body.score === 2 &&
+            result.body.totalPoints === 4 &&
+            longResult?.inputMethod === 'VOICE_TRANSCRIPT',
+          'Written result delivery must retain the voice-transcript provenance',
         );
+        if (longResult?.outcome === 'PENDING_AI_GRADING') {
+          assert(
+            result.body.pendingAiGradingCount === 1,
+            'Failed AI grading must remain retryable',
+          );
+          const pending = await admin.request<any>(
+            'GET',
+            '/admin/assessments/grading/pending',
+          );
+          expectStatus(pending, 200);
+          const pendingAnswer = pending.body.find(
+            (answer: any) => answer.assessmentQuestionId === longSnapshot.id,
+          );
+          assert(
+            pendingAnswer?.gradingRubric === undefined &&
+              pendingAnswer?.assessmentQuestion?.gradingRubric,
+            'Graders must receive the frozen rubric only through the grading queue',
+          );
+          const graded = await admin.request<any>(
+            'POST',
+            `/admin/assessments/grading/answers/${pendingAnswer.id}`,
+            {
+              awardedPoints: 1,
+              feedback: 'Concept is present; expand the explanation.',
+            },
+          );
+          expectStatus(graded, 201);
+          const gradedResult = await student<any>(
+            student1Token,
+            'GET',
+            `/student/assessments/${writtenAssessmentId}/attempts/current/result`,
+          );
+          expectStatus(gradedResult, 200);
+          assert(
+            gradedResult.body.score === 3 &&
+              gradedResult.body.pendingGradingCount === 0 &&
+              gradedResult.body.questions.find(
+                (question: any) => question.id === longSnapshot.id,
+              )?.outcome === 'PARTIALLY_CORRECT',
+            'Manual grading must apply partial credit and remove the pending state',
+          );
+        } else {
+          assert(
+            ['CORRECT', 'PARTIALLY_CORRECT', 'INCORRECT'].includes(
+              longResult?.outcome,
+            ) &&
+              longResult?.aiGrading?.status === 'COMPLETED' &&
+              typeof longResult?.graderFeedback === 'string',
+            'Configured AI grading must return a scored long answer with feedback',
+          );
+        }
       },
     );
 

@@ -48,5 +48,9 @@ export {
   AssessmentStatus,
   AssessmentAttemptStatus,
   AssessmentQuestionOutcome,
+  AnswerInputMethod,
+  AiRunStatus,
+  QuestionReportType,
+  QuestionReportStatus,
   QuestionDifficultyBand,
 } from '@prisma/client';

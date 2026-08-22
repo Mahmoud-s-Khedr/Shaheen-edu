@@ -60,6 +60,10 @@ export interface AppConfig {
     openRouterApiKey: string;
     questionImportModel: string;
     questionExplanationModel: string;
+    quizPlanningModel: string;
+    answerGradingModel: string;
+    speechToTextModel: string;
+    speechToTextMaxBytes: number;
     pdfTranscriptionModel: string;
     pdfTranscriptionFallbackModel: string;
     workerConcurrency: number;
@@ -212,6 +216,19 @@ export default (): AppConfig => ({
       process.env.AI_QUESTION_EXPLANATION_MODEL ??
       process.env.AI_QUESTION_IMPORT_MODEL ??
       '',
+    quizPlanningModel:
+      process.env.AI_QUIZ_PLANNING_MODEL ??
+      process.env.AI_QUESTION_EXPLANATION_MODEL ??
+      process.env.AI_QUESTION_IMPORT_MODEL ??
+      '',
+    answerGradingModel:
+      process.env.AI_ANSWER_GRADING_MODEL ??
+      process.env.AI_QUESTION_EXPLANATION_MODEL ??
+      process.env.AI_QUESTION_IMPORT_MODEL ??
+      '',
+    speechToTextModel:
+      process.env.AI_SPEECH_TO_TEXT_MODEL ?? 'openai/whisper-large-v3',
+    speechToTextMaxBytes: envInteger('AI_SPEECH_TO_TEXT_MAX_BYTES', 10485760),
     pdfTranscriptionModel: process.env.AI_PDF_TRANSCRIPTION_MODEL ?? '',
     pdfTranscriptionFallbackModel:
       process.env.AI_PDF_TRANSCRIPTION_FALLBACK_MODEL ?? '',

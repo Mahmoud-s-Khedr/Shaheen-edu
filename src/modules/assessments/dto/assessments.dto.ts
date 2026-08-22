@@ -9,6 +9,7 @@ import {
   IsEnum,
   IsIn,
   IsInt,
+  IsNumber,
   IsOptional,
   IsString,
   Max,
@@ -21,6 +22,9 @@ import { SearchPaginationQueryDto } from '../../../common/dto/pagination-query.d
 import {
   AssessmentMode,
   AssessmentStatus,
+  AnswerInputMethod,
+  QuestionReportStatus,
+  QuestionReportType,
   QuestionContentBlockType,
   QuestionDifficultyBand,
   QuestionSourceType,
@@ -138,6 +142,78 @@ export class GenerateStudentAssessmentDto extends GenerateAssessmentSettingsDto 
   @ApiPropertyOptional() @IsOptional() @IsBoolean() markedOnly?: boolean;
 }
 
+export class GenerateAiPromptAssessmentDto extends GenerateAssessmentSettingsDto {
+  @ApiProperty({ minLength: 3, maxLength: 2000 })
+  @IsString()
+  @MinLength(3)
+  @MaxLength(2000)
+  prompt!: string;
+  @ApiProperty({ type: [AssessmentScopeDto] })
+  @IsArray()
+  @ArrayMinSize(1)
+  @ValidateNested({ each: true })
+  @Type(() => AssessmentScopeDto)
+  scopes!: AssessmentScopeDto[];
+}
+
+export class CreateSelectedTutorAssessmentDto {
+  @ApiProperty({ type: [String], minItems: 1, maxItems: 50 })
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(50)
+  @ArrayUnique()
+  @IsString({ each: true })
+  questionIds!: string[];
+  @ApiProperty({ type: [AssessmentScopeDto] })
+  @IsArray()
+  @ArrayMinSize(1)
+  @ValidateNested({ each: true })
+  @Type(() => AssessmentScopeDto)
+  scopes!: AssessmentScopeDto[];
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  title?: string;
+}
+
+export class CommunityIncorrectQueryDto extends SearchPaginationQueryDto {
+  @ApiPropertyOptional() @IsOptional() @IsString() subjectId?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() courseId?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() chapterId?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() lessonId?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() sectionId?: string;
+}
+
+export class CreateQuestionReportDto {
+  @ApiProperty({ enum: QuestionReportType })
+  @IsEnum(QuestionReportType)
+  type!: QuestionReportType;
+  @ApiPropertyOptional({ maxLength: 4000 })
+  @IsOptional()
+  @IsString()
+  @MaxLength(4000)
+  note?: string;
+}
+
+export class QueryQuestionReportDto extends SearchPaginationQueryDto {
+  @ApiPropertyOptional({ enum: QuestionReportStatus })
+  @IsOptional()
+  @IsEnum(QuestionReportStatus)
+  status?: QuestionReportStatus;
+}
+
+export class ReviewQuestionReportDto {
+  @ApiProperty({ enum: QuestionReportStatus })
+  @IsEnum(QuestionReportStatus)
+  status!: QuestionReportStatus;
+  @ApiPropertyOptional({ maxLength: 4000 })
+  @IsOptional()
+  @IsString()
+  @MaxLength(4000)
+  note?: string;
+}
+
 export class GenerateAdminStandardAssessmentDto extends GenerateAssessmentSettingsDto {
   @ApiProperty({ type: [AssessmentScopeDto] })
   @IsArray()
@@ -247,6 +323,32 @@ export class AutosaveAnswerDto {
   @IsString()
   @MaxLength(100000)
   responseText?: string;
+  @ApiPropertyOptional({
+    enum: AnswerInputMethod,
+    default: AnswerInputMethod.TEXT,
+  })
+  @IsOptional()
+  @IsEnum(AnswerInputMethod)
+  inputMethod?: AnswerInputMethod;
+  @ApiPropertyOptional({
+    description: 'BCP-47 language of the editable transcript',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(16)
+  responseLanguageCode?: string;
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  transcriptionProvider?: string;
+  @ApiPropertyOptional({ minimum: 0, maximum: 1 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  @Max(1)
+  transcriptionConfidence?: number;
 }
 
 export class GradeLongAnswerDto {
@@ -372,13 +474,17 @@ export class AssessmentContentBlockDto {
   type!: QuestionContentBlockType;
   @ApiProperty() sortOrder!: number;
   @ApiPropertyOptional({ type: String, nullable: true }) text?: string | null;
-  @ApiPropertyOptional({ type: String, nullable: true }) assetId?: string | null;
+  @ApiPropertyOptional({ type: String, nullable: true }) assetId?:
+    string | null;
   @ApiPropertyOptional({ nullable: true }) tableData?: object | null;
   @ApiPropertyOptional({ type: String, nullable: true }) latex?: string | null;
   @ApiPropertyOptional({ type: String, nullable: true }) mathml?: string | null;
-  @ApiPropertyOptional({ type: String, nullable: true }) caption?: string | null;
-  @ApiPropertyOptional({ type: String, nullable: true }) altText?: string | null;
-  @ApiPropertyOptional({ type: String, nullable: true }) languageCode?: string | null;
+  @ApiPropertyOptional({ type: String, nullable: true }) caption?:
+    string | null;
+  @ApiPropertyOptional({ type: String, nullable: true }) altText?:
+    string | null;
+  @ApiPropertyOptional({ type: String, nullable: true }) languageCode?:
+    string | null;
   @ApiPropertyOptional({ type: Object, nullable: true }) asset?: {
     id: string;
     kind: string | null;
@@ -466,6 +572,8 @@ export class AssessmentResultDto {
   @ApiProperty() correctCount!: number;
   @ApiProperty() incorrectCount!: number;
   @ApiProperty() omittedCount!: number;
+  @ApiProperty() pendingGradingCount!: number;
+  @ApiProperty() pendingAiGradingCount!: number;
   @ApiProperty() answeredCount!: number;
   @ApiPropertyOptional({ type: String, format: 'date-time', nullable: true })
   submittedAt!: Date | null;
@@ -494,7 +602,8 @@ export class AdminAssessmentQuestionDto {
   @ApiProperty() sortOrder!: number;
   @ApiProperty() type!: string;
   @ApiProperty() body!: string;
-  @ApiPropertyOptional({ type: String, nullable: true }) explanation!: string | null;
+  @ApiPropertyOptional({ type: String, nullable: true }) explanation!:
+    string | null;
   @ApiPropertyOptional({ type: AssessmentQuestionVideoDto, nullable: true })
   video!: AssessmentQuestionVideoDto | null;
   @ApiProperty({ type: [AssessmentQuestionAttachmentDto] })

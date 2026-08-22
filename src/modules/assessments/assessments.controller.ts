@@ -38,6 +38,12 @@ import {
   GradeLongAnswerDto,
   GenerateAdminStandardAssessmentDto,
   GenerateStudentAssessmentDto,
+  GenerateAiPromptAssessmentDto,
+  CreateSelectedTutorAssessmentDto,
+  CommunityIncorrectQueryDto,
+  CreateQuestionReportDto,
+  QueryQuestionReportDto,
+  ReviewQuestionReportDto,
   IdDeletedResponseDto,
   PaginatedAdminAssessmentsResponseDto,
   PaginatedAssessmentsResponseDto,
@@ -68,6 +74,41 @@ export class AssessmentsController {
     @Body() dto: GenerateStudentAssessmentDto,
   ) {
     return this.assessments.generateStandard(user.id, dto);
+  }
+
+  @Post('ai-prompt')
+  @ApiOperation({
+    summary:
+      'Generate a private quiz from a student prompt and permitted scope',
+  })
+  aiPrompt(
+    @CurrentUser() user: RequestUser,
+    @Body() dto: GenerateAiPromptAssessmentDto,
+  ) {
+    return this.assessments.generateAiPrompt(user.id, dto);
+  }
+
+  @Get('community-most-incorrect')
+  @ApiOperation({
+    summary:
+      'List entitled community-most-incorrect question cards without answers',
+  })
+  communityMostIncorrect(
+    @CurrentUser() user: RequestUser,
+    @Query() query: CommunityIncorrectQueryDto,
+  ) {
+    return this.assessments.communityMostIncorrect(user.id, query);
+  }
+
+  @Post('community-tutor')
+  @ApiOperation({
+    summary: 'Create a tutor assessment from accessible ranked question cards',
+  })
+  communityTutor(
+    @CurrentUser() user: RequestUser,
+    @Body() dto: CreateSelectedTutorAssessmentDto,
+  ) {
+    return this.assessments.createSelectedTutorAssessment(user.id, dto);
   }
 
   @Get('question-banks')
@@ -146,6 +187,18 @@ export class AssessmentsController {
     @Param('questionId') questionId: string,
   ) {
     return this.assessments.deleteQuestionNote(user.id, questionId);
+  }
+
+  @Post('question-reports/:questionId')
+  @ApiOperation({
+    summary: 'Report an accessible authored or assessment-snapshot question',
+  })
+  createQuestionReport(
+    @CurrentUser() user: RequestUser,
+    @Param('questionId') questionId: string,
+    @Body() dto: CreateQuestionReportDto,
+  ) {
+    return this.assessments.createQuestionReport(user.id, questionId, dto);
   }
 
   @Get()
@@ -296,6 +349,25 @@ export class AdminAssessmentsController {
   })
   pendingGrades(@CurrentUser() user: RequestUser) {
     return this.assessments.pendingGrades(user);
+  }
+
+  @Get('question-reports')
+  @ApiOperation({ summary: 'List student question reports for moderation' })
+  questionReports(
+    @CurrentUser() user: RequestUser,
+    @Query() query: QueryQuestionReportDto,
+  ) {
+    return this.assessments.listQuestionReports(user, query);
+  }
+
+  @Post('question-reports/:reportId/review')
+  @ApiOperation({ summary: 'Assign and transition a student question report' })
+  reviewQuestionReport(
+    @CurrentUser() user: RequestUser,
+    @Param('reportId') reportId: string,
+    @Body() dto: ReviewQuestionReportDto,
+  ) {
+    return this.assessments.reviewQuestionReport(user, reportId, dto);
   }
 
   @Post('grading/answers/:answerId')

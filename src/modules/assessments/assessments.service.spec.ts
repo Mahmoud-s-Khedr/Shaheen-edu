@@ -87,6 +87,7 @@ describe('AssessmentsService', () => {
     const config = { get: jest.fn().mockReturnValue(10) };
     const assets = { getReady: jest.fn(), protectedAccess: jest.fn() };
     const videos = { playback: jest.fn() };
+    const ai = { planQuiz: jest.fn(), gradeAnswer: jest.fn() };
     return {
       service: new AssessmentsService(
         prisma,
@@ -96,6 +97,7 @@ describe('AssessmentsService', () => {
         config as any,
         assets as any,
         videos as any,
+        ai as any,
       ),
       prisma,
       communityStats,
@@ -454,7 +456,7 @@ describe('AssessmentsService', () => {
         courseIds: ['c1'],
         questionBankIds: ['bank-a', 'bank-b'],
         questionCount: 1,
-      } as any);
+      });
 
       expect(prisma.question.findMany.mock.calls[0][0].where.bankId).toEqual({
         in: ['bank-a', 'bank-b'],
@@ -528,7 +530,7 @@ describe('AssessmentsService', () => {
       await service.generateStandard(studentUserId, {
         courseIds: ['c1'],
         questionCount: 2,
-      } as any);
+      });
 
       expect(prisma.assessment.create).toHaveBeenCalledTimes(1);
       expect(prisma.assessment.create.mock.calls[0][0].data.questionCount).toBe(

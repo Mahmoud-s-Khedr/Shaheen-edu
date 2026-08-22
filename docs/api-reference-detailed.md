@@ -6798,3 +6798,55 @@ Creates a `HUMAN_REVIEWED` draft question from a corrected `AcceptQuestionImport
 ### `POST /api/v1/admin/ai/question-imports/{id}/items/{itemId}/reject`
 
 Records the required rejection reason from `RejectQuestionImportItemDto` and excludes the review candidate (HTTP 201).
+### `POST /api/v1/student/assessments/ai-prompt`
+
+Create a private, AI-planned assessment from `prompt`, `scopes`, and normal
+assessment settings. The selection is limited to the student's entitled,
+published question pool.
+
+### `GET /api/v1/student/assessments/community-most-incorrect`
+
+Legacy assessment-path alias for the student-safe community ranking.
+
+### `POST /api/v1/student/assessments/community-tutor`
+
+Create a private tutor assessment from eligible ranked `questionIds` and
+`scopes`.
+
+### `POST /api/v1/student/assessments/question-reports/{questionId}`
+
+Legacy assessment-path alias for reporting an accessible question.
+
+### `GET /api/v1/admin/assessments/question-reports`
+
+Legacy assessment-path alias for question-report moderation.
+
+### `POST /api/v1/admin/assessments/question-reports/{reportId}/review`
+
+Legacy assessment-path alias for transitioning a question report.
+
+### `GET /api/v1/student/questions/community-most-incorrect`
+
+List entitled question cards ranked by community incorrect rate. Supports
+`subjectId`, hierarchy scope filters, `page`, and `limit`; answers and
+explanations are not returned.
+
+### `POST /api/v1/student/questions/{questionId}/reports`
+
+Create a student report using `WRONG_ANSWER`, `UNCLEAR_WORDING`,
+`TYPO_LANGUAGE`, `MISSING_OR_BROKEN_MEDIA`, `DUPLICATE`, or `OTHER`.
+
+### `GET /api/v1/admin/question-reports`
+
+List question reports for moderators, optionally filtered by status.
+
+### `POST /api/v1/admin/question-reports/{reportId}/review`
+
+Assign and transition a question report. Closing reports requires a resolution
+note.
+
+### `POST /api/v1/student/voice/transcriptions`
+
+Accept a multipart `file` recording and optional `language` query parameter,
+send the bytes to OpenRouter speech-to-text, and return its transcript without
+retaining the audio.

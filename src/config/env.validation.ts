@@ -125,6 +125,16 @@ export const envValidationSchema = Joi.object({
   OPENROUTER_API_KEY: Joi.string().min(1).optional(),
   AI_QUESTION_IMPORT_MODEL: Joi.string().min(1).optional(),
   AI_QUESTION_EXPLANATION_MODEL: Joi.string().min(1).optional(),
+  AI_QUIZ_PLANNING_MODEL: Joi.string().min(1).optional(),
+  AI_ANSWER_GRADING_MODEL: Joi.string().min(1).optional(),
+  AI_SPEECH_TO_TEXT_MODEL: Joi.string()
+    .min(1)
+    .default('openai/whisper-large-v3'),
+  AI_SPEECH_TO_TEXT_MAX_BYTES: Joi.number()
+    .integer()
+    .min(1024)
+    .max(26214400)
+    .default(10485760),
   AI_PDF_TRANSCRIPTION_MODEL: Joi.string().min(1).optional(),
   AI_PDF_TRANSCRIPTION_FALLBACK_MODEL: Joi.string().min(1).optional(),
   AI_PDF_TRANSCRIPTION_TIMEOUT_MS: Joi.number()

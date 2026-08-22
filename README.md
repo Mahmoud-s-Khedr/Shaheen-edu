@@ -67,7 +67,9 @@ See `.env.example` for a fully worked, non-secret example set. Summary:
 | `JWT_ACCESS_SECRET` / `JWT_ACCESS_TTL_SECONDS`               | User access token (15 min default)                                |
 | `JWT_REFRESH_TTL_SECONDS`                                    | Opaque refresh token TTL (30 days default)                        |
 | `JWT_PARENT_ACCESS_SECRET` / `JWT_PARENT_ACCESS_TTL_SECONDS` | Parent access token (30 min default)                              |
-| `RATE_LIMIT_*`                                                | Global, auth-route, identifier, and IP rate-limit thresholds       |
+| `RATE_LIMIT_*`                                               | Global, auth-route, identifier, and IP rate-limit thresholds      |
+| `AI_QUIZ_PLANNING_MODEL` / `AI_ANSWER_GRADING_MODEL`         | Optional OpenRouter models for prompt quizzes and rubric grading  |
+| `AI_SPEECH_TO_TEXT_MODEL` / `AI_SPEECH_TO_TEXT_MAX_BYTES`    | OpenRouter transcription model and per-recording upload limit     |
 | `NATIONAL_ID_HMAC_SECRET`                                    | HMAC key for the deterministic National ID lookup hash            |
 | `NATIONAL_ID_ENCRYPTION_KEY`                                 | Key material for AES-256-GCM National ID encryption               |
 | `NATIONAL_ID_KEY_VERSION`                                    | Recorded alongside encrypted National IDs for future key rotation |
@@ -166,16 +168,15 @@ No course, payment, subscription, question-bank, AI, media, or notification
 modules are implemented in this repository. Only the auth/identity system
 and empty placeholder module folders (to avoid future coupling) exist.
 
-
 ## notes:
 
 test server link: https://api-edu.mydevtest.website/
 
-  JOURNEY_REQUEST_TIMEOUT_MS=60000 \
-  JOURNEY_ALLOW_MUTATIONS=true \
-  JOURNEY_TARGET=staging \
-  JOURNEY_CONFIRM_STAGING_MUTATIONS=true \
-  JOURNEY_BASE_URL=https://api-edu.mydevtest.website \
-  JOURNEY_SUPER_ADMIN_EMAIL=superadmin@example.com \
-  JOURNEY_SUPER_ADMIN_PASSWORD='ChangeThisPassword123!' \
-  pnpm api:test:full
+JOURNEY_REQUEST_TIMEOUT_MS=60000 \
+JOURNEY_ALLOW_MUTATIONS=true \
+JOURNEY_TARGET=staging \
+JOURNEY_CONFIRM_STAGING_MUTATIONS=true \
+JOURNEY_BASE_URL=https://api-edu.mydevtest.website \
+JOURNEY_SUPER_ADMIN_EMAIL=superadmin@example.com \
+JOURNEY_SUPER_ADMIN_PASSWORD='ChangeThisPassword123!' \
+pnpm api:test:full

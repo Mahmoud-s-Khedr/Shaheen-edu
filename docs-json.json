@@ -15169,6 +15169,161 @@
         ]
       }
     },
+    "/api/v1/student/assessments/ai-prompt": {
+      "post": {
+        "operationId": "AssessmentsController_aiPrompt_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GenerateAiPromptAssessmentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Generate a private quiz from a student prompt and permitted scope",
+        "tags": [
+          "student/assessments"
+        ]
+      }
+    },
+    "/api/v1/student/assessments/community-most-incorrect": {
+      "get": {
+        "operationId": "AssessmentsController_communityMostIncorrect_v1",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "One-based page number.",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Maximum records to return per page.",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Case-insensitive text search.",
+            "schema": {
+              "minLength": 1,
+              "maxLength": 120,
+              "type": "string"
+            }
+          },
+          {
+            "name": "subjectId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "courseId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "chapterId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "lessonId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sectionId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List entitled community-most-incorrect question cards without answers",
+        "tags": [
+          "student/assessments"
+        ]
+      }
+    },
+    "/api/v1/student/assessments/community-tutor": {
+      "post": {
+        "operationId": "AssessmentsController_communityTutor_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSelectedTutorAssessmentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create a tutor assessment from accessible ranked question cards",
+        "tags": [
+          "student/assessments"
+        ]
+      }
+    },
     "/api/v1/student/assessments/question-banks": {
       "get": {
         "operationId": "AssessmentsController_questionBanks_v1",
@@ -15533,6 +15688,45 @@
           }
         ],
         "summary": "Delete the current student’s private question note",
+        "tags": [
+          "student/assessments"
+        ]
+      }
+    },
+    "/api/v1/student/assessments/question-reports/{questionId}": {
+      "post": {
+        "operationId": "AssessmentsController_createQuestionReport_v1",
+        "parameters": [
+          {
+            "name": "questionId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateQuestionReportDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Report an accessible authored or assessment-snapshot question",
         "tags": [
           "student/assessments"
         ]
@@ -16436,6 +16630,114 @@
         ]
       }
     },
+    "/api/v1/admin/assessments/question-reports": {
+      "get": {
+        "operationId": "AdminAssessmentsController_questionReports_v1",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "One-based page number.",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Maximum records to return per page.",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Case-insensitive text search.",
+            "schema": {
+              "minLength": 1,
+              "maxLength": 120,
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "OPEN",
+                "UNDER_REVIEW",
+                "RESOLVED",
+                "REJECTED"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List student question reports for moderation",
+        "tags": [
+          "admin/assessments"
+        ]
+      }
+    },
+    "/api/v1/admin/assessments/question-reports/{reportId}/review": {
+      "post": {
+        "operationId": "AdminAssessmentsController_reviewQuestionReport_v1",
+        "parameters": [
+          {
+            "name": "reportId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewQuestionReportDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Assign and transition a student question report",
+        "tags": [
+          "admin/assessments"
+        ]
+      }
+    },
     "/api/v1/admin/assessments/grading/answers/{answerId}": {
       "post": {
         "operationId": "AdminAssessmentsController_grade_v1",
@@ -17095,6 +17397,296 @@
         "summary": "Archive a published assessment",
         "tags": [
           "admin/assessments"
+        ]
+      }
+    },
+    "/api/v1/student/questions/community-most-incorrect": {
+      "get": {
+        "operationId": "QuestionIntelligenceController_communityMostIncorrect_v1",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "One-based page number.",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Maximum records to return per page.",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Case-insensitive text search.",
+            "schema": {
+              "minLength": 1,
+              "maxLength": 120,
+              "type": "string"
+            }
+          },
+          {
+            "name": "subjectId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "courseId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "chapterId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "lessonId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sectionId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List entitled community-most-incorrect question cards without answers",
+        "tags": [
+          "student/questions"
+        ]
+      }
+    },
+    "/api/v1/student/questions/{questionId}/reports": {
+      "post": {
+        "operationId": "QuestionIntelligenceController_report_v1",
+        "parameters": [
+          {
+            "name": "questionId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateQuestionReportDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Report an accessible authored or assessment-snapshot question",
+        "tags": [
+          "student/questions"
+        ]
+      }
+    },
+    "/api/v1/student/voice/transcriptions": {
+      "post": {
+        "operationId": "StudentVoiceController_transcribe_v1",
+        "parameters": [
+          {
+            "name": "language",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "file"
+                ],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Transcribe a student voice-answer recording without retaining audio",
+        "tags": [
+          "student/voice"
+        ]
+      }
+    },
+    "/api/v1/admin/question-reports": {
+      "get": {
+        "operationId": "AdminQuestionReportsController_list_v1",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "One-based page number.",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Maximum records to return per page.",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Case-insensitive text search.",
+            "schema": {
+              "minLength": 1,
+              "maxLength": 120,
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "OPEN",
+                "UNDER_REVIEW",
+                "RESOLVED",
+                "REJECTED"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List student question reports for moderation",
+        "tags": [
+          "admin/question-reports"
+        ]
+      }
+    },
+    "/api/v1/admin/question-reports/{reportId}/review": {
+      "post": {
+        "operationId": "AdminQuestionReportsController_review_v1",
+        "parameters": [
+          {
+            "name": "reportId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewQuestionReportDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Assign and transition a student question report",
+        "tags": [
+          "admin/question-reports"
         ]
       }
     },
@@ -24296,6 +24888,94 @@
           "scopes"
         ]
       },
+      "AssessmentScopeDto": {
+        "type": "object",
+        "properties": {
+          "courseId": {
+            "type": "string"
+          },
+          "chapterId": {
+            "type": "string"
+          },
+          "lessonId": {
+            "type": "string"
+          },
+          "sectionId": {
+            "type": "string"
+          }
+        }
+      },
+      "GenerateAiPromptAssessmentDto": {
+        "type": "object",
+        "properties": {
+          "questionCount": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 50
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "TUTOR",
+              "EXAM"
+            ],
+            "default": "EXAM"
+          },
+          "isTimed": {
+            "type": "boolean",
+            "default": false
+          },
+          "durationSeconds": {
+            "type": "number",
+            "description": "Required when isTimed is true"
+          },
+          "title": {
+            "type": "string"
+          },
+          "prompt": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 2000
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AssessmentScopeDto"
+            }
+          }
+        },
+        "required": [
+          "questionCount",
+          "prompt",
+          "scopes"
+        ]
+      },
+      "CreateSelectedTutorAssessmentDto": {
+        "type": "object",
+        "properties": {
+          "questionIds": {
+            "minItems": 1,
+            "maxItems": 50,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AssessmentScopeDto"
+            }
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "questionIds",
+          "scopes"
+        ]
+      },
       "UpdateQuestionNoteDto": {
         "type": "object",
         "properties": {
@@ -24306,6 +24986,29 @@
         },
         "required": [
           "body"
+        ]
+      },
+      "CreateQuestionReportDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "WRONG_ANSWER",
+              "UNCLEAR_WORDING",
+              "TYPO_LANGUAGE",
+              "MISSING_OR_BROKEN_MEDIA",
+              "DUPLICATE",
+              "OTHER"
+            ]
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 4000
+          }
+        },
+        "required": [
+          "type"
         ]
       },
       "AssessmentListItemDto": {
@@ -24780,6 +25483,26 @@
           "responseText": {
             "type": "string",
             "description": "Written response for short, fill-in, and long-answer questions"
+          },
+          "inputMethod": {
+            "type": "string",
+            "enum": [
+              "TEXT",
+              "VOICE_TRANSCRIPT"
+            ],
+            "default": "TEXT"
+          },
+          "responseLanguageCode": {
+            "type": "string",
+            "description": "BCP-47 language of the editable transcript"
+          },
+          "transcriptionProvider": {
+            "type": "string"
+          },
+          "transcriptionConfidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
           }
         }
       },
@@ -24821,6 +25544,12 @@
           "omittedCount": {
             "type": "number"
           },
+          "pendingGradingCount": {
+            "type": "number"
+          },
+          "pendingAiGradingCount": {
+            "type": "number"
+          },
           "answeredCount": {
             "type": "number"
           },
@@ -24844,8 +25573,31 @@
           "correctCount",
           "incorrectCount",
           "omittedCount",
+          "pendingGradingCount",
+          "pendingAiGradingCount",
           "answeredCount",
           "questions"
+        ]
+      },
+      "ReviewQuestionReportDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "OPEN",
+              "UNDER_REVIEW",
+              "RESOLVED",
+              "REJECTED"
+            ]
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 4000
+          }
+        },
+        "required": [
+          "status"
         ]
       },
       "GradeLongAnswerDto": {
@@ -24862,23 +25614,6 @@
         "required": [
           "awardedPoints"
         ]
-      },
-      "AssessmentScopeDto": {
-        "type": "object",
-        "properties": {
-          "courseId": {
-            "type": "string"
-          },
-          "chapterId": {
-            "type": "string"
-          },
-          "lessonId": {
-            "type": "string"
-          },
-          "sectionId": {
-            "type": "string"
-          }
-        }
       },
       "GenerateAdminStandardAssessmentDto": {
         "type": "object",

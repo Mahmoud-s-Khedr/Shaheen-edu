@@ -324,6 +324,7 @@ enum AssessmentOwnerType {
 enum AssessmentGenerationType {
   STANDARD
   CUSTOM
+  AI_PROMPT
 }
 
 enum AssessmentMode {
@@ -348,6 +349,34 @@ enum AssessmentQuestionOutcome {
   INCORRECT
   OMITTED
   PENDING_GRADING
+  PENDING_AI_GRADING
+}
+
+enum AnswerInputMethod {
+  TEXT
+  VOICE_TRANSCRIPT
+}
+
+enum AiRunStatus {
+  PENDING
+  COMPLETED
+  FAILED
+}
+
+enum QuestionReportType {
+  WRONG_ANSWER
+  UNCLEAR_WORDING
+  TYPO_LANGUAGE
+  MISSING_OR_BROKEN_MEDIA
+  DUPLICATE
+  OTHER
+}
+
+enum QuestionReportStatus {
+  OPEN
+  UNDER_REVIEW
+  RESOLVED
+  REJECTED
 }
 
 enum QuestionDifficultyBand {
@@ -412,6 +441,8 @@ model User {
   questionsReviewed         Question[]                @relation("QuestionReviewedBy")
   questionAnswersReviewed   Question[]                @relation("QuestionAnswerReviewedBy")
   assessmentAnswersGraded   AssessmentAttemptAnswer[] @relation("AssessmentAnswerGradedBy")
+  questionReportsReviewed   QuestionReport[]          @relation("QuestionReportReviewedBy")
+  questionReportActions     QuestionReportAction[]    @relation("QuestionReportActionActor")
   questionImportsCreated    QuestionImportBatch[]     @relation("QuestionImportCreatedBy")
   assessmentsCreated        Assessment[]              @relation("AssessmentCreatedByAdmin")
   leaderboardWeeksFinalized LeaderboardWeek[]         @relation("LeaderboardWeekFinalizedBy")
@@ -427,6 +458,8 @@ model StudentProfile {
   archivedAccessSnapshots ArchivedAccessSnapshot[]
   questionMarks           StudentQuestionMark[]
   questionNotes           StudentQuestionNote[]
+  questionReports         QuestionReport[]
+  aiQuizRuns              AiQuizGenerationRun[]
   fullName                String
   nationalIdHash          String                     @unique
   nationalIdEncrypted     String?
@@ -930,36 +963,36 @@ model QuestionBank {
 }
 
 model Question {
-  id                    String                    @id @default(cuid())
+  id                    String                     @id @default(cuid())
   bankId                String
   sourceId              String
   courseId              String
-  type                  QuestionType              @default(SINGLE_CHOICE)
+  type                  QuestionType               @default(SINGLE_CHOICE)
   body                  String
   explanation           String?
-  maxPoints             Int                       @default(1)
+  maxPoints             Int                        @default(1)
   acceptedAnswers       Json?
   gradingRubric         String?
   answerOrigin          QuestionAnswerProvenance?
   answerReviewedAt      DateTime?
   answerReviewedById    String?
-  status                QuestionStatus            @default(DRAFT)
+  status                QuestionStatus             @default(DRAFT)
   reviewNote            String?
   reviewedAt            DateTime?
-  createdAt             DateTime                  @default(now())
-  updatedAt             DateTime                  @updatedAt
+  createdAt             DateTime                   @default(now())
+  updatedAt             DateTime                   @updatedAt
   publishedAt           DateTime?
   archivedAt            DateTime?
   createdById           String
   updatedById           String
   reviewedById          String?
-  bank                  QuestionBank              @relation(fields: [bankId], references: [id], onDelete: Restrict)
-  source                QuestionSource            @relation(fields: [sourceId], references: [id], onDelete: Restrict)
-  course                Course                    @relation(fields: [courseId], references: [id], onDelete: Restrict)
-  createdBy             User                      @relation("QuestionCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
-  updatedBy             User                      @relation("QuestionUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
-  reviewedBy            User?                     @relation("QuestionReviewedBy", fields: [reviewedById], references: [id], onDelete: Restrict)
-  answerReviewedBy      User?                     @relation("QuestionAnswerReviewedBy", fields: [answerReviewedById], references: [id], onDelete: Restrict)
+  bank                  QuestionBank               @relation(fields: [bankId], references: [id], onDelete: Restrict)
+  source                QuestionSource             @relation(fields: [sourceId], references: [id], onDelete: Restrict)
+  course                Course                     @relation(fields: [courseId], references: [id], onDelete: Restrict)
+  createdBy             User                       @relation("QuestionCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  updatedBy             User                       @relation("QuestionUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
+  reviewedBy            User?                      @relation("QuestionReviewedBy", fields: [reviewedById], references: [id], onDelete: Restrict)
+  answerReviewedBy      User?                      @relation("QuestionAnswerReviewedBy", fields: [answerReviewedById], references: [id], onDelete: Restrict)
   options               QuestionOption[]
   assets                QuestionAsset[]
   videoLink             QuestionVideoLink?
@@ -972,9 +1005,10 @@ model Question {
   contexts              QuestionContextQuestion[]
   structuredExplanation QuestionExplanation?
   explanationRuns       QuestionAiExplanationRun[]
+  reports               QuestionReport[]
   replacesQuestionId    String?
-  replacesQuestion      Question?                 @relation("QuestionReplacement", fields: [replacesQuestionId], references: [id], onDelete: SetNull)
-  replacementQuestions  Question[]                @relation("QuestionReplacement")
+  replacesQuestion      Question?                  @relation("QuestionReplacement", fields: [replacesQuestionId], references: [id], onDelete: SetNull)
+  replacementQuestions  Question[]                 @relation("QuestionReplacement")
   contentBlocks         QuestionContentBlock[]
 
   @@index([status, createdAt, id])
@@ -985,16 +1019,16 @@ model Question {
 }
 
 model QuestionContext {
-  id            String                        @id @default(cuid())
-  type          QuestionContextType           @default(TEXT)
-  title         String?
-  body          String
-  languageCode  String                        @default("ar")
-  sourceLocator Json?
-  createdAt     DateTime                      @default(now())
-  updatedAt     DateTime                      @updatedAt
-  questions     QuestionContextQuestion[]
-  contentBlocks QuestionContextContentBlock[]
+  id             String                        @id @default(cuid())
+  type           QuestionContextType           @default(TEXT)
+  title          String?
+  body           String
+  languageCode   String                        @default("ar")
+  sourceLocator  Json?
+  createdAt      DateTime                      @default(now())
+  updatedAt      DateTime                      @updatedAt
+  questions      QuestionContextQuestion[]
+  contentBlocks  QuestionContextContentBlock[]
   importContexts QuestionImportContext[]
 
   @@index([type, createdAt])
@@ -1072,21 +1106,21 @@ model QuestionAiExplanationRun {
 }
 
 model QuestionImportBatch {
-  id                    String                       @id @default(cuid())
+  id                    String                         @id @default(cuid())
   inputType             QuestionImportInputType
   rawText               String?
   sourceAssetId         String?
-  sourceAsset           Asset?                       @relation("QuestionImportSourceAsset", fields: [sourceAssetId], references: [id], onDelete: Restrict)
+  sourceAsset           Asset?                         @relation("QuestionImportSourceAsset", fields: [sourceAssetId], references: [id], onDelete: Restrict)
   parentId              String?
-  parent                QuestionImportBatch?         @relation("QuestionImportChildren", fields: [parentId], references: [id], onDelete: Cascade)
-  children              QuestionImportBatch[]        @relation("QuestionImportChildren")
+  parent                QuestionImportBatch?           @relation("QuestionImportChildren", fields: [parentId], references: [id], onDelete: Cascade)
+  children              QuestionImportBatch[]          @relation("QuestionImportChildren")
   childSequence         Int?
   pageScope             Json?
   bankId                String
   sourceId              String
   courseId              String
   placements            Json
-  status                QuestionImportStatus         @default(QUEUED)
+  status                QuestionImportStatus           @default(QUEUED)
   normalizedText        String?
   extractionMetadata    Json?
   segmentationRawOutput Json?
@@ -1096,18 +1130,18 @@ model QuestionImportBatch {
   errorSummary          String?
   model                 String
   schemaVersion         String
-  totalChunks           Int                          @default(0)
-  completedChunks       Int                          @default(0)
-  totalItems            Int                          @default(0)
-  createdQuestions      Int                          @default(0)
-  invalidItems          Int                          @default(0)
-  failedItems           Int                          @default(0)
-  createdAt             DateTime                     @default(now())
-  updatedAt             DateTime                     @updatedAt
+  totalChunks           Int                            @default(0)
+  completedChunks       Int                            @default(0)
+  totalItems            Int                            @default(0)
+  createdQuestions      Int                            @default(0)
+  invalidItems          Int                            @default(0)
+  failedItems           Int                            @default(0)
+  createdAt             DateTime                       @default(now())
+  updatedAt             DateTime                       @updatedAt
   startedAt             DateTime?
   completedAt           DateTime?
   createdById           String
-  createdBy             User                         @relation("QuestionImportCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  createdBy             User                           @relation("QuestionImportCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
   chunks                QuestionImportChunk[]
   items                 QuestionImportItem[]
   sourceBlocks          QuestionImportSourceBlock[]
@@ -1158,36 +1192,36 @@ model QuestionImportPage {
 /// A durable, batch-local visual crop from a physical PDF page.  It remains
 /// unassigned until the visual ownership phase validates an attachment.
 model QuestionImportMedia {
-  id                 String                    @id @default(cuid())
-  batchId            String
-  batch              QuestionImportBatch       @relation(fields: [batchId], references: [id], onDelete: Cascade)
-  mediaKey           String
-  pageNumber         Int
-  normalizedBounds   Json
-  renderedBounds     Json
-  pageDimensions     Json
-  rotation           Int                       @default(0)
-  renderDpi          Int
-  type               QuestionImportMediaType
-  confidence         Float
-  description        String
-  warnings           Json?
-  validationFlags    Json?
-  cropCompleteness   QuestionImportMediaCropCompleteness @default(UNKNOWN)
-  cropVerification   Json?
-  checksum           String?
-  assetId            String?                   @unique
-  asset              Asset?                    @relation("QuestionImportMediaAsset", fields: [assetId], references: [id], onDelete: SetNull)
-  status             QuestionImportMediaStatus @default(REVIEW_REQUIRED)
-  materializedAt     DateTime?
-  reviewedAt         DateTime?
-  reviewedById       String?
-  reviewNote         String?
-  errorDetail        String?
-  createdAt          DateTime                  @default(now())
-  updatedAt          DateTime                  @updatedAt
-  detections         QuestionImportMediaDetection[]
-  assignments        QuestionImportMediaAssignment[]
+  id               String                              @id @default(cuid())
+  batchId          String
+  batch            QuestionImportBatch                 @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  mediaKey         String
+  pageNumber       Int
+  normalizedBounds Json
+  renderedBounds   Json
+  pageDimensions   Json
+  rotation         Int                                 @default(0)
+  renderDpi        Int
+  type             QuestionImportMediaType
+  confidence       Float
+  description      String
+  warnings         Json?
+  validationFlags  Json?
+  cropCompleteness QuestionImportMediaCropCompleteness @default(UNKNOWN)
+  cropVerification Json?
+  checksum         String?
+  assetId          String?                             @unique
+  asset            Asset?                              @relation("QuestionImportMediaAsset", fields: [assetId], references: [id], onDelete: SetNull)
+  status           QuestionImportMediaStatus           @default(REVIEW_REQUIRED)
+  materializedAt   DateTime?
+  reviewedAt       DateTime?
+  reviewedById     String?
+  reviewNote       String?
+  errorDetail      String?
+  createdAt        DateTime                            @default(now())
+  updatedAt        DateTime                            @updatedAt
+  detections       QuestionImportMediaDetection[]
+  assignments      QuestionImportMediaAssignment[]
 
   @@unique([batchId, mediaKey])
   @@index([batchId, pageNumber, status])
@@ -1197,15 +1231,15 @@ model QuestionImportMedia {
 /// Stable, batch-local context identities used by visual extraction.  The
 /// external model sees contextKey, never the database QuestionContext id.
 model QuestionImportContext {
-  id          String              @id @default(cuid())
-  batchId     String
-  batch       QuestionImportBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
-  contextKey  String
-  contextId   String
-  context     QuestionContext     @relation(fields: [contextId], references: [id], onDelete: Cascade)
-  firstBlock  String
-  lastBlock   String
-  createdAt   DateTime            @default(now())
+  id         String              @id @default(cuid())
+  batchId    String
+  batch      QuestionImportBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  contextKey String
+  contextId  String
+  context    QuestionContext     @relation(fields: [contextId], references: [id], onDelete: Cascade)
+  firstBlock String
+  lastBlock  String
+  createdAt  DateTime            @default(now())
 
   @@unique([batchId, contextKey])
   @@unique([batchId, contextId])
@@ -1216,30 +1250,30 @@ model QuestionImportContext {
 /// question, option, or shared context. finalContentBlockId is intentionally a
 /// polymorphic reference because the final block can live in three tables.
 model QuestionImportMediaAssignment {
-  id                  String                              @id @default(cuid())
-  importItemId        String
-  importItem          QuestionImportItem                  @relation(fields: [importItemId], references: [id], onDelete: Cascade)
-  mediaId             String
-  media               QuestionImportMedia                 @relation(fields: [mediaId], references: [id], onDelete: Restrict)
-  assignmentKey       String
+  id                    String                              @id @default(cuid())
+  importItemId          String
+  importItem            QuestionImportItem                  @relation(fields: [importItemId], references: [id], onDelete: Cascade)
+  mediaId               String
+  media                 QuestionImportMedia                 @relation(fields: [mediaId], references: [id], onDelete: Restrict)
+  assignmentKey         String
   /// Set only for QUESTION/OPTION ownership. A nullable unique key lets a
   /// shared context reuse its visual while making non-context ownership safe
   /// even when chunks are processed concurrently.
   exclusiveOwnershipKey String?
-  owner               QuestionImportMediaAssignmentOwner
-  ownerReference      String
-  placementAnchor     String?
-  confidence          Float?
-  reason              String?
-  status              QuestionImportMediaAssignmentStatus @default(PROPOSED)
-  scoreComponents     Json?
-  evidenceVersion     String?
-  reviewNote          String?
-  reviewedAt          DateTime?
-  reviewedById        String?
-  finalContentBlockId String?
-  createdAt           DateTime                            @default(now())
-  updatedAt           DateTime                            @updatedAt
+  owner                 QuestionImportMediaAssignmentOwner
+  ownerReference        String
+  placementAnchor       String?
+  confidence            Float?
+  reason                String?
+  status                QuestionImportMediaAssignmentStatus @default(PROPOSED)
+  scoreComponents       Json?
+  evidenceVersion       String?
+  reviewNote            String?
+  reviewedAt            DateTime?
+  reviewedById          String?
+  finalContentBlockId   String?
+  createdAt             DateTime                            @default(now())
+  updatedAt             DateTime                            @updatedAt
 
   @@unique([importItemId, assignmentKey])
   @@unique([exclusiveOwnershipKey])
@@ -1250,24 +1284,24 @@ model QuestionImportMediaAssignment {
 /// A deterministic, reviewable visual contract for one imported candidate.
 /// A candidate cannot create answer content until every requirement resolves.
 model QuestionImportVisualRequirement {
-  id                  String                               @id @default(cuid())
-  importItemId        String
-  importItem          QuestionImportItem                   @relation(fields: [importItemId], references: [id], onDelete: Cascade)
-  requirementKey      String
-  kind                QuestionImportVisualRequirementKind
-  sourcePage          Int?
-  sourceEnvelope      Json?
-  owner               QuestionImportMediaAssignmentOwner?
-  ownerReference      String?
-  optionIndexes       Json?
-  expectedCardinality Int                                  @default(0)
-  interpretationRequired Boolean                           @default(true)
-  resolutionState     QuestionImportVisualResolutionState @default(PENDING)
-  unresolvedReason    String?
-  candidateRankings   Json?
-  evidenceVersion     String?
-  createdAt           DateTime                             @default(now())
-  updatedAt           DateTime                             @updatedAt
+  id                     String                              @id @default(cuid())
+  importItemId           String
+  importItem             QuestionImportItem                  @relation(fields: [importItemId], references: [id], onDelete: Cascade)
+  requirementKey         String
+  kind                   QuestionImportVisualRequirementKind
+  sourcePage             Int?
+  sourceEnvelope         Json?
+  owner                  QuestionImportMediaAssignmentOwner?
+  ownerReference         String?
+  optionIndexes          Json?
+  expectedCardinality    Int                                 @default(0)
+  interpretationRequired Boolean                             @default(true)
+  resolutionState        QuestionImportVisualResolutionState @default(PENDING)
+  unresolvedReason       String?
+  candidateRankings      Json?
+  evidenceVersion        String?
+  createdAt              DateTime                            @default(now())
+  updatedAt              DateTime                            @updatedAt
 
   @@unique([importItemId, requirementKey])
   @@index([importItemId, resolutionState])
@@ -1276,20 +1310,20 @@ model QuestionImportVisualRequirement {
 /// Keeps all model proposals and manual corrections even when they collapse
 /// into a single canonical crop.
 model QuestionImportMediaDetection {
-  id              String                            @id @default(cuid())
-  mediaId         String
-  media           QuestionImportMedia               @relation(fields: [mediaId], references: [id], onDelete: Cascade)
-  source          QuestionImportMediaDetectionSource
+  id               String                             @id @default(cuid())
+  mediaId          String
+  media            QuestionImportMedia                @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+  source           QuestionImportMediaDetectionSource
   normalizedBounds Json
-  type            QuestionImportMediaType
-  confidence      Float?
-  description     String?
-  warnings        Json?
-  rawEvidence     Json?
-  validationFlags Json?
-  accepted        Boolean                           @default(false)
-  createdById     String?
-  createdAt       DateTime                          @default(now())
+  type             QuestionImportMediaType
+  confidence       Float?
+  description      String?
+  warnings         Json?
+  rawEvidence      Json?
+  validationFlags  Json?
+  accepted         Boolean                            @default(false)
+  createdById      String?
+  createdAt        DateTime                           @default(now())
 
   @@index([mediaId, createdAt])
 }
@@ -1373,39 +1407,39 @@ model QuestionImportChunk {
 }
 
 model QuestionImportItem {
-  id               String                   @id @default(cuid())
-  batchId          String
-  batch            QuestionImportBatch      @relation(fields: [batchId], references: [id], onDelete: Cascade)
-  chunkId          String?
-  chunk            QuestionImportChunk?     @relation(fields: [chunkId], references: [id], onDelete: Cascade)
-  sequence         Int
-  status           QuestionImportItemStatus
-  rawOutput        Json?
-  normalizedOutput Json?
-  confidence       Float?
-  warnings         Json?
-  sourceLocator    Json?
-  errorDetail      String?
-  questionId       String?                  @unique
-  question         Question?                @relation(fields: [questionId], references: [id], onDelete: SetNull)
-  sourceNumber     String?
-  globalOrder      Int?
-  section          String?
-  detectedType     String?
-  exclusionReason  String?
-  answerOrigin     QuestionAnswerProvenance?
-  citedEvidenceKeys Json?
-  reviewerCandidate Json?
-  reviewedAt        DateTime?
-  reviewedById      String?
-  reviewNote        String?
-  visualState       QuestionImportVisualResolutionState @default(NOT_REQUIRED)
+  id                    String                              @id @default(cuid())
+  batchId               String
+  batch                 QuestionImportBatch                 @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  chunkId               String?
+  chunk                 QuestionImportChunk?                @relation(fields: [chunkId], references: [id], onDelete: Cascade)
+  sequence              Int
+  status                QuestionImportItemStatus
+  rawOutput             Json?
+  normalizedOutput      Json?
+  confidence            Float?
+  warnings              Json?
+  sourceLocator         Json?
+  errorDetail           String?
+  questionId            String?                             @unique
+  question              Question?                           @relation(fields: [questionId], references: [id], onDelete: SetNull)
+  sourceNumber          String?
+  globalOrder           Int?
+  section               String?
+  detectedType          String?
+  exclusionReason       String?
+  answerOrigin          QuestionAnswerProvenance?
+  citedEvidenceKeys     Json?
+  reviewerCandidate     Json?
+  reviewedAt            DateTime?
+  reviewedById          String?
+  reviewNote            String?
+  visualState           QuestionImportVisualResolutionState @default(NOT_REQUIRED)
   visualEvidenceVersion String?
-  answerContentValid Boolean @default(true)
-  createdAt        DateTime                 @default(now())
-  updatedAt        DateTime                 @updatedAt
-  mediaAssignments QuestionImportMediaAssignment[]
-  visualRequirements QuestionImportVisualRequirement[]
+  answerContentValid    Boolean                             @default(true)
+  createdAt             DateTime                            @default(now())
+  updatedAt             DateTime                            @updatedAt
+  mediaAssignments      QuestionImportMediaAssignment[]
+  visualRequirements    QuestionImportVisualRequirement[]
 
   @@unique([chunkId, sequence])
   @@index([batchId, status])
@@ -1566,6 +1600,7 @@ model Assessment {
   questions     AssessmentQuestion[]
   contexts      AssessmentContext[]
   attempts      AssessmentAttempt[]
+  aiQuizRun     AiQuizGenerationRun?
 
   @@index([ownerType, studentUserId, status, createdAt, id])
   @@index([ownerType, createdByAdminId, status, createdAt, id])
@@ -1812,28 +1847,123 @@ model AssessmentAttempt {
 /// Autosaved answer state per snapshot question. Upserted while the parent
 /// attempt is SUSPENDED; frozen once it is COMPLETED.
 model AssessmentAttemptAnswer {
-  id                   String                     @id @default(cuid())
-  attemptId            String
-  attempt              AssessmentAttempt          @relation(fields: [attemptId], references: [id], onDelete: Cascade)
-  assessmentQuestionId String
-  assessmentQuestion   AssessmentQuestion         @relation(fields: [assessmentQuestionId], references: [id], onDelete: Cascade)
-  selectedOptionIds    String[]
-  responseText         String?
-  isCorrect            Boolean?
-  outcome              AssessmentQuestionOutcome?
-  awardedPoints        Int?
-  gradedAt             DateTime?
-  gradedById           String?
-  gradedBy             User?                      @relation("AssessmentAnswerGradedBy", fields: [gradedById], references: [id], onDelete: Restrict)
-  graderFeedback       String?
-  activeSeconds        Int                        @default(0)
-  answeredAt           DateTime                   @default(now())
-  updatedAt            DateTime                   @updatedAt
-  answerChanges        AssessmentAnswerChange[]
+  id                      String                         @id @default(cuid())
+  attemptId               String
+  attempt                 AssessmentAttempt              @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  assessmentQuestionId    String
+  assessmentQuestion      AssessmentQuestion             @relation(fields: [assessmentQuestionId], references: [id], onDelete: Cascade)
+  selectedOptionIds       String[]
+  responseText            String?
+  inputMethod             AnswerInputMethod              @default(TEXT)
+  responseLanguageCode    String?
+  transcriptionProvider   String?
+  transcriptionConfidence Float?
+  isCorrect               Boolean?
+  outcome                 AssessmentQuestionOutcome?
+  awardedPoints           Int?
+  gradedAt                DateTime?
+  gradedById              String?
+  gradedBy                User?                          @relation("AssessmentAnswerGradedBy", fields: [gradedById], references: [id], onDelete: Restrict)
+  graderFeedback          String?
+  activeSeconds           Int                            @default(0)
+  answeredAt              DateTime                       @default(now())
+  updatedAt               DateTime                       @updatedAt
+  answerChanges           AssessmentAnswerChange[]
+  aiGradingRuns           AssessmentAnswerAiGradingRun[]
 
   @@unique([attemptId, assessmentQuestionId])
   @@index([attemptId])
   @@index([outcome, answeredAt])
+}
+
+/// Immutable records of AI score/feedback proposals.  The current accepted
+/// result is copied to the answer fields, but every model response remains
+/// reviewable and an administrator can override it later.
+model AssessmentAnswerAiGradingRun {
+  id                   String                     @id @default(cuid())
+  attemptAnswerId      String
+  attemptAnswer        AssessmentAttemptAnswer    @relation(fields: [attemptAnswerId], references: [id], onDelete: Cascade)
+  status               AiRunStatus                @default(PENDING)
+  questionSnapshot     Json
+  responseSnapshot     String
+  responseLanguageCode String
+  proposedPoints       Int?
+  proposedOutcome      AssessmentQuestionOutcome?
+  feedback             String?
+  highlights           Json?
+  model                String?
+  promptVersion        String
+  rawResponse          Json?
+  usage                Json?
+  error                String?
+  createdAt            DateTime                   @default(now())
+  completedAt          DateTime?
+
+  @@index([attemptAnswerId, createdAt])
+  @@index([status, createdAt])
+}
+
+/// The AI interpretation of a student request is retained separately from the
+/// assessment snapshot so it is auditable without trusting model output.
+model AiQuizGenerationRun {
+  id                  String         @id @default(cuid())
+  studentUserId       String
+  student             StudentProfile @relation(fields: [studentUserId], references: [userId], onDelete: Cascade)
+  assessmentId        String?        @unique
+  assessment          Assessment?    @relation(fields: [assessmentId], references: [id], onDelete: SetNull)
+  status              AiRunStatus    @default(PENDING)
+  prompt              String
+  requestedFilters    Json
+  normalizedPlan      Json?
+  rationale           String?
+  eligibleQuestionIds Json?
+  selectedQuestionIds Json?
+  model               String?
+  promptVersion       String
+  rawResponse         Json?
+  usage               Json?
+  error               String?
+  createdAt           DateTime       @default(now())
+  completedAt         DateTime?
+
+  @@index([studentUserId, createdAt])
+  @@index([status, createdAt])
+}
+
+model QuestionReport {
+  id               String                 @id @default(cuid())
+  questionId       String
+  question         Question               @relation(fields: [questionId], references: [id], onDelete: Restrict)
+  studentUserId    String
+  student          StudentProfile         @relation(fields: [studentUserId], references: [userId], onDelete: Cascade)
+  type             QuestionReportType
+  note             String?
+  questionSnapshot Json
+  status           QuestionReportStatus   @default(OPEN)
+  assignedToId     String?
+  assignedTo       User?                  @relation("QuestionReportReviewedBy", fields: [assignedToId], references: [id], onDelete: SetNull)
+  resolutionNote   String?
+  resolvedAt       DateTime?
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+  actions          QuestionReportAction[]
+
+  @@index([status, createdAt])
+  @@index([questionId, status])
+}
+
+model QuestionReportAction {
+  id          String                @id @default(cuid())
+  reportId    String
+  report      QuestionReport        @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  actorUserId String
+  actor       User                  @relation("QuestionReportActionActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+  fromStatus  QuestionReportStatus?
+  toStatus    QuestionReportStatus
+  note        String?
+  createdAt   DateTime              @default(now())
+
+  @@index([reportId, createdAt])
 }
 
 model AssessmentAnswerChange {

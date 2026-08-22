@@ -27,10 +27,10 @@ student direct practice (immediate feedback)       generated assessment snapshot
 All routes are under `/api/v1`. Use `Authorization: Bearer <token>` for every
 route in this guide:
 
-| Route family | Required role |
-| --- | --- |
-| `/admin/question-banks`, `/admin/questions`, `/admin/assessments` | `ADMIN` or `SUPER_ADMIN` |
-| `/student/practice/*`, `/student/performance`, `/student/assessments` | `STUDENT` |
+| Route family                                                          | Required role            |
+| --------------------------------------------------------------------- | ------------------------ |
+| `/admin/question-banks`, `/admin/questions`, `/admin/assessments`     | `ADMIN` or `SUPER_ADMIN` |
+| `/student/practice/*`, `/student/performance`, `/student/assessments` | `STUDENT`                |
 
 ## State and UI model
 
@@ -54,10 +54,47 @@ change an already-created assessment or its result.
 
 `TUTOR` and `EXAM` are modes of the same assessment API:
 
-| Mode | Frontend behavior |
-| --- | --- |
+| Mode    | Frontend behavior                                                           |
+| ------- | --------------------------------------------------------------------------- |
 | `TUTOR` | After each autosave, show correctness, correct option IDs, and explanation. |
-| `EXAM` | Do not show correctness or explanations until the attempt is completed. |
+| `EXAM`  | Do not show correctness or explanations until the attempt is completed.     |
+
+## AI quiz and question intelligence
+
+- `POST /student/assessments/ai-prompt` accepts `prompt`, `scopes`,
+  `questionCount`, and the normal optional assessment settings. It returns a
+  private, frozen `AI_PROMPT` assessment. The model can select only the
+  student's entitled published questions and may use only that student's own
+  history.
+- `GET /student/questions/community-most-incorrect` accepts the usual page
+  fields plus optional `subjectId`, `courseId`, `chapterId`, `lessonId`, and
+  `sectionId`. It returns answer-safe cards only after at least 20 responses.
+  `POST /student/assessments/community-tutor` turns selected returned card IDs
+  into a private tutor assessment; its body is `questionIds`, `scopes`, and an
+  optional `title`.
+- `POST /student/questions/:questionId/reports` accepts one of
+  `WRONG_ANSWER`, `UNCLEAR_WORDING`, `TYPO_LANGUAGE`,
+  `MISSING_OR_BROKEN_MEDIA`, `DUPLICATE`, or `OTHER`, plus an optional `note`
+  (`OTHER` requires one). `GET /admin/question-reports` and
+  `POST /admin/question-reports/:reportId/review` provide moderation. Review
+  uses `OPEN`, `UNDER_REVIEW`, `RESOLVED`, or `REJECTED`; closing requires a
+  resolution note.
+
+### Voice transcripts and AI essay feedback
+
+Upload the student's recording as multipart field `file` to
+`POST /student/voice/transcriptions?language=ar` (the language is optional).
+The backend sends the bytes directly to OpenRouter STT, returns `{ text,
+provider, model }`, and does not retain the recording. Put the student-edited
+returned text in `responseText` when autosaving, with
+`inputMethod: "VOICE_TRANSCRIPT"`, optional `responseLanguageCode`,
+`transcriptionProvider: "openrouter"`, and optional
+`transcriptionConfidence`. Rubric-backed long answers create AI feedback after
+submission. Result question entries expose `graderFeedback` and `aiGrading`
+with exact text-offset highlights (`CORRECT`, `LANGUAGE`, `FACTUAL_ERROR`).
+Keep those offsets against the returned immutable `responseText`; do not apply
+them to edited text. Failed AI runs stay `PENDING_AI_GRADING` and retry when
+the result is read. Admin grading can override an AI score.
 
 ## 1. Admin question banks and authoring
 
@@ -67,16 +104,16 @@ collection. Both must be published before a question can pass review.
 
 ### Question-source endpoints
 
-| Method and path | Request body or query | Frontend use |
-| --- | --- | --- |
-| `POST /admin/question-banks/sources` | `type`, localized `title`, optional localized `note`, optional `publisherUserId` | Create a source. |
-| `GET /admin/question-banks/sources` | `page`, `limit`, `q`, `status`, `type` | List/search sources. |
-| `GET /admin/question-banks/sources/:id` | — | Load source detail. |
-| `PATCH /admin/question-banks/sources/:id` | Any mutable create fields | Edit a source. |
-| `POST /admin/question-banks/sources/:id/publish` | — | Make it available for question review. |
-| `POST /admin/question-banks/sources/:id/archive` | — | Archive an unused source. |
-| `POST /admin/question-banks/sources/:id/restore` | — | Restore an archived source to `DRAFT`. |
-| `DELETE /admin/question-banks/sources/:id` | — | Delete an unreferenced draft source. |
+| Method and path                                  | Request body or query                                                            | Frontend use                           |
+| ------------------------------------------------ | -------------------------------------------------------------------------------- | -------------------------------------- |
+| `POST /admin/question-banks/sources`             | `type`, localized `title`, optional localized `note`, optional `publisherUserId` | Create a source.                       |
+| `GET /admin/question-banks/sources`              | `page`, `limit`, `q`, `status`, `type`                                           | List/search sources.                   |
+| `GET /admin/question-banks/sources/:id`          | —                                                                                | Load source detail.                    |
+| `PATCH /admin/question-banks/sources/:id`        | Any mutable create fields                                                        | Edit a source.                         |
+| `POST /admin/question-banks/sources/:id/publish` | —                                                                                | Make it available for question review. |
+| `POST /admin/question-banks/sources/:id/archive` | —                                                                                | Archive an unused source.              |
+| `POST /admin/question-banks/sources/:id/restore` | —                                                                                | Restore an archived source to `DRAFT`. |
+| `DELETE /admin/question-banks/sources/:id`       | —                                                                                | Delete an unreferenced draft source.   |
 
 Recorded creation request and response:
 
@@ -117,16 +154,16 @@ publisher relationship was omitted.
 
 ### Question-bank endpoints
 
-| Method and path | Request body or query | Frontend use |
-| --- | --- | --- |
-| `POST /admin/question-banks` | `title`, optional `description` | Create a bank. |
-| `GET /admin/question-banks` | `page`, `limit`, `q`, `status` | List/search banks. |
-| `GET /admin/question-banks/:id` | — | Load detail. |
-| `PATCH /admin/question-banks/:id` | `title?`, `description?` | Edit a bank. |
-| `POST /admin/question-banks/:id/publish` | — | Publish it for question review. |
-| `POST /admin/question-banks/:id/archive` | — | Archive an unused bank. |
-| `POST /admin/question-banks/:id/restore` | — | Restore it to `DRAFT`. |
-| `DELETE /admin/question-banks/:id` | — | Delete an unreferenced draft bank. |
+| Method and path                          | Request body or query           | Frontend use                       |
+| ---------------------------------------- | ------------------------------- | ---------------------------------- |
+| `POST /admin/question-banks`             | `title`, optional `description` | Create a bank.                     |
+| `GET /admin/question-banks`              | `page`, `limit`, `q`, `status`  | List/search banks.                 |
+| `GET /admin/question-banks/:id`          | —                               | Load detail.                       |
+| `PATCH /admin/question-banks/:id`        | `title?`, `description?`        | Edit a bank.                       |
+| `POST /admin/question-banks/:id/publish` | —                               | Publish it for question review.    |
+| `POST /admin/question-banks/:id/archive` | —                               | Archive an unused bank.            |
+| `POST /admin/question-banks/:id/restore` | —                               | Restore it to `DRAFT`.             |
+| `DELETE /admin/question-banks/:id`       | —                               | Delete an unreferenced draft bank. |
 
 ```http
 POST /api/v1/admin/question-banks
@@ -156,17 +193,17 @@ recorded journey returned `409 Conflict` for both cases.
 
 ### Question endpoints
 
-| Method and path | Request body or query | Frontend use |
-| --- | --- | --- |
-| `POST /admin/questions` | `bankId`, `sourceId`, `courseId`, `placements`, `body`, optional `type` and `explanation` | Create a draft question. |
-| `GET /admin/questions` | `page`, `limit`, `q`, `status`, bank/source/course/subject/grade and hierarchy filters | Search the authoring queue. |
-| `GET /admin/questions/:id` | — | Load full authoring detail. |
-| `PATCH /admin/questions/:id` | Any mutable create fields | Edit an editable question. |
-| `POST /admin/questions/:id/submit` | — | Validate and send to review. |
-| `POST /admin/questions/:id/publish` | — | Publish a reviewed question. |
-| `POST /admin/questions/:id/reject` | `reviewNote` | Return an in-review question for revision. |
-| `POST /admin/questions/:id/archive` | — | Archive a question. |
-| `DELETE /admin/questions/:id` | — | Delete an unreferenced draft question. |
+| Method and path                     | Request body or query                                                                     | Frontend use                               |
+| ----------------------------------- | ----------------------------------------------------------------------------------------- | ------------------------------------------ |
+| `POST /admin/questions`             | `bankId`, `sourceId`, `courseId`, `placements`, `body`, optional `type` and `explanation` | Create a draft question.                   |
+| `GET /admin/questions`              | `page`, `limit`, `q`, `status`, bank/source/course/subject/grade and hierarchy filters    | Search the authoring queue.                |
+| `GET /admin/questions/:id`          | —                                                                                         | Load full authoring detail.                |
+| `PATCH /admin/questions/:id`        | Any mutable create fields                                                                 | Edit an editable question.                 |
+| `POST /admin/questions/:id/submit`  | —                                                                                         | Validate and send to review.               |
+| `POST /admin/questions/:id/publish` | —                                                                                         | Publish a reviewed question.               |
+| `POST /admin/questions/:id/reject`  | `reviewNote`                                                                              | Return an in-review question for revision. |
+| `POST /admin/questions/:id/archive` | —                                                                                         | Archive a question.                        |
+| `DELETE /admin/questions/:id`       | —                                                                                         | Delete an unreferenced draft question.     |
 
 Each placement must contain exactly one of `courseId`, `chapterId`, `lessonId`,
 or `sectionId`, and each placement must belong to the question's `courseId`.
@@ -191,17 +228,17 @@ derived `scope` containing course, subject, and academic-grade IDs.
 
 ### Options, attachments, and video
 
-| Method and path | Request body | Frontend use |
-| --- | --- | --- |
-| `POST /admin/questions/:id/options` | `body`, optional `isCorrect` | Add an option. |
-| `PATCH /admin/questions/:id/options/:optionId` | `body?`, `isCorrect?` | Edit an option. |
-| `DELETE /admin/questions/:id/options/:optionId` | — | Remove an option. |
-| `POST /admin/questions/:id/options/reorder` | `{ "optionIds": ["…"] }` | Persist the complete option order. |
-| `POST /admin/questions/:id/assets` | `{ "assetId": "…" }` | Attach a ready image, PDF, or document. |
-| `DELETE /admin/questions/:id/assets/:assetId` | — | Remove an attachment. |
-| `POST /admin/questions/:id/assets/reorder` | `{ "assetIds": ["…"] }` | Persist the complete attachment order. |
-| `POST /admin/questions/:id/video-link` | `videoAssetId`, `timestampSeconds` | Link a ready video at a timestamp. |
-| `DELETE /admin/questions/:id/video-link` | — | Remove the video link. |
+| Method and path                                 | Request body                       | Frontend use                            |
+| ----------------------------------------------- | ---------------------------------- | --------------------------------------- |
+| `POST /admin/questions/:id/options`             | `body`, optional `isCorrect`       | Add an option.                          |
+| `PATCH /admin/questions/:id/options/:optionId`  | `body?`, `isCorrect?`              | Edit an option.                         |
+| `DELETE /admin/questions/:id/options/:optionId` | —                                  | Remove an option.                       |
+| `POST /admin/questions/:id/options/reorder`     | `{ "optionIds": ["…"] }`           | Persist the complete option order.      |
+| `POST /admin/questions/:id/assets`              | `{ "assetId": "…" }`               | Attach a ready image, PDF, or document. |
+| `DELETE /admin/questions/:id/assets/:assetId`   | —                                  | Remove an attachment.                   |
+| `POST /admin/questions/:id/assets/reorder`      | `{ "assetIds": ["…"] }`            | Persist the complete attachment order.  |
+| `POST /admin/questions/:id/video-link`          | `videoAssetId`, `timestampSeconds` | Link a ready video at a timestamp.      |
+| `DELETE /admin/questions/:id/video-link`        | —                                  | Remove the video link.                  |
 
 Recorded option request:
 
@@ -222,9 +259,9 @@ Submitting validates the whole question, not just the last edited field. The
 question needs a non-empty body and explanation, a published source and bank,
 published course ancestry, a placement, and valid options:
 
-| Question type | Required answer setup |
-| --- | --- |
-| `SINGLE_CHOICE` | At least two options and exactly one correct option. |
+| Question type     | Required answer setup                                  |
+| ----------------- | ------------------------------------------------------ |
+| `SINGLE_CHOICE`   | At least two options and exactly one correct option.   |
 | `MULTIPLE_CHOICE` | At least two options and at least two correct options. |
 
 The recorded run attempted to submit a new single-choice question before
@@ -248,13 +285,13 @@ Direct practice is separate from generated quizzes/exams. It presents eligible
 live published questions and records a new immutable attempt on every submit.
 It always returns immediate feedback.
 
-| Method and path | Request body or query | Frontend use |
-| --- | --- | --- |
-| `GET /student/practice/questions` | Exactly one of `courseId`, `chapterId`, `lessonId`, `sectionId`; `page`, `limit` | List practice questions in one scope. |
-| `POST /student/practice/questions/:questionId/attempts` | `{ "optionIds": ["…"] }` | Submit one immutable practice answer. |
-| `GET /student/practice/questions/:questionId/attempts` | `page`, `limit` | Show retry history. |
-| `GET /student/practice/questions/:questionId/assets/:assetId/access` | — | Obtain protected attachment/video access. |
-| `GET /student/performance` | — | Show current-grade practice summary. |
+| Method and path                                                      | Request body or query                                                            | Frontend use                              |
+| -------------------------------------------------------------------- | -------------------------------------------------------------------------------- | ----------------------------------------- |
+| `GET /student/practice/questions`                                    | Exactly one of `courseId`, `chapterId`, `lessonId`, `sectionId`; `page`, `limit` | List practice questions in one scope.     |
+| `POST /student/practice/questions/:questionId/attempts`              | `{ "optionIds": ["…"] }`                                                         | Submit one immutable practice answer.     |
+| `GET /student/practice/questions/:questionId/attempts`               | `page`, `limit`                                                                  | Show retry history.                       |
+| `GET /student/practice/questions/:questionId/assets/:assetId/access` | —                                                                                | Obtain protected attachment/video access. |
+| `GET /student/performance`                                           | —                                                                                | Show current-grade practice summary.      |
 
 The list only includes questions that are published, in the student's current
 grade, and accessible through the student's effective content access. The
@@ -275,14 +312,20 @@ Authorization: Bearer <student-access-token>
       "id": "cmsksaxk100o2nw01ivrmwuao",
       "type": "SINGLE_CHOICE",
       "body": "Which option is correct?",
-      "placements": [{
-        "courseId": null,
-        "chapterId": null,
-        "lessonId": null,
-        "sectionId": "cmsksavjb00n2nw014hgr5i2t"
-      }],
+      "placements": [
+        {
+          "courseId": null,
+          "chapterId": null,
+          "lessonId": null,
+          "sectionId": "cmsksavjb00n2nw014hgr5i2t"
+        }
+      ],
       "options": [
-        { "id": "cmsksaxpp00o8nw01em4bzqeo", "body": "Correct", "sortOrder": 1 },
+        {
+          "id": "cmsksaxpp00o8nw01em4bzqeo",
+          "body": "Correct",
+          "sortOrder": 1
+        },
         { "id": "cmsksaxw900ocnw01uksiqfzi", "body": "Wrong", "sortOrder": 2 }
       ],
       "attachments": [],
@@ -369,20 +412,20 @@ the candidate set; duplicate targets are rejected.
 
 ### Student assessment endpoints
 
-| Method and path | Request body or query | Frontend use |
-| --- | --- | --- |
-| `POST /student/assessments` | `scopes`, `questionCount` (1–50), optional `mode`, `isTimed`, `durationSeconds`, `title` | Create a private random assessment. |
-| `GET /student/assessments` | `page`, `limit`, `search`, `status` (`ALL`, `SUSPENDED`, `COMPLETED`) | List own and visible public assessments. |
-| `GET /student/assessments/:id` | — | Read metadata and scopes. |
-| `PATCH /student/assessments/:id` | `{ "title": "…" }` | Rename an owned assessment. |
-| `DELETE /student/assessments/:id` | — | Delete an owned assessment. |
-| `POST /student/assessments/:id/attempts/start` | — | Start or resume the only attempt. |
-| `GET /student/assessments/:id/attempts/current` | — | Restore a saved attempt. |
-| `POST /student/assessments/:id/attempts/current/answers/:questionId` | `selectedOptionIds` | Autosave one answer. |
-| `POST /student/assessments/:id/attempts/current/submit` | — | Finalize and score. |
-| `GET /student/assessments/:id/attempts/current/result` | optional `includeComparison` (default `true`) | Retrieve completed review data and weighted chapter peer comparisons. |
-| `PATCH /student/assessments/:id/attempts/current/questions/:questionId/active-time` | `{ "activeSeconds": number }` | Persist the monotonic active-time total while an attempt is resumable. |
-| `GET /student/assessments/analytics/summary` | optional `subjectId`, `chapterId`, `q`, `page`, `limit` | Retrieve paginated completed-result subject/chapter/topic rollups and chapter attempt drill-down. |
+| Method and path                                                                     | Request body or query                                                                    | Frontend use                                                                                      |
+| ----------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `POST /student/assessments`                                                         | `scopes`, `questionCount` (1–50), optional `mode`, `isTimed`, `durationSeconds`, `title` | Create a private random assessment.                                                               |
+| `GET /student/assessments`                                                          | `page`, `limit`, `search`, `status` (`ALL`, `SUSPENDED`, `COMPLETED`)                    | List own and visible public assessments.                                                          |
+| `GET /student/assessments/:id`                                                      | —                                                                                        | Read metadata and scopes.                                                                         |
+| `PATCH /student/assessments/:id`                                                    | `{ "title": "…" }`                                                                       | Rename an owned assessment.                                                                       |
+| `DELETE /student/assessments/:id`                                                   | —                                                                                        | Delete an owned assessment.                                                                       |
+| `POST /student/assessments/:id/attempts/start`                                      | —                                                                                        | Start or resume the only attempt.                                                                 |
+| `GET /student/assessments/:id/attempts/current`                                     | —                                                                                        | Restore a saved attempt.                                                                          |
+| `POST /student/assessments/:id/attempts/current/answers/:questionId`                | `selectedOptionIds`                                                                      | Autosave one answer.                                                                              |
+| `POST /student/assessments/:id/attempts/current/submit`                             | —                                                                                        | Finalize and score.                                                                               |
+| `GET /student/assessments/:id/attempts/current/result`                              | optional `includeComparison` (default `true`)                                            | Retrieve completed review data and weighted chapter peer comparisons.                             |
+| `PATCH /student/assessments/:id/attempts/current/questions/:questionId/active-time` | `{ "activeSeconds": number }`                                                            | Persist the monotonic active-time total while an attempt is resumable.                            |
+| `GET /student/assessments/analytics/summary`                                        | optional `subjectId`, `chapterId`, `q`, `page`, `limit`                                  | Retrieve paginated completed-result subject/chapter/topic rollups and chapter attempt drill-down. |
 
 `GET /student/assessments` combines the student's non-archived private
 assessments with accessible published admin assessments. Its `status` query is
@@ -415,12 +458,14 @@ Content-Type: application/json
   "createdAt": "2026-08-08T19:46:35.802Z",
   "attemptStatus": null,
   "score": null,
-  "scopes": [{
-    "courseId": "cmsksb6i600q8nw01kxa4s2se",
-    "chapterId": null,
-    "lessonId": null,
-    "sectionId": null
-  }]
+  "scopes": [
+    {
+      "courseId": "cmsksb6i600q8nw01kxa4s2se",
+      "chapterId": null,
+      "lessonId": null,
+      "sectionId": null
+    }
+  ]
 }
 ```
 
@@ -473,7 +518,11 @@ Recorded start response for the generated exam:
       "type": "SINGLE_CHOICE",
       "body": "Assessment question 1",
       "options": [
-        { "id": "cmsksbb3o00snnw0189eq9zzp", "body": "Correct", "sortOrder": 1 },
+        {
+          "id": "cmsksbb3o00snnw0189eq9zzp",
+          "body": "Correct",
+          "sortOrder": 1
+        },
         { "id": "cmsksbb3o00sonw01bvcsndjd", "body": "Wrong", "sortOrder": 2 }
       ],
       "selectedOptionIds": [],
@@ -543,16 +592,16 @@ autosaving after expiry causes the API to finalize the attempt.
 
 ### Admin assessment endpoints
 
-| Method and path | Request body or query | Frontend use |
-| --- | --- | --- |
-| `POST /admin/assessments/standard` | Same generation payload as student creation | Create a random draft. |
-| `POST /admin/assessments/custom` | `questionIds`, `scopes`, optional mode/timer/title | Create a hand-picked draft. |
-| `GET /admin/assessments` | `page`, `limit`, `search`, `status` (`DRAFT`, `READY`, `ARCHIVED`) | List admin assessments. |
-| `GET /admin/assessments/:id` | — | Load snapshot questions, answer keys, and scopes. |
-| `PATCH /admin/assessments/:id` | `title?`, `mode?`, `isTimed?`, `durationSeconds?` | Edit a draft. |
-| `POST /admin/assessments/:id/publish` | — | Move a draft to `READY`. |
-| `POST /admin/assessments/:id/archive` | — | Move a ready assessment to `ARCHIVED`. |
-| `DELETE /admin/assessments/:id` | — | Delete a never-published draft. |
+| Method and path                       | Request body or query                                              | Frontend use                                      |
+| ------------------------------------- | ------------------------------------------------------------------ | ------------------------------------------------- |
+| `POST /admin/assessments/standard`    | Same generation payload as student creation                        | Create a random draft.                            |
+| `POST /admin/assessments/custom`      | `questionIds`, `scopes`, optional mode/timer/title                 | Create a hand-picked draft.                       |
+| `GET /admin/assessments`              | `page`, `limit`, `search`, `status` (`DRAFT`, `READY`, `ARCHIVED`) | List admin assessments.                           |
+| `GET /admin/assessments/:id`          | —                                                                  | Load snapshot questions, answer keys, and scopes. |
+| `PATCH /admin/assessments/:id`        | `title?`, `mode?`, `isTimed?`, `durationSeconds?`                  | Edit a draft.                                     |
+| `POST /admin/assessments/:id/publish` | —                                                                  | Move a draft to `READY`.                          |
+| `POST /admin/assessments/:id/archive` | —                                                                  | Move a ready assessment to `ARCHIVED`.            |
+| `DELETE /admin/assessments/:id`       | —                                                                  | Delete a never-published draft.                   |
 
 An admin standard assessment uses the same eligible published-question pool as
 student generation but is created as `DRAFT`. The admin detail/create response
@@ -594,10 +643,7 @@ Recorded custom creation request:
 
 ```json
 {
-  "questionIds": [
-    "cmsksb7u300qunw01gjab3wwu",
-    "cmsksb8pr00rcnw0156wo7aa2"
-  ],
+  "questionIds": ["cmsksb7u300qunw01gjab3wwu", "cmsksb8pr00rcnw0156wo7aa2"],
   "scopes": [{ "courseId": "cmsksb6i600q8nw01kxa4s2se" }],
   "mode": "TUTOR"
 }
@@ -661,7 +707,13 @@ request had no JSON payload or query parameters.
 **Request**
 
 ```json
-{ "type": "PLATFORM", "title": { "ar": "Coverage source journey-20260808194316-db39-125", "en": "Coverage source journey-20260808194316-db39-125" } }
+{
+  "type": "PLATFORM",
+  "title": {
+    "ar": "Coverage source journey-20260808194316-db39-125",
+    "en": "Coverage source journey-20260808194316-db39-125"
+  }
+}
 ```
 
 **Response — `201 Created`**
@@ -677,7 +729,12 @@ request had no JSON payload or query parameters.
 **Response — `200 OK`**
 
 ```json
-{ "data": [{ "id": "cmsksa6v400h5nw01xp5tlz27", "type": "PLATFORM", "status": "DRAFT" }], "meta": { "page": 1, "limit": 20, "total": 112, "totalPages": 6 } }
+{
+  "data": [
+    { "id": "cmsksa6v400h5nw01xp5tlz27", "type": "PLATFORM", "status": "DRAFT" }
+  ],
+  "meta": { "page": 1, "limit": 20, "total": 112, "totalPages": 6 }
+}
 ```
 
 #### Read a source — `GET /admin/question-banks/sources/:id`
@@ -695,13 +752,22 @@ request had no JSON payload or query parameters.
 **Request**
 
 ```json
-{ "title": { "ar": "Updated coverage source journey-20260808194316-db39-127", "en": "Updated coverage source journey-20260808194316-db39-127" } }
+{
+  "title": {
+    "ar": "Updated coverage source journey-20260808194316-db39-127",
+    "en": "Updated coverage source journey-20260808194316-db39-127"
+  }
+}
 ```
 
 **Response — `200 OK`**
 
 ```json
-{ "id": "cmsksa6v400h5nw01xp5tlz27", "status": "DRAFT", "title": { "ar": "Updated coverage source journey-20260808194316-db39-127" } }
+{
+  "id": "cmsksa6v400h5nw01xp5tlz27",
+  "status": "DRAFT",
+  "title": { "ar": "Updated coverage source journey-20260808194316-db39-127" }
+}
 ```
 
 #### Publish a source — `POST /admin/question-banks/sources/:id/publish`
@@ -737,7 +803,11 @@ request had no JSON payload or query parameters.
 **Response — `201 Created`**
 
 ```json
-{ "id": "cmsksa70g00h9nw01rl77tn68", "title": "Coverage bank journey-20260808194316-db39-126", "status": "DRAFT" }
+{
+  "id": "cmsksa70g00h9nw01rl77tn68",
+  "title": "Coverage bank journey-20260808194316-db39-126",
+  "status": "DRAFT"
+}
 ```
 
 #### List banks — `GET /admin/question-banks`
@@ -782,13 +852,24 @@ request had no JSON payload or query parameters.
 **Request**
 
 ```json
-{ "bankId": "cmsksa70g00h9nw01rl77tn68", "sourceId": "cmsksa6v400h5nw01xp5tlz27", "courseId": "cmsks7iro002lnw01mveg8obj", "placements": [{ "chapterId": "cmsks7iyh002pnw01l3h8uqex" }], "body": "Coverage question?" }
+{
+  "bankId": "cmsksa70g00h9nw01rl77tn68",
+  "sourceId": "cmsksa6v400h5nw01xp5tlz27",
+  "courseId": "cmsks7iro002lnw01mveg8obj",
+  "placements": [{ "chapterId": "cmsks7iyh002pnw01l3h8uqex" }],
+  "body": "Coverage question?"
+}
 ```
 
 **Response — `201 Created`**
 
 ```json
-{ "id": "cmsksa9e900htnw01xpsrxxq0", "type": "SINGLE_CHOICE", "status": "DRAFT", "options": [] }
+{
+  "id": "cmsksa9e900htnw01xpsrxxq0",
+  "type": "SINGLE_CHOICE",
+  "status": "DRAFT",
+  "options": []
+}
 ```
 
 #### Read and edit a question
@@ -810,7 +891,13 @@ Request: `GET /api/v1/admin/questions/cmsksa9e900htnw01xpsrxxq0`
 Response — `200 OK`:
 
 ```json
-{ "id": "cmsksa9e900htnw01xpsrxxq0", "body": "Coverage question?", "status": "DRAFT", "placements": [{ "chapterId": "cmsks7iyh002pnw01l3h8uqex" }], "options": [] }
+{
+  "id": "cmsksa9e900htnw01xpsrxxq0",
+  "body": "Coverage question?",
+  "status": "DRAFT",
+  "placements": [{ "chapterId": "cmsks7iyh002pnw01l3h8uqex" }],
+  "options": []
+}
 ```
 
 **`PATCH /admin/questions/:id`**
@@ -824,7 +911,11 @@ Request: `PATCH /api/v1/admin/questions/cmsks8n3d009hnw01wkv08lha`
 Response — `200 OK`:
 
 ```json
-{ "id": "cmsks8n3d009hnw01wkv08lha", "body": "Which revised synthetic option is correct?", "status": "IN_REVIEW" }
+{
+  "id": "cmsks8n3d009hnw01wkv08lha",
+  "body": "Which revised synthetic option is correct?",
+  "status": "IN_REVIEW"
+}
 ```
 
 #### Submit, reject, publish, archive, or delete a question
@@ -889,7 +980,17 @@ Response — `200 OK`:
 **Response — `200 OK`**
 
 ```json
-{ "data": [{ "id": "cmsksaxk100o2nw01ivrmwuao", "body": "Which option is correct?", "attemptCount": 0, "solved": false }], "meta": { "page": 1, "limit": 20, "total": 1, "totalPages": 1 } }
+{
+  "data": [
+    {
+      "id": "cmsksaxk100o2nw01ivrmwuao",
+      "body": "Which option is correct?",
+      "attemptCount": 0,
+      "solved": false
+    }
+  ],
+  "meta": { "page": 1, "limit": 20, "total": 1, "totalPages": 1 }
+}
 ```
 
 #### Submit and inspect practice attempts
@@ -955,13 +1056,23 @@ Response — `200 OK`:
 **Request**
 
 ```json
-{ "scopes": [{ "courseId": "cmsksb6i600q8nw01kxa4s2se" }], "questionCount": 2, "mode": "EXAM", "title": "Disposable standard assessment journey-20260808194316-db39-172" }
+{
+  "scopes": [{ "courseId": "cmsksb6i600q8nw01kxa4s2se" }],
+  "questionCount": 2,
+  "mode": "EXAM",
+  "title": "Disposable standard assessment journey-20260808194316-db39-172"
+}
 ```
 
 **Response — `201 Created`**
 
 ```json
-{ "id": "cmsksbd6h00synw01ebpt732i", "generationType": "STANDARD", "status": "DRAFT", "questionCount": 2 }
+{
+  "id": "cmsksbd6h00synw01ebpt732i",
+  "generationType": "STANDARD",
+  "status": "DRAFT",
+  "questionCount": 2
+}
 ```
 
 #### Create a custom assessment — `POST /admin/assessments/custom`
@@ -969,13 +1080,22 @@ Response — `200 OK`:
 **Request**
 
 ```json
-{ "questionIds": ["cmsksb7u300qunw01gjab3wwu", "cmsksb8pr00rcnw0156wo7aa2"], "scopes": [{ "courseId": "cmsksb6i600q8nw01kxa4s2se" }], "mode": "TUTOR" }
+{
+  "questionIds": ["cmsksb7u300qunw01gjab3wwu", "cmsksb8pr00rcnw0156wo7aa2"],
+  "scopes": [{ "courseId": "cmsksb6i600q8nw01kxa4s2se" }],
+  "mode": "TUTOR"
+}
 ```
 
 **Response — `201 Created`**
 
 ```json
-{ "id": "cmsksbe0m00tgnw01bn7mlihq", "generationType": "CUSTOM", "mode": "TUTOR", "status": "DRAFT" }
+{
+  "id": "cmsksbe0m00tgnw01bn7mlihq",
+  "generationType": "CUSTOM",
+  "mode": "TUTOR",
+  "status": "DRAFT"
+}
 ```
 
 #### List assessments — `GET /admin/assessments`
