@@ -9,7 +9,8 @@ navigation are treated as complete when the API exposes the required data and
 commands.
 
 The checked-in OpenAPI document currently describes **223 paths and 276
-operations** under `/api/v1`, plus the unversioned `GET /health` endpoint.
+operations** under `/api/v1`, plus the unversioned `GET /health` and
+`GET /health/ready` endpoints.
 The implementation is broader than the original student-portal brief: it
 also contains the administration, authoring, commerce, partner, publisher,
 asset, and integration surfaces needed to operate the platform.

@@ -91,8 +91,8 @@ it's Express-oriented and not installed).
 
 ## API surface
 
-All routes are mounted under `/api/v1/...` except `/health`, which is
-intentionally unversioned/unprefixed (`GET /health`).
+All routes are mounted under `/api/v1/...` except `/health` and
+`/health/ready`, which are intentionally unversioned/unprefixed.
 
 | Endpoint                                                         | Notes                                                    |
 | ---------------------------------------------------------------- | -------------------------------------------------------- |

@@ -1,6 +1,6 @@
 # Shaheen Edu API reference
 
-Implementation-backed API contract. Every endpoint below is self-contained: its authorization, parameter/body fields, and success response fields appear in the same section. Base URL is `/api/v1`; `/health` is unversioned. Unknown JSON fields are rejected. Errors use `{ statusCode, code, message: { ar, en }, error: { ar, en }, details?, correlationId }`; `details` contains field-level bilingual validation feedback.
+Implementation-backed API contract. Every endpoint below is self-contained: its authorization, parameter/body fields, and success response fields appear in the same section. Base URL is `/api/v1`; `/health` and `/health/ready` are unversioned. Unknown JSON fields are rejected. Errors use `{ statusCode, code, message: { ar, en }, error: { ar, en }, details?, correlationId }`; `details` contains field-level bilingual validation feedback.
 
 ## Health
 
@@ -59,6 +59,27 @@ No path, query, or header input.
 ```json
 {
   "status": "ok",
+  "timestamp": "ISO-8601 date-time"
+}
+```
+
+### `GET /health/ready`
+
+**Authorization:** Public
+
+**Request**
+
+No path, query, or header input.
+
+**Success response — HTTP 200**
+
+```json
+{
+  "status": "ready",
+  "dependencies": {
+    "database": "up",
+    "redis": "up"
+  },
   "timestamp": "ISO-8601 date-time"
 }
 ```

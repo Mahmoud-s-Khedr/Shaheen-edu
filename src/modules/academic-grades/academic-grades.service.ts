@@ -25,6 +25,36 @@ import { paginateArabicSearch } from '../../common/search/arabic-search';
 import { contentStatusScope, publishedScope } from '../../common/search/content-scope';
 
 /**
+ * Renumber one phase with a single statement. The temporary first phase is
+ * still necessary because AcademicGrade.sortOrder is globally unique, but
+ * issuing one update per row makes large reorders exceed Prisma's interactive
+ * transaction timeout.
+ */
+function updateAcademicGradeSortOrders(
+  tx: Prisma.TransactionClient,
+  items: Array<{ id: string; sortOrder: number }>,
+  actorId?: string,
+) {
+  const rows = Prisma.join(
+    items.map(
+      ({ id, sortOrder }) =>
+        Prisma.sql`(${id}::text, ${sortOrder}::integer)`,
+    ),
+    ', ',
+  );
+  const auditFields = actorId
+    ? Prisma.sql`, "updatedById" = ${actorId}, "updatedAt" = NOW()`
+    : Prisma.empty;
+
+  return tx.$executeRaw(Prisma.sql`
+    UPDATE "AcademicGrade" AS grade
+    SET "sortOrder" = reordered."sortOrder"${auditFields}
+    FROM (VALUES ${rows}) AS reordered(id, "sortOrder")
+    WHERE grade.id = reordered.id
+  `);
+}
+
+/**
  * NOTE: this level models only the DRAFT/PUBLISHED/ARCHIVED lifecycle and the
  * minimal "publish only if parent is published" rule Phase 1 requires.
  * Phase 5's PublicationService/PublicationValidator will later extend
@@ -197,21 +227,8 @@ export class AcademicGradesService {
 
     try {
       await this.prisma.$transaction(async (tx) => {
-        for (const phase1 of plan.phase1) {
-    await tx.academicGrade.updateMany({
-            where: { id: phase1.id },
-            data: {
-              sortOrder: phase1.sortOrder,
-              updatedById: actor.id,
-              },
-          });
-        }
-        for (const phase2 of plan.phase2) {
-          await tx.academicGrade.updateMany({
-            where: { id: phase2.id },
-            data: { sortOrder: phase2.sortOrder },
-          });
-        }
+        await updateAcademicGradeSortOrders(tx, plan.phase1);
+        await updateAcademicGradeSortOrders(tx, plan.phase2, actor.id);
       });
     } catch (error) {
       if (

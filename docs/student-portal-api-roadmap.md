@@ -7,7 +7,8 @@
 > capabilities, while `[ ]` and `[-]` entries are the remaining roadmap.
 
 The current OpenAPI document contains **223 paths and 276 operations**. All
-versioned routes use `/api/v1`; `GET /health` is intentionally unversioned.
+versioned routes use `/api/v1`; `GET /health` and `GET /health/ready` are
+intentionally unversioned.
 For request-level schemas and examples, use the [compact API reference](api-reference-compact.md),
 [detailed API reference](api-reference-detailed.md), [catalogue guide](student-content-catalog-api-guide.md),
 [assessment reference](assessments-api-reference.md), and [video reference](video-api-reference.md).

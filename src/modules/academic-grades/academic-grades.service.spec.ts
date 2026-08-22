@@ -25,6 +25,7 @@ describe('AcademicGradesService', () => {
       subject: {
         count: jest.fn(),
       },
+      $executeRaw: jest.fn(),
       $transaction: jest.fn(),
     };
     const auditService = { record: jest.fn().mockResolvedValue(undefined) };
@@ -132,5 +133,33 @@ describe('AcademicGradesService', () => {
       }),
     );
     expect(prisma.subject.count).not.toHaveBeenCalled();
+  });
+
+  it('reorders a large grade list with two bulk updates rather than per-grade updates', async () => {
+    const { service, prisma, auditService } = buildService();
+    const items = Array.from({ length: 674 }, (_, index) => ({
+      id: `grade-${index + 1}`,
+      sortOrder: 674 - index,
+    }));
+    prisma.academicGrade.findMany.mockResolvedValue(
+      items.map(({ id }, index) => ({ id, sortOrder: index + 1 })),
+    );
+    prisma.$executeRaw.mockResolvedValue(674);
+    prisma.$transaction.mockImplementation(
+      async (callback: (tx: typeof prisma) => Promise<void>) =>
+        callback(prisma),
+    );
+
+    await service.reorder(actor, { items });
+
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(prisma.$executeRaw).toHaveBeenCalledTimes(2);
+    expect(prisma.academicGrade.updateMany).not.toHaveBeenCalled();
+    expect(auditService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'GRADE_REORDERED',
+        metadata: { itemIds: items.map((item) => item.id) },
+      }),
+    );
   });
 });

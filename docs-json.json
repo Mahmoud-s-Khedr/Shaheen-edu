@@ -37,6 +37,21 @@
         ]
       }
     },
+    "/health/ready": {
+      "get": {
+        "operationId": "HealthController_ready",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Check database and Redis readiness",
+        "tags": [
+          "health"
+        ]
+      }
+    },
     "/api/v1/auth/students/register": {
       "post": {
         "description": "Creates a student account and sets an HttpOnly refresh_token cookie.",
@@ -17063,6 +17078,7 @@
             "bearer": []
           }
         ],
+        "summary": "Get the current weekly leaderboard",
         "tags": [
           "student/leaderboard"
         ]
@@ -17114,6 +17130,7 @@
             "bearer": []
           }
         ],
+        "summary": "Get a historical weekly leaderboard",
         "tags": [
           "student/leaderboard"
         ]
@@ -17133,6 +17150,7 @@
             "bearer": []
           }
         ],
+        "summary": "Get the student performance overview",
         "tags": [
           "student/performance"
         ]
@@ -17187,6 +17205,7 @@
             "bearer": []
           }
         ],
+        "summary": "Analyze performance by academic hierarchy level",
         "tags": [
           "student/performance"
         ]
@@ -17206,6 +17225,7 @@
             "bearer": []
           }
         ],
+        "summary": "Get student performance trends over time",
         "tags": [
           "student/performance"
         ]
@@ -17225,6 +17245,7 @@
             "bearer": []
           }
         ],
+        "summary": "Compare student performance with peers",
         "tags": [
           "student/performance"
         ]
@@ -17244,6 +17265,7 @@
             "bearer": []
           }
         ],
+        "summary": "Get answer-change performance statistics",
         "tags": [
           "student/performance"
         ]

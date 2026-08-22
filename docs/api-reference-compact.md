@@ -1,12 +1,13 @@
 # Shaheen Edu API compact reference
 
-Request cheat sheet for the implementation-backed API contract. Base URL is `/api/v1`; `/health` is unversioned. Send user tokens as `Authorization: Bearer <accessToken>`. `?` marks an optional input. Refer to [the detailed API reference](api-reference-detailed.md) for response schemas, field types, validation, cookies, and error cases. Errors use `{ statusCode, code, message: { ar, en }, error: { ar, en }, details?, correlationId }`.
+Request cheat sheet for the implementation-backed API contract. Base URL is `/api/v1`; `/health` and `/health/ready` are unversioned. Send user tokens as `Authorization: Bearer <accessToken>`. `?` marks an optional input. Refer to [the detailed API reference](api-reference-detailed.md) for response schemas, field types, validation, cookies, and error cases. Errors use `{ statusCode, code, message: { ar, en }, error: { ar, en }, details?, correlationId }`.
 
 ## Health
 
 | Method & path | Summary              | Authorization | Inputs |
 | ------------- | -------------------- | ------------- | ------ |
 | `GET /health` | Check service health | Public        | —      |
+| `GET /health/ready` | Check database and Redis readiness | Public | — |
 
 ## Authentication
 
