@@ -188,13 +188,10 @@ describe('CommerceService payment proofs', () => {
     prisma.$transaction = jest.fn((callback) => callback(tx));
 
     await expect(
-      service.createMethod(
-        { id: 'admin-1', role: Role.ADMIN } as any,
-        {
-          titleAr: 'تحويل',
-          instructionsAr: 'ارفع الإيصال',
-        },
-      ),
+      service.createMethod({ id: 'admin-1', role: Role.ADMIN } as any, {
+        titleAr: 'تحويل',
+        instructionsAr: 'ارفع الإيصال',
+      }),
     ).resolves.toBe(created);
 
     expect(tx.$executeRaw).toHaveBeenCalledTimes(1);

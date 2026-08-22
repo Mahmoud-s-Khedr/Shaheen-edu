@@ -56,6 +56,18 @@ export interface AppConfig {
     ip: { maxAttempts: number; windowSeconds: number };
   };
   platformComparisonMinSample: number;
+  commerce: {
+    paymobBaseUrl: string;
+    paymobSecretKey: string;
+    paymobPublicKey: string;
+    paymobHmacSecret: string;
+    paymobIntegrationIds: number[];
+    paymobNotificationUrl: string;
+    paymobRedirectUrl: string;
+    paymobTimeoutMs: number;
+    paymobOrderExpirySeconds: number;
+    manualOrderExpirySeconds: number;
+  };
   ai: {
     openRouterApiKey: string;
     questionImportModel: string;
@@ -209,6 +221,21 @@ export default (): AppConfig => ({
     },
   },
   platformComparisonMinSample: envInteger('PLATFORM_COMPARISON_MIN_SAMPLE', 10),
+  commerce: {
+    paymobBaseUrl: process.env.PAYMOB_BASE_URL ?? 'https://accept.paymob.com',
+    paymobSecretKey: process.env.PAYMOB_SECRET_KEY ?? '',
+    paymobPublicKey: process.env.PAYMOB_PUBLIC_KEY ?? '',
+    paymobHmacSecret: process.env.PAYMOB_HMAC_SECRET ?? '',
+    paymobIntegrationIds: (process.env.PAYMOB_INTEGRATION_IDS ?? '')
+      .split(',')
+      .map((value) => Number.parseInt(value.trim(), 10))
+      .filter(Number.isInteger),
+    paymobNotificationUrl: process.env.PAYMOB_NOTIFICATION_URL ?? '',
+    paymobRedirectUrl: process.env.PAYMOB_REDIRECT_URL ?? '',
+    paymobTimeoutMs: envInteger('PAYMOB_TIMEOUT_MS', 15_000),
+    paymobOrderExpirySeconds: envInteger('PAYMOB_ORDER_EXPIRY_SECONDS', 1800),
+    manualOrderExpirySeconds: envInteger('MANUAL_ORDER_EXPIRY_SECONDS', 86_400),
+  },
   ai: {
     openRouterApiKey: process.env.OPENROUTER_API_KEY ?? '',
     questionImportModel: process.env.AI_QUESTION_IMPORT_MODEL ?? '',

@@ -71,6 +71,32 @@ enum OrderStatus {
   APPROVED
   REJECTED
   CANCELLED
+  EXPIRED
+}
+
+enum PaymentChannel {
+  MANUAL
+  PAYMOB
+}
+
+enum PaymentAttemptStatus {
+  INITIATED
+  PENDING
+  PAID
+  DECLINED
+  FAILED
+  EXPIRED
+}
+
+enum PromotionKind {
+  PERCENTAGE
+  FIXED
+}
+
+enum CouponReservationStatus {
+  RESERVED
+  REDEEMED
+  RELEASED
 }
 
 enum ManualPaymentSubmissionStatus {
@@ -446,6 +472,10 @@ model User {
   questionImportsCreated    QuestionImportBatch[]     @relation("QuestionImportCreatedBy")
   assessmentsCreated        Assessment[]              @relation("AssessmentCreatedByAdmin")
   leaderboardWeeksFinalized LeaderboardWeek[]         @relation("LeaderboardWeekFinalizedBy")
+  discountCampaignsCreated  DiscountCampaign[]        @relation("DiscountCampaignCreatedBy")
+  discountCampaignsUpdated  DiscountCampaign[]        @relation("DiscountCampaignUpdatedBy")
+  couponsCreated            Coupon[]                  @relation("CouponCreatedBy")
+  couponsUpdated            Coupon[]                  @relation("CouponUpdatedBy")
 
   @@index([role])
   @@index([role, createdAt, id])
@@ -458,6 +488,7 @@ model StudentProfile {
   archivedAccessSnapshots ArchivedAccessSnapshot[]
   questionMarks           StudentQuestionMark[]
   questionNotes           StudentQuestionNote[]
+  couponReservations      CouponReservation[]
   questionReports         QuestionReport[]
   aiQuizRuns              AiQuizGenerationRun[]
   fullName                String
@@ -654,6 +685,8 @@ model Course {
   entitlements        StudentEntitlement[]
   cartItems           CartItem[]                   @relation("CartItemCourse")
   orderItems          OrderItem[]                  @relation("OrderItemCourse")
+  discountTargets     DiscountCampaignTarget[]     @relation("DiscountCampaignTargetCourse")
+  couponTargets       CouponTarget[]               @relation("CouponTargetCourse")
   publisherAgreements PublisherAgreement[]         @relation("PublisherAgreementCourse")
   earningsStatements  PublisherEarningsStatement[] @relation("EarningsCourse")
   contentPlacements   ContentPlacement[]           @relation("ContentPlacementCourse")
@@ -694,6 +727,8 @@ model Chapter {
   entitlements        StudentEntitlement[]
   cartItems           CartItem[]                   @relation("CartItemChapter")
   orderItems          OrderItem[]                  @relation("OrderItemChapter")
+  discountTargets     DiscountCampaignTarget[]     @relation("DiscountCampaignTargetChapter")
+  couponTargets       CouponTarget[]               @relation("CouponTargetChapter")
   publisherAgreements PublisherAgreement[]         @relation("PublisherAgreementChapter")
   earningsStatements  PublisherEarningsStatement[] @relation("EarningsChapter")
   contentPlacements   ContentPlacement[]           @relation("ContentPlacementChapter")
@@ -2270,42 +2305,207 @@ model Order {
   id                    String                    @id @default(cuid())
   studentUserId         String
   student               StudentProfile            @relation(fields: [studentUserId], references: [userId], onDelete: Restrict)
-  manualPaymentMethodId String
-  manualPaymentMethod   ManualPaymentMethod       @relation(fields: [manualPaymentMethodId], references: [id], onDelete: Restrict)
+  manualPaymentMethodId String?
+  manualPaymentMethod   ManualPaymentMethod?      @relation(fields: [manualPaymentMethodId], references: [id], onDelete: Restrict)
+  paymentChannel        PaymentChannel            @default(MANUAL)
   paymentMethodSnapshot Json
+  subtotalMinor         Int                       @default(0)
+  discountMinor         Int                       @default(0)
   totalMinor            Int
   currency              String
   status                OrderStatus               @default(AWAITING_PAYMENT)
   items                 OrderItem[]
   submissions           ManualPaymentSubmission[]
+  paymentAttempts       PaymentAttempt[]
+  couponReservation     CouponReservation?
+  receipt               PaymentReceipt?
   createdAt             DateTime                  @default(now())
   updatedAt             DateTime                  @updatedAt
   approvedAt            DateTime?
   cancelledAt           DateTime?
+  paymentExpiresAt      DateTime?
+  expiredAt             DateTime?
 
   @@index([studentUserId, createdAt, id])
   @@index([status, createdAt, id])
   @@index([status, approvedAt])
+  @@index([status, paymentExpiresAt])
 }
 
 model OrderItem {
-  id            String              @id @default(cuid())
-  orderId       String
-  order         Order               @relation(fields: [orderId], references: [id], onDelete: Restrict)
-  targetType    CommerceTargetType
-  courseId      String?
-  course        Course?             @relation("OrderItemCourse", fields: [courseId], references: [id], onDelete: Restrict)
-  chapterId     String?
-  chapter       Chapter?            @relation("OrderItemChapter", fields: [chapterId], references: [id], onDelete: Restrict)
-  titleSnapshot String
-  priceMinor    Int
-  currency      String
-  entitlement   StudentEntitlement?
-  createdAt     DateTime            @default(now())
+  id                       String              @id @default(cuid())
+  orderId                  String
+  order                    Order               @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  targetType               CommerceTargetType
+  courseId                 String?
+  course                   Course?             @relation("OrderItemCourse", fields: [courseId], references: [id], onDelete: Restrict)
+  chapterId                String?
+  chapter                  Chapter?            @relation("OrderItemChapter", fields: [chapterId], references: [id], onDelete: Restrict)
+  titleSnapshot            String
+  basePriceMinor           Int
+  discountMinor            Int                 @default(0)
+  priceMinor               Int
+  currency                 String
+  appliedPromotionSnapshot Json?
+  entitlement              StudentEntitlement?
+  createdAt                DateTime            @default(now())
 
   @@index([orderId])
   @@index([courseId])
   @@index([chapterId])
+}
+
+model PaymentAttempt {
+  id                    String               @id @default(cuid())
+  orderId               String
+  order                 Order                @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  channel               PaymentChannel
+  status                PaymentAttemptStatus @default(INITIATED)
+  attemptNumber         Int
+  merchantReference     String               @unique
+  providerOrderId       String?
+  providerTransactionId String?              @unique
+  checkoutUrl           String?
+  failureCode           String?
+  failureMessage        String?
+  providerPayload       Json?
+  initiatedAt           DateTime             @default(now())
+  completedAt           DateTime?
+  expiresAt             DateTime?
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+  receipt               PaymentReceipt?
+
+  @@unique([orderId, attemptNumber])
+  @@index([orderId, status, createdAt])
+  @@index([status, expiresAt])
+}
+
+model PaymobWebhookEvent {
+  id                    String    @id @default(cuid())
+  externalTransactionId String    @unique
+  merchantReference     String?
+  verified              Boolean
+  payloadHash           String
+  payload               Json?
+  processingError       String?
+  processedAt           DateTime?
+  createdAt             DateTime  @default(now())
+
+  @@index([merchantReference])
+  @@index([verified, processedAt])
+}
+
+model DiscountCampaign {
+  id           String                   @id @default(cuid())
+  name         String
+  note         String?
+  kind         PromotionKind
+  amount       Int
+  startsAt     DateTime
+  endsAt       DateTime
+  priority     Int                      @default(0)
+  isActive     Boolean                  @default(true)
+  appliesToAll Boolean                  @default(false)
+  targets      DiscountCampaignTarget[]
+  createdById  String
+  createdBy    User                     @relation("DiscountCampaignCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  updatedById  String
+  updatedBy    User                     @relation("DiscountCampaignUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
+  createdAt    DateTime                 @default(now())
+  updatedAt    DateTime                 @updatedAt
+
+  @@index([isActive, startsAt, endsAt, priority])
+}
+
+model DiscountCampaignTarget {
+  id         String           @id @default(cuid())
+  campaignId String
+  campaign   DiscountCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  courseId   String?
+  course     Course?          @relation("DiscountCampaignTargetCourse", fields: [courseId], references: [id], onDelete: Restrict)
+  chapterId  String?
+  chapter    Chapter?         @relation("DiscountCampaignTargetChapter", fields: [chapterId], references: [id], onDelete: Restrict)
+
+  @@unique([campaignId, courseId])
+  @@unique([campaignId, chapterId])
+  @@index([courseId])
+  @@index([chapterId])
+}
+
+model Coupon {
+  id                   String              @id @default(cuid())
+  code                 String              @unique
+  name                 String
+  kind                 PromotionKind
+  amount               Int
+  startsAt             DateTime
+  endsAt               DateTime
+  isActive             Boolean             @default(true)
+  appliesToAll         Boolean             @default(false)
+  minimumOrderMinor    Int                 @default(0)
+  maximumDiscountMinor Int?
+  usageLimit           Int?
+  perStudentUsageLimit Int?
+  targets              CouponTarget[]
+  reservations         CouponReservation[]
+  createdById          String
+  createdBy            User                @relation("CouponCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  updatedById          String
+  updatedBy            User                @relation("CouponUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
+
+  @@index([isActive, startsAt, endsAt])
+}
+
+model CouponTarget {
+  id        String   @id @default(cuid())
+  couponId  String
+  coupon    Coupon   @relation(fields: [couponId], references: [id], onDelete: Cascade)
+  courseId  String?
+  course    Course?  @relation("CouponTargetCourse", fields: [courseId], references: [id], onDelete: Restrict)
+  chapterId String?
+  chapter   Chapter? @relation("CouponTargetChapter", fields: [chapterId], references: [id], onDelete: Restrict)
+
+  @@unique([couponId, courseId])
+  @@unique([couponId, chapterId])
+  @@index([courseId])
+  @@index([chapterId])
+}
+
+model CouponReservation {
+  id            String                  @id @default(cuid())
+  couponId      String
+  coupon        Coupon                  @relation(fields: [couponId], references: [id], onDelete: Restrict)
+  orderId       String                  @unique
+  order         Order                   @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  studentUserId String
+  student       StudentProfile          @relation(fields: [studentUserId], references: [userId], onDelete: Restrict)
+  status        CouponReservationStatus @default(RESERVED)
+  discountMinor Int
+  snapshot      Json
+  releasedAt    DateTime?
+  redeemedAt    DateTime?
+  createdAt     DateTime                @default(now())
+  updatedAt     DateTime                @updatedAt
+
+  @@index([couponId, status, createdAt])
+  @@index([couponId, studentUserId, status])
+}
+
+model PaymentReceipt {
+  id               String          @id @default(cuid())
+  orderId          String          @unique
+  order            Order           @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  paymentAttemptId String?         @unique
+  paymentAttempt   PaymentAttempt? @relation(fields: [paymentAttemptId], references: [id], onDelete: Restrict)
+  reference        String          @unique
+  snapshot         Json
+  issuedAt         DateTime        @default(now())
+  createdAt        DateTime        @default(now())
+
+  @@index([issuedAt])
 }
 
 model ManualPaymentSubmission {

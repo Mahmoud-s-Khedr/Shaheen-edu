@@ -24,6 +24,14 @@ export async function cleanDatabase(
   // Entitlements hold restrictive FKs to Course, Chapter, and OrderItem, so they
   // must go before the hierarchy rows below and before the commerce rows.
   await prisma.studentEntitlement.deleteMany();
+  await prisma.paymentReceipt.deleteMany();
+  await prisma.paymobWebhookEvent.deleteMany();
+  await prisma.paymentAttempt.deleteMany();
+  await prisma.couponReservation.deleteMany();
+  await prisma.couponTarget.deleteMany();
+  await prisma.coupon.deleteMany();
+  await prisma.discountCampaignTarget.deleteMany();
+  await prisma.discountCampaign.deleteMany();
   // Commerce rows hold restrictive FKs to Course/Chapter (cart and order items),
   // Asset (payment proofs), StudentProfile (orders), and User (payment methods),
   // so the whole chain must go before all four.

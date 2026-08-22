@@ -122,6 +122,28 @@ export const envValidationSchema = Joi.object({
   RATE_LIMIT_IP_MAX_ATTEMPTS: Joi.number().integer().positive().default(20),
   RATE_LIMIT_IP_WINDOW_SECONDS: Joi.number().integer().positive().default(900),
   PLATFORM_COMPARISON_MIN_SAMPLE: Joi.number().integer().min(1).default(10),
+  PAYMOB_BASE_URL: Joi.string().uri().default('https://accept.paymob.com'),
+  PAYMOB_SECRET_KEY: Joi.string().allow('').optional(),
+  PAYMOB_PUBLIC_KEY: Joi.string().allow('').optional(),
+  PAYMOB_HMAC_SECRET: Joi.string().allow('').optional(),
+  PAYMOB_INTEGRATION_IDS: Joi.string().allow('').optional(),
+  PAYMOB_NOTIFICATION_URL: Joi.string().uri().allow('').optional(),
+  PAYMOB_REDIRECT_URL: Joi.string().uri().allow('').optional(),
+  PAYMOB_TIMEOUT_MS: Joi.number()
+    .integer()
+    .min(1000)
+    .max(120000)
+    .default(15000),
+  PAYMOB_ORDER_EXPIRY_SECONDS: Joi.number()
+    .integer()
+    .min(60)
+    .max(86400)
+    .default(1800),
+  MANUAL_ORDER_EXPIRY_SECONDS: Joi.number()
+    .integer()
+    .min(300)
+    .max(604800)
+    .default(86400),
   OPENROUTER_API_KEY: Joi.string().min(1).optional(),
   AI_QUESTION_IMPORT_MODEL: Joi.string().min(1).optional(),
   AI_QUESTION_EXPLANATION_MODEL: Joi.string().min(1).optional(),
