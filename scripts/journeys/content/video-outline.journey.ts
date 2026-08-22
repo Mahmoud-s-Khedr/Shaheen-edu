@@ -12,7 +12,13 @@ export const videoOutlineJourney: JourneyDefinition = {
     const admin = clients.admin;
     const courseId = String(context.academic.courseId);
     const videoAssetId = String(context.academic.coverageVideoAssetId ?? '');
+    const studentId = context.students[0]?.id;
     let contentItemId = '';
+
+    assert(
+      studentId,
+      'AUTH-004 must provide an authenticated student for video-outline delivery',
+    );
 
     await step(
       'Authoring an outline before attaching the ready video asset',
@@ -115,6 +121,16 @@ export const videoOutlineJourney: JourneyDefinition = {
             'POST',
             `/admin/content-items/${contentItemId}/publish`,
           ),
+          201,
+        );
+        // CONTENT-007 changes the shared course to PAID.  The reusable student
+        // session therefore needs an explicit grant before this journey can
+        // exercise the protected student-delivery endpoint.
+        expectStatus(
+          await admin.request('POST', '/admin/entitlements', {
+            studentUserId: studentId,
+            courseId,
+          }),
           201,
         );
       },
