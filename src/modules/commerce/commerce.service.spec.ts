@@ -174,14 +174,51 @@ describe('CommerceService payment proofs', () => {
     expect(tx.studentEntitlement.create).not.toHaveBeenCalled();
   });
 
-  it('moves payment-method positions aside before assigning final unique positions', async () => {
+  it('uses a non-returning raw query for the payment-method creation lock', async () => {
+    const { service } = build();
+    const prisma: any = (service as any).prisma;
+    const created = { id: 'method-1', sortOrder: 3 };
+    const tx: any = {
+      $executeRaw: jest.fn().mockResolvedValue(1),
+      manualPaymentMethod: {
+        aggregate: jest.fn().mockResolvedValue({ _max: { sortOrder: 2 } }),
+        create: jest.fn().mockResolvedValue(created),
+      },
+    };
+    prisma.$transaction = jest.fn((callback) => callback(tx));
+
+    await expect(
+      service.createMethod(
+        { id: 'admin-1', role: Role.ADMIN } as any,
+        {
+          titleAr: 'تحويل',
+          instructionsAr: 'ارفع الإيصال',
+        },
+      ),
+    ).resolves.toBe(created);
+
+    expect(tx.$executeRaw).toHaveBeenCalledTimes(1);
+    expect(tx.manualPaymentMethod.create).toHaveBeenCalledWith({
+      data: {
+        titleAr: 'تحويل',
+        instructionsAr: 'ارفع الإيصال',
+        sortOrder: 3,
+        createdById: 'admin-1',
+      },
+    });
+  });
+
+  it('moves payment-method positions aside using positive unique positions', async () => {
     const { service } = build();
     const prisma: any = (service as any).prisma;
     const update = jest.fn().mockResolvedValue(undefined);
     const tx: any = {
-      $queryRaw: jest.fn().mockResolvedValue(undefined),
+      $executeRaw: jest.fn().mockResolvedValue(1),
       manualPaymentMethod: {
-        findMany: jest.fn().mockResolvedValue([{ id: 'a' }, { id: 'b' }]),
+        findMany: jest.fn().mockResolvedValue([
+          { id: 'a', sortOrder: 1 },
+          { id: 'b', sortOrder: 2 },
+        ]),
         update,
       },
     };
@@ -196,7 +233,8 @@ describe('CommerceService payment proofs', () => {
     ]);
 
     expect(update.mock.calls.map(([call]) => call.data.sortOrder)).toEqual([
-      -1, -2, 1, 2,
+      3, 4, 1, 2,
     ]);
+    expect(tx.$executeRaw).toHaveBeenCalledTimes(1);
   });
 });

@@ -153,9 +153,64 @@ export class CommerceService {
     } catch (error: any) { if (error.code === 'P2002') { const saved = await this.prisma.commerceIdempotencyKey.findUnique({ where: { studentUserId_operation_key: { studentUserId, operation, key } } }); if (saved) return { id: saved.resourceId, status: ManualPaymentSubmissionStatus.SUBMITTED }; } throw error; }
   }
   async methodsAdmin(actor: RequestUser, query: SearchPaginationQueryDto) { this.admin(actor); const { data, total } = await paginateArabicSearch({ prisma: this.prisma, delegate: this.prisma.manualPaymentMethod, target: 'manualPaymentMethod', q: query.q, orderBySql: Prisma.sql`t."sortOrder" ASC, t.id ASC`, orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }], where: {}, page: query.page, limit: query.limit }); return { data, meta: toPaginationMeta(query.page, query.limit, total) }; }
-  async createMethod(actor: RequestUser, dto: CreatePaymentMethodDto) { this.admin(actor); const method = await this.prisma.$transaction(async (tx) => { await tx.$queryRaw`SELECT pg_advisory_xact_lock(73122401)`; const max = await tx.manualPaymentMethod.aggregate({ _max: { sortOrder: true } }); return tx.manualPaymentMethod.create({ data: { ...dto, sortOrder: (max._max.sortOrder ?? 0) + 1, createdById: actor.id } }); }); await this.audit.record({ actorUserId: actor.id, action: 'MANUAL_PAYMENT_METHOD_CREATED', targetType: 'ManualPaymentMethod', targetId: method.id }); return method; }
+  async createMethod(actor: RequestUser, dto: CreatePaymentMethodDto) {
+    this.admin(actor);
+    const method = await this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(73122401)`;
+      const max = await tx.manualPaymentMethod.aggregate({
+        _max: { sortOrder: true },
+      });
+      return tx.manualPaymentMethod.create({
+        data: {
+          ...dto,
+          sortOrder: (max._max.sortOrder ?? 0) + 1,
+          createdById: actor.id,
+        },
+      });
+    });
+    await this.audit.record({
+      actorUserId: actor.id,
+      action: 'MANUAL_PAYMENT_METHOD_CREATED',
+      targetType: 'ManualPaymentMethod',
+      targetId: method.id,
+    });
+    return method;
+  }
   async updateMethod(actor: RequestUser, id: string, dto: UpdatePaymentMethodDto) { this.admin(actor); const method = await this.prisma.manualPaymentMethod.update({ where: { id }, data: dto }); await this.audit.record({ actorUserId: actor.id, action: 'MANUAL_PAYMENT_METHOD_UPDATED', targetType: 'ManualPaymentMethod', targetId: id }); return method; }
-  async reorderMethods(actor: RequestUser, ids: string[]) { this.admin(actor); await this.prisma.$transaction(async (tx) => { await tx.$queryRaw`SELECT pg_advisory_xact_lock(73122401)`; const methods = await tx.manualPaymentMethod.findMany({ select: { id: true } }); if (ids.length !== methods.length || new Set(ids).size !== ids.length || ids.some((id) => !methods.some((x) => x.id === id))) throw new BadRequestException('Provide every payment method exactly once'); for (const [index, id] of ids.entries()) await tx.manualPaymentMethod.update({ where: { id }, data: { sortOrder: -(index + 1) } }); for (const [index, id] of ids.entries()) await tx.manualPaymentMethod.update({ where: { id }, data: { sortOrder: index + 1 } }); }); return { data: await this.prisma.manualPaymentMethod.findMany({ orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }] }) }; }
+  async reorderMethods(actor: RequestUser, ids: string[]) {
+    this.admin(actor);
+    await this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(73122401)`;
+      const methods = await tx.manualPaymentMethod.findMany({
+        select: { id: true, sortOrder: true },
+      });
+      if (
+        ids.length !== methods.length ||
+        new Set(ids).size !== ids.length ||
+        ids.some((id) => !methods.some((method) => method.id === id))
+      )
+        throw new BadRequestException(
+          'Provide every payment method exactly once',
+        );
+      const temporaryOrderStart =
+        Math.max(0, ...methods.map((method) => method.sortOrder)) + 1;
+      for (const [index, id] of ids.entries())
+        await tx.manualPaymentMethod.update({
+          where: { id },
+          data: { sortOrder: temporaryOrderStart + index },
+        });
+      for (const [index, id] of ids.entries())
+        await tx.manualPaymentMethod.update({
+          where: { id },
+          data: { sortOrder: index + 1 },
+        });
+    });
+    return {
+      data: await this.prisma.manualPaymentMethod.findMany({
+        orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
+      }),
+    };
+  }
   async submissions(actor: RequestUser, query: PaymentSubmissionQueryDto) { this.admin(actor); const where = { ...(query.status ? { status: query.status } : {}), ...(query.studentUserId ? { order: { studentUserId: query.studentUserId } } : {}) }; const [data, total] = await this.prisma.$transaction([this.prisma.manualPaymentSubmission.findMany({ where, include: { order: { include: { student: true, items: true } } }, orderBy: [{ createdAt: 'asc' }, { id: 'asc' }], skip: (query.page - 1) * query.limit, take: query.limit }), this.prisma.manualPaymentSubmission.count({ where })]); return { data: data.map((x) => ({ id: x.id, status: x.status, transactionReference: x.transactionReference, orderId: x.orderId, orderStatus: x.order.status, studentUserId: x.order.studentUserId, studentName: x.order.student.fullName, total: { amountMinor: x.order.totalMinor, currency: x.order.currency }, createdAt: x.createdAt })), meta: toPaginationMeta(query.page, query.limit, total) }; }
   async submission(actor: RequestUser, id: string) { this.admin(actor); const item = await this.prisma.manualPaymentSubmission.findUnique({ where: { id }, include: { proofAsset: true, order: { include: { items: true } } } }); if (!item) throw new NotFoundException('Payment submission not found'); return { id: item.id, status: item.status, transactionReference: item.transactionReference, note: item.note, rejectionReason: item.rejectionReason, createdAt: item.createdAt, reviewedAt: item.reviewedAt, order: this.orderDto({ ...item.order, submissions: [] }), proof: { id: item.proofAssetId, filename: item.proofAsset.filename, mimeType: item.proofAsset.mimeType, ...this.assets.protectedAccess(item.proofAsset) } }; }
   async approve(actor: RequestUser, id: string) {
