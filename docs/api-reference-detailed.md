@@ -6283,6 +6283,114 @@ No path, query, or header input.
 }
 ```
 
+### `POST /api/v1/admin/questions/{questionId}/ai/re-answer`
+
+**Authorization:** Bearer token; role must be `ADMIN` or `SUPER_ADMIN`
+
+Creates one retained AI answer-and-explanation review run. `INFER` asks AI to
+propose the answer; `GROUNDED` requires the admin-supplied answer and uses it as
+the authoritative answer while generating the explanation.
+
+**Request**
+
+- path `questionId` (required)
+
+```json
+{
+  "mode": "INFER | GROUNDED",
+  "suppliedAnswer?": {
+    "selectedOptionIndexes?": [0],
+    "acceptedAnswers?": ["string"],
+    "gradingRubric?": "string"
+  },
+  "additionalContext?": "string"
+}
+```
+
+For `GROUNDED`, provide exactly the answer format that matches the question:
+`selectedOptionIndexes` for choice questions, `acceptedAnswers` for written
+questions, or `gradingRubric` for long-answer questions. Do not provide
+`suppliedAnswer` with `INFER`.
+
+**Success response — HTTP 201**
+
+Returns the retained `QuestionAiExplanationRun`, including its proposed answer,
+six-part structured explanation, confidence, warnings, model metadata, and
+`PENDING_REVIEW` status.
+
+### `GET /api/v1/admin/questions/{questionId}/ai/re-answer`
+
+**Authorization:** Bearer token; role must be `ADMIN` or `SUPER_ADMIN`
+
+**Request**
+
+- path `questionId` (required)
+
+**Success response — HTTP 200**
+
+Returns retained `QuestionAiExplanationRun` records for the question, newest
+first.
+
+### `GET /api/v1/admin/questions/{questionId}/ai/re-answer/{runId}`
+
+**Authorization:** Bearer token; role must be `ADMIN` or `SUPER_ADMIN`
+
+**Request**
+
+- path `questionId` (required)
+- path `runId` (required)
+
+**Success response — HTTP 200**
+
+Returns the requested retained `QuestionAiExplanationRun`.
+
+### `POST /api/v1/admin/questions/{questionId}/ai/re-answer/{runId}/apply`
+
+**Authorization:** Bearer token; role must be `ADMIN` or `SUPER_ADMIN`
+
+Applies the reviewed answer, explanation, or both. When the source question is
+published, the result is applied to a replacement draft; publishing that draft
+archives the original question.
+
+**Request**
+
+- path `questionId` (required)
+- path `runId` (required)
+
+```json
+{
+  "applyAnswer": "boolean",
+  "applyExplanation": "boolean",
+  "note?": "string"
+}
+```
+
+**Success response — HTTP 201**
+
+Returns the changed question, or the replacement draft for a published source
+question.
+
+### `POST /api/v1/admin/questions/{questionId}/ai/re-answer/{runId}/reject`
+
+**Authorization:** Bearer token; role must be `ADMIN` or `SUPER_ADMIN`
+
+Rejects a pending AI review run while preserving its audit record and output.
+
+**Request**
+
+- path `questionId` (required)
+- path `runId` (required)
+
+```json
+{
+  "note": "string"
+}
+```
+
+**Success response — HTTP 201**
+
+Returns the rejected `QuestionAiExplanationRun`.
+
 ## Student administration
 
 ### `POST /api/v1/admin/admins/{id}/reset-password`

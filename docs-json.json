@@ -18402,6 +18402,203 @@
           "admin/ai/question-imports"
         ]
       }
+    },
+    "/api/v1/admin/questions/{questionId}/ai/re-answer": {
+      "post": {
+        "operationId": "QuestionAiExplanationsController_create_v1",
+        "parameters": [
+          {
+            "name": "questionId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAiQuestionExplanationRunDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Generate one AI answer/explanation review run",
+        "tags": [
+          "admin/questions/ai"
+        ]
+      },
+      "get": {
+        "operationId": "QuestionAiExplanationsController_list_v1",
+        "parameters": [
+          {
+            "name": "questionId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List retained AI re-answer review runs",
+        "tags": [
+          "admin/questions/ai"
+        ]
+      }
+    },
+    "/api/v1/admin/questions/{questionId}/ai/re-answer/{runId}": {
+      "get": {
+        "operationId": "QuestionAiExplanationsController_get_v1",
+        "parameters": [
+          {
+            "name": "questionId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "runId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get an AI re-answer review run",
+        "tags": [
+          "admin/questions/ai"
+        ]
+      }
+    },
+    "/api/v1/admin/questions/{questionId}/ai/re-answer/{runId}/apply": {
+      "post": {
+        "operationId": "QuestionAiExplanationsController_apply_v1",
+        "parameters": [
+          {
+            "name": "questionId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "runId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApplyAiQuestionExplanationRunDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Apply reviewed answer and/or explanation",
+        "tags": [
+          "admin/questions/ai"
+        ]
+      }
+    },
+    "/api/v1/admin/questions/{questionId}/ai/re-answer/{runId}/reject": {
+      "post": {
+        "operationId": "QuestionAiExplanationsController_reject_v1",
+        "parameters": [
+          {
+            "name": "questionId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "runId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RejectAiQuestionExplanationRunDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Reject an AI re-answer review run",
+        "tags": [
+          "admin/questions/ai"
+        ]
+      }
     }
   },
   "info": {
@@ -25239,6 +25436,76 @@
         },
         "required": [
           "reason"
+        ]
+      },
+      "AiQuestionAnswerDto": {
+        "type": "object",
+        "properties": {
+          "selectedOptionIndexes": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "acceptedAnswers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "gradingRubric": {
+            "type": "string"
+          }
+        }
+      },
+      "CreateAiQuestionExplanationRunDto": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "INFER",
+              "GROUNDED"
+            ]
+          },
+          "suppliedAnswer": {
+            "$ref": "#/components/schemas/AiQuestionAnswerDto"
+          },
+          "additionalContext": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "mode"
+        ]
+      },
+      "ApplyAiQuestionExplanationRunDto": {
+        "type": "object",
+        "properties": {
+          "applyAnswer": {
+            "type": "boolean"
+          },
+          "applyExplanation": {
+            "type": "boolean"
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "applyAnswer",
+          "applyExplanation"
+        ]
+      },
+      "RejectAiQuestionExplanationRunDto": {
+        "type": "object",
+        "properties": {
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "note"
         ]
       }
     }
