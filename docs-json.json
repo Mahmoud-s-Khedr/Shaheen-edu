@@ -14730,26 +14730,6 @@
         ]
       }
     },
-    "/api/v1/parent/selected-child/performance": {
-      "get": {
-        "operationId": "ParentLearningController_performance_v1",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Get selected child learning summary",
-        "tags": [
-          "parent/learning"
-        ]
-      }
-    },
     "/api/v1/parent/selected-child/analytics/scopes": {
       "get": {
         "operationId": "ParentLearningController_analyticsScopes_v1",
@@ -17881,6 +17861,26 @@
         ]
       }
     },
+    "/api/v1/student/performance/insights": {
+      "get": {
+        "operationId": "PerformanceController_insights_v1",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get unified performance insights and recommendations",
+        "tags": [
+          "student/performance"
+        ]
+      }
+    },
     "/api/v1/student/performance/peers": {
       "get": {
         "operationId": "PerformanceController_peers_v1",
@@ -17918,6 +17918,121 @@
         "summary": "Get answer-change performance statistics",
         "tags": [
           "student/performance"
+        ]
+      }
+    },
+    "/api/v1/parent/selected-child/performance": {
+      "get": {
+        "operationId": "ParentPerformanceController_overview_v1",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get selected child unified performance overview",
+        "tags": [
+          "parent/performance"
+        ]
+      }
+    },
+    "/api/v1/parent/selected-child/performance/analysis": {
+      "get": {
+        "operationId": "ParentPerformanceController_analysis_v1",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "One-based page number.",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Maximum records to return per page.",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Case-insensitive text search.",
+            "schema": {
+              "minLength": 1,
+              "maxLength": 120,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Analyze selected child performance by curriculum scope",
+        "tags": [
+          "parent/performance"
+        ]
+      }
+    },
+    "/api/v1/parent/selected-child/performance/trends": {
+      "get": {
+        "operationId": "ParentPerformanceController_trends_v1",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get selected child unified performance trends",
+        "tags": [
+          "parent/performance"
+        ]
+      }
+    },
+    "/api/v1/parent/selected-child/performance/insights": {
+      "get": {
+        "operationId": "ParentPerformanceController_insights_v1",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get selected child performance insights",
+        "tags": [
+          "parent/performance"
         ]
       }
     },
