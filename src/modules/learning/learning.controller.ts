@@ -142,11 +142,6 @@ export class LearningController {
 @Controller({ path: 'parent/selected-child', version: '1' })
 export class ParentLearningController {
   constructor(private readonly learning: LearningService) {}
-  @Get('performance')
-  @ApiOperation({ summary: 'Get selected child learning summary' })
-  performance(@CurrentParentSession() parent: RequestParentSession) {
-    return this.learning.parentPerformance(parent);
-  }
   @Get('analytics/scopes')
   @ApiOperation({
     summary: 'List selected child approved purchase analytics scopes',

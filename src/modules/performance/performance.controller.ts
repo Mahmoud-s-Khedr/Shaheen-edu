@@ -9,6 +9,7 @@ import { PerformanceService } from './performance.service';
 import {
   PerformanceAnalysisQueryDto,
   PerformanceAnswerChangesQueryDto,
+  PerformanceInsightsQueryDto,
   PerformancePeersQueryDto,
   PerformancePeriodQueryDto,
   PerformanceTrendQueryDto,
@@ -44,6 +45,16 @@ export class PerformanceController {
     @Query() query: PerformanceTrendQueryDto,
   ) {
     return this.performance.trends(user.id, query);
+  }
+  @ApiOperation({
+    summary: 'Get unified performance insights and recommendations',
+  })
+  @Get('insights')
+  insights(
+    @CurrentUser() user: RequestUser,
+    @Query() query: PerformanceInsightsQueryDto,
+  ) {
+    return this.performance.insights(user.id, query);
   }
   @ApiOperation({ summary: 'Compare student performance with peers' })
   @Get('peers')

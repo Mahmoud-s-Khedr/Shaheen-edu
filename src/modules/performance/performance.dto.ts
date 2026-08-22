@@ -5,23 +5,36 @@ export class PerformancePeriodQueryDto {
   @IsOptional() @IsDateString() from?: string;
   @IsOptional() @IsDateString() to?: string;
 }
-export class PerformanceAnalysisQueryDto extends SearchPaginationQueryDto {
-  @IsEnum(['subject', 'chapter', 'lesson']) level:
-    'subject' | 'chapter' | 'lesson' = 'subject';
+
+/** Curriculum scope. `section` is the product's analytics topic level. */
+export class PerformanceScopeQueryDto extends PerformancePeriodQueryDto {
   @IsOptional() @IsString() subjectId?: string;
   @IsOptional() @IsString() courseId?: string;
   @IsOptional() @IsString() chapterId?: string;
+  @IsOptional() @IsString() lessonId?: string;
+  @IsOptional() @IsString() sectionId?: string;
 }
-export class PerformanceTrendQueryDto extends PerformancePeriodQueryDto {
-  @IsOptional() @IsString() assessmentId?: string;
+
+export class PerformanceAnalysisQueryDto extends SearchPaginationQueryDto {
+  @IsEnum(['subject', 'course', 'chapter', 'lesson', 'section']) level:
+    'subject' | 'course' | 'chapter' | 'lesson' | 'section' = 'subject';
+  @IsOptional() @IsDateString() from?: string;
+  @IsOptional() @IsDateString() to?: string;
+  @IsOptional() @IsString() subjectId?: string;
+  @IsOptional() @IsString() courseId?: string;
+  @IsOptional() @IsString() chapterId?: string;
+  @IsOptional() @IsString() lessonId?: string;
+  @IsOptional() @IsString() sectionId?: string;
 }
-export class PerformancePeersQueryDto {
+
+export class PerformanceTrendQueryDto extends PerformanceScopeQueryDto {}
+export class PerformanceInsightsQueryDto extends PerformanceScopeQueryDto {}
+
+export class PerformancePeersQueryDto extends PerformancePeriodQueryDto {
   @IsString() subjectId!: string;
   @IsString() courseId!: string;
   @IsOptional() @IsString() chapterId?: string;
+  @IsOptional() @IsString() lessonId?: string;
+  @IsOptional() @IsString() sectionId?: string;
 }
-export class PerformanceAnswerChangesQueryDto extends PerformancePeriodQueryDto {
-  @IsOptional() @IsString() subjectId?: string;
-  @IsOptional() @IsString() courseId?: string;
-  @IsOptional() @IsString() chapterId?: string;
-}
+export class PerformanceAnswerChangesQueryDto extends PerformanceScopeQueryDto {}

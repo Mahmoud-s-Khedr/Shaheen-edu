@@ -32,6 +32,20 @@ Implementation-backed API contract. Every endpoint below is self-contained: its 
 
 ### `GET /api/v1/student/performance/answer-changes`
 
+### Unified performance endpoints
+
+`GET /api/v1/student/performance/overview` returns combined assessment and direct-practice totals, accuracy, omissions, question-bank coverage, and separate source breakdowns. Optional `from` and `to` filters use UTC calendar days.
+
+`GET /api/v1/student/performance/analysis` returns paginated combined rollups for `subject`, `course`, `chapter`, `lesson`, or `section`. The section level is the API's curriculum-topic level. It accepts optional date and hierarchy filters plus `q`.
+
+`GET /api/v1/student/performance/trends` returns combined daily totals, source breakdowns, and a 28-day `IMPROVING`, `STABLE`, `DECLINING`, or `INSUFFICIENT_DATA` classification. Each comparison window requires ten answered attempts.
+
+`GET /api/v1/student/performance/insights` returns strongest and weakest qualifying scopes, omission-heavy scopes, repeated-error questions, trend evidence, and recommendation labels. It accepts the same date and hierarchy filters as trends.
+
+`GET /api/v1/student/performance/peers` requires `subjectId` and `courseId`; optional `chapterId`, `lessonId`, `sectionId`, `from`, and `to` narrow the cohort. It returns only aggregate grade-cohort data. A response is `INSUFFICIENT_DATA` unless the student and at least the configured minimum number of peers each have ten answered attempts in the selected scope. Available responses include percentile, average, median, ten-point histogram buckets, and points versus average/median.
+
+Authorized parent equivalents are `GET /api/v1/parent/selected-child/performance` and its `/analysis`, `/trends`, and `/insights` subroutes. Peer comparison is intentionally not exposed to parents.
+
 ### `GET /api/v1/student/leaderboard/current`
 
 ### `GET /api/v1/student/leaderboard/history/{weekKey}`
@@ -255,8 +269,16 @@ No path, query, or header input.
     {
       "questionId": "string",
       "markedAt": "ISO-8601 date-time",
-      "bank": { "id": "string", "title": "string", "subject": { "id": "string", "title": "string" } },
-      "source": { "id": "string", "type": "string", "title": { "ar": "string", "en": "string" } },
+      "bank": {
+        "id": "string",
+        "title": "string",
+        "subject": { "id": "string", "title": "string" }
+      },
+      "source": {
+        "id": "string",
+        "type": "string",
+        "title": { "ar": "string", "en": "string" }
+      },
       "difficultyBand": "A_PLUS | A | B | C | D"
     }
   ]
@@ -360,8 +382,18 @@ Deletes the current student's private note for an accessible question. Access fa
   "data": ["paginated hierarchy rollups"],
   "attempts": ["paginated completed attempts when chapterId is supplied"],
   "meta": {
-    "groups": { "page": "number", "limit": "number", "total": "number", "totalPages": "number" },
-    "attempts?": { "page": "number", "limit": "number", "total": "number", "totalPages": "number" }
+    "groups": {
+      "page": "number",
+      "limit": "number",
+      "total": "number",
+      "totalPages": "number"
+    },
+    "attempts?": {
+      "page": "number",
+      "limit": "number",
+      "total": "number",
+      "totalPages": "number"
+    }
   }
 }
 ```
@@ -4207,7 +4239,12 @@ No path, query, or header input.
       "revokedByName": "string | null"
     }
   ],
-  "meta": { "page": "number", "limit": "number", "total": "number", "totalPages": "number" }
+  "meta": {
+    "page": "number",
+    "limit": "number",
+    "total": "number",
+    "totalPages": "number"
+  }
 }
 ```
 
@@ -6537,7 +6574,10 @@ the localized `name` shape (`{ "ar": "string", "en": "string | null" }`), wrappe
 in the standard offset-pagination envelope.
 
 ```json
-{ "data": ["{id, name, centers:[{id, name, governorateId}]}"], "meta": { "page": 1, "limit": 100, "total": 27, "totalPages": 1 } }
+{
+  "data": ["{id, name, centers:[{id, name, governorateId}]}"],
+  "meta": { "page": 1, "limit": 100, "total": 27, "totalPages": 1 }
+}
 ```
 
 ### `GET /api/v1/admin/geography/governorates`
@@ -6551,7 +6591,10 @@ Optional query: `q`, `page` (default `1`), `limit` (default `100`, max `200`).
 **Success response — HTTP 200**
 
 ```json
-{ "data": ["{id, name, centers:[{id, name, governorateId}]}"], "meta": { "page": 1, "limit": 100, "total": 27, "totalPages": 1 } }
+{
+  "data": ["{id, name, centers:[{id, name, governorateId}]}"],
+  "meta": { "page": 1, "limit": 100, "total": 27, "totalPages": 1 }
+}
 ```
 
 ### `POST /api/v1/admin/geography/governorates`
@@ -6798,6 +6841,7 @@ Creates a `HUMAN_REVIEWED` draft question from a corrected `AcceptQuestionImport
 ### `POST /api/v1/admin/ai/question-imports/{id}/items/{itemId}/reject`
 
 Records the required rejection reason from `RejectQuestionImportItemDto` and excludes the review candidate (HTTP 201).
+
 ### `POST /api/v1/student/assessments/ai-prompt`
 
 Create a private, AI-planned assessment from `prompt`, `scopes`, and normal

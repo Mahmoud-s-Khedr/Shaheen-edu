@@ -386,7 +386,7 @@ export const studentLearningJourney: JourneyDefinition = {
     );
 
     await step(
-      'Showing only summary performance to the selected parent',
+      'Showing unified summary performance to the selected parent',
       async () => {
         const login = await clients.public.request<any>(
           'POST',
@@ -409,10 +409,12 @@ export const studentLearningJourney: JourneyDefinition = {
         );
         expectStatus(parent, 200);
         assert(
-          parent.body.child?.userId === studentId &&
-            parent.body.performance?.solvedQuestions === 1 &&
+          parent.body.total === 2 &&
+            parent.body.correct === 1 &&
+            parent.body.incorrect === 1 &&
+            parent.body.sources?.practice?.total === 2 &&
             !JSON.stringify(parent.body).includes('selectedOptionIds'),
-          'Parent performance must be summary-only',
+          'Parent performance must expose only the selected child unified summary',
         );
       },
     );

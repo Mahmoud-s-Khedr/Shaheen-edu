@@ -5,11 +5,11 @@
 
 ## Completion assessment
 
-The backend is approximately **78% complete**, weighted against the functional
+The backend is approximately **83% complete**, weighted against the functional
 requirements in `docs/MohamedDiab-Req.pdf`.
 
-- **30 of 49** capability areas are fully implemented.
-- **16 of 49** are partially implemented.
+- **35 of 49** capability areas are fully implemented.
+- **11 of 49** are partially implemented.
 - **3 of 49** are absent.
 
 This includes the current implementation, rather than every statement in
@@ -17,7 +17,7 @@ This includes the current implementation, rather than every statement in
 question import, per-item AI-import accept/reject controls, and assessment
 question video-timestamp snapshots.
 
-The codebase builds successfully and its unit suite passes: **295 tests in 39
+The codebase builds successfully and its unit suite passes: **305 tests in 43
 suites**.
 
 ## Missing and partial backend features
@@ -59,13 +59,13 @@ AI score with an audit record.
 
 ### 4. Performance and peer analytics
 
-| Feature                               | Current state                                                                        | Required backend work                                                                                                       |
-| ------------------------------------- | ------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------- |
-| Unified performance history           | Several analytics views use completed assessments rather than all practice activity. | Combine assessment and direct-practice attempts consistently in overview, analysis, trends, peer comparisons, and insights. |
-| Topic-level peer comparison           | Course and optional chapter comparisons are supported.                               | Support lesson/section/topic comparison with minimum cohort and privacy safeguards.                                         |
-| Bell-curve/distribution data          | Percentile, average, and median are available.                                       | Return distribution/histogram data and comparison metrics suitable for a bell-curve display.                                |
-| Best/worst/needs-improvement insights | Clients can derive some rankings from grouped responses.                             | Add a dedicated insight endpoint for strongest/weakest scopes, most omissions, and recommendation labels.                   |
-| Richer trend insights                 | Date/test trends exist.                                                              | Add improving/stable/declining classifications, repeated-error detection, and recommendation inputs.                        |
+| Feature                               | Current state                                                                                                                        | Required backend work                                                                     |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------- |
+| Unified performance history           | Implemented. Overview, analysis, trends, peers, and insights use completed assessment answers plus every direct-practice submission. | Accuracy is consistently `correct / answered`; omissions remain explicit.                 |
+| Topic-level peer comparison           | Implemented using the existing curriculum section as the topic level.                                                                | Video-outline topics are not question scopes and remain excluded.                         |
+| Bell-curve/distribution data          | Implemented. Peer comparison returns a privacy-safe ten-point histogram and student-vs-cohort metrics.                               | Raw peer scores and identities are deliberately not returned.                             |
+| Best/worst/needs-improvement insights | Implemented at `GET /student/performance/insights`.                                                                                  | Includes strongest/weakest scopes, omissions, repeated errors, and recommendation labels. |
+| Richer trend insights                 | Implemented. Unified daily trends include 28-day improving/stable/declining classification.                                          | Both windows require sufficient answered activity.                                        |
 
 ### 5. Parent features
 
@@ -120,4 +120,4 @@ launch:
 2. Implement PSP commerce, refunds, discounts, expiry, and reconciliation.
 3. Complete parent accounts, parent monitoring, and consolidated admin reports.
 4. Add AI-prompt quiz generation and student AI explanations with safety/audit controls.
-5. Unify performance analytics and add richer peer/insight endpoints.
+5. Unified performance analytics, richer peer comparison, and insights are implemented.
