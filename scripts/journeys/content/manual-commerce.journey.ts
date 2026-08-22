@@ -174,6 +174,122 @@ export const manualCommerceJourney: JourneyDefinition = {
       },
     );
     await step(
+      'Managing promotions and previewing coupon pricing',
+      async () => {
+        const startsAt = new Date(Date.now() - 60_000).toISOString();
+        const endsAt = new Date(Date.now() + 86_400_000).toISOString();
+        const campaign = await admin.request<any>(
+          'POST',
+          '/admin/discount-campaigns',
+          {
+            name: factory.title('Course campaign'),
+            kind: 'PERCENTAGE',
+            amount: 500,
+            startsAt,
+            endsAt,
+            targets: [{ courseId }],
+          },
+        );
+        expectStatus(campaign, 201);
+        const campaignId = campaign.body.id;
+        const campaigns = await admin.request<any>(
+          'GET',
+          '/admin/discount-campaigns?limit=100',
+        );
+        expectStatus(campaigns, 200);
+        assert(
+          campaigns.body.data.some((item: any) => item.id === campaignId),
+          'Created campaign must be listed for admins',
+        );
+        expectStatus(
+          await admin.request<any>(
+            'PATCH',
+            `/admin/discount-campaigns/${campaignId}`,
+            { priority: 1 },
+          ),
+          200,
+        );
+        expectStatus(
+          await admin.request<any>(
+            'POST',
+            `/admin/discount-campaigns/${campaignId}/deactivate`,
+          ),
+          201,
+        );
+        expectStatus(
+          await admin.request<any>(
+            'POST',
+            `/admin/discount-campaigns/${campaignId}/activate`,
+          ),
+          201,
+        );
+
+        const couponCode = factory.slug('coupon').toUpperCase();
+        const coupon = await admin.request<any>('POST', '/admin/coupons', {
+          name: factory.title('Course coupon'),
+          code: couponCode,
+          kind: 'FIXED',
+          amount: 2_000,
+          startsAt,
+          endsAt,
+          targets: [{ courseId }],
+        });
+        expectStatus(coupon, 201);
+        const couponId = coupon.body.id;
+        const coupons = await admin.request<any>(
+          'GET',
+          '/admin/coupons?limit=100',
+        );
+        expectStatus(coupons, 200);
+        assert(
+          coupons.body.data.some((item: any) => item.id === couponId),
+          'Created coupon must be listed for admins',
+        );
+        expectStatus(
+          await admin.request<any>('PATCH', `/admin/coupons/${couponId}`, {
+            minimumOrderMinor: 1,
+          }),
+          200,
+        );
+        expectStatus(
+          await admin.request<any>(
+            'POST',
+            `/admin/coupons/${couponId}/deactivate`,
+          ),
+          201,
+        );
+        expectStatus(
+          await admin.request<any>(
+            'POST',
+            `/admin/coupons/${couponId}/activate`,
+          ),
+          201,
+        );
+
+        const preview = await student<any>('POST', '/student/price-preview', {
+          targets: [{ targetType: 'COURSE', targetId: courseId }],
+          couponCode,
+        });
+        expectStatus(preview, 201);
+        assert(
+          preview.body.coupon?.code === couponCode &&
+            preview.body.totalMinor < preview.body.subtotalMinor,
+          'Price preview must apply the better active coupon price',
+        );
+
+        // Covers the retry route without creating an external Paymob intention.
+        expectStatus(
+          await student<any>(
+            'POST',
+            '/student/orders/missing-paymob-order/paymob/attempt',
+            undefined,
+            { 'idempotency-key': factory.slug('missing-paymob-attempt') },
+          ),
+          404,
+        );
+      },
+    );
+    await step(
       'Checking out and ensuring receipt review is required for access',
       async () => {
         const methods = await student<any>(

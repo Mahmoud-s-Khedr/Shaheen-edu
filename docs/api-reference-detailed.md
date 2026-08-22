@@ -108,6 +108,8 @@ No path, query, or header input.
 
 ## Manual commerce
 
+### `POST /api/v1/student/price-preview`
+
 ### `GET /api/v1/admin/manual-payment-methods`
 
 ### `POST /api/v1/admin/manual-payment-methods`
@@ -115,6 +117,26 @@ No path, query, or header input.
 ### `PATCH /api/v1/admin/manual-payment-methods/{id}`
 
 ### `POST /api/v1/admin/manual-payment-methods/reorder`
+
+### `GET /api/v1/admin/discount-campaigns`
+
+### `POST /api/v1/admin/discount-campaigns`
+
+### `PATCH /api/v1/admin/discount-campaigns/{id}`
+
+### `POST /api/v1/admin/discount-campaigns/{id}/activate`
+
+### `POST /api/v1/admin/discount-campaigns/{id}/deactivate`
+
+### `GET /api/v1/admin/coupons`
+
+### `POST /api/v1/admin/coupons`
+
+### `PATCH /api/v1/admin/coupons/{id}`
+
+### `POST /api/v1/admin/coupons/{id}/activate`
+
+### `POST /api/v1/admin/coupons/{id}/deactivate`
 
 ### `GET /api/v1/admin/payment-submissions`
 
@@ -140,9 +162,13 @@ No path, query, or header input.
 
 ### `POST /api/v1/student/orders/{id}/cancel`
 
+### `POST /api/v1/student/orders/{id}/paymob/attempt`
+
 ### `POST /api/v1/student/orders/{id}/payment-proof`
 
 ### `POST /api/v1/student/orders/{orderId}/payment-submissions/{submissionId}/resubmit`
+
+### `POST /api/v1/payments/paymob/webhook`
 
 ## Assessments
 

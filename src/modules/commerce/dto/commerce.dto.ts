@@ -400,8 +400,12 @@ export class OrderDto {
   @ApiPropertyOptional({ type: MoneyDto }) discount?: MoneyDto;
   @ApiPropertyOptional({ type: String, format: 'date-time', nullable: true })
   paymentExpiresAt?: Date | null;
-  @ApiPropertyOptional({ example: 'RCT-20260822-ORDER' }) receiptReference?:
-    string | null;
+  @ApiPropertyOptional({
+    type: String,
+    example: 'RCT-20260822-ORDER',
+    nullable: true,
+  })
+  receiptReference?: string | null;
 }
 
 export class PaginatedOrdersResponseDto {

@@ -376,7 +376,11 @@ async function main(): Promise<void> {
       schemaFailures,
     };
   });
-  const uncovered = coverage
+  const requiredCoverage = coverage.filter((entry) => !entry.deferredReason);
+  const deferred = coverage
+    .filter((entry) => entry.deferredReason)
+    .map(({ key, deferredReason }) => ({ key, reason: deferredReason! }));
+  const uncovered = requiredCoverage
     .filter((entry) => entry.calls === 0)
     .map((entry) => entry.key);
   const invalidResponses = coverage.filter(
@@ -395,8 +399,10 @@ async function main(): Promise<void> {
     target: environment.baseUrl,
     durationMs: performance.now() - started,
     operationCount: manifest.length,
-    exercised: manifest.length - uncovered.length,
+    requiredOperationCount: requiredCoverage.length,
+    exercised: requiredCoverage.length - uncovered.length,
     uncovered,
+    deferred,
     invalidResponses,
     cleanup,
     deliveryFetches: runner.getDeliveryFetches(),
@@ -406,7 +412,7 @@ async function main(): Promise<void> {
   };
   await writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
   console.log(
-    `\nAPI acceptance: ${manifest.length - uncovered.length}/${manifest.length} operations exercised; ${invalidResponses.length} response-schema failures.`,
+    `\nAPI acceptance: ${requiredCoverage.length - uncovered.length}/${requiredCoverage.length} required operations exercised; ${deferred.length} deferred; ${invalidResponses.length} response-schema failures.`,
   );
   console.log(`JSON report: ${reportPath}`);
   const cleanupFailures = cleanup.filter(

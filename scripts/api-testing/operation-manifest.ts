@@ -12,7 +12,14 @@ export type RequiredCheck =
 export interface OperationManifestEntry {
   key: string;
   requiredChecks: RequiredCheck[];
+  /** Endpoint cannot be invoked by a local journey without a third-party callback. */
+  deferredReason?: string;
 }
+
+const DEFERRED_OPERATION_REASONS: Record<string, string> = {
+  'POST /api/v1/payments/paymob/webhook':
+    'Requires a provider-signed Paymob transaction callback; covered by Paymob HMAC unit tests until sandbox callback testing is enabled.',
+};
 
 /**
  * The manifest deliberately has one entry for every OpenAPI operation. Rules
@@ -40,6 +47,10 @@ export async function loadOperationManifest(): Promise<
     if (path.includes('{')) requiredChecks.push('not-found');
     if (['POST', 'PATCH', 'PUT', 'DELETE'].includes(method))
       requiredChecks.push('state-transition');
-    return { key, requiredChecks };
+    return {
+      key,
+      requiredChecks,
+      deferredReason: DEFERRED_OPERATION_REASONS[key],
+    };
   });
 }

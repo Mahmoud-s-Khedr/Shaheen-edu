@@ -12714,6 +12714,36 @@
         ]
       }
     },
+    "/api/v1/student/price-preview": {
+      "post": {
+        "operationId": "CommerceController_pricePreview_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PricePreviewDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Preview current campaign/coupon prices for purchasable targets",
+        "tags": [
+          "student/commerce"
+        ]
+      }
+    },
     "/api/v1/student/cart/items": {
       "post": {
         "operationId": "CommerceController_add_v1",
@@ -12958,6 +12988,43 @@
           }
         ],
         "summary": "Create an order from the current cart",
+        "tags": [
+          "student/commerce"
+        ]
+      }
+    },
+    "/api/v1/student/orders/{id}/paymob/attempt": {
+      "post": {
+        "operationId": "CommerceController_retryPaymob_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "idempotency-key",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create a fresh hosted Paymob checkout attempt for an unpaid order",
         "tags": [
           "student/commerce"
         ]
@@ -14299,6 +14366,359 @@
         "summary": "Reject a manual payment submission",
         "tags": [
           "admin/manual-payments"
+        ]
+      }
+    },
+    "/api/v1/admin/discount-campaigns": {
+      "get": {
+        "operationId": "ManualPaymentAdminController_campaigns_v1",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "One-based page number.",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Maximum records to return per page.",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List timed discount campaigns",
+        "tags": [
+          "admin/manual-payments"
+        ]
+      },
+      "post": {
+        "operationId": "ManualPaymentAdminController_createCampaign_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateDiscountCampaignDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create a timed discount campaign",
+        "tags": [
+          "admin/manual-payments"
+        ]
+      }
+    },
+    "/api/v1/admin/discount-campaigns/{id}": {
+      "patch": {
+        "operationId": "ManualPaymentAdminController_updateCampaign_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateDiscountCampaignDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update a timed discount campaign",
+        "tags": [
+          "admin/manual-payments"
+        ]
+      }
+    },
+    "/api/v1/admin/discount-campaigns/{id}/activate": {
+      "post": {
+        "operationId": "ManualPaymentAdminController_activateCampaign_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Activate a timed discount campaign",
+        "tags": [
+          "admin/manual-payments"
+        ]
+      }
+    },
+    "/api/v1/admin/discount-campaigns/{id}/deactivate": {
+      "post": {
+        "operationId": "ManualPaymentAdminController_deactivateCampaign_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Deactivate a timed discount campaign",
+        "tags": [
+          "admin/manual-payments"
+        ]
+      }
+    },
+    "/api/v1/admin/coupons": {
+      "get": {
+        "operationId": "ManualPaymentAdminController_coupons_v1",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "One-based page number.",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Maximum records to return per page.",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List coupons",
+        "tags": [
+          "admin/manual-payments"
+        ]
+      },
+      "post": {
+        "operationId": "ManualPaymentAdminController_createCoupon_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCouponDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create a coupon",
+        "tags": [
+          "admin/manual-payments"
+        ]
+      }
+    },
+    "/api/v1/admin/coupons/{id}": {
+      "patch": {
+        "operationId": "ManualPaymentAdminController_updateCoupon_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCouponDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update a coupon",
+        "tags": [
+          "admin/manual-payments"
+        ]
+      }
+    },
+    "/api/v1/admin/coupons/{id}/activate": {
+      "post": {
+        "operationId": "ManualPaymentAdminController_activateCoupon_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Activate a coupon",
+        "tags": [
+          "admin/manual-payments"
+        ]
+      }
+    },
+    "/api/v1/admin/coupons/{id}/deactivate": {
+      "post": {
+        "operationId": "ManualPaymentAdminController_deactivateCoupon_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Deactivate a coupon",
+        "tags": [
+          "admin/manual-payments"
+        ]
+      }
+    },
+    "/api/v1/payments/paymob/webhook": {
+      "post": {
+        "operationId": "PaymobWebhookController_webhook_v1",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Receive a signed Paymob payment callback",
+        "tags": [
+          "payments/paymob"
         ]
       }
     },
@@ -24057,6 +24477,23 @@
           "targetId"
         ]
       },
+      "PricePreviewDto": {
+        "type": "object",
+        "properties": {
+          "targets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CartTargetDto"
+            }
+          },
+          "couponCode": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "targets"
+        ]
+      },
       "IdDeletedResponseDto": {
         "type": "object",
         "properties": {
@@ -24075,13 +24512,22 @@
       "CheckoutDto": {
         "type": "object",
         "properties": {
+          "paymentChannel": {
+            "type": "string",
+            "enum": [
+              "MANUAL",
+              "PAYMOB"
+            ],
+            "default": "MANUAL"
+          },
           "manualPaymentMethodId": {
             "type": "string"
+          },
+          "couponCode": {
+            "type": "string",
+            "example": "MIDTERMS25"
           }
-        },
-        "required": [
-          "manualPaymentMethodId"
-        ]
+        }
       },
       "PaymentMethodSnapshotDto": {
         "type": "object",
@@ -24218,7 +24664,8 @@
               "SUBMITTED",
               "APPROVED",
               "REJECTED",
-              "CANCELLED"
+              "CANCELLED",
+              "EXPIRED"
             ]
           },
           "total": {
@@ -24255,6 +24702,25 @@
             "items": {
               "$ref": "#/components/schemas/PaymentSubmissionSummaryDto"
             }
+          },
+          "paymentChannel": {
+            "type": "string"
+          },
+          "subtotal": {
+            "$ref": "#/components/schemas/MoneyDto"
+          },
+          "discount": {
+            "$ref": "#/components/schemas/MoneyDto"
+          },
+          "paymentExpiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "receiptReference": {
+            "type": "string",
+            "example": "RCT-20260822-ORDER",
+            "nullable": true
           }
         },
         "required": [
@@ -24581,7 +25047,8 @@
               "SUBMITTED",
               "APPROVED",
               "REJECTED",
-              "CANCELLED"
+              "CANCELLED",
+              "EXPIRED"
             ]
           },
           "studentUserId": {
@@ -24740,6 +25207,228 @@
         "required": [
           "rejectionReason"
         ]
+      },
+      "PromotionTargetDto": {
+        "type": "object",
+        "properties": {
+          "courseId": {
+            "type": "string"
+          },
+          "chapterId": {
+            "type": "string"
+          }
+        }
+      },
+      "CreateDiscountCampaignDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "PERCENTAGE",
+              "FIXED"
+            ]
+          },
+          "amount": {
+            "type": "number",
+            "description": "Basis points for PERCENTAGE, minor EGP units for FIXED"
+          },
+          "startsAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "endsAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "priority": {
+            "type": "number"
+          },
+          "appliesToAll": {
+            "type": "boolean"
+          },
+          "targets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PromotionTargetDto"
+            }
+          }
+        },
+        "required": [
+          "name",
+          "kind",
+          "amount",
+          "startsAt",
+          "endsAt"
+        ]
+      },
+      "UpdateDiscountCampaignDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "PERCENTAGE",
+              "FIXED"
+            ]
+          },
+          "amount": {
+            "type": "number"
+          },
+          "startsAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "endsAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "priority": {
+            "type": "number"
+          },
+          "appliesToAll": {
+            "type": "boolean"
+          },
+          "targets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PromotionTargetDto"
+            }
+          }
+        }
+      },
+      "CreateCouponDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "PERCENTAGE",
+              "FIXED"
+            ]
+          },
+          "amount": {
+            "type": "number",
+            "description": "Basis points for PERCENTAGE, minor EGP units for FIXED"
+          },
+          "startsAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "endsAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "priority": {
+            "type": "number"
+          },
+          "appliesToAll": {
+            "type": "boolean"
+          },
+          "targets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PromotionTargetDto"
+            }
+          },
+          "code": {
+            "type": "string"
+          },
+          "minimumOrderMinor": {
+            "type": "number"
+          },
+          "maximumDiscountMinor": {
+            "type": "number"
+          },
+          "usageLimit": {
+            "type": "number"
+          },
+          "perStudentUsageLimit": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "name",
+          "kind",
+          "amount",
+          "startsAt",
+          "endsAt",
+          "code"
+        ]
+      },
+      "UpdateCouponDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "PERCENTAGE",
+              "FIXED"
+            ]
+          },
+          "amount": {
+            "type": "number"
+          },
+          "startsAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "endsAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "priority": {
+            "type": "number"
+          },
+          "appliesToAll": {
+            "type": "boolean"
+          },
+          "targets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PromotionTargetDto"
+            }
+          },
+          "code": {
+            "type": "string"
+          },
+          "minimumOrderMinor": {
+            "type": "number"
+          },
+          "maximumDiscountMinor": {
+            "type": "number"
+          },
+          "usageLimit": {
+            "type": "number"
+          },
+          "perStudentUsageLimit": {
+            "type": "number"
+          }
+        }
       },
       "UpdateContentStudyStateDto": {
         "type": "object",
