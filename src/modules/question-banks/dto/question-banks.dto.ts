@@ -289,7 +289,8 @@ export class CreateQuestionDto {
   @MaxLength(10000, { each: true })
   acceptedAnswers?: string[];
   @ApiPropertyOptional({
-    description: 'Required for long-answer questions before review',
+    description:
+      'Optional long-answer rubric. When present, submitted essays receive AI grading; without one they enter the manual grading queue.',
   })
   @IsOptional()
   @IsString()

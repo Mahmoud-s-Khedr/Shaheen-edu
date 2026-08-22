@@ -302,7 +302,8 @@ For a short-answer or fill-in-the-blank question, include accepted answers:
 }
 ```
 
-For a long-answer question, include a grading rubric:
+For a long-answer question that should receive AI grading, include a grading
+rubric. Omitting it is supported when a human grader should assess responses:
 
 ```json
 {

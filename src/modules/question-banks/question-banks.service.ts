@@ -887,7 +887,11 @@ export class QuestionBanksService {
   async createImportedDraftWithClient(
     actor: RequestUser,
     dto: CreateQuestionDto & {
-      options?: Array<{ body: string; isCorrect: boolean; contentBlocks?: any[] }>;
+      options?: Array<{
+        body: string;
+        isCorrect: boolean;
+        contentBlocks?: any[];
+      }>;
       contextIds?: string[];
       contentBlocks?: any[];
       aiExplanation?: any;
@@ -906,15 +910,20 @@ export class QuestionBanksService {
   ) {
     this.admin(actor);
     const options = dto.options ?? [];
-    const choice = dto.type === QuestionType.SINGLE_CHOICE || dto.type === QuestionType.MULTIPLE_CHOICE;
+    const choice =
+      dto.type === QuestionType.SINGLE_CHOICE ||
+      dto.type === QuestionType.MULTIPLE_CHOICE;
     const correct = options.filter((option) => option.isCorrect).length;
     if (
-      (choice && (options.length < 2 || correct < 1 ||
-      (dto.type === QuestionType.SINGLE_CHOICE && correct !== 1) ||
-      (dto.type === QuestionType.MULTIPLE_CHOICE && correct < 2))) ||
+      (choice &&
+        (options.length < 2 ||
+          correct < 1 ||
+          (dto.type === QuestionType.SINGLE_CHOICE && correct !== 1) ||
+          (dto.type === QuestionType.MULTIPLE_CHOICE && correct < 2))) ||
       (!choice && options.length) ||
-      ((dto.type === QuestionType.SHORT_ANSWER || dto.type === QuestionType.FILL_IN_THE_BLANK) && !dto.acceptedAnswers?.length) ||
-      (dto.type === QuestionType.LONG_ANSWER && !dto.gradingRubric?.trim())
+      ((dto.type === QuestionType.SHORT_ANSWER ||
+        dto.type === QuestionType.FILL_IN_THE_BLANK) &&
+        !dto.acceptedAnswers?.length)
     )
       throw new BadRequestException(
         'Imported question does not satisfy its answer type',
@@ -924,10 +933,23 @@ export class QuestionBanksService {
     const contexts = await this.contextLinks(dto.contextIds);
     const importedBlocks = dto.contentBlocks?.length
       ? dto.contentBlocks
-      : [{ type: QuestionContentBlockType.TEXT, text: dto.body?.trim() || '[Content]' }];
-    const bodyProjection = (blocks: any[]) => blocks
-      .map((block) => block.type === QuestionContentBlockType.TEXT ? block.text?.trim() : block.caption?.trim() || block.altText?.trim() || `[${block.type}]`)
-      .filter(Boolean).join('\n\n') || '[Content]';
+      : [
+          {
+            type: QuestionContentBlockType.TEXT,
+            text: dto.body?.trim() || '[Content]',
+          },
+        ];
+    const bodyProjection = (blocks: any[]) =>
+      blocks
+        .map((block) =>
+          block.type === QuestionContentBlockType.TEXT
+            ? block.text?.trim()
+            : block.caption?.trim() ||
+              block.altText?.trim() ||
+              `[${block.type}]`,
+        )
+        .filter(Boolean)
+        .join('\n\n') || '[Content]';
     const importedBody = bodyProjection(importedBlocks);
     const item = await client.question.create({
       data: {
@@ -936,27 +958,55 @@ export class QuestionBanksService {
         courseId: dto.courseId,
         type: dto.type ?? QuestionType.SINGLE_CHOICE,
         body: importedBody,
-        contentBlocks: { create: importedBlocks.map((block, index) => ({ ...block, sortOrder: index + 1 })) },
+        contentBlocks: {
+          create: importedBlocks.map((block, index) => ({
+            ...block,
+            sortOrder: index + 1,
+          })),
+        },
         explanation: dto.explanation?.trim(),
-        acceptedAnswers: dto.acceptedAnswers?.map((answer) => answer.trim()) as any,
+        acceptedAnswers: dto.acceptedAnswers?.map((answer) =>
+          answer.trim(),
+        ) as any,
         gradingRubric: dto.gradingRubric?.trim(),
         answerOrigin: dto.answerOrigin,
-        answerReviewedAt: dto.answerOrigin === QuestionAnswerProvenance.HUMAN_REVIEWED ? new Date() : null,
-        answerReviewedById: dto.answerOrigin === QuestionAnswerProvenance.HUMAN_REVIEWED ? actor.id : null,
+        answerReviewedAt:
+          dto.answerOrigin === QuestionAnswerProvenance.HUMAN_REVIEWED
+            ? new Date()
+            : null,
+        answerReviewedById:
+          dto.answerOrigin === QuestionAnswerProvenance.HUMAN_REVIEWED
+            ? actor.id
+            : null,
         createdById: actor.id,
         updatedById: actor.id,
         placements: { create: resolvedPlacements },
         contexts: { create: contexts },
-        options: choice ? {
-          create: options.map((option, index) => {
-            const blocks = option.contentBlocks?.length ? option.contentBlocks : [{ type: QuestionContentBlockType.TEXT, text: option.body.trim() }];
-            return ({
-            body: bodyProjection(blocks),
-            contentBlocks: { create: blocks.map((block, blockIndex) => ({ ...block, sortOrder: blockIndex + 1 })) },
-            isCorrect: option.isCorrect,
-            sortOrder: index + 1,
-          }); }),
-        } : undefined,
+        options: choice
+          ? {
+              create: options.map((option, index) => {
+                const blocks = option.contentBlocks?.length
+                  ? option.contentBlocks
+                  : [
+                      {
+                        type: QuestionContentBlockType.TEXT,
+                        text: option.body.trim(),
+                      },
+                    ];
+                return {
+                  body: bodyProjection(blocks),
+                  contentBlocks: {
+                    create: blocks.map((block, blockIndex) => ({
+                      ...block,
+                      sortOrder: blockIndex + 1,
+                    })),
+                  },
+                  isCorrect: option.isCorrect,
+                  sortOrder: index + 1,
+                };
+              }),
+            }
+          : undefined,
         structuredExplanation: dto.aiExplanation
           ? {
               create: {
@@ -970,7 +1020,10 @@ export class QuestionBanksService {
             }
           : undefined,
       },
-      include: { contentBlocks: true, options: { include: { contentBlocks: true } } },
+      include: {
+        contentBlocks: true,
+        options: { include: { contentBlocks: true } },
+      },
     });
     await this.audit.recordWithClient(client, {
       actorUserId: actor.id,
@@ -1192,7 +1245,19 @@ export class QuestionBanksService {
       });
       if (content) await this.syncQuestionAssets(tx, id, content.rows);
     });
-    if (!dto.structuredExplanation && [dto.body, dto.contentBlocks, dto.contextIds, dto.type, dto.acceptedAnswers, dto.gradingRubric, dto.explanation, dto.answerOrigin].some((value) => value !== undefined))
+    if (
+      !dto.structuredExplanation &&
+      [
+        dto.body,
+        dto.contentBlocks,
+        dto.contextIds,
+        dto.type,
+        dto.acceptedAnswers,
+        dto.gradingRubric,
+        dto.explanation,
+        dto.answerOrigin,
+      ].some((value) => value !== undefined)
+    )
       await this.invalidateStructuredExplanation(id);
     await this.log(actor, 'QUESTION_UPDATED', 'Question', id);
     return this.getQuestion(actor, id);
@@ -1276,7 +1341,10 @@ export class QuestionBanksService {
       },
     });
     await this.prisma.questionExplanation.updateMany({
-      where: { question: { contexts: { some: { contextId: id } } }, staleAt: null },
+      where: {
+        question: { contexts: { some: { contextId: id } } },
+        staleAt: null,
+      },
       data: { staleAt: new Date() },
     });
     await this.log(actor, 'QUESTION_CONTEXT_UPDATED', 'QuestionContext', id);
@@ -1314,7 +1382,9 @@ export class QuestionBanksService {
         'Question body, explanation, and positive maxPoints are required',
       );
     if (question.structuredExplanation?.staleAt)
-      throw new ConflictException('Question explanation is stale and must be regenerated or reviewed');
+      throw new ConflictException(
+        'Question explanation is stale and must be regenerated or reviewed',
+      );
     if (
       question.source.status !== ContentStatus.PUBLISHED ||
       question.bank.status !== ContentStatus.PUBLISHED
@@ -1344,13 +1414,6 @@ export class QuestionBanksService {
     )
       throw new ConflictException(
         'Short and fill-in questions require accepted answers',
-      );
-    if (
-      question.type === QuestionType.LONG_ANSWER &&
-      !question.gradingRubric?.trim()
-    )
-      throw new ConflictException(
-        'Long-answer questions require a grading rubric',
       );
     if (question.answerOrigin === QuestionAnswerProvenance.AI_INFERRED)
       throw new ConflictException(
@@ -1461,10 +1524,15 @@ export class QuestionBanksService {
           updatedById: actor.id,
         },
       });
-      if (item.replacesQuestionId) await tx.question.update({
-        where: { id: item.replacesQuestionId },
-        data: { status: QuestionStatus.ARCHIVED, archivedAt: new Date(), updatedById: actor.id },
-      });
+      if (item.replacesQuestionId)
+        await tx.question.update({
+          where: { id: item.replacesQuestionId },
+          data: {
+            status: QuestionStatus.ARCHIVED,
+            archivedAt: new Date(),
+            updatedById: actor.id,
+          },
+        });
     });
     await this.log(actor, 'QUESTION_PUBLISHED', 'Question', id);
     return this.getQuestion(actor, id);

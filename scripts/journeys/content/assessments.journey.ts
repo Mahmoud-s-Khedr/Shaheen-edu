@@ -200,24 +200,18 @@ export const assessmentsJourney: JourneyDefinition = {
     });
 
     await step(
-      'Rejecting unsupported student voice uploads before transcription',
+      'Rejecting invalid student voice uploads before transcription',
       async () => {
         const upload = await clients.public.upload<any>(
           '/student/voice/transcriptions',
           {
             buffer: Buffer.from('not an audio recording'),
-            filename: 'answer.webm',
-            contentType: 'audio/webm',
+            filename: 'answer.txt',
+            contentType: 'text/plain',
           },
           { accessToken: student1Token, expected: 400 },
         );
         expectStatus(upload, 400);
-        assert(
-          String((upload.body as any)?.message ?? '').includes(
-            'Unsupported audio format',
-          ),
-          'Student voice transcription must reject unsupported recording formats without calling AI',
-        );
       },
     );
 
@@ -346,6 +340,32 @@ export const assessmentsJourney: JourneyDefinition = {
             'POST',
             `/admin/question-reports/${report.body.id}/review`,
             { status: 'RESOLVED', note: 'Reviewed and corrected.' },
+          ),
+          201,
+        );
+        const legacyReport = await student<any>(
+          student1Token,
+          'POST',
+          `/student/assessments/question-reports/${questionIds[1]}`,
+          { type: 'UNCLEAR_WORDING', note: 'The wording needs review.' },
+        );
+        expectStatus(legacyReport, 201);
+        const legacyReports = await admin.request<any>(
+          'GET',
+          '/admin/assessments/question-reports?status=OPEN',
+        );
+        expectStatus(legacyReports, 200);
+        assert(
+          legacyReports.body.data.some(
+            (item: any) => item.id === legacyReport.body.id,
+          ),
+          'The compatibility report list must include an open legacy report',
+        );
+        expectStatus(
+          await admin.request<any>(
+            'POST',
+            `/admin/assessments/question-reports/${legacyReport.body.id}/review`,
+            { status: 'RESOLVED', note: 'Wording review complete.' },
           ),
           201,
         );
@@ -577,6 +597,95 @@ export const assessmentsJourney: JourneyDefinition = {
     );
 
     await step(
+      'Ranking community errors and generating AI and tutor assessments',
+      async () => {
+        const practice = await student<any>(
+          student1Token,
+          'GET',
+          `/student/practice/questions?courseId=${courseId}`,
+        );
+        expectStatus(practice, 200);
+        const rankedQuestion = practice.body.data.find(
+          (question: any) => question.id === questionIds[0],
+        );
+        const wrongOption = rankedQuestion?.options?.find(
+          (option: any) => option.body === 'Wrong',
+        );
+        assert(
+          typeof wrongOption?.id === 'string',
+          'The ranked-question fixture must expose a selectable wrong option',
+        );
+        for (let attempt = 0; attempt < 20; attempt += 1) {
+          expectStatus(
+            await student<any>(
+              student1Token,
+              'POST',
+              `/student/practice/questions/${questionIds[0]}/attempts`,
+              { optionIds: [wrongOption.id] },
+            ),
+            201,
+          );
+        }
+        const community = await student<any>(
+          student1Token,
+          'GET',
+          `/student/questions/community-most-incorrect?subjectId=${subjectId}&courseId=${courseId}`,
+        );
+        expectStatus(community, 200);
+        const ranked = community.body.data.find(
+          (item: any) => item.questionId === questionIds[0],
+        );
+        assert(
+          ranked?.totalResponses >= 20 &&
+            ranked?.incorrectResponses >= 20 &&
+            !JSON.stringify(ranked).includes('options'),
+          'Community ranking must expose answer-safe cards after its minimum sample threshold',
+        );
+        const legacyCommunity = await student<any>(
+          student1Token,
+          'GET',
+          `/student/assessments/community-most-incorrect?subjectId=${subjectId}&courseId=${courseId}`,
+        );
+        expectStatus(legacyCommunity, 200);
+        const tutor = await student<any>(
+          student1Token,
+          'POST',
+          '/student/assessments/community-tutor',
+          {
+            questionIds: [questionIds[0]],
+            scopes: [{ courseId }],
+            title: factory.title('Community tutor quiz'),
+          },
+        );
+        expectStatus(tutor, 201);
+        assert(
+          tutor.body.mode === 'TUTOR' && tutor.body.questionCount === 1,
+          'A tutor quiz must freeze the student-selected ranked question',
+        );
+        context.created.assessments.push(tutor.body.id);
+        const aiPrompt = await student<any>(
+          student1Token,
+          'POST',
+          '/student/assessments/ai-prompt',
+          {
+            prompt: 'Give me one focused practice question about this course.',
+            questionCount: 1,
+            mode: 'TUTOR',
+            scopes: [{ courseId }],
+          },
+        );
+        expectStatus(aiPrompt, 201);
+        assert(
+          aiPrompt.body.generationType === 'AI_PROMPT' &&
+            aiPrompt.body.visibility === 'MINE' &&
+            aiPrompt.body.questionCount === 1,
+          'An AI prompt must produce a private frozen assessment from eligible questions',
+        );
+        context.created.assessments.push(aiPrompt.body.id);
+      },
+    );
+
+    await step(
       'Delivering written responses through autosave, submission, and manual grading',
       async () => {
         const short = await create('/admin/questions', {
@@ -773,6 +882,102 @@ export const assessmentsJourney: JourneyDefinition = {
         }
       },
     );
+
+    await step('Manually grading an essay without an AI rubric', async () => {
+      const manualQuestion = await create('/admin/questions', {
+        bankId: questionBankId,
+        sourceId: questionSourceId,
+        courseId,
+        placements: [{ chapterId }],
+        type: 'LONG_ANSWER',
+        body: 'Describe the synthetic concept for a manual grader.',
+        explanation: 'This response intentionally has no AI rubric.',
+        answerOrigin: 'HUMAN_REVIEWED',
+        maxPoints: 2,
+      });
+      expectStatus(
+        await admin.request<any>(
+          'POST',
+          `/admin/questions/${manualQuestion.id}/submit`,
+        ),
+        201,
+      );
+      expectStatus(
+        await admin.request<any>(
+          'POST',
+          `/admin/questions/${manualQuestion.id}/publish`,
+        ),
+        201,
+      );
+      context.created.questions.push(manualQuestion.id);
+      const assessment = await admin.request<any>(
+        'POST',
+        '/admin/assessments/custom',
+        {
+          questionIds: [manualQuestion.id],
+          scopes: [{ courseId }],
+          mode: 'EXAM',
+          title: factory.title('Manual essay assessment'),
+        },
+      );
+      expectStatus(assessment, 201);
+      context.created.assessments.push(assessment.body.id);
+      expectStatus(
+        await admin.request<any>(
+          'POST',
+          `/admin/assessments/${assessment.body.id}/publish`,
+        ),
+        201,
+      );
+      const started = await student<any>(
+        student1Token,
+        'POST',
+        `/student/assessments/${assessment.body.id}/attempts/start`,
+      );
+      expectStatus(started, 201);
+      const snapshot = started.body.questions[0];
+      expectStatus(
+        await student<any>(
+          student1Token,
+          'POST',
+          `/student/assessments/${assessment.body.id}/attempts/current/answers/${snapshot.id}`,
+          { responseText: 'A manually reviewed synthetic explanation.' },
+        ),
+        201,
+      );
+      expectStatus(
+        await student<any>(
+          student1Token,
+          'POST',
+          `/student/assessments/${assessment.body.id}/attempts/current/submit`,
+        ),
+        201,
+      );
+      const pending = await admin.request<any>(
+        'GET',
+        '/admin/assessments/grading/pending',
+      );
+      expectStatus(pending, 200);
+      const pendingAnswer = pending.body.find(
+        (answer: any) =>
+          answer.assessmentQuestion?.sourceQuestionId === manualQuestion.id,
+      );
+      assert(
+        typeof pendingAnswer?.id === 'string',
+        'An essay without an AI rubric must enter the manual grading queue',
+      );
+      expectStatus(
+        await admin.request<any>(
+          'POST',
+          `/admin/assessments/grading/answers/${pendingAnswer.id}`,
+          {
+            awardedPoints: 1,
+            feedback: 'The concept is present; add more detail.',
+          },
+        ),
+        201,
+      );
+    });
 
     await step(
       'Building an admin quiz from hand-picked questions and publishing it',

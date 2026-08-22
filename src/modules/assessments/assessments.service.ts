@@ -989,6 +989,10 @@ export class AssessmentsService {
       throw new NotFoundException(
         'One or more questions are not accessible in the selected scope',
       );
+    if (selected.some((q) => (q!.communityStats?.totalResponses ?? 0) < 20))
+      throw new BadRequestException(
+        'Selected questions must have at least 20 community responses',
+      );
     const assessment = await this.prisma.$transaction((tx) =>
       this.freezeSnapshot(tx, {
         ownerType: AssessmentOwnerType.STUDENT,
@@ -1295,11 +1299,16 @@ export class AssessmentsService {
       'audio/x-wav': 'wav',
       'audio/mpeg': 'mp3',
       'audio/mp4': 'm4a',
+      'audio/x-m4a': 'm4a',
       'audio/aac': 'aac',
       'audio/ogg': 'ogg',
       'audio/flac': 'flac',
+      'audio/webm': 'webm',
+      // Some browser recorders label an audio-only WebM recording this way.
+      'video/webm': 'webm',
     };
-    const format = formats[input.mimeType.toLowerCase()];
+    const mimeType = input.mimeType.split(';', 1)[0].trim().toLowerCase();
+    const format = formats[mimeType];
     if (!format) throw new BadRequestException('Unsupported audio format');
     const aiConfig = this.config.get('ai', { infer: true });
     if (
