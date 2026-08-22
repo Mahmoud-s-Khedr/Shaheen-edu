@@ -124,6 +124,7 @@ export const envValidationSchema = Joi.object({
   PLATFORM_COMPARISON_MIN_SAMPLE: Joi.number().integer().min(1).default(10),
   OPENROUTER_API_KEY: Joi.string().min(1).optional(),
   AI_QUESTION_IMPORT_MODEL: Joi.string().min(1).optional(),
+  AI_QUESTION_EXPLANATION_MODEL: Joi.string().min(1).optional(),
   AI_PDF_TRANSCRIPTION_MODEL: Joi.string().min(1).optional(),
   AI_PDF_TRANSCRIPTION_FALLBACK_MODEL: Joi.string().min(1).optional(),
   AI_PDF_TRANSCRIPTION_TIMEOUT_MS: Joi.number()

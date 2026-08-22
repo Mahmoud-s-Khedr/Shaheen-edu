@@ -49,6 +49,7 @@
     "journey:content:assessments": "tsx scripts/run-journey.ts CONTENT-016",
     "journey:content:leaderboard-performance": "tsx scripts/run-journey.ts CONTENT-017",
     "journey:content:ai-question-import": "tsx scripts/run-journey.ts CONTENT-019",
+    "journey:content:ai-question-explanations": "tsx scripts/run-journey.ts CONTENT-021",
     "journey:content:video-outline": "tsx scripts/run-journey.ts CONTENT-020",
     "test:ai-question-import": "tsx scripts/real-ai-question-import-test.ts",
     "evaluate:shared-context-ab": "tsx scripts/evaluate-shared-context-ab.ts",

@@ -591,6 +591,12 @@ export class QuestionBanksService {
           .join('\n\n')
       : undefined;
   }
+  private async invalidateStructuredExplanation(questionId: string) {
+    await this.prisma.questionExplanation.updateMany({
+      where: { questionId, staleAt: null },
+      data: { staleAt: new Date() },
+    });
+  }
   private async normalizedBlocks(
     body: string | undefined,
     blocks: any[] | undefined,
@@ -1175,6 +1181,8 @@ export class QuestionBanksService {
                       confidence: null,
                       answerOrigin: null,
                       warnings: Prisma.JsonNull,
+                      sourceFingerprint: null,
+                      staleAt: null,
                     },
                   },
                 },
@@ -1184,6 +1192,8 @@ export class QuestionBanksService {
       });
       if (content) await this.syncQuestionAssets(tx, id, content.rows);
     });
+    if (!dto.structuredExplanation && [dto.body, dto.contentBlocks, dto.contextIds, dto.type, dto.acceptedAnswers, dto.gradingRubric, dto.explanation, dto.answerOrigin].some((value) => value !== undefined))
+      await this.invalidateStructuredExplanation(id);
     await this.log(actor, 'QUESTION_UPDATED', 'Question', id);
     return this.getQuestion(actor, id);
   }
@@ -1265,6 +1275,10 @@ export class QuestionBanksService {
           : {}),
       },
     });
+    await this.prisma.questionExplanation.updateMany({
+      where: { question: { contexts: { some: { contextId: id } } }, staleAt: null },
+      data: { staleAt: new Date() },
+    });
     await this.log(actor, 'QUESTION_CONTEXT_UPDATED', 'QuestionContext', id);
     return this.prisma.questionContext.findUniqueOrThrow({
       where: { id: item.id },
@@ -1299,6 +1313,8 @@ export class QuestionBanksService {
       throw new ConflictException(
         'Question body, explanation, and positive maxPoints are required',
       );
+    if (question.structuredExplanation?.staleAt)
+      throw new ConflictException('Question explanation is stale and must be regenerated or reviewed');
     if (
       question.source.status !== ContentStatus.PUBLISHED ||
       question.bank.status !== ContentStatus.PUBLISHED
@@ -1433,16 +1449,22 @@ export class QuestionBanksService {
     if (item.status !== QuestionStatus.IN_REVIEW)
       throw new ConflictException('Only questions in review can be published');
     await this.validate(item);
-    await this.prisma.question.update({
-      where: { id },
-      data: {
-        status: QuestionStatus.PUBLISHED,
-        publishedAt: new Date(),
-        archivedAt: null,
-        reviewedAt: new Date(),
-        reviewedById: actor.id,
-        updatedById: actor.id,
-      },
+    await this.prisma.$transaction(async (tx) => {
+      await tx.question.update({
+        where: { id },
+        data: {
+          status: QuestionStatus.PUBLISHED,
+          publishedAt: new Date(),
+          archivedAt: null,
+          reviewedAt: new Date(),
+          reviewedById: actor.id,
+          updatedById: actor.id,
+        },
+      });
+      if (item.replacesQuestionId) await tx.question.update({
+        where: { id: item.replacesQuestionId },
+        data: { status: QuestionStatus.ARCHIVED, archivedAt: new Date(), updatedById: actor.id },
+      });
     });
     await this.log(actor, 'QUESTION_PUBLISHED', 'Question', id);
     return this.getQuestion(actor, id);
@@ -1515,6 +1537,7 @@ export class QuestionBanksService {
         sortOrder: item.options.length + 1,
       },
     });
+    await this.invalidateStructuredExplanation(id);
     await this.log(actor, 'QUESTION_OPTION_ADDED', 'Question', id, {
       optionId: created.id,
     });
@@ -1558,6 +1581,7 @@ export class QuestionBanksService {
           : {}),
       },
     });
+    await this.invalidateStructuredExplanation(id);
     await this.log(actor, 'QUESTION_OPTION_UPDATED', 'Question', id, {
       optionId,
     });
@@ -1578,6 +1602,7 @@ export class QuestionBanksService {
         data: { sortOrder: { decrement: 1 } },
       }),
     ]);
+    await this.invalidateStructuredExplanation(id);
     await this.log(actor, 'QUESTION_OPTION_DELETED', 'Question', id, {
       optionId,
     });

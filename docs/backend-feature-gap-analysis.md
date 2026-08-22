@@ -35,7 +35,7 @@ suites**.
 | Feature | Current state | Required backend work |
 | --- | --- | --- |
 | AI-prompt quiz | Not implemented. | Accept a student prompt plus permitted filters, turn it into a safe question-selection strategy, create an assessment from reviewed/published questions, and retain audit/rationale data. |
-| Student AI explanations/hints | Not implemented. | Generate controlled post-submission explanations, retain model/version/audit data, and add moderation and safety controls. |
+| Reusable AI question explanations | Admin-controlled generation and re-answer review are implemented. | Explanations are generated once per question/import, reviewed by admins, and reused through normal answer-reveal rules; per-student AI chat/hints remain deliberately out of scope. |
 | Ranked community-most-incorrect questions | Community statistics provide difficulty bands only. | Add student-safe ranked queries by incorrect rate with scope filters and minimum-sample/privacy thresholds. |
 | Student question reporting | Not implemented. | Add student question flags, moderation states, review actions, resolution notes, and audit history. |
 

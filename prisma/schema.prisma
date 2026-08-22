@@ -179,6 +179,18 @@ enum QuestionExplanationOrigin {
   HUMAN
 }
 
+enum QuestionAiExplanationRunMode {
+  INFER
+  GROUNDED
+}
+
+enum QuestionAiExplanationRunStatus {
+  PENDING_REVIEW
+  APPLIED
+  REJECTED
+  FAILED
+}
+
 enum QuestionAnswerOrigin {
   EXPLICIT
   INFERRED
@@ -959,12 +971,17 @@ model Question {
   importItem            QuestionImportItem?
   contexts              QuestionContextQuestion[]
   structuredExplanation QuestionExplanation?
+  explanationRuns       QuestionAiExplanationRun[]
+  replacesQuestionId    String?
+  replacesQuestion      Question?                 @relation("QuestionReplacement", fields: [replacesQuestionId], references: [id], onDelete: SetNull)
+  replacementQuestions  Question[]                @relation("QuestionReplacement")
   contentBlocks         QuestionContentBlock[]
 
   @@index([status, createdAt, id])
   @@index([bankId, status])
   @@index([sourceId, status])
   @@index([courseId, status])
+  @@index([replacesQuestionId])
 }
 
 model QuestionContext {
@@ -1010,10 +1027,48 @@ model QuestionExplanation {
   confidence          Float?
   answerOrigin        QuestionAnswerOrigin?
   warnings            Json?
+  sourceFingerprint   String?
+  staleAt             DateTime?
   reviewedAt          DateTime?
   reviewedById        String?
   createdAt           DateTime                  @default(now())
   updatedAt           DateTime                  @updatedAt
+}
+
+/// Every admin-triggered AI answer/explanation evaluation is retained for
+/// audit and review. Only an explicitly applied run can change a question.
+model QuestionAiExplanationRun {
+  id                    String                         @id @default(cuid())
+  questionId            String
+  question              Question                       @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  mode                  QuestionAiExplanationRunMode
+  status                QuestionAiExplanationRunStatus @default(PENDING_REVIEW)
+  questionSnapshot      Json
+  sourceFingerprint     String
+  languageCode          String                         @default("ar")
+  suppliedAnswer        Json?
+  additionalContext     String?
+  proposedAnswer        Json?
+  structuredExplanation Json?
+  confidence            Float?
+  warnings              Json?
+  conflictWarning       String?
+  model                 String
+  promptVersion         String
+  rawResponse           Json?
+  usage                 Json?
+  createdById           String
+  reviewedById          String?
+  reviewedAt            DateTime?
+  applyAnswer           Boolean?
+  applyExplanation      Boolean?
+  appliedQuestionId     String?
+  reviewNote            String?
+  createdAt             DateTime                       @default(now())
+  updatedAt             DateTime                       @updatedAt
+
+  @@index([questionId, createdAt])
+  @@index([status, createdAt])
 }
 
 model QuestionImportBatch {

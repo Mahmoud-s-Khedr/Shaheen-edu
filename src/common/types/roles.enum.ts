@@ -25,6 +25,8 @@ export {
   QuestionContextType,
   QuestionContentBlockType,
   QuestionExplanationOrigin,
+  QuestionAiExplanationRunMode,
+  QuestionAiExplanationRunStatus,
   QuestionAnswerOrigin,
   QuestionAnswerProvenance,
   QuestionImportInputType,

@@ -21,6 +21,7 @@ import { assessmentsJourney } from './content/assessments.journey.js';
 import { leaderboardPerformanceJourney } from './content/leaderboard-performance.journey.js';
 import { partnerAnalyticsJourney } from './content/partner-analytics.journey.js';
 import { aiQuestionImportJourney } from './content/ai-question-import.journey.js';
+import { aiQuestionExplanationsJourney } from './content/ai-question-explanations.journey.js';
 import { videoOutlineJourney } from './content/video-outline.journey.js';
 import type { JourneyDefinition } from './lib/types.js';
 
@@ -45,6 +46,7 @@ export const journeys: JourneyDefinition[] = [
   manualCommerceJourney,
   partnerAnalyticsJourney,
   aiQuestionImportJourney,
+  aiQuestionExplanationsJourney,
   studentLearningJourney,
   assetAccessJourney,
   assessmentsJourney,

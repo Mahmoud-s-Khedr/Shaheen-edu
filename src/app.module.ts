@@ -38,6 +38,7 @@ import { LeaderboardModule } from './modules/leaderboard/leaderboard.module';
 import { PerformanceModule } from './modules/performance/performance.module';
 import { PartnerAnalyticsModule } from './modules/partner-analytics/partner-analytics.module';
 import { QuestionImportModule } from './modules/ai-question-import/question-import.module';
+import { QuestionAiExplanationsModule } from './modules/ai-question-explanations/question-ai-explanations.module';
 import { UserAuthGuard } from './common/guards/user-auth.guard';
 import type { IncomingMessage } from 'http';
 import { normalizeCorrelationId } from './common/logging/correlation-id';
@@ -102,6 +103,7 @@ import { normalizeCorrelationId } from './common/logging/correlation-id';
     PerformanceModule,
     PartnerAnalyticsModule,
     QuestionImportModule,
+    QuestionAiExplanationsModule,
   ],
   providers: [
     // Global deny-by-default auth guard - @Public() opts a route out.

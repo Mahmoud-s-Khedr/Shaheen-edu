@@ -65,4 +65,8 @@ Purpose: validate the generated quiz/exam domain end to end. Depends on CONTENT-
 
 Purpose: queue an admin-owned raw-text import against a valid question-bank target and validate its redacted queue summary, list/detail/source-text and empty-candidate retrieval contracts. It also rejects ambiguous input, retries and source-text edits outside their valid worker states, and partner access. The journey intentionally does not call OpenRouter or wait for a worker; asynchronous extraction and generation require separately configured provider credentials. Depends on CONTENT-006. Script: `scripts/journeys/content/ai-question-import.journey.ts`.
 
+## CONTENT-021 — AI question explanation and re-answer review contract
+
+Purpose: validates admin-only AI re-answer route registration, grounded/infer request validation, empty retained-run retrieval, missing-run responses, and non-admin denial without calling OpenRouter. Successful generation is covered by provider-client unit tests because journeys never depend on live model credentials. Depends on CONTENT-006. Script: `scripts/journeys/content/ai-question-explanations.journey.ts`.
+
 All journey delivery APIs returning a browser URL (`url` or `embedUrl`) fetch that URL and consume its body; an issued URL alone is not treated as successful delivery.

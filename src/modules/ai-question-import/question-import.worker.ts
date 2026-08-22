@@ -133,12 +133,14 @@ export class QuestionImportWorker {
         'question-import-v3',
         'question-import-v4',
         'question-import-v5',
+        'question-import-v6',
       ].includes(batch.schemaVersion)
     )
       return;
     const v4 =
       batch.schemaVersion === 'question-import-v4' ||
-      batch.schemaVersion === 'question-import-v5';
+      batch.schemaVersion === 'question-import-v5' ||
+      batch.schemaVersion === 'question-import-v6';
     const v3 = batch.schemaVersion === 'question-import-v3' || v4;
     try {
       if (!batch.normalizedText) {
@@ -1001,7 +1003,7 @@ export class QuestionImportWorker {
   private async ensureSourceBlocks(batch: any, current: any) {
     const rootBatchId = batch.parentId ?? batch.id;
     const layoutPages: any[] =
-      current.schemaVersion === 'question-import-v5'
+      ['question-import-v5', 'question-import-v6'].includes(current.schemaVersion)
         ? await this.prisma.questionImportPage.findMany({
             where: { batchId: rootBatchId },
             select: { pageNumber: true, layoutEnvelopes: true },
@@ -2213,7 +2215,7 @@ export class QuestionImportWorker {
       const questions = Array.isArray(input) ? input : input.questions;
       const v4 =
         batch.schemaVersion === 'question-import-v4' ||
-        batch.schemaVersion === 'question-import-v5';
+        ['question-import-v5', 'question-import-v6'].includes(batch.schemaVersion);
       const v3 = batch.schemaVersion === 'question-import-v3' || v4;
       const r = await (v4
         ? this.extractV4(
@@ -2667,6 +2669,11 @@ export class QuestionImportWorker {
             placements: batch.placements,
             body: c.body,
             explanation: c.explanation,
+            aiExplanation: c.structuredExplanation,
+            aiAnswerOrigin: c.answerOrigin === 'SOURCE_MARKED' ? 'EXPLICIT' : 'INFERRED',
+            confidence: c.confidence,
+            warnings: c.warnings,
+            model: batch.model,
             type,
             options,
             acceptedAnswers,
@@ -2736,7 +2743,7 @@ export class QuestionImportWorker {
     c: ImportedCandidateV4,
     source: any,
   ) {
-    const isV5 = batch.schemaVersion === 'question-import-v5';
+    const isV5 = ['question-import-v5', 'question-import-v6'].includes(batch.schemaVersion);
     const type = c?.type;
     const choice = type === 'SINGLE_CHOICE' || type === 'MULTIPLE_CHOICE';
     const written = type === 'SHORT_ANSWER' || type === 'FILL_IN_THE_BLANK';
@@ -2822,6 +2829,13 @@ export class QuestionImportWorker {
           (item) => `${item.mediaKey}:${item.owner}:${item.ownerReference}`,
         ),
       ).size === assignments.length;
+    const structuredExplanationValid =
+      !isV5 ||
+      ['keywords', 'eliminationStrategy', 'whyCorrect', 'generalRule', 'whatIf', 'commonMistakes'].every(
+        (key) =>
+          typeof (c as any).structuredExplanation?.[key] === 'string' &&
+          (c as any).structuredExplanation[key].trim(),
+      );
     const hasOptionVisual = (index: number) =>
       assignments.some(
         (item) =>
@@ -2855,7 +2869,8 @@ export class QuestionImportWorker {
       Boolean(c.explanation?.trim()) &&
       ['SOURCE_MARKED', 'AI_INFERRED'].includes(c.answerOrigin) &&
       assignmentValid &&
-      sourceCitationValid;
+      sourceCitationValid &&
+      structuredExplanationValid;
     const warnings = c.warnings ?? [];
     const requirementSpecs = isV5
       ? this.visualLinker.requirements(c, source)
@@ -3126,6 +3141,11 @@ export class QuestionImportWorker {
             body: c.body,
             contentBlocks: questionBlocks,
             explanation: c.explanation,
+            aiExplanation: c.structuredExplanation,
+            aiAnswerOrigin: c.answerOrigin === 'SOURCE_MARKED' ? 'EXPLICIT' : 'INFERRED',
+            confidence: c.confidence,
+            warnings: c.warnings,
+            model: batch.model,
             type,
             options: visualOptions,
             acceptedAnswers,

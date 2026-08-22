@@ -213,8 +213,8 @@ export class QuestionImportService {
         model: this.model,
         schemaVersion:
           asset?.mimeType === 'application/pdf'
-            ? 'question-import-v5'
-            : 'question-import-v3',
+            ? 'question-import-v6'
+            : 'question-import-v6',
         createdById: actor.id,
       },
     });
@@ -605,7 +605,7 @@ export class QuestionImportService {
           'Only unresolved visual candidates can be updated',
         );
       if (
-        !['question-import-v4', 'question-import-v5'].includes(
+        !['question-import-v4', 'question-import-v5', 'question-import-v6'].includes(
           item.batch.schemaVersion,
         )
       )
@@ -751,7 +751,7 @@ export class QuestionImportService {
           reviewNote: dto.note?.trim() ?? null,
         })),
       });
-      if (item.batch.schemaVersion === 'question-import-v5') {
+      if (['question-import-v5', 'question-import-v6'].includes(item.batch.schemaVersion)) {
         const [requirements, assigned, allMedia] = await Promise.all([
           tx.questionImportVisualRequirement.findMany({
             where: { importItemId: item.id },
@@ -841,7 +841,7 @@ export class QuestionImportService {
           'Only unresolved review candidates can be accepted',
         );
       if (
-        item.batch.schemaVersion === 'question-import-v5' &&
+        ['question-import-v5', 'question-import-v6'].includes(item.batch.schemaVersion) &&
         !item.visualRequirements.every(
           (requirement: any) =>
             requirement.resolutionState ===
@@ -856,6 +856,7 @@ export class QuestionImportService {
       const acceptedVisuals = [
         'question-import-v4',
         'question-import-v5',
+        'question-import-v6',
       ].includes(item.batch.schemaVersion)
         ? item.mediaAssignments.filter(
             (assignment: any) =>
@@ -909,6 +910,8 @@ export class QuestionImportService {
           body: normalized.body,
           contentBlocks: questionBlocks,
           explanation: normalized.explanation,
+          aiExplanation: normalized.structuredExplanation,
+          model: item.batch.model,
           type: normalized.type,
           options: visualOptions,
           acceptedAnswers: normalized.acceptedAnswers,
@@ -1359,6 +1362,12 @@ export class QuestionImportService {
       acceptedAnswers: [],
       gradingRubric: undefined,
     };
+    if (value.structuredExplanation !== undefined) {
+      const fields = ['keywords', 'eliminationStrategy', 'whyCorrect', 'generalRule', 'whatIf', 'commonMistakes'];
+      if (!value.structuredExplanation || !fields.every((field) => typeof value.structuredExplanation[field] === 'string' && value.structuredExplanation[field].trim()))
+        throw new BadRequestException('Structured explanation must contain all six explanation sections');
+      output.structuredExplanation = Object.fromEntries(fields.map((field) => [field, value.structuredExplanation[field].trim()]));
+    }
     if (type === 'SINGLE_CHOICE' || type === 'MULTIPLE_CHOICE') {
       if (
         !Array.isArray(value.options) ||

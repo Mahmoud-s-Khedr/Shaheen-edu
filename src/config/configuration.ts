@@ -59,6 +59,7 @@ export interface AppConfig {
   ai: {
     openRouterApiKey: string;
     questionImportModel: string;
+    questionExplanationModel: string;
     pdfTranscriptionModel: string;
     pdfTranscriptionFallbackModel: string;
     workerConcurrency: number;
@@ -207,6 +208,10 @@ export default (): AppConfig => ({
   ai: {
     openRouterApiKey: process.env.OPENROUTER_API_KEY ?? '',
     questionImportModel: process.env.AI_QUESTION_IMPORT_MODEL ?? '',
+    questionExplanationModel:
+      process.env.AI_QUESTION_EXPLANATION_MODEL ??
+      process.env.AI_QUESTION_IMPORT_MODEL ??
+      '',
     pdfTranscriptionModel: process.env.AI_PDF_TRANSCRIPTION_MODEL ?? '',
     pdfTranscriptionFallbackModel:
       process.env.AI_PDF_TRANSCRIPTION_FALLBACK_MODEL ?? '',
