@@ -172,9 +172,9 @@ added:
 1. Add refunds/cancellations with entitlement reversal rules, payment expiry,
    coupons, timed discounts, and PSP integration only after the manual-payment
    operating process is settled.
-2. Add structured video topics/concepts and a direct higher-level completion
-   command only if the client needs server-authored node completion rather than
-   derived progress.
+2. Video topics/concepts are now optional client-facing metadata; retain
+   derived hierarchy progress and do not add a direct higher-level completion
+   command unless future product rules require an explicit override.
 3. Add AI question generation/explanations, automated PDF extraction, and
    question reporting/moderation behind explicit product and safety decisions.
 

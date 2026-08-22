@@ -3459,6 +3459,16 @@ No path, query, or header input.
       "sortOrder": "number"
     }
   ],
+  "videoOutline": [
+    {
+      "id": "string",
+      "title": "string",
+      "startSeconds": "number | null",
+      "endSeconds": "number | null",
+      "sortOrder": "number",
+      "concepts": [{ "id": "string", "title": "string", "sortOrder": "number" }]
+    }
+  ],
   "placement": {
     "id": "string",
     "courseId?": "string | null",
@@ -3471,6 +3481,28 @@ No path, query, or header input.
   "updatedAt": "ISO-8601 date-time",
   "publishedAt?": "ISO-8601 date-time",
   "archivedAt?": "ISO-8601 date-time"
+}
+```
+
+### `PUT /api/v1/admin/content-items/{id}/video-outline`
+
+**Authorization:** Bearer token; role must be `ADMIN` or `SUPER_ADMIN`
+
+Replaces the complete optional outline for a `VIDEO` content item. An empty
+`topics` array clears the outline. Each topic may have optional non-negative
+`startSeconds` and `endSeconds`; when both are supplied, end must be after
+start. If Bunny has reported a duration, both timestamps must be within it.
+
+```json
+{
+  "topics": [
+    {
+      "title": "Newton's second law",
+      "startSeconds": 0,
+      "endSeconds": 420,
+      "concepts": [{ "title": "force" }, { "title": "mass" }]
+    }
+  ]
 }
 ```
 
@@ -4235,6 +4267,8 @@ No path, query, or header input.
 
 **Request**
 
+- query `includeVideoOutline=true` (optional; applies to `VIDEO` items only)
+
 - path `id` (required)
 
 **Success response — HTTP 200 (DeliveryItem)**
@@ -4270,9 +4304,22 @@ No path, query, or header input.
   "studyState": {
     "lastOpenedAt": "ISO-8601 date-time | null",
     "playbackPositionSeconds": "number | null"
-  }
+  },
+  "videoOutline?": [
+    {
+      "id": "string",
+      "title": "string",
+      "startSeconds": "number | null",
+      "endSeconds": "number | null",
+      "sortOrder": "number",
+      "concepts": [{ "id": "string", "title": "string", "sortOrder": "number" }]
+    }
+  ]
 }
 ```
+
+`videoOutline` is omitted unless `includeVideoOutline=true` is sent. A video
+with no authored outline returns an empty array when the flag is present.
 
 ### `PUT /api/v1/student/content-items/{id}/study-state`
 

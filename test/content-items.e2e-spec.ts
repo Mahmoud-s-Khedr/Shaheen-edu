@@ -224,6 +224,97 @@ describe('Content items (e2e)', () => {
     ]);
   });
 
+  it('replaces an optional ordered outline for VIDEO content', async () => {
+    const video = await app.inject({
+      method: 'POST',
+      url: '/api/v1/admin/content-items',
+      headers: auth(),
+      payload: {
+        type: 'VIDEO',
+        title: 'Forces explained',
+        placement: { chapterId },
+      },
+    });
+    expect(video.statusCode).toBe(201);
+    const videoId = json(video).id as string;
+
+    const saved = await app.inject({
+      method: 'PUT',
+      url: `/api/v1/admin/content-items/${videoId}/video-outline`,
+      headers: auth(),
+      payload: {
+        topics: [
+          {
+            title: 'Newton second law',
+            startSeconds: 0,
+            endSeconds: 120,
+            concepts: [{ title: 'Force' }, { title: 'Mass' }],
+          },
+          { title: 'Worked example', concepts: [] },
+        ],
+      },
+    });
+    expect(saved.statusCode).toBe(200);
+    expect(json(saved).videoOutline).toMatchObject([
+      {
+        title: 'Newton second law',
+        startSeconds: 0,
+        endSeconds: 120,
+        sortOrder: 1,
+        concepts: [
+          { title: 'Force', sortOrder: 1 },
+          { title: 'Mass', sortOrder: 2 },
+        ],
+      },
+      { title: 'Worked example', sortOrder: 2, concepts: [] },
+    ]);
+
+    const detail = await app.inject({
+      method: 'GET',
+      url: `/api/v1/admin/content-items/${videoId}`,
+      headers: auth(),
+    });
+    expect(detail.statusCode).toBe(200);
+    expect(json(detail).videoOutline).toMatchObject([
+      { title: 'Newton second law' },
+      { title: 'Worked example' },
+    ]);
+
+    const invalidRange = await app.inject({
+      method: 'PUT',
+      url: `/api/v1/admin/content-items/${videoId}/video-outline`,
+      headers: auth(),
+      payload: {
+        topics: [
+          {
+            title: 'Invalid',
+            startSeconds: 120,
+            endSeconds: 120,
+            concepts: [],
+          },
+        ],
+      },
+    });
+    expect(invalidRange.statusCode).toBe(400);
+
+    const nonVideo = await app.inject({
+      method: 'PUT',
+      url: `/api/v1/admin/content-items/${initialContent.id}/video-outline`,
+      headers: auth(),
+      payload: { topics: [] },
+    });
+    expect(nonVideo.statusCode).toBe(400);
+
+    const cleared = await app.inject({
+      method: 'PUT',
+      url: `/api/v1/admin/content-items/${videoId}/video-outline`,
+      headers: auth(),
+      payload: { topics: [] },
+    });
+    expect(cleared.statusCode).toBe(200);
+    expect(json(cleared).videoOutline).toEqual([]);
+  });
+
   it('moves, atomically reorders, and hides archived items from normal lists', async () => {
     const first = await app.inject({
       method: 'POST',
@@ -330,7 +421,10 @@ describe('Content items (e2e)', () => {
 
     // Every admin content route, exercised as a student (403) and unauthenticated
     // (401). Authorization must be decided before any DTO validation or lookup.
-    type Route = { method: 'GET' | 'POST' | 'PATCH' | 'DELETE'; url: string };
+    type Route = {
+      method: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
+      url: string;
+    };
     const routes = (): Route[] => {
       const item = `/api/v1/admin/content-items/${initialContent.id}`;
       return [
@@ -340,6 +434,7 @@ describe('Content items (e2e)', () => {
         { method: 'POST', url: '/api/v1/admin/content-items/reorder' },
         { method: 'PATCH', url: item },
         { method: 'PATCH', url: `${item}/access` },
+        { method: 'PUT', url: `${item}/video-outline` },
         { method: 'POST', url: `${item}/move` },
         { method: 'POST', url: `${item}/publish` },
         { method: 'POST', url: `${item}/archive` },

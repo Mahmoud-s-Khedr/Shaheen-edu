@@ -7,6 +7,7 @@ import {
   Patch,
   Post,
   Query,
+  Put,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -23,6 +24,7 @@ import {
   ContentItemDetailDto,
   ContentItemSummaryDto,
   PaginatedContentItemResponseDto,
+  VideoOutlineResponseDto,
 } from '../../common/dto/api-response.dto';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import type { RequestUser } from '../../common/types/request-with-user.types';
@@ -34,6 +36,7 @@ import { ReorderContentItemDto } from './dto/reorder-content-item.dto';
 import { UpdateAccessTypeDto } from '../../common/dto/update-access-type.dto';
 import { UpdateContentItemDto } from './dto/update-content-item.dto';
 import { ContentItemsService } from './content-items.service';
+import { ReplaceVideoOutlineDto } from './dto/replace-video-outline.dto';
 
 @ApiTags('admin/content-items')
 @ApiBearerAuth()
@@ -76,9 +79,26 @@ export class ContentItemsController {
     return this.contentItemsService.update(actor, id, dto);
   }
 
+  @Put(':id/video-outline')
+  @ApiOperation({
+    summary: 'Replace the optional ordered topics and concepts for a video',
+  })
+  @ApiOkResponse({ type: VideoOutlineResponseDto })
+  replaceVideoOutline(
+    @CurrentUser() actor: RequestUser,
+    @Param('id') id: string,
+    @Body() dto: ReplaceVideoOutlineDto,
+  ) {
+    return this.contentItemsService.replaceVideoOutline(actor, id, dto);
+  }
+
   @Patch(':id/access')
   @ApiOperation({ summary: 'Set the content item access type' })
-  updateAccess(@CurrentUser() actor: RequestUser, @Param('id') id: string, @Body() dto: UpdateAccessTypeDto) {
+  updateAccess(
+    @CurrentUser() actor: RequestUser,
+    @Param('id') id: string,
+    @Body() dto: UpdateAccessTypeDto,
+  ) {
     return this.contentItemsService.updateAccess(actor, id, dto.accessType);
   }
 
@@ -111,49 +131,59 @@ export class ContentItemsController {
 
   @Post(':id/archive')
   @ApiOperation({ summary: 'Archive a content item' })
-  archive(
-    @CurrentUser() actor: RequestUser,
-    @Param('id') id: string,  ) {
+  archive(@CurrentUser() actor: RequestUser, @Param('id') id: string) {
     return this.contentItemsService.archive(actor, id);
   }
 
   @Post(':id/restore')
   @ApiOperation({ summary: 'Restore an archived content item as draft' })
-  restore(
-    @CurrentUser() actor: RequestUser,
-    @Param('id') id: string,  ) {
+  restore(@CurrentUser() actor: RequestUser, @Param('id') id: string) {
     return this.contentItemsService.restore(actor, id);
   }
 
   @Delete(':id')
   @ApiOperation({ summary: 'Delete an eligible draft content item' })
-  delete(
-    @CurrentUser() actor: RequestUser,
-    @Param('id') id: string,  ) {
+  delete(@CurrentUser() actor: RequestUser, @Param('id') id: string) {
     return this.contentItemsService.delete(actor, id);
   }
 
   @Post(':id/primary-asset')
   @ApiOperation({ summary: 'Set the content item primary asset' })
-  setPrimaryAsset(@CurrentUser() actor: RequestUser, @Param('id') id: string, @Body('assetId') assetId: string) {
+  setPrimaryAsset(
+    @CurrentUser() actor: RequestUser,
+    @Param('id') id: string,
+    @Body('assetId') assetId: string,
+  ) {
     return this.contentItemsService.setPrimaryAsset(actor, id, assetId);
   }
 
   @Post(':id/attachments')
   @ApiOperation({ summary: 'Add an ordered attachment to a content item' })
-  addAttachment(@CurrentUser() actor: RequestUser, @Param('id') id: string, @Body('assetId') assetId: string) {
+  addAttachment(
+    @CurrentUser() actor: RequestUser,
+    @Param('id') id: string,
+    @Body('assetId') assetId: string,
+  ) {
     return this.contentItemsService.addAttachment(actor, id, assetId);
   }
 
   @Post(':id/attachments/reorder')
   @ApiOperation({ summary: 'Reorder content item attachments' })
-  reorderAttachments(@CurrentUser() actor: RequestUser, @Param('id') id: string, @Body('assetIds') assetIds: string[]) {
+  reorderAttachments(
+    @CurrentUser() actor: RequestUser,
+    @Param('id') id: string,
+    @Body('assetIds') assetIds: string[],
+  ) {
     return this.contentItemsService.reorderAttachments(actor, id, assetIds);
   }
 
   @Delete(':id/attachments/:assetId')
   @ApiOperation({ summary: 'Remove an attachment from a content item' })
-  removeAttachment(@CurrentUser() actor: RequestUser, @Param('id') id: string, @Param('assetId') assetId: string) {
+  removeAttachment(
+    @CurrentUser() actor: RequestUser,
+    @Param('id') id: string,
+    @Param('assetId') assetId: string,
+  ) {
     return this.contentItemsService.removeAttachment(actor, id, assetId);
   }
 }

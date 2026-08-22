@@ -698,6 +698,45 @@ export class ContentAttachmentDto {
   sortOrder!: number;
 }
 
+export class VideoOutlineConceptDto {
+  @ApiProperty()
+  id!: string;
+
+  @ApiProperty()
+  title!: string;
+
+  @ApiProperty()
+  sortOrder!: number;
+}
+
+export class VideoOutlineTopicDto {
+  @ApiProperty()
+  id!: string;
+
+  @ApiProperty()
+  title!: string;
+
+  @ApiPropertyOptional({ type: Number, nullable: true })
+  startSeconds!: number | null;
+
+  @ApiPropertyOptional({ type: Number, nullable: true })
+  endSeconds!: number | null;
+
+  @ApiProperty()
+  sortOrder!: number;
+
+  @ApiProperty({ type: [VideoOutlineConceptDto] })
+  concepts!: VideoOutlineConceptDto[];
+}
+
+export class VideoOutlineResponseDto {
+  @ApiProperty()
+  contentItemId!: string;
+
+  @ApiProperty({ type: [VideoOutlineTopicDto] })
+  videoOutline!: VideoOutlineTopicDto[];
+}
+
 /** Full admin read shape; list and mutation responses remain summaries. */
 export class ContentItemDetailDto extends ContentItemSummaryDto {
   @ApiPropertyOptional({
@@ -708,6 +747,9 @@ export class ContentItemDetailDto extends ContentItemSummaryDto {
 
   @ApiProperty({ type: [ContentAttachmentDto] })
   attachments!: ContentAttachmentDto[];
+
+  @ApiProperty({ type: [VideoOutlineTopicDto] })
+  videoOutline!: VideoOutlineTopicDto[];
 }
 
 export class PaginatedContentItemResponseDto {

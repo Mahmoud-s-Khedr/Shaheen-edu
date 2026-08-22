@@ -79,8 +79,8 @@ asset, and integration surfaces needed to operate the platform.
 | [x]    | Chapter, lesson, and section lists with expand/collapse. | Ordered, cursor-paginated child routes exist for each level; expand/collapse is client state. [E-CATALOG]                                                                                                                              |
 | [x]    | Video player and protected assets.                       | Entitled delivery, protected asset access, Bunny playback, upload processing, and resume position are implemented. Player rendering and rich playback telemetry are client/product work. [E-CONTENT, E-MEDIA]                          |
 | [x]    | Subject/chapter/lesson progress indicators.              | Progress endpoints expose content, course, chapter, lesson, and section rollups. [E-CONTENT]                                                                                                                                           |
-| [-]    | Mark a chapter, lesson, or section complete.             | The API marks an individual content item complete; higher-level completion is derived. There is no direct command that completes a hierarchy node. [E-CONTENT]                                                                         |
-| [-]    | Topics/concepts in a video.                              | Content has title, description, type, duration, and attachments; structured topic/concept metadata is not modeled. [E-CONTENT]                                                                                                         |
+| [x]    | Mark a chapter, lesson, or section complete.             | The API marks individual content items complete; course, chapter, lesson, and section completion are derived automatically from accessible published descendant content. No direct hierarchy command is needed. [E-CONTENT]                 |
+| [x]    | Topics/concepts in a video.                              | Admins can author an optional ordered video outline with topics, concepts, and optional timestamps. Student delivery returns it only with `includeVideoOutline=true`, so existing clients remain unaffected. [E-CONTENT]                 |
 | [x]    | Previous/next navigation and course outline.             | Stable ordered hierarchy pages provide the data needed for client navigation; no separate navigation state is required. [E-CATALOG]                                                                                                    |
 | [x]    | Search chapters, lessons, and sections within a subject. | `GET /api/v1/student/catalog/search` returns matching published nodes with breadcrumbs and access/lock state. [E-CATALOG]                                                                                                              |
 
@@ -173,9 +173,8 @@ those operations remain admin-only.
    orders/entitlements views exist.
 4. **Commercial lifecycle:** no subject-level subscriptions, PSP/webhooks,
    refunds, coupons, timed discounts, or payment/entitlement expiry workflow.
-5. **Learning metadata and commands:** no structured video topics/concepts,
-   no direct higher-level completion command, and no unified performance model
-   combining direct practice and assessments in every analytic view.
+5. **Learning analytics:** no unified performance model combining direct
+   practice and assessments in every analytic view.
 6. **Operational workflows:** PDF/TXT-to-draft-question import
    is implemented. Scanned-PDF OCR, question-report/moderation flow, parent
    entity administration, and referral-partner reporting remain open.

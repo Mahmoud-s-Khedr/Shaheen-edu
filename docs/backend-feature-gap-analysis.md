@@ -26,9 +26,9 @@ suites**.
 
 | Feature | Current state | Required backend work |
 | --- | --- | --- |
-| Subject-level subscription | Course and chapter purchases are supported, but subjects are not purchasable products. | Add subject pricing/products, subject entitlements, cart/checkout support, and access-resolution rules. |
-| Complete chapter, lesson, or section directly | Only individual content items can be marked complete; hierarchy progress is derived. | Add explicit hierarchy completion commands and define override/progress rules. |
-| Video topics and concepts | Content includes title, description, duration, assets, and resume state, but no structured concepts. | Model ordered topics/concepts, optionally with timestamps, and expose them in student delivery. |
+| Subject-level subscription | Course and chapter purchases are supported. | Deliberately deferred: subjects are not purchasable products in the current commercial model. |
+| Complete chapter, lesson, or section directly | Individual content-item completion is persisted; hierarchy completion is derived automatically. | No direct hierarchy-completion command is required. A populated node is complete when every accessible published descendant item is complete. |
+| Video topics and concepts | Optional ordered video outlines are admin-authored and can include timestamped topics plus concepts. | Clients opt in through `includeVideoOutline=true`; ordinary delivery remains unchanged. |
 
 ### 2. AI quiz and question-bank intelligence
 

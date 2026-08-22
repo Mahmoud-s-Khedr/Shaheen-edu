@@ -16,6 +16,7 @@ export const studentLearningJourney: JourneyDefinition = {
     let lessonId = '';
     let sectionId = '';
     let contentItemId = '';
+    let chapterContentItemId = '';
     let questionId = '';
     let correctOptionId = '';
     let wrongOptionId = '';
@@ -97,6 +98,14 @@ export const studentLearningJourney: JourneyDefinition = {
         });
         contentItemId = content.id;
         context.created.contentItems.push(contentItemId);
+        const chapterContent = await create('/admin/content-items', {
+          type: 'TEXT',
+          title: factory.title('Learning chapter text'),
+          textBody: 'This item is placed directly on the chapter.',
+          placement: { chapterId },
+        });
+        chapterContentItemId = chapterContent.id;
+        context.created.contentItems.push(chapterContentItemId);
         for (const [resource, id] of [
           ['academic-grades', gradeId],
           ['subjects', subject.id],
@@ -105,6 +114,7 @@ export const studentLearningJourney: JourneyDefinition = {
           ['lessons', lessonId],
           ['sections', sectionId],
           ['content-items', contentItemId],
+          ['content-items', chapterContentItemId],
         ])
           await publish(resource, id);
 
@@ -243,40 +253,74 @@ export const studentLearningJourney: JourneyDefinition = {
       },
     );
 
-    await step('Deriving progress at every hierarchy level', async () => {
-      const progress = await student<any>('GET', '/student/progress');
-      expectStatus(progress, 200);
-      assert(
-        progress.body.content?.completedItems === 1 &&
-          progress.body.courses?.some(
+    await step(
+      'Deriving partial hierarchy progress from direct and descendant content',
+      async () => {
+        const progress = await student<any>('GET', '/student/progress');
+        expectStatus(progress, 200);
+        assert(
+          progress.body.content?.completedItems === 1 &&
+            progress.body.courses?.some(
+              (node: any) => node.id === courseId && !node.completed,
+            ),
+          'A course with an incomplete direct child must not be complete',
+        );
+        assert(
+          progress.body.chapters?.some(
+            (node: any) => node.id === chapterId && !node.completed,
+          ) &&
+            progress.body.lessons?.some(
+              (node: any) => node.id === lessonId && node.completed,
+            ) &&
+            progress.body.sections?.some(
+              (node: any) => node.id === sectionId && node.completed,
+            ),
+          'Only the populated completed lesson and section should roll up',
+        );
+      },
+    );
+
+    await step(
+      'Completing the remaining direct item automatically completes ancestors',
+      async () => {
+        expectStatus(
+          await student<any>(
+            'POST',
+            `/student/content-items/${chapterContentItemId}/complete`,
+          ),
+          201,
+        );
+        const progress = await student<any>('GET', '/student/progress');
+        expectStatus(progress, 200);
+        assert(
+          progress.body.content?.completedItems === 2 &&
+            progress.body.courses?.some(
+              (node: any) => node.id === courseId && node.completed,
+            ) &&
+            progress.body.chapters?.some(
+              (node: any) => node.id === chapterId && node.completed,
+            ) &&
+            progress.body.lessons?.some(
+              (node: any) => node.id === lessonId && node.completed,
+            ) &&
+            progress.body.sections?.some(
+              (node: any) => node.id === sectionId && node.completed,
+            ),
+          'Completing every direct and descendant item must complete all ancestors',
+        );
+        const library = await student<any>(
+          'GET',
+          `/student/library/COURSE/${courseId}/progress`,
+        );
+        expectStatus(library, 200);
+        assert(
+          library.body.nodes?.some(
             (node: any) => node.id === courseId && node.completed,
           ),
-        'Course progress must be derived from the completed content item',
-      );
-      assert(
-        progress.body.chapters?.some(
-          (node: any) => node.id === chapterId && node.completed,
-        ) &&
-          progress.body.lessons?.some(
-            (node: any) => node.id === lessonId && node.completed,
-          ) &&
-          progress.body.sections?.some(
-            (node: any) => node.id === sectionId && node.completed,
-          ),
-        'Chapter, lesson, and section must roll up completion',
-      );
-      const library = await student<any>(
-        'GET',
-        `/student/library/COURSE/${courseId}/progress`,
-      );
-      expectStatus(library, 200);
-      assert(
-        library.body.nodes?.some(
-          (node: any) => node.id === courseId && node.completed,
-        ),
-        'Detailed library progress must include the completed course',
-      );
-    });
+          'Detailed library progress must include the completed course',
+        );
+      },
+    );
 
     await step(
       'Recording immutable wrong and correct direct-practice attempts',

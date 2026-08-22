@@ -23,8 +23,12 @@ import {
 import type { RequestUser } from '../../common/types/request-with-user.types';
 import type { CreateContentItemDto } from './dto/create-content-item.dto';
 import type { UpdateContentItemDto } from './dto/update-content-item.dto';
+import type { ReplaceVideoOutlineDto } from './dto/replace-video-outline.dto';
 import type { QueryContentItemDto } from './dto/query-content-item.dto';
-import { paginateArabicSearch, sqlAnd } from '../../common/search/arabic-search';
+import {
+  paginateArabicSearch,
+  sqlAnd,
+} from '../../common/search/arabic-search';
 import { contentStatusScope } from '../../common/search/content-scope';
 import type { MoveContentItemDto } from './dto/move-content-item.dto';
 import type { ReorderContentItemDto } from './dto/reorder-content-item.dto';
@@ -113,7 +117,9 @@ export class ContentItemsService {
             ? await this.prisma.lesson.findUnique({
                 where: { id: target.id },
                 include: {
-                  chapter: { include: { course: { include: { subject: true } } } },
+                  chapter: {
+                    include: { course: { include: { subject: true } } },
+                  },
                 },
               })
             : await this.prisma.section.findUnique({
@@ -121,7 +127,9 @@ export class ContentItemsService {
                 include: {
                   lesson: {
                     include: {
-                      chapter: { include: { course: { include: { subject: true } } } },
+                      chapter: {
+                        include: { course: { include: { subject: true } } },
+                      },
                     },
                   },
                 },
@@ -173,6 +181,7 @@ export class ContentItemsService {
       include: {
         placement: { include: this.placementNames },
         primaryAsset: { include: { video: true } },
+        videoOutlineTopics: { select: { id: true } },
       },
     });
     if (!item || !item.placement)
@@ -200,6 +209,12 @@ export class ContentItemsService {
                 sizeBytes: true,
               },
             },
+          },
+        },
+        videoOutlineTopics: {
+          orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
+          include: {
+            concepts: { orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }] },
           },
         },
       },
@@ -337,7 +352,8 @@ export class ContentItemsService {
           : query.sectionId
             ? 'sectionId'
             : undefined;
-    const placementId = query.courseId ?? query.chapterId ?? query.lessonId ?? query.sectionId;
+    const placementId =
+      query.courseId ?? query.chapterId ?? query.lessonId ?? query.sectionId;
     const { data: items, total } = await paginateArabicSearch({
       prisma: this.prisma,
       delegate: this.prisma.contentItem,
@@ -347,8 +363,12 @@ export class ContentItemsService {
         join: Prisma.sql`JOIN "ContentPlacement" p ON p."contentItemId" = t.id`,
         where: sqlAnd(
           contentStatusScope(query.status),
-          query.type ? Prisma.sql`t.type = ${query.type}::"ContentItemType"` : undefined,
-          query.accessType ? Prisma.sql`t."accessType" = ${query.accessType}::"AccessType"` : undefined,
+          query.type
+            ? Prisma.sql`t.type = ${query.type}::"ContentItemType"`
+            : undefined,
+          query.accessType
+            ? Prisma.sql`t."accessType" = ${query.accessType}::"AccessType"`
+            : undefined,
           placementColumn && placementId
             ? Prisma.sql`${Prisma.raw(`p."${placementColumn}"`)} = ${placementId}`
             : undefined,
@@ -386,6 +406,10 @@ export class ContentItemsService {
     const externalUrl =
       dto.externalUrl === undefined ? item.externalUrl : dto.externalUrl;
     this.assertTypeFields(type, textBody, externalUrl);
+    if (type !== ContentItemType.VIDEO && item.videoOutlineTopics.length > 0)
+      throw new ConflictException(
+        'Remove the video outline before changing this item to a non-video type',
+      );
     await this.prisma.contentItem.updateMany({
       where: { id },
       data: {
@@ -397,7 +421,7 @@ export class ContentItemsService {
         accessType: dto.accessType,
         estimatedDuration: dto.estimatedDuration,
         updatedById: actor.id,
-        },
+      },
     });
     await this.auditService.record({
       actorUserId: actor.id,
@@ -409,11 +433,120 @@ export class ContentItemsService {
     return this.toSummary(await this.getOrThrow(id));
   }
 
+  private assertVideoOutline(
+    dto: ReplaceVideoOutlineDto,
+    durationSeconds: number | null | undefined,
+  ) {
+    for (const topic of dto.topics) {
+      if (!topic.title.trim())
+        throw new BadRequestException(
+          'Video outline topic titles cannot be blank',
+        );
+      if (topic.concepts.some((concept) => !concept.title.trim()))
+        throw new BadRequestException(
+          'Video outline concept titles cannot be blank',
+        );
+      const startSeconds = topic.startSeconds ?? null;
+      const endSeconds = topic.endSeconds ?? null;
+      if (
+        startSeconds !== null &&
+        endSeconds !== null &&
+        endSeconds <= startSeconds
+      )
+        throw new BadRequestException(
+          'Video outline endSeconds must be greater than startSeconds',
+        );
+      if (
+        durationSeconds !== null &&
+        durationSeconds !== undefined &&
+        ((startSeconds !== null && startSeconds > durationSeconds) ||
+          (endSeconds !== null && endSeconds > durationSeconds))
+      )
+        throw new BadRequestException(
+          'Video outline timestamps must not exceed the video duration',
+        );
+    }
+  }
+
+  private videoOutline(topics: any[]) {
+    return topics.map((topic) => ({
+      id: topic.id,
+      title: topic.title,
+      startSeconds: topic.startSeconds,
+      endSeconds: topic.endSeconds,
+      sortOrder: topic.sortOrder,
+      concepts: topic.concepts.map((concept: any) => ({
+        id: concept.id,
+        title: concept.title,
+        sortOrder: concept.sortOrder,
+      })),
+    }));
+  }
+
+  async replaceVideoOutline(
+    actor: RequestUser,
+    id: string,
+    dto: ReplaceVideoOutlineDto,
+  ) {
+    this.assertActorRole(actor);
+    const item = await this.getOrThrow(id);
+    if (item.type !== ContentItemType.VIDEO)
+      throw new BadRequestException(
+        'Video outlines can only be attached to VIDEO content items',
+      );
+    this.assertVideoOutline(dto, item.primaryAsset?.video?.durationSeconds);
+    await this.prisma.$transaction(async (tx) => {
+      await tx.videoOutlineTopic.deleteMany({ where: { contentItemId: id } });
+      for (const [topicIndex, topic] of dto.topics.entries())
+        await tx.videoOutlineTopic.create({
+          data: {
+            contentItemId: id,
+            title: topic.title.trim(),
+            startSeconds: topic.startSeconds ?? null,
+            endSeconds: topic.endSeconds ?? null,
+            sortOrder: topicIndex + 1,
+            concepts: {
+              create: topic.concepts.map((concept, conceptIndex) => ({
+                title: concept.title.trim(),
+                sortOrder: conceptIndex + 1,
+              })),
+            },
+          },
+        });
+      await tx.contentItem.update({
+        where: { id },
+        data: { updatedById: actor.id },
+      });
+    });
+    await this.auditService.record({
+      actorUserId: actor.id,
+      action: 'CONTENT_VIDEO_OUTLINE_REPLACED',
+      targetType: 'ContentItem',
+      targetId: id,
+      metadata: { topicCount: dto.topics.length },
+    });
+    return {
+      contentItemId: id,
+      videoOutline: this.videoOutline(
+        (await this.getDetailOrThrow(id)).videoOutlineTopics,
+      ),
+    };
+  }
+
   async updateAccess(actor: RequestUser, id: string, accessType: AccessType) {
     this.assertActorRole(actor);
     await this.getOrThrow(id);
-    await this.prisma.contentItem.update({ where: { id }, data: { accessType, updatedById: actor.id } });
-    await this.auditService.record({ actorUserId: actor.id, action: 'CONTENT_ITEM_ACCESS_UPDATED', targetType: 'ContentItem', targetId: id, metadata: { accessType } });
+    await this.prisma.contentItem.update({
+      where: { id },
+      data: { accessType, updatedById: actor.id },
+    });
+    await this.auditService.record({
+      actorUserId: actor.id,
+      action: 'CONTENT_ITEM_ACCESS_UPDATED',
+      targetType: 'ContentItem',
+      targetId: id,
+      metadata: { accessType },
+    });
     return this.toSummary(await this.getOrThrow(id));
   }
 
@@ -436,12 +569,12 @@ export class ContentItemsService {
         sortOrder: item.sortOrder,
       })),
     );
-        try {
+    try {
       await this.prisma.$transaction(async (tx) => {
         for (const step of plan.phase1) {
-    await tx.contentPlacement.updateMany({
+          await tx.contentPlacement.updateMany({
             where: { id: step.id },
-            data: { sortOrder: step.sortOrder, },
+            data: { sortOrder: step.sortOrder },
           });
         }
         for (const step of plan.phase2)
@@ -477,7 +610,9 @@ export class ContentItemsService {
     const resolvedTarget = await this.assertValidTarget(target);
     const oldTarget = this.targetFromPlacement(item.placement);
     if (oldTarget.field === target.field && oldTarget.id === target.id) {
-      throw new ConflictException('Use reorder to change position within the same parent');
+      throw new ConflictException(
+        'Use reorder to change position within the same parent',
+      );
     }
     const max = await this.prisma.contentPlacement.aggregate({
       where: this.scopeWhere(target),
@@ -496,7 +631,7 @@ export class ContentItemsService {
       await this.prisma.$transaction(async (tx) => {
         await tx.contentPlacement.updateMany({
           where: { id: item.placement.id },
-          data: { sortOrder: 1_000_000_000, },
+          data: { sortOrder: 1_000_000_000 },
         });
 
         await tx.contentPlacement.updateMany({
@@ -504,14 +639,14 @@ export class ContentItemsService {
             ...this.scopeWhere(oldTarget),
             sortOrder: { gt: item.placement.sortOrder },
           },
-          data: { sortOrder: { decrement: 1 }, },
+          data: { sortOrder: { decrement: 1 } },
         });
         await tx.contentPlacement.updateMany({
           where: {
             ...this.scopeWhere(target),
             sortOrder: { gte: targetSortOrder },
           },
-          data: { sortOrder: { increment: 1 }, },
+          data: { sortOrder: { increment: 1 } },
         });
         await tx.contentPlacement.update({
           where: { id: item.placement.id },
@@ -551,7 +686,7 @@ export class ContentItemsService {
       data: {
         status: ContentStatus.ARCHIVED,
         archivedAt: new Date(),
-        },
+      },
     });
     await this.auditService.record({
       actorUserId: actor.id,
@@ -565,7 +700,12 @@ export class ContentItemsService {
   async publish(actor: RequestUser, id: string) {
     this.assertActorRole(actor);
     await this.publicationService.publish('contentItem', id, actor.id);
-    await this.auditService.record({ actorUserId: actor.id, action: 'CONTENT_ITEM_PUBLISHED', targetType: 'ContentItem', targetId: id });
+    await this.auditService.record({
+      actorUserId: actor.id,
+      action: 'CONTENT_ITEM_PUBLISHED',
+      targetType: 'ContentItem',
+      targetId: id,
+    });
     return this.toSummary(await this.getOrThrow(id));
   }
 
@@ -577,7 +717,7 @@ export class ContentItemsService {
         status: ContentStatus.DRAFT,
         archivedAt: null,
         publishedAt: null,
-        },
+      },
     });
     await this.auditService.record({
       actorUserId: actor.id,
@@ -588,10 +728,7 @@ export class ContentItemsService {
     return this.toSummary(await this.getOrThrow(id));
   }
 
-  async delete(
-    actor: RequestUser,
-    id: string
-  ): Promise<void> {
+  async delete(actor: RequestUser, id: string): Promise<void> {
     this.assertActorRole(actor);
     const item = await this.getOrThrow(id);
     if (item.status !== ContentStatus.DRAFT)
@@ -615,32 +752,111 @@ export class ContentItemsService {
       throw new ConflictException('Archived assets cannot be linked');
     this.assets.assertCompatible(asset, item.type);
     const previousAssetId = item.primaryAssetId;
-    await this.prisma.contentItem.update({ where: { id }, data: { primaryAssetId: assetId, updatedById: actor.id } });
-    await this.auditService.record({ actorUserId: actor.id, action: 'CONTENT_PRIMARY_ASSET_SET', targetType: 'ContentItem', targetId: id, metadata: { assetId } });
-    if (previousAssetId && previousAssetId !== assetId) await this.assets.archiveIfUnreferenced(actor, previousAssetId);
+    await this.prisma.contentItem.update({
+      where: { id },
+      data: { primaryAssetId: assetId, updatedById: actor.id },
+    });
+    await this.auditService.record({
+      actorUserId: actor.id,
+      action: 'CONTENT_PRIMARY_ASSET_SET',
+      targetType: 'ContentItem',
+      targetId: id,
+      metadata: { assetId },
+    });
+    if (previousAssetId && previousAssetId !== assetId)
+      await this.assets.archiveIfUnreferenced(actor, previousAssetId);
     return this.toSummary(await this.getOrThrow(id));
   }
 
   async addAttachment(actor: RequestUser, id: string, assetId: string) {
-    this.assertActorRole(actor); await this.getOrThrow(id); const asset = await this.assets.getReady(assetId); if (asset.kind === 'PAYMENT_PROOF') throw new BadRequestException('Payment proofs cannot be content attachments');
-    const max = await this.prisma.assetReference.aggregate({ where: { contentItemId: id }, _max: { sortOrder: true } });
-    await this.prisma.assetReference.create({ data: { contentItemId: id, assetId, sortOrder: (max._max.sortOrder ?? 0) + 1 } });
-    await this.auditService.record({ actorUserId: actor.id, action: 'CONTENT_ATTACHMENT_ADDED', targetType: 'ContentItem', targetId: id, metadata: { assetId } });
+    this.assertActorRole(actor);
+    await this.getOrThrow(id);
+    const asset = await this.assets.getReady(assetId);
+    if (asset.kind === 'PAYMENT_PROOF')
+      throw new BadRequestException(
+        'Payment proofs cannot be content attachments',
+      );
+    const max = await this.prisma.assetReference.aggregate({
+      where: { contentItemId: id },
+      _max: { sortOrder: true },
+    });
+    await this.prisma.assetReference.create({
+      data: {
+        contentItemId: id,
+        assetId,
+        sortOrder: (max._max.sortOrder ?? 0) + 1,
+      },
+    });
+    await this.auditService.record({
+      actorUserId: actor.id,
+      action: 'CONTENT_ATTACHMENT_ADDED',
+      targetType: 'ContentItem',
+      targetId: id,
+      metadata: { assetId },
+    });
     return this.toSummary(await this.getOrThrow(id));
   }
 
   async removeAttachment(actor: RequestUser, id: string, assetId: string) {
-    this.assertActorRole(actor); const ref = await this.prisma.assetReference.findUnique({ where: { contentItemId_assetId: { contentItemId: id, assetId } } }); if (!ref) throw new NotFoundException('Attachment not found');
-    await this.prisma.$transaction([this.prisma.assetReference.delete({ where: { id: ref.id } }), this.prisma.assetReference.updateMany({ where: { contentItemId: id, sortOrder: { gt: ref.sortOrder } }, data: { sortOrder: { decrement: 1 } } })]);
-    await this.auditService.record({ actorUserId: actor.id, action: 'CONTENT_ATTACHMENT_REMOVED', targetType: 'ContentItem', targetId: id, metadata: { assetId } });
+    this.assertActorRole(actor);
+    const ref = await this.prisma.assetReference.findUnique({
+      where: { contentItemId_assetId: { contentItemId: id, assetId } },
+    });
+    if (!ref) throw new NotFoundException('Attachment not found');
+    await this.prisma.$transaction([
+      this.prisma.assetReference.delete({ where: { id: ref.id } }),
+      this.prisma.assetReference.updateMany({
+        where: { contentItemId: id, sortOrder: { gt: ref.sortOrder } },
+        data: { sortOrder: { decrement: 1 } },
+      }),
+    ]);
+    await this.auditService.record({
+      actorUserId: actor.id,
+      action: 'CONTENT_ATTACHMENT_REMOVED',
+      targetType: 'ContentItem',
+      targetId: id,
+      metadata: { assetId },
+    });
   }
 
   async reorderAttachments(actor: RequestUser, id: string, assetIds: string[]) {
     this.assertActorRole(actor);
-    const references = await this.prisma.assetReference.findMany({ where: { contentItemId: id }, select: { id: true, assetId: true } });
-    if (assetIds.length !== references.length || new Set(assetIds).size !== assetIds.length || references.some((reference) => !assetIds.includes(reference.assetId))) throw new BadRequestException('assetIds must contain every attachment exactly once');
-    await this.prisma.$transaction(async (tx) => { for (let index = 0; index < references.length; index++) await tx.assetReference.update({ where: { id: references[index].id }, data: { sortOrder: 1_000_000 + index } }); for (let index = 0; index < assetIds.length; index++) await tx.assetReference.update({ where: { contentItemId_assetId: { contentItemId: id, assetId: assetIds[index] } }, data: { sortOrder: index + 1 } }); });
-    await this.auditService.record({ actorUserId: actor.id, action: 'CONTENT_ATTACHMENTS_REORDERED', targetType: 'ContentItem', targetId: id, metadata: { assetIds } });
+    const references = await this.prisma.assetReference.findMany({
+      where: { contentItemId: id },
+      select: { id: true, assetId: true },
+    });
+    if (
+      assetIds.length !== references.length ||
+      new Set(assetIds).size !== assetIds.length ||
+      references.some((reference) => !assetIds.includes(reference.assetId))
+    )
+      throw new BadRequestException(
+        'assetIds must contain every attachment exactly once',
+      );
+    await this.prisma.$transaction(async (tx) => {
+      for (let index = 0; index < references.length; index++)
+        await tx.assetReference.update({
+          where: { id: references[index].id },
+          data: { sortOrder: 1_000_000 + index },
+        });
+      for (let index = 0; index < assetIds.length; index++)
+        await tx.assetReference.update({
+          where: {
+            contentItemId_assetId: {
+              contentItemId: id,
+              assetId: assetIds[index],
+            },
+          },
+          data: { sortOrder: index + 1 },
+        });
+    });
+    await this.auditService.record({
+      actorUserId: actor.id,
+      action: 'CONTENT_ATTACHMENTS_REORDERED',
+      targetType: 'ContentItem',
+      targetId: id,
+      metadata: { assetIds },
+    });
   }
 
   private primaryAssetSummary(asset: any) {
@@ -700,11 +916,13 @@ export class ContentItemsService {
             status: item.primaryAsset.status,
             filename: item.primaryAsset.filename,
             processingStatus: item.primaryAsset.video?.processingStatus ?? null,
-            processingProgress: item.primaryAsset.video?.processingProgress ?? null,
+            processingProgress:
+              item.primaryAsset.video?.processingProgress ?? null,
             video: item.primaryAsset.video
               ? {
                   processingStatus: item.primaryAsset.video.processingStatus,
-                  processingProgress: item.primaryAsset.video.processingProgress,
+                  processingProgress:
+                    item.primaryAsset.video.processingProgress,
                   attempt: item.primaryAsset.video.attempt,
                   readyAt: item.primaryAsset.readyAt,
                   failedAt: item.primaryAsset.failedAt,
@@ -716,6 +934,7 @@ export class ContentItemsService {
         ...reference.asset,
         sortOrder: reference.sortOrder,
       })),
+      videoOutline: this.videoOutline(item.videoOutlineTopics),
     };
   }
 }

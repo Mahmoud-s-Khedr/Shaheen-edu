@@ -7982,6 +7982,52 @@
         ]
       }
     },
+    "/api/v1/admin/content-items/{id}/video-outline": {
+      "put": {
+        "operationId": "ContentItemsController_replaceVideoOutline_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReplaceVideoOutlineDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VideoOutlineResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Replace the optional ordered topics and concepts for a video",
+        "tags": [
+          "admin/content-items"
+        ]
+      }
+    },
     "/api/v1/admin/content-items/{id}/access": {
       "patch": {
         "operationId": "ContentItemsController_updateAccess_v1",
@@ -8849,6 +8895,18 @@
             "in": "path",
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "includeVideoOutline",
+            "required": false,
+            "in": "query",
+            "description": "Include the optional ordered topics and concepts for a video.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true"
+              ]
             }
           }
         ],
@@ -21199,6 +21257,59 @@
           "sortOrder"
         ]
       },
+      "VideoOutlineConceptDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "sortOrder": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "sortOrder"
+        ]
+      },
+      "VideoOutlineTopicDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "startSeconds": {
+            "type": "number",
+            "nullable": true
+          },
+          "endSeconds": {
+            "type": "number",
+            "nullable": true
+          },
+          "sortOrder": {
+            "type": "number"
+          },
+          "concepts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VideoOutlineConceptDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "sortOrder",
+          "concepts"
+        ]
+      },
       "ContentItemDetailDto": {
         "type": "object",
         "properties": {
@@ -21292,6 +21403,12 @@
             "items": {
               "$ref": "#/components/schemas/ContentAttachmentDto"
             }
+          },
+          "videoOutline": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VideoOutlineTopicDto"
+            }
           }
         },
         "required": [
@@ -21303,7 +21420,8 @@
           "placement",
           "createdAt",
           "updatedAt",
-          "attachments"
+          "attachments",
+          "videoOutline"
         ]
       },
       "UpdateContentItemDto": {
@@ -21351,6 +21469,77 @@
             "nullable": true
           }
         }
+      },
+      "VideoOutlineConceptInputDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "title"
+        ]
+      },
+      "VideoOutlineTopicInputDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "startSeconds": {
+            "type": "number",
+            "minimum": 0,
+            "nullable": true
+          },
+          "endSeconds": {
+            "type": "number",
+            "minimum": 0,
+            "nullable": true
+          },
+          "concepts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VideoOutlineConceptInputDto"
+            }
+          }
+        },
+        "required": [
+          "title",
+          "concepts"
+        ]
+      },
+      "ReplaceVideoOutlineDto": {
+        "type": "object",
+        "properties": {
+          "topics": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VideoOutlineTopicInputDto"
+            }
+          }
+        },
+        "required": [
+          "topics"
+        ]
+      },
+      "VideoOutlineResponseDto": {
+        "type": "object",
+        "properties": {
+          "contentItemId": {
+            "type": "string"
+          },
+          "videoOutline": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VideoOutlineTopicDto"
+            }
+          }
+        },
+        "required": [
+          "contentItemId",
+          "videoOutline"
+        ]
       },
       "ReorderContentItemEntryDto": {
         "type": "object",

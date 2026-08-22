@@ -758,6 +758,7 @@ model ContentItem {
   primaryAssetId     String?
   primaryAsset       Asset?                     @relation("ContentPrimaryAsset", fields: [primaryAssetId], references: [id], onDelete: Restrict)
   assetReferences    AssetReference[]
+  videoOutlineTopics VideoOutlineTopic[]
   studentProgress    StudentContentProgress[]
   studentStudyStates StudentContentStudyState[]
 
@@ -833,6 +834,38 @@ model VideoAsset {
   questionVideoLinks      QuestionVideoLink[]
 
   @@index([processingStatus])
+}
+
+/// Optional, ordered teaching outline for a VIDEO content item. It is kept
+/// separate from the curriculum hierarchy: a topic is a segment inside one
+/// video, not a chapter, lesson, or section.
+model VideoOutlineTopic {
+  id            String                @id @default(cuid())
+  contentItemId String
+  title         String
+  startSeconds  Int?
+  endSeconds    Int?
+  sortOrder     Int
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+  contentItem   ContentItem           @relation(fields: [contentItemId], references: [id], onDelete: Cascade)
+  concepts      VideoOutlineConcept[]
+
+  @@unique([contentItemId, sortOrder])
+  @@index([contentItemId])
+}
+
+model VideoOutlineConcept {
+  id        String            @id @default(cuid())
+  topicId   String
+  title     String
+  sortOrder Int
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+  topic     VideoOutlineTopic @relation(fields: [topicId], references: [id], onDelete: Cascade)
+
+  @@unique([topicId, sortOrder])
+  @@index([topicId])
 }
 
 model QuestionSource {
