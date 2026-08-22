@@ -21,13 +21,16 @@ UPDATE "OrderItem" SET "basePriceMinor" = "priceMinor" WHERE "basePriceMinor" IS
 ALTER TABLE "OrderItem" ALTER COLUMN "basePriceMinor" SET NOT NULL;
 UPDATE "Order" SET "subtotalMinor" = "totalMinor", "discountMinor" = 0;
 
+ALTER TABLE "Order" DROP CONSTRAINT "Order_lifecycle";
+
 -- There is no live data yet: expire only legacy unpaid/rejected orders at the
 -- migration boundary. Submitted receipts remain available for administrator review.
+-- The legacy lifecycle constraint does not allow EXPIRED, so remove it before
+-- converting existing rows and then add the expanded replacement below.
 UPDATE "Order"
 SET "status" = 'EXPIRED', "expiredAt" = NOW()
 WHERE "status" IN ('AWAITING_PAYMENT', 'REJECTED');
 
-ALTER TABLE "Order" DROP CONSTRAINT "Order_lifecycle";
 ALTER TABLE "Order" ADD CONSTRAINT "Order_lifecycle"
   CHECK (
     ("status" IN ('AWAITING_PAYMENT', 'SUBMITTED', 'REJECTED') AND "approvedAt" IS NULL AND "cancelledAt" IS NULL AND "expiredAt" IS NULL)
