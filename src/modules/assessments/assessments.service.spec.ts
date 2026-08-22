@@ -656,6 +656,7 @@ describe('AssessmentsService', () => {
           }),
         }),
       );
+      expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
       expect(communityStats.recordResponse).toHaveBeenCalledWith(
         prisma,
         'source-question-1',

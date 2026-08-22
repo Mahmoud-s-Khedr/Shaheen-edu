@@ -13,7 +13,8 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
+      test:
+        ['CMD-SHELL', 'pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
       interval: 5s
       timeout: 5s
       retries: 20
@@ -53,6 +54,10 @@ services:
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
       REDIS_URL: redis://redis:6379/0
+      TRUST_PROXY_HOPS: 1
+      # Bootstrap credentials belong only to the one-shot migrate/seed job.
+      SUPER_ADMIN_EMAIL: ''
+      SUPER_ADMIN_PASSWORD: ''
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -62,10 +67,28 @@ services:
       test:
         - CMD-SHELL
         - >-
-          node -e "fetch('http://127.0.0.1:3000/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
+          node -e "fetch('http://127.0.0.1:3000/health/ready').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
       interval: 5s
       timeout: 5s
       retries: 20
+
+  ai-question-import-worker:
+    build:
+      context: ../..
+      target: runtime
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
+      REDIS_URL: redis://redis:6379/0
+      SUPER_ADMIN_EMAIL: ''
+      SUPER_ADMIN_PASSWORD: ''
+    command: ['node', 'dist/worker']
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
 
   nginx:
     image: nginx:1.27-alpine

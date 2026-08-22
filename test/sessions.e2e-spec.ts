@@ -4,6 +4,7 @@ import { createTestApp } from './utils/create-test-app';
 import {
   cleanDatabase,
   flushTestRedis,
+  seedGovernorate,
   seedPublishedAcademicGrade,
 } from './utils/db';
 import { PrismaService } from '../src/database/prisma.service';
@@ -13,7 +14,6 @@ const studentPayload = {
   nationalId: '29904040412345',
   phone: '01077778888',
   parentPhone: '01066665555',
-  governorate: 'Alexandria',
   password: 'SessionP@ss1!',
 };
 
@@ -28,6 +28,7 @@ function extractCookie(response: {
 describe('Sessions (e2e)', () => {
   let app: NestFastifyApplication;
   let academicGradeId: string;
+  let governorateId: string;
 
   beforeAll(async () => {
     app = await createTestApp();
@@ -36,6 +37,7 @@ describe('Sessions (e2e)', () => {
     academicGradeId = (
       await seedPublishedAcademicGrade(app, 'sessions-e2e-grade')
     ).id;
+    governorateId = (await seedGovernorate(app, 'Alexandria')).id;
   });
 
   afterAll(async () => {
@@ -50,6 +52,7 @@ describe('Sessions (e2e)', () => {
     const payload = {
       ...studentPayload,
       academicGradeId,
+      governorateId,
       phone: `0107777${phoneSuffix}`,
       nationalId: `2990404041${phoneSuffix}`,
     };

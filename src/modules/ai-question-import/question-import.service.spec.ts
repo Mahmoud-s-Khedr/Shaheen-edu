@@ -4,6 +4,7 @@ import {
   QuestionImportStatus,
   Role,
 } from '../../common/types/roles.enum';
+import { ServiceUnavailableException } from '@nestjs/common';
 import { QuestionImportService } from './question-import.service';
 
 describe('QuestionImportService review summaries', () => {
@@ -22,6 +23,34 @@ describe('QuestionImportService review summaries', () => {
       } as any,
     );
   }
+
+  it('marks a persisted queued batch retryable when Redis enqueue fails', async () => {
+    const update = jest.fn().mockResolvedValue({});
+    const service = new QuestionImportService(
+      { questionImportBatch: { update } } as any,
+      { enqueue: jest.fn().mockRejectedValue(new Error('redis down')) } as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {
+        get: jest.fn().mockReturnValue({ questionImportModel: 'test-model' }),
+      } as any,
+    );
+
+    await expect(
+      (service as any).enqueueBatchOrFail('batch-1'),
+    ).rejects.toBeInstanceOf(ServiceUnavailableException);
+    expect(update).toHaveBeenCalledWith({
+      where: { id: 'batch-1' },
+      data: {
+        status: QuestionImportStatus.FAILED,
+        errorSummary: 'Unable to enqueue import work',
+      },
+    });
+  });
 
   it('clears a completed-with-errors summary when every review item is resolved', async () => {
     const service = serviceWith();

@@ -146,10 +146,19 @@ export class AuthRateLimitService {
     threshold: Threshold,
   ): Promise<void> {
     const client = this.redisService.client;
-    const count = await client.incr(key);
-    if (count === 1) {
-      await client.expire(key, threshold.windowSeconds);
-    }
+    // INCR followed by EXPIRE leaves an immortal lockout key if the process or
+    // Redis connection dies between commands. Lua makes creation and expiry a
+    // single atomic operation without extending the fixed window on retries.
+    const count = Number(
+      await client.eval(
+        `local count = redis.call('INCR', KEYS[1])
+         if count == 1 then redis.call('EXPIRE', KEYS[1], ARGV[1]) end
+         return count`,
+        1,
+        key,
+        String(threshold.windowSeconds),
+      ),
+    );
     if (count > threshold.maxAttempts) {
       const ttl = await client.ttl(key);
       const retryAfter = ttl > 0 ? ttl : threshold.windowSeconds;

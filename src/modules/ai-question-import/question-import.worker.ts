@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { Worker } from 'bullmq';
 import { ConfigService } from '@nestjs/config';
 import { Prisma } from '@prisma/client';
@@ -42,6 +42,7 @@ import {
 } from './question-import.queue';
 @Injectable()
 export class QuestionImportWorker {
+  private readonly logger = new Logger(QuestionImportWorker.name);
   private workers: Worker[] = [];
   private readonly config: AppConfig['ai'];
   private readonly redisUrl: string;
@@ -61,9 +62,15 @@ export class QuestionImportWorker {
   ) {
     this.config = config.get('ai', { infer: true });
     this.redisUrl = config.get('redisUrl', { infer: true });
-    // A chunk can make one request that lasts up to requestTimeoutMs.  The
-    // extra time covers response persistence before another worker may reclaim it.
-    this.processingLeaseMs = this.config.requestTimeoutMs + 30_000;
+    // A page can make up to three sequential transcription attempts. The DB
+    // stale-job reclaimer shares this lease with BullMQ; sizing it only for a
+    // normal extraction request allowed valid OCR work to be reclaimed and
+    // executed twice while a provider call was still in flight.
+    this.processingLeaseMs =
+      Math.max(
+        this.config.requestTimeoutMs,
+        this.config.pdfTranscriptionTimeoutMs * 3,
+      ) + 60_000;
   }
   start() {
     if (!this.config.openRouterApiKey || !this.config.questionImportModel)
@@ -101,6 +108,14 @@ export class QuestionImportWorker {
         options(this.config.questionImportExtractionConcurrency ?? 6),
       ),
     ];
+    for (const worker of this.workers) {
+      worker.on('error', (error) =>
+        this.logger.error(
+          `BullMQ worker ${worker.name} error: ${error.message}`,
+          error.stack,
+        ),
+      );
+    }
   }
   async stop() {
     await Promise.all(this.workers.map((worker) => worker.close()));
@@ -463,6 +478,7 @@ export class QuestionImportWorker {
         batch.sourceAsset.storageKey,
       );
       const totalPages = await this.pdfRanges.pageCount(original);
+      this.assertPdfPageLimit(totalPages);
       await this.prisma.questionImportPage.createMany({
         data: Array.from({ length: totalPages }, (_, index) => ({
           batchId: batch.id,
@@ -684,6 +700,7 @@ export class QuestionImportWorker {
       throw new Error('PDF imports require AI_PDF_TRANSCRIPTION_MODEL');
     const original = await this.storage.download(batch.sourceAsset.storageKey);
     const totalPages = await this.pdfRanges.pageCount(original);
+    this.assertPdfPageLimit(totalPages);
     await this.prisma.questionImportBatch.update({
       where: { id: batch.id },
       data: { status: QuestionImportStatus.TRANSCRIBING },
@@ -867,6 +884,13 @@ export class QuestionImportWorker {
         })),
       },
     };
+  }
+
+  private assertPdfPageLimit(totalPages: number) {
+    if (totalPages > this.config.pdfMaxPages)
+      throw new Error(
+        `PDF has ${totalPages} pages; the configured maximum is ${this.config.pdfMaxPages}`,
+      );
   }
   private canonicalPageText(value: string) {
     return value
@@ -1198,7 +1222,7 @@ export class QuestionImportWorker {
           ? QuestionImportStatus.COMPLETED_WITH_ERRORS
           : review
             ? QuestionImportStatus.AWAITING_REVIEW
-          : QuestionImportStatus.COMPLETED,
+            : QuestionImportStatus.COMPLETED,
         completedAt: new Date(),
         completedChunks: children.length,
         totalItems: children.reduce((sum, child) => sum + child.totalItems, 0),
@@ -1628,22 +1652,24 @@ export class QuestionImportWorker {
       )
     )
       return 'AI returned invalid excluded-source metadata.';
-    if (!(result.skippedRanges ?? []).every((item) =>
-      Boolean(range(item.firstBlock, item.lastBlock)),
-    )) return 'AI returned invalid skipped-source metadata.';
+    if (
+      !(result.skippedRanges ?? []).every((item) =>
+        Boolean(range(item.firstBlock, item.lastBlock)),
+      )
+    )
+      return 'AI returned invalid skipped-source metadata.';
 
-    const represented = [
-      ...result.questions,
-      ...result.excluded,
-    ].flatMap((item) => {
-      const itemRange = range(item.firstBlock, item.lastBlock);
-      return itemRange ? [itemRange] : [];
-    });
-    const missing = this.questionStartBlocks(blocks, scope).filter((index) =>
-      !represented.some(
-        (itemRange) =>
-          itemRange.first <= index && index <= itemRange.last,
-      ),
+    const represented = [...result.questions, ...result.excluded].flatMap(
+      (item) => {
+        const itemRange = range(item.firstBlock, item.lastBlock);
+        return itemRange ? [itemRange] : [];
+      },
+    );
+    const missing = this.questionStartBlocks(blocks, scope).filter(
+      (index) =>
+        !represented.some(
+          (itemRange) => itemRange.first <= index && index <= itemRange.last,
+        ),
     );
     return missing.length
       ? `AI returned incomplete source coverage; missing question starts: ${missing
@@ -1653,8 +1679,10 @@ export class QuestionImportWorker {
   }
 
   private isIncompleteCoverageIssue(issue: string) {
-    return issue.startsWith('AI reported incomplete source coverage') ||
-      issue.startsWith('AI returned incomplete source coverage');
+    return (
+      issue.startsWith('AI reported incomplete source coverage') ||
+      issue.startsWith('AI returned incomplete source coverage')
+    );
   }
 
   /** Identifies numbered question stems while excluding page numbers/footers.
@@ -1678,10 +1706,13 @@ export class QuestionImportWorker {
             page > scope.corePageEnd))
       )
         return [];
-      const nearby = blocks.slice(index + 1, index + 8).filter(
-        (candidate) => this.pageForBlock(blocks, candidate.blockKey) === page,
-      );
-      return directive.test(block.text) || nearby.some((candidate) => option.test(candidate.text))
+      const nearby = blocks
+        .slice(index + 1, index + 8)
+        .filter(
+          (candidate) => this.pageForBlock(blocks, candidate.blockKey) === page,
+        );
+      return directive.test(block.text) ||
+        nearby.some((candidate) => option.test(candidate.text))
         ? [index]
         : [];
     });

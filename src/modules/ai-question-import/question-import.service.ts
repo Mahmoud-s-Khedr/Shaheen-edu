@@ -100,6 +100,78 @@ export class QuestionImportService {
         'AI question import is not configured',
       );
   }
+  private async enqueueBatchOrFail(id: string) {
+    try {
+      await this.queue.enqueue(id);
+    } catch {
+      await this.prisma.questionImportBatch.update({
+        where: { id },
+        data: {
+          status: QuestionImportStatus.FAILED,
+          errorSummary: 'Unable to enqueue import work',
+        },
+      });
+      throw new ServiceUnavailableException(
+        'Question import queue is unavailable; the import can be retried',
+      );
+    }
+  }
+
+  private async enqueueChunkOrFail(batchId: string, chunkId: string) {
+    try {
+      await this.queue.enqueueChunk(batchId, chunkId);
+    } catch {
+      await this.prisma.$transaction([
+        this.prisma.questionImportChunk.update({
+          where: { id: chunkId },
+          data: {
+            status: 'FAILED',
+            errorDetail: 'Unable to enqueue chunk work',
+          },
+        }),
+        this.prisma.questionImportBatch.update({
+          where: { id: batchId },
+          data: {
+            status: QuestionImportStatus.FAILED,
+            errorSummary: 'Unable to enqueue chunk work',
+          },
+        }),
+      ]);
+      throw new ServiceUnavailableException(
+        'Question import queue is unavailable; the chunk can be retried',
+      );
+    }
+  }
+
+  private async enqueuePageOrFail(
+    batchId: string,
+    pageId: string,
+    pageNumber: number,
+  ) {
+    try {
+      await this.queue.enqueuePage(batchId, pageNumber);
+    } catch {
+      await this.prisma.$transaction([
+        this.prisma.questionImportPage.update({
+          where: { id: pageId },
+          data: {
+            status: 'FAILED',
+            errorDetail: 'Unable to enqueue page work',
+          },
+        }),
+        this.prisma.questionImportBatch.update({
+          where: { id: batchId },
+          data: {
+            status: QuestionImportStatus.FAILED,
+            errorSummary: 'Unable to enqueue page work',
+          },
+        }),
+      ]);
+      throw new ServiceUnavailableException(
+        'Question import queue is unavailable; the page can be retried',
+      );
+    }
+  }
   async create(actor: RequestUser, dto: CreateQuestionImportDto) {
     this.admin(actor);
     this.assertConfigured();
@@ -152,7 +224,7 @@ export class QuestionImportService {
       targetType: 'QuestionImportBatch',
       targetId: batch.id,
     });
-    await this.queue.enqueue(batch.id);
+    await this.enqueueBatchOrFail(batch.id);
     return this.summary(batch);
   }
   async list(actor: RequestUser, query: QueryQuestionImportDto) {
@@ -247,7 +319,7 @@ export class QuestionImportService {
         },
       }),
     ]);
-    await this.queue.enqueue(id);
+    await this.enqueueBatchOrFail(id);
     await this.audit.record({
       actorUserId: actor.id,
       action: 'AI_QUESTION_IMPORT_SOURCE_TEXT_UPDATED',
@@ -1088,7 +1160,7 @@ export class QuestionImportService {
         });
       }
     });
-    await this.queue.enqueue(id);
+    await this.enqueueBatchOrFail(id);
     await this.audit.record({
       actorUserId: actor.id,
       action: 'AI_QUESTION_IMPORT_RETRIED',
@@ -1135,7 +1207,7 @@ export class QuestionImportService {
         },
       }),
     ]);
-    await this.queue.enqueueChunk(chunk.batchId, chunk.id);
+    await this.enqueueChunkOrFail(chunk.batchId, chunk.id);
     await this.audit.record({
       actorUserId: actor.id,
       action: 'AI_QUESTION_IMPORT_CHUNK_RETRIED',
@@ -1195,7 +1267,7 @@ export class QuestionImportService {
         },
       }),
     ]);
-    await this.queue.enqueuePage(id, pageNumber);
+    await this.enqueuePageOrFail(id, page.id, pageNumber);
     return this.get(actor, id);
   }
   private itemSource(item: any) {

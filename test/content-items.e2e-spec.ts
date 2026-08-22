@@ -6,6 +6,7 @@ import { PrismaService } from '../src/database/prisma.service';
 import {
   cleanDatabase,
   flushTestRedis,
+  seedGovernorate,
   seedPublishedAcademicGrade,
   seedSuperAdmin,
 } from './utils/db';
@@ -18,6 +19,7 @@ describe('Content items (e2e)', () => {
   let courseId: string;
   let chapterId: string;
   let initialContent: { id: string };
+  let attachmentDetailId: string;
 
   const json = (response: { body: string }) => JSON.parse(response.body);
   const auth = () => ({ authorization: `Bearer ${token}` });
@@ -42,7 +44,7 @@ describe('Content items (e2e)', () => {
       method: 'POST',
       url: '/api/v1/admin/academic-grades',
       headers: auth(),
-      payload: { title: 'Content Grade' },
+      payload: { title: { ar: 'Content Grade', en: 'Content Grade' } },
     });
     const subject = await app.inject({
       method: 'POST',
@@ -81,7 +83,7 @@ describe('Content items (e2e)', () => {
           nationalId: '29901010154321',
           phone: '01099991111',
           parentPhone: '01088881111',
-          governorate: 'Cairo',
+          governorateId: (await seedGovernorate(app, 'Cairo')).id,
           password: 'StudentP@ss1!',
           academicGradeId: studentGradeId,
         },
@@ -159,6 +161,7 @@ describe('Content items (e2e)', () => {
     });
     expect(created.statusCode).toBe(201);
     const contentItemId = json(created).id as string;
+    attachmentDetailId = contentItemId;
     const prisma = app.get(PrismaService);
     const first = await prisma.asset.create({
       data: {
@@ -253,7 +256,8 @@ describe('Content items (e2e)', () => {
       payload: {
         placement: { courseId },
         items: [
-          { id: initialContent.id, sortOrder: 3 },
+          { id: initialContent.id, sortOrder: 4 },
+          { id: attachmentDetailId, sortOrder: 3 },
           { id: firstBody.id, sortOrder: 2 },
           { id: secondBody.id, sortOrder: 1 },
         ],

@@ -22,6 +22,7 @@ import { AssetsService } from '../assets/assets.service';
 
 @Injectable()
 export class VideosService {
+  private static readonly PROVIDER_TIMEOUT_MS = 15_000;
   private readonly config: AppConfig['stream'];
   constructor(
     private readonly prisma: PrismaService,
@@ -41,6 +42,7 @@ export class VideosService {
       `https://video.bunnycdn.com/library/${this.config.libraryId}/videos`,
       {
         method: 'POST',
+        signal: AbortSignal.timeout(VideosService.PROVIDER_TIMEOUT_MS),
         headers: {
           AccessKey: this.config.apiKey,
           'Content-Type': 'application/json',
@@ -232,7 +234,11 @@ export class VideosService {
       throw new ConflictException('Referenced video assets cannot be deleted');
     const response = await fetch(
       `https://video.bunnycdn.com/library/${this.config.libraryId}/videos/${asset.video.bunnyVideoId}`,
-      { method: 'DELETE', headers: { AccessKey: this.config.apiKey } },
+      {
+        method: 'DELETE',
+        signal: AbortSignal.timeout(VideosService.PROVIDER_TIMEOUT_MS),
+        headers: { AccessKey: this.config.apiKey },
+      },
     );
     // Bunny returns 404 when an operator already removed the remote object; deleting the
     // local orphan is still safe and makes the operation idempotent for cleanup runbooks.
@@ -307,23 +313,6 @@ export class VideosService {
     const eventKey = createHash('sha256')
       .update(`${payload.VideoGuid}:${payload.Status}:${raw}`)
       .digest('hex');
-    try {
-      await this.prisma.bunnyStreamWebhookEvent.create({
-        data: {
-          eventKey,
-          bunnyVideoId: payload.VideoGuid,
-          status: payload.Status,
-          payload: payload as object,
-        },
-      });
-    } catch {
-      return { received: true, duplicate: true };
-    }
-    const video = await this.prisma.videoAsset.findUnique({
-      where: { bunnyVideoId: payload.VideoGuid },
-      include: { asset: true },
-    });
-    if (!video) return { received: true };
     const statuses: Record<number, VideoProcessingStatus> = {
       0: VideoProcessingStatus.QUEUED,
       1: VideoProcessingStatus.PROCESSING,
@@ -333,45 +322,70 @@ export class VideosService {
       8: VideoProcessingStatus.FAILED,
     };
     const next = statuses[payload.Status];
-    if (
-      !next ||
-      (video.processingStatus === VideoProcessingStatus.READY &&
-        next !== VideoProcessingStatus.READY) ||
-      (video.processingStatus === VideoProcessingStatus.FAILED &&
-        next !== VideoProcessingStatus.FAILED)
-    )
-      return { received: true };
-    await this.prisma.$transaction([
-      this.prisma.videoAsset.update({
-        where: { assetId: video.assetId },
-        data: {
-          processingStatus: next,
-          processingProgress:
-            payload.Status === 3
-              ? 100
-              : Math.max(video.processingProgress, payload.EncodeProgress ?? 0),
-          durationSeconds: payload.Length
-            ? Math.round(payload.Length)
-            : undefined,
-          thumbnailUrl: payload.ThumbnailFileName ?? undefined,
-          lastWebhookAt: new Date(),
-          failureMetadata:
-            next === VideoProcessingStatus.FAILED
-              ? { bunnyStatus: payload.Status }
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        // Persisting the delivery and applying its state change are atomic.
+        // Otherwise a failure after event insertion makes every retry look
+        // duplicate and permanently loses the provider transition.
+        await tx.bunnyStreamWebhookEvent.create({
+          data: {
+            eventKey,
+            bunnyVideoId: payload.VideoGuid!,
+            status: payload.Status!,
+            payload: payload as object,
+          },
+        });
+        const video = await tx.videoAsset.findUnique({
+          where: { bunnyVideoId: payload.VideoGuid },
+          include: { asset: true },
+        });
+        if (!video) return { received: true };
+        if (
+          !next ||
+          (video.processingStatus === VideoProcessingStatus.READY &&
+            next !== VideoProcessingStatus.READY) ||
+          (video.processingStatus === VideoProcessingStatus.FAILED &&
+            next !== VideoProcessingStatus.FAILED)
+        )
+          return { received: true };
+        await tx.videoAsset.update({
+          where: { assetId: video.assetId },
+          data: {
+            processingStatus: next,
+            processingProgress:
+              payload.Status === 3
+                ? 100
+                : Math.max(
+                    video.processingProgress,
+                    payload.EncodeProgress ?? 0,
+                  ),
+            durationSeconds: payload.Length
+              ? Math.round(payload.Length)
               : undefined,
-        },
-      }),
-      this.prisma.asset.update({
-        where: { id: video.assetId },
-        data:
-          next === VideoProcessingStatus.READY
-            ? { status: AssetStatus.READY, readyAt: new Date(), failedAt: null }
-            : next === VideoProcessingStatus.FAILED
-              ? { status: AssetStatus.FAILED, failedAt: new Date() }
-              : { status: AssetStatus.PROCESSING },
-      }),
-    ]);
-    return { received: true };
+            thumbnailUrl: payload.ThumbnailFileName ?? undefined,
+            lastWebhookAt: new Date(),
+            failureMetadata:
+              next === VideoProcessingStatus.FAILED
+                ? { bunnyStatus: payload.Status }
+                : undefined,
+          },
+        });
+        await tx.asset.update({
+          where: { id: video.assetId },
+          data:
+            next === VideoProcessingStatus.READY
+              ? { status: AssetStatus.READY, readyAt: new Date(), failedAt: null }
+              : next === VideoProcessingStatus.FAILED
+                ? { status: AssetStatus.FAILED, failedAt: new Date() }
+                : { status: AssetStatus.PROCESSING },
+        });
+        return { received: true };
+      });
+    } catch (error) {
+      if ((error as { code?: string } | null)?.code === 'P2002')
+        return { received: true, duplicate: true };
+      throw error;
+    }
   }
 
   private async getWithVideo(id: string) {

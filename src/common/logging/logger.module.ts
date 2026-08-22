@@ -1,8 +1,8 @@
 import { Module } from '@nestjs/common';
 import { LoggerModule as PinoLoggerModule } from 'nestjs-pino';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { randomUUID } from 'crypto';
 import type { AppConfig } from '../../config/configuration';
+import { normalizeCorrelationId } from './correlation-id';
 
 @Module({
   imports: [
@@ -32,8 +32,7 @@ import type { AppConfig } from '../../config/configuration';
               censor: '[REDACTED]',
             },
             genReqId: (req: { headers: Record<string, unknown> }) =>
-              (req.headers['x-correlation-id'] as string | undefined) ??
-              randomUUID(),
+              normalizeCorrelationId(req.headers['x-correlation-id']),
           },
         };
       },

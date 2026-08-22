@@ -319,7 +319,6 @@ export class AssetsService {
     const used = await this.isReferenced(id);
     if (used)
       throw new ConflictException('Referenced assets cannot be archived');
-    if (asset.storageKey) await this.storage.delete(asset.storageKey);
     const updated = await this.prisma.asset.update({
       where: { id },
       data: { status: AssetStatus.ARCHIVED, archivedAt: new Date() },
@@ -346,8 +345,13 @@ export class AssetsService {
       );
     if (await this.isReferenced(id))
       throw new ConflictException('Referenced assets cannot be deleted');
-    if (asset.storageKey) await this.storage.delete(asset.storageKey);
+    // Delete the database row first. Its foreign keys are the final,
+    // concurrency-safe reference check: deleting the object first could leave
+    // a live reference pointing at missing storage if a reference is created
+    // between isReferenced() and this delete.
     await this.prisma.asset.delete({ where: { id } });
+    if (asset.storageKey)
+      void this.storage.delete(asset.storageKey).catch(() => undefined);
     await this.audit.record({
       actorUserId: actor.id,
       action: 'ASSET_DELETED',
@@ -365,8 +369,6 @@ export class AssetsService {
       where: { id },
       data: { status: AssetStatus.ARCHIVED, archivedAt: new Date() },
     });
-    if (asset.storageKey)
-      void this.storage.delete(asset.storageKey).catch(() => undefined);
     await this.audit.record({
       actorUserId: actor.id,
       action: 'ASSET_REPLACED',
@@ -433,11 +435,9 @@ export class AssetsService {
       }),
       this.prisma.questionImportMedia.count({ where: { assetId: id } }),
     ]);
-    const paymentProofs = (this.prisma as any).manualPaymentSubmission
-      ? await (this.prisma as any).manualPaymentSubmission.count({
-          where: { proofAssetId: id },
-        })
-      : 0;
+    const paymentProofs = await this.prisma.manualPaymentSubmission.count({
+      where: { proofAssetId: id },
+    });
     return (
       content +
         refs +

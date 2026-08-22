@@ -245,7 +245,7 @@ describe('QuestionImportMediaService', () => {
     expect([...keys]).toEqual(
       expect.arrayContaining([expect.stringMatching(/^M-[0-9a-f-]{36}$/)]),
     );
-    expect(prisma.questionImportMedia.count).toBeUndefined();
+    expect((prisma.questionImportMedia as any).count).toBeUndefined();
   });
 
   it('retains the original crop error if failure persistence also fails', async () => {

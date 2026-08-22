@@ -131,7 +131,11 @@ export class ApiClient {
       const authorization = await this.multipartUpload<any>(path, file, { accessToken: options.accessToken, fields: options.fields, headers: options.headers });
       if (authorization.status !== 201) return authorization as ApiResponse<T>;
       const upload = authorization.body.upload;
-      const direct = await fetch(upload.url, { method: upload.method, headers: upload.headers, body: file.buffer });
+      const direct = await fetch(upload.url, {
+        method: upload.method,
+        headers: upload.headers,
+        body: new Uint8Array(file.buffer),
+      });
       if (!direct.ok) throw new Error(`Direct Bunny upload failed with ${direct.status}`);
       if (assetMatch) return this.request<T>('POST', `/admin/assets/${authorization.body.asset.id}/complete`, undefined, { expected: options.expected, accessToken: options.accessToken, headers: options.headers });
       return this.request<T>('POST', `${path}/complete`, { assetId: authorization.body.asset.id, ...options.fields }, { expected: options.expected, accessToken: options.accessToken, headers: options.headers });

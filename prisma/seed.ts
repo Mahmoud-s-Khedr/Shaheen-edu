@@ -14,6 +14,12 @@ async function main() {
     );
     process.exit(1);
   }
+  if (rawPassword.length < 12) {
+    console.error(
+      'FATAL: SUPER_ADMIN_PASSWORD must contain at least 12 characters.',
+    );
+    process.exit(1);
+  }
 
   const loginIdentifier = rawEmail.trim().toLowerCase();
 

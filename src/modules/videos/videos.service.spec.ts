@@ -43,7 +43,11 @@ function buildService() {
     // Supports both the array form (webhook) and the callback form (retry).
     $transaction: jest.fn().mockImplementation(async (arg: any) => {
       if (typeof arg === 'function') {
-        return arg({ videoAsset: prisma.videoAsset, asset: prisma.asset });
+        return arg({
+          videoAsset: prisma.videoAsset,
+          asset: prisma.asset,
+          bunnyStreamWebhookEvent: prisma.bunnyStreamWebhookEvent,
+        });
       }
       return Promise.all(arg);
     }),
@@ -153,13 +157,17 @@ describe('VideosService', () => {
     it('is idempotent: a duplicate event key short-circuits with no state change', async () => {
       const { service, prisma } = buildService();
       prisma.bunnyStreamWebhookEvent.create.mockRejectedValue(
-        new Error('unique clash'),
+        Object.assign(new Error('unique clash'), {
+          code: 'P2002',
+          clientVersion: 'test',
+          meta: {},
+        }),
       );
       const payload = { VideoGuid: 'bunny-1', Status: 3 };
       const result = await service.webhook(payload, JSON.stringify(payload));
       expect(result).toEqual({ received: true, duplicate: true });
       expect(prisma.videoAsset.findUnique).not.toHaveBeenCalled();
-      expect(prisma.$transaction).not.toHaveBeenCalled();
+      expect(prisma.$transaction).toHaveBeenCalled();
     });
 
     it('ignores webhooks for an unknown video', async () => {
@@ -168,7 +176,7 @@ describe('VideosService', () => {
       const payload = { VideoGuid: 'ghost', Status: 3 };
       const result = await service.webhook(payload, JSON.stringify(payload));
       expect(result).toEqual({ received: true });
-      expect(prisma.$transaction).not.toHaveBeenCalled();
+      expect(prisma.videoAsset.update).not.toHaveBeenCalled();
     });
 
     it('rejects a state regression away from READY', async () => {
@@ -180,7 +188,7 @@ describe('VideosService', () => {
       const payload = { VideoGuid: 'bunny-1', Status: 1 };
       const result = await service.webhook(payload, JSON.stringify(payload));
       expect(result).toEqual({ received: true });
-      expect(prisma.$transaction).not.toHaveBeenCalled();
+      expect(prisma.videoAsset.update).not.toHaveBeenCalled();
     });
 
     it('rejects a state regression away from FAILED', async () => {
@@ -191,7 +199,19 @@ describe('VideosService', () => {
       });
       const payload = { VideoGuid: 'bunny-1', Status: 1 };
       await service.webhook(payload, JSON.stringify(payload));
-      expect(prisma.$transaction).not.toHaveBeenCalled();
+      expect(prisma.videoAsset.update).not.toHaveBeenCalled();
+    });
+
+    it('does not acknowledge a database failure as a duplicate', async () => {
+      const { service, prisma } = buildService();
+      prisma.bunnyStreamWebhookEvent.create.mockRejectedValue(
+        new Error('database unavailable'),
+      );
+      const payload = { VideoGuid: 'bunny-1', Status: 3 };
+
+      await expect(
+        service.webhook(payload, JSON.stringify(payload)),
+      ).rejects.toThrow('database unavailable');
     });
 
     it('rejects an invalid payload', async () => {

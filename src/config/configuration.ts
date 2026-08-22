@@ -2,6 +2,7 @@ export interface AppConfig {
   nodeEnv: string;
   port: number;
   host: string;
+  trustProxyHops: number;
   corsOrigins: string[];
   cookieSecure: boolean;
   cookieSameSite: 'lax' | 'strict' | 'none';
@@ -19,10 +20,6 @@ export interface AppConfig {
     hmacSecret: string;
     encryptionKey: string;
     keyVersion: number;
-  };
-  superAdmin: {
-    email: string;
-    password: string;
   };
   storage: {
     endpoint: string;
@@ -70,6 +67,7 @@ export interface AppConfig {
     questionImportCandidateConcurrency: number;
     requestTimeoutMs: number;
     pdfTranscriptionTimeoutMs: number;
+    pdfMaxPages: number;
     segmentationSplitThresholdTokens: number;
     segmentationChildTargetTokens: number;
     extractionTargetTokens: number;
@@ -85,6 +83,7 @@ export default (): AppConfig => ({
   nodeEnv: process.env.NODE_ENV ?? 'development',
   port: parseInt(process.env.PORT ?? '3000', 10),
   host: process.env.HOST ?? '0.0.0.0',
+  trustProxyHops: envInteger('TRUST_PROXY_HOPS', 0),
   corsOrigins: (process.env.CORS_ORIGINS ?? '')
     .split(',')
     .map((origin) => origin.trim())
@@ -112,10 +111,6 @@ export default (): AppConfig => ({
     hmacSecret: process.env.NATIONAL_ID_HMAC_SECRET ?? '',
     encryptionKey: process.env.NATIONAL_ID_ENCRYPTION_KEY ?? '',
     keyVersion: parseInt(process.env.NATIONAL_ID_KEY_VERSION ?? '1', 10),
-  },
-  superAdmin: {
-    email: process.env.SUPER_ADMIN_EMAIL ?? '',
-    password: process.env.SUPER_ADMIN_PASSWORD ?? '',
   },
   storage: {
     endpoint: process.env.BUNNY_STORAGE_S3_ENDPOINT ?? '',
@@ -233,6 +228,7 @@ export default (): AppConfig => ({
       'AI_PDF_TRANSCRIPTION_TIMEOUT_MS',
       120_000,
     ),
+    pdfMaxPages: envInteger('AI_PDF_MAX_PAGES', 500),
     segmentationSplitThresholdTokens: envInteger(
       'AI_SEGMENTATION_SPLIT_THRESHOLD_TOKENS',
       8_000,

@@ -8,12 +8,12 @@ import { QuestionImportVisualLinkerService } from './question-import-visual-link
 
 describe('QuestionImportVisualLinkerService', () => {
   const linker = new QuestionImportVisualLinkerService();
-  const media = (key: string, completeness = QuestionImportMediaCropCompleteness.COMPLETE) => ({ mediaKey: key, pageNumber: 3, checksum: key, cropCompleteness: completeness, normalizedBounds: { left: 100, top: 100, right: 300, bottom: 300 } });
+  const media = (key: string, completeness: QuestionImportMediaCropCompleteness = QuestionImportMediaCropCompleteness.COMPLETE) => ({ mediaKey: key, pageNumber: 3, checksum: key, cropCompleteness: completeness, normalizedBounds: { left: 100, top: 100, right: 300, bottom: 300 } });
 
   it('requires every separate image option and never resolves proposals', () => {
     const [requirement] = linker.requirements({ options: [{ body: null }, { body: null }, { body: null }, { body: null }], mediaAssignments: [] }, { page: 3 });
     expect(requirement).toMatchObject({ kind: QuestionImportVisualRequirementKind.OPTION_IMAGE_SET, expectedCardinality: 4, optionIndexes: [0, 1, 2, 3] });
-    const assignments = [0, 1, 2, 3].map((index) => ({ mediaKey: `M${index}`, owner: 'OPTION', ownerReference: `OPTION:${index}`, status: QuestionImportMediaAssignmentStatus.PROPOSED, media: media(`M${index}`) }));
+    const assignments: Array<{ mediaKey: string; owner: string; ownerReference: string; status: QuestionImportMediaAssignmentStatus; media: ReturnType<typeof media> }> = [0, 1, 2, 3].map((index) => ({ mediaKey: `M${index}`, owner: 'OPTION', ownerReference: `OPTION:${index}`, status: QuestionImportMediaAssignmentStatus.PROPOSED, media: media(`M${index}`) }));
     expect(linker.resolve(requirement, assignments, assignments.map((item) => item.media)).state).toBe(QuestionImportVisualResolutionState.PENDING);
     assignments.forEach((item) => { item.status = QuestionImportMediaAssignmentStatus.APPROVED; });
     expect(linker.resolve(requirement, assignments, assignments.map((item) => item.media)).state).toBe(QuestionImportVisualResolutionState.RESOLVED);

@@ -498,6 +498,7 @@ model ParentAccessSession {
   createdAt             DateTime        @default(now())
 
   @@index([parentPhoneNormalized])
+  @@index([activeStudentId])
 }
 
 model AdminAuditLog {
@@ -1744,6 +1745,7 @@ model AssessmentAttemptAnswer {
 
   @@unique([attemptId, assessmentQuestionId])
   @@index([attemptId])
+  @@index([outcome, answeredAt])
 }
 
 model AssessmentAnswerChange {
@@ -1855,6 +1857,8 @@ model BunnyStreamWebhookEvent {
   status       Int
   payload      Json
   receivedAt   DateTime @default(now())
+
+  @@index([receivedAt])
 }
 
 model ContentPlacement {
@@ -2090,7 +2094,7 @@ model ManualPaymentSubmission {
   id                   String                        @id @default(cuid())
   orderId              String
   order                Order                         @relation(fields: [orderId], references: [id], onDelete: Restrict)
-  proofAssetId         String
+  proofAssetId         String                        @unique
   proofAsset           Asset                         @relation("ManualPaymentProof", fields: [proofAssetId], references: [id], onDelete: Restrict)
   transactionReference String?
   note                 String?
@@ -2116,6 +2120,7 @@ model CommerceIdempotencyKey {
   createdAt     DateTime @default(now())
 
   @@unique([studentUserId, operation, key])
+  @@index([createdAt])
 }
 
 model PublisherAgreement {

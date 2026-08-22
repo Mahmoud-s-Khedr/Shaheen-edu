@@ -107,6 +107,16 @@ export async function seedDraftAcademicGrade(
   return seedAcademicGrade(app, slug, ContentStatus.DRAFT);
 }
 
+export async function seedGovernorate(
+  app: NestFastifyApplication,
+  nameEn: string,
+): Promise<{ id: string }> {
+  return app.get(PrismaService).governorate.create({
+    data: { nameAr: nameEn, nameEn },
+    select: { id: true },
+  });
+}
+
 async function seedAcademicGrade(
   app: NestFastifyApplication,
   slug: string,

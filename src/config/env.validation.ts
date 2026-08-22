@@ -6,14 +6,18 @@ export const envValidationSchema = Joi.object({
     .default('development'),
   PORT: Joi.number().port().default(3000),
   HOST: Joi.string().default('0.0.0.0'),
+  TRUST_PROXY_HOPS: Joi.number().integer().min(0).max(10).default(0),
 
   DATABASE_URL: Joi.string().uri().required(),
   REDIS_URL: Joi.string().uri().required(),
 
   CORS_ORIGINS: Joi.string().required(),
-  COOKIE_SECURE: Joi.boolean().default(true),
+  COOKIE_SECURE: Joi.boolean()
+    .default(true)
+    .when('NODE_ENV', { is: 'production', then: Joi.valid(true) }),
   COOKIE_SAME_SITE: Joi.string().valid('lax', 'strict', 'none').default('lax'),
   COOKIE_SECRET: Joi.string().min(32).required(),
+  API_DOCS_ENABLED: Joi.boolean().optional(),
 
   JWT_ACCESS_SECRET: Joi.string().min(32).required(),
   JWT_ACCESS_TTL_SECONDS: Joi.number().positive().default(900),
@@ -24,9 +28,6 @@ export const envValidationSchema = Joi.object({
   NATIONAL_ID_HMAC_SECRET: Joi.string().min(32).required(),
   NATIONAL_ID_ENCRYPTION_KEY: Joi.string().min(32).required(),
   NATIONAL_ID_KEY_VERSION: Joi.number().integer().positive().default(1),
-
-  SUPER_ADMIN_EMAIL: Joi.string().email().required(),
-  SUPER_ADMIN_PASSWORD: Joi.string().min(12).required(),
 
   BUNNY_STORAGE_S3_ENDPOINT: Joi.string().uri().required(),
   BUNNY_STORAGE_BUCKET: Joi.string().required(),
@@ -130,6 +131,7 @@ export const envValidationSchema = Joi.object({
     .min(1000)
     .max(300000)
     .default(120000),
+  AI_PDF_MAX_PAGES: Joi.number().integer().min(1).max(2000).default(500),
   AI_WORKER_CONCURRENCY: Joi.number().integer().min(1).max(10).default(2),
   AI_QUESTION_IMPORT_OCR_CONCURRENCY: Joi.number()
     .integer()

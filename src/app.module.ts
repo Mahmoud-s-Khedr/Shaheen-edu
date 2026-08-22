@@ -2,7 +2,6 @@ import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { ClsModule } from 'nestjs-cls';
-import { randomUUID } from 'crypto';
 import { ConfigModule } from './config/config.module';
 import { ConfigService } from '@nestjs/config';
 import type { AppConfig } from './config/configuration';
@@ -41,6 +40,7 @@ import { PartnerAnalyticsModule } from './modules/partner-analytics/partner-anal
 import { QuestionImportModule } from './modules/ai-question-import/question-import.module';
 import { UserAuthGuard } from './common/guards/user-auth.guard';
 import type { IncomingMessage } from 'http';
+import { normalizeCorrelationId } from './common/logging/correlation-id';
 
 @Module({
   imports: [
@@ -52,8 +52,7 @@ import type { IncomingMessage } from 'http';
         mount: true,
         generateId: true,
         idGenerator: (req: IncomingMessage) =>
-          (req.headers['x-correlation-id'] as string | undefined) ??
-          randomUUID(),
+          normalizeCorrelationId(req.headers['x-correlation-id']),
       },
     }),
     ThrottlerModule.forRootAsync({

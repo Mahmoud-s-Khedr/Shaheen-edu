@@ -121,9 +121,14 @@ export class SharedAuthController {
   })
   @ApiStandardErrors(401)
   async logout(
+    @CurrentUser() user: RequestUser,
     @Req() req: FastifyRequest,
     @Res({ passthrough: true }) reply: FastifyReply,
   ) {
+    // The bearer token identifies the browser session being logged out. The
+    // cookie can be absent, stale, or belong to another rotation generation,
+    // so it must not be the only revocation mechanism.
+    await this.sessionService.revokeById(user.sessionId, user.id);
     const rawToken = req.cookies?.[REFRESH_COOKIE_NAME];
     if (rawToken) {
       await this.sessionService.revokeByRawToken(rawToken);
@@ -217,13 +222,18 @@ export class SharedAuthController {
     }
 
     const newPasswordHash = await this.passwordService.hash(dto.newPassword);
-    await this.prisma.user.update({
-      where: { id: user.id },
-      data: { passwordHash: newPasswordHash, mustChangePassword: false },
-    });
-
-    // Force re-login everywhere, same as logout-all.
-    await this.sessionService.revokeAllForUser(user.id);
+    // Password replacement and session invalidation are one security
+    // boundary: neither state should commit without the other.
+    await this.prisma.$transaction([
+      this.prisma.user.update({
+        where: { id: user.id },
+        data: { passwordHash: newPasswordHash, mustChangePassword: false },
+      }),
+      this.prisma.authSession.updateMany({
+        where: { userId: user.id, revoked: false },
+        data: { revoked: true, revokedAt: new Date() },
+      }),
+    ]);
     clearRefreshCookie(reply, this.configService);
 
     return { success: true };

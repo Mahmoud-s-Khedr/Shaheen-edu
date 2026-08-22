@@ -5,6 +5,7 @@ import { createTestApp } from './utils/create-test-app';
 import {
   cleanDatabase,
   flushTestRedis,
+  seedGovernorate,
   seedPublishedAcademicGrade,
   seedSuperAdmin,
 } from './utils/db';
@@ -88,7 +89,7 @@ describe('Video assets (e2e)', () => {
           nationalId: '29903030312345',
           phone: '01099991111',
           parentPhone: '01088881111',
-          governorate: 'Cairo',
+          governorateId: (await seedGovernorate(app, 'Cairo')).id,
           password: 'StudentP@ss1!',
           academicGradeId: gradeId,
         },
@@ -226,7 +227,9 @@ describe('Video assets (e2e)', () => {
       const second = await app
         .get(PrismaService)
         .videoAsset.findUnique({ where: { assetId } });
-      expect(second?.clientUploadCompletedAt).toEqual(first?.clientUploadCompletedAt);
+      expect(second?.clientUploadCompletedAt).toEqual(
+        first?.clientUploadCompletedAt,
+      );
     });
 
     it('allows attaching an in-flight video and reports its state', async () => {
@@ -236,7 +239,7 @@ describe('Video assets (e2e)', () => {
           method: 'POST',
           url: '/api/v1/admin/academic-grades',
           headers: admin(),
-          payload: { title: 'Video Grade' },
+          payload: { title: { ar: 'Video Grade', en: 'Video Grade' } },
         }),
       ).id;
       await app.inject({

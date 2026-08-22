@@ -21,9 +21,9 @@ ENV NODE_ENV=production
 RUN apk add --no-cache poppler-utils
 RUN corepack enable
 COPY package.json pnpm-lock.yaml ./
+COPY prisma ./prisma
 RUN pnpm install --frozen-lockfile --prod
 COPY --from=build /app/dist ./dist
-COPY --from=build /app/node_modules/.prisma ./node_modules/.prisma
-COPY prisma ./prisma
 EXPOSE 3000
+USER node
 CMD ["node", "dist/main"]

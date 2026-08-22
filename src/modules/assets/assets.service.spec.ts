@@ -47,6 +47,7 @@ function build() {
     assessmentQuestionOptionContentBlock: { count: jest.fn() },
     assessmentContextContentBlock: { count: jest.fn() },
     questionImportMedia: { count: jest.fn() },
+    manualPaymentSubmission: { count: jest.fn().mockResolvedValue(0) },
     $transaction: jest.fn(),
   };
   const storage: any = {
@@ -230,5 +231,53 @@ describe('AssetsService direct uploads', () => {
       service.completeUpload(admin, 'asset-1'),
     ).rejects.toBeInstanceOf(BadRequestException);
     expect(storage.delete).toHaveBeenCalledWith('assets/pdf/a.pdf');
+  });
+
+  it('deletes database metadata before removing the remote object', async () => {
+    const { service, prisma, storage } = build();
+    const operations: string[] = [];
+    prisma.asset.findUnique.mockResolvedValue({
+      id: 'asset-1',
+      kind: AssetKind.PDF,
+      storageKey: 'assets/pdf/a.pdf',
+      video: null,
+    });
+    prisma.$transaction.mockResolvedValue(new Array(19).fill(0));
+    prisma.asset.delete.mockImplementation(async () => {
+      operations.push('database');
+    });
+    storage.delete.mockImplementation(async () => {
+      operations.push('storage');
+    });
+
+    await expect(service.delete(admin, 'asset-1')).resolves.toEqual({
+      id: 'asset-1',
+      deleted: true,
+    });
+
+    expect(operations).toEqual(['database', 'storage']);
+  });
+
+  it('retains an archived object for reference-safe asynchronous cleanup', async () => {
+    const { service, prisma, storage } = build();
+    prisma.asset.findUnique.mockResolvedValue({
+      id: 'asset-1',
+      kind: AssetKind.PDF,
+      status: AssetStatus.READY,
+      storageKey: 'assets/pdf/a.pdf',
+    });
+    prisma.$transaction.mockResolvedValue(new Array(19).fill(0));
+    prisma.asset.update.mockResolvedValue({
+      id: 'asset-1',
+      kind: AssetKind.PDF,
+      status: AssetStatus.ARCHIVED,
+    });
+
+    await expect(service.archive(admin, 'asset-1')).resolves.toMatchObject({
+      id: 'asset-1',
+      status: AssetStatus.ARCHIVED,
+    });
+
+    expect(storage.delete).not.toHaveBeenCalled();
   });
 });

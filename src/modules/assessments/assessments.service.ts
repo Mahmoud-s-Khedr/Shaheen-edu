@@ -1996,6 +1996,15 @@ export class AssessmentsService {
           ? AssessmentQuestionOutcome.INCORRECT
           : AssessmentQuestionOutcome.PARTIALLY_CORRECT;
     await this.prisma.$transaction(async (tx) => {
+      // Different long answers from the same attempt may be graded in
+      // parallel. Serialize score recomputation on the attempt row so the
+      // second aggregate observes the first committed grade.
+      await tx.$queryRaw`
+        SELECT "id"
+        FROM "AssessmentAttempt"
+        WHERE "id" = ${answer.attemptId}
+        FOR UPDATE
+      `;
       const graded = await tx.assessmentAttemptAnswer.updateMany({
         where: {
           id: answerId,

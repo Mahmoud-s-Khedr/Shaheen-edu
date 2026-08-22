@@ -1,5 +1,5 @@
 import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -15,13 +15,17 @@ import { LeaderboardService } from './leaderboard.service';
 @Controller({ path: 'student/leaderboard', version: '1' })
 export class LeaderboardController {
   constructor(private readonly leaderboard: LeaderboardService) {}
-  @Get('current') current(
+  @ApiOperation({ summary: 'Get the current weekly leaderboard' })
+  @Get('current')
+  current(
     @CurrentUser() user: RequestUser,
     @Query() query: PaginationQueryDto,
   ) {
     return this.leaderboard.current(user.id, query);
   }
-  @Get('history/:weekKey') history(
+  @ApiOperation({ summary: 'Get a historical weekly leaderboard' })
+  @Get('history/:weekKey')
+  history(
     @CurrentUser() user: RequestUser,
     @Param('weekKey') weekKey: string,
     @Query() query: PaginationQueryDto,

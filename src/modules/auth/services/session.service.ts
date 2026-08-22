@@ -172,6 +172,13 @@ export class SessionService {
     });
   }
 
+  async revokeById(sessionId: string, userId: string): Promise<void> {
+    await this.prisma.authSession.updateMany({
+      where: { id: sessionId, userId, revoked: false },
+      data: { revoked: true, revokedAt: new Date() },
+    });
+  }
+
   async revokeAllForUser(userId: string): Promise<void> {
     await this.prisma.authSession.updateMany({
       where: { userId, revoked: false },

@@ -140,10 +140,10 @@ async function main() {
         status: detail.status,
         model: detail.model,
         counts: { totalItems: detail.totalItems, createdQuestions: detail.createdQuestions, invalidItems: detail.invalidItems, failedItems: detail.failedItems },
-        sourceBlockCount: (stored.children.length ? stored.children : [stored]).reduce((count, child) => count + child.sourceBlocks.length, 0),
-        chunkCount: (stored.children.length ? stored.children : [stored]).reduce((count, child) => count + child.chunks.length, 0),
-        childImports: stored.children.map((child) => ({ id: child.id, status: child.status, pageScope: child.pageScope, counts: { totalItems: child.totalItems, createdQuestions: child.createdQuestions, invalidItems: child.invalidItems, failedItems: child.failedItems } })),
-        transcriptionPages: stored.pages.map((page) => ({ pageNumber: page.pageNumber, status: page.status, confidence: page.confidence, warnings: page.warnings, uncertainSpans: page.uncertainSpans })),
+        sourceBlockCount: (stored.children.length ? stored.children : [stored]).reduce((count: number, child: any) => count + child.sourceBlocks.length, 0),
+        chunkCount: (stored.children.length ? stored.children : [stored]).reduce((count: number, child: any) => count + child.chunks.length, 0),
+        childImports: stored.children.map((child: any) => ({ id: child.id, status: child.status, pageScope: child.pageScope, counts: { totalItems: child.totalItems, createdQuestions: child.createdQuestions, invalidItems: child.invalidItems, failedItems: child.failedItems } })),
+        transcriptionPages: stored.pages.map((page: any) => ({ pageNumber: page.pageNumber, status: page.status, confidence: page.confidence, warnings: page.warnings, uncertainSpans: page.uncertainSpans })),
         candidates: itemsResponse.data.map((item: any) => ({ id: item.id, sequence: item.sequence, status: item.status, questionId: item.questionId, sourceNumber: item.sourceNumber, globalOrder: item.globalOrder, section: item.section, detectedType: item.detectedType, confidence: item.confidence, answerOrigin: item.answerOrigin, warnings: item.warnings, errorDetail: item.errorDetail })),
       });
     }

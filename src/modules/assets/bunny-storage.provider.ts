@@ -1,8 +1,15 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { DeleteObjectCommand, GetObjectCommand, HeadObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import {
+  DeleteObjectCommand,
+  GetObjectCommand,
+  HeadObjectCommand,
+  PutObjectCommand,
+  S3Client,
+} from '@aws-sdk/client-s3';
 import { Upload } from '@aws-sdk/lib-storage';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { NodeHttpHandler } from '@smithy/node-http-handler';
 import { createHmac } from 'node:crypto';
 import { Readable } from 'node:stream';
 import type { AppConfig } from '../../config/configuration';
@@ -15,38 +22,91 @@ export class BunnyStorageProvider implements FileStorageProvider {
 
   constructor(configService: ConfigService<AppConfig, true>) {
     this.config = configService.get('storage', { infer: true });
-    this.client = new S3Client({ region: 'auto', endpoint: this.config.endpoint, forcePathStyle: true, credentials: { accessKeyId: this.config.accessKeyId, secretAccessKey: this.config.secretAccessKey } });
+    this.client = new S3Client({
+      region: 'auto',
+      endpoint: this.config.endpoint,
+      forcePathStyle: true,
+      maxAttempts: 3,
+      requestHandler: new NodeHttpHandler({
+        connectionTimeout: 5_000,
+        requestTimeout: 60_000,
+      }),
+      credentials: {
+        accessKeyId: this.config.accessKeyId,
+        secretAccessKey: this.config.secretAccessKey,
+      },
+    });
   }
 
   async upload(key: string, body: Readable, mimeType: string): Promise<void> {
     // Bunny rejects a PutObject whose body length is unknown, so unbounded streams go through
     // multipart upload, which sizes each part before signing it (and aborts the upload on failure).
-    await new Upload({ client: this.client, params: { Bucket: this.config.bucket, Key: key, Body: body, ContentType: mimeType } }).done();
+    await new Upload({
+      client: this.client,
+      params: {
+        Bucket: this.config.bucket,
+        Key: key,
+        Body: body,
+        ContentType: mimeType,
+      },
+    }).done();
   }
 
   async delete(key: string): Promise<void> {
-    await this.client.send(new DeleteObjectCommand({ Bucket: this.config.bucket, Key: key }));
+    await this.client.send(
+      new DeleteObjectCommand({ Bucket: this.config.bucket, Key: key }),
+    );
   }
 
-  async createUploadUrl(key: string, mimeType: string, expiresIn: number): Promise<string> {
+  async createUploadUrl(
+    key: string,
+    mimeType: string,
+    expiresIn: number,
+  ): Promise<string> {
     // Bunny's S3 client and its presigner resolve compatible runtime middleware;
     // the AWS packages can expose duplicate Smithy type declarations in pnpm.
-    return getSignedUrl(this.client as never, new PutObjectCommand({ Bucket: this.config.bucket, Key: key, ContentType: mimeType }) as never, { expiresIn });
+    return getSignedUrl(
+      this.client as never,
+      new PutObjectCommand({
+        Bucket: this.config.bucket,
+        Key: key,
+        ContentType: mimeType,
+      }) as never,
+      { expiresIn },
+    );
   }
 
-  async inspect(key: string): Promise<{ sizeBytes: number; mimeType?: string; first: Buffer }> {
-    const head = await this.client.send(new HeadObjectCommand({ Bucket: this.config.bucket, Key: key }));
-    const output = await this.client.send(new GetObjectCommand({ Bucket: this.config.bucket, Key: key, Range: 'bytes=0-15' }));
+  async inspect(
+    key: string,
+  ): Promise<{ sizeBytes: number; mimeType?: string; first: Buffer }> {
+    const head = await this.client.send(
+      new HeadObjectCommand({ Bucket: this.config.bucket, Key: key }),
+    );
+    const output = await this.client.send(
+      new GetObjectCommand({
+        Bucket: this.config.bucket,
+        Key: key,
+        Range: 'bytes=0-15',
+      }),
+    );
     const chunks: Buffer[] = [];
-    for await (const chunk of output.Body as Readable) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-    return { sizeBytes: head.ContentLength ?? 0, mimeType: head.ContentType, first: Buffer.concat(chunks) };
+    for await (const chunk of output.Body as Readable)
+      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    return {
+      sizeBytes: head.ContentLength ?? 0,
+      mimeType: head.ContentType,
+      first: Buffer.concat(chunks),
+    };
   }
 
   /** Reads a private storage object for trusted server-side processing. */
   async download(key: string): Promise<Buffer> {
-    const output = await this.client.send(new GetObjectCommand({ Bucket: this.config.bucket, Key: key }));
+    const output = await this.client.send(
+      new GetObjectCommand({ Bucket: this.config.bucket, Key: key }),
+    );
     const chunks: Buffer[] = [];
-    for await (const chunk of output.Body as Readable) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    for await (const chunk of output.Body as Readable)
+      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
     return Buffer.concat(chunks);
   }
 

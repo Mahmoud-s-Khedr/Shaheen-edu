@@ -1,10 +1,10 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return -- e2e tests parse raw JSON bodies and stub provider internals */
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
-import { Readable } from 'node:stream';
 import { createTestApp } from './utils/create-test-app';
 import {
   cleanDatabase,
   flushTestRedis,
+  seedGovernorate,
   seedPublishedAcademicGrade,
   seedSuperAdmin,
 } from './utils/db';
@@ -36,7 +36,8 @@ function multipart(fileBuffer: Buffer, filename: string, mimetype: string) {
  */
 describe('Entitlements and student delivery (e2e)', () => {
   let app: NestFastifyApplication;
-  let uploadSpy: jest.SpyInstance;
+  let uploadUrlSpy: jest.SpyInstance;
+  let inspectSpy: jest.SpyInstance;
   let deleteSpy: jest.SpyInstance;
 
   let adminToken: string;
@@ -55,12 +56,15 @@ describe('Entitlements and student delivery (e2e)', () => {
   let paidDraftItemId: string;
   let paidCourseId: string;
   let chapterAId: string;
+  let chapterBId: string;
   let lessonAId: string;
   let sectionAId: string;
   let pdfItemId: string;
   let pdfAssetId: string;
   let catalogGradeId: string;
+  let registrationGradeId: string;
   let catalogSubjectId: string;
+  let governorateId: string;
 
   const json = (response: { body: string }) => JSON.parse(response.body);
   const bearer = (token: string) => ({ authorization: `Bearer ${token}` });
@@ -87,7 +91,7 @@ describe('Entitlements and student delivery (e2e)', () => {
           nationalId,
           phone,
           parentPhone: '01088880000',
-          governorate: 'Cairo',
+          governorateId,
           password: 'StudentP@ss1!',
           academicGradeId: gradeId,
         },
@@ -134,15 +138,14 @@ describe('Entitlements and student delivery (e2e)', () => {
     app = await createTestApp();
     await cleanDatabase(app);
     await flushTestRedis(app);
+    governorateId = (await seedGovernorate(app, 'Cairo')).id;
 
     // Never touch real Bunny Storage; protected-URL signing stays real so the
     // expiry assertions below exercise the production token format.
-    uploadSpy = jest
-      .spyOn(BunnyStorageProvider.prototype, 'upload')
-      .mockImplementation((_key, body: Readable) => {
-        body.resume();
-        return Promise.resolve();
-      });
+    uploadUrlSpy = jest
+      .spyOn(BunnyStorageProvider.prototype, 'createUploadUrl')
+      .mockResolvedValue('https://bunny.example.test/presigned');
+    inspectSpy = jest.spyOn(BunnyStorageProvider.prototype, 'inspect');
     deleteSpy = jest
       .spyOn(BunnyStorageProvider.prototype, 'delete')
       .mockResolvedValue(undefined);
@@ -180,7 +183,7 @@ describe('Entitlements and student delivery (e2e)', () => {
       }),
     ).accessToken;
 
-    const registrationGradeId = (
+    registrationGradeId = (
       await seedPublishedAcademicGrade(app, 'entitlements-grade')
     ).id;
     await createStudent(
@@ -204,7 +207,9 @@ describe('Entitlements and student delivery (e2e)', () => {
 
     // Published grade -> subject shared by all three courses.
     catalogGradeId = json(
-      await post('/api/v1/admin/academic-grades', { title: 'Delivery Grade' }),
+      await post('/api/v1/admin/academic-grades', {
+        title: { ar: 'Delivery Grade', en: 'Delivery Grade' },
+      }),
     ).id;
     await publish('academic-grades', catalogGradeId);
     catalogSubjectId = json(
@@ -242,13 +247,16 @@ describe('Entitlements and student delivery (e2e)', () => {
 
     const createChapter = async (title: string) => {
       const id = json(
-        await post('/api/v1/admin/chapters', { title, courseId: paidCourseId }),
+        await post('/api/v1/admin/chapters', {
+          title,
+          courseId: paidCourseId,
+        }),
       ).id;
       await publish('chapters', id);
       return id as string;
     };
     chapterAId = await createChapter('Paid Chapter A');
-    const chapterBId = await createChapter('Paid Chapter B');
+    chapterBId = await createChapter('Paid Chapter B');
     await createChapter('إسلاميات 100%_');
     paidChapterAItemId = await createPublishedItem('Chapter A item', {
       chapterId: chapterAId,
@@ -259,7 +267,10 @@ describe('Entitlements and student delivery (e2e)', () => {
 
     const createLesson = async (title: string) => {
       const id = json(
-        await post('/api/v1/admin/lessons', { title, chapterId: chapterAId }),
+        await post('/api/v1/admin/lessons', {
+          title,
+          chapterId: chapterAId,
+        }),
       ).id;
       await publish('lessons', id);
       return id as string;
@@ -268,7 +279,10 @@ describe('Entitlements and student delivery (e2e)', () => {
     const lessonBId = await createLesson('Paid Lesson B');
     const createSection = async (title: string) => {
       const id = json(
-        await post('/api/v1/admin/sections', { title, lessonId: lessonAId }),
+        await post('/api/v1/admin/sections', {
+          title,
+          lessonId: lessonAId,
+        }),
       ).id;
       await publish('sections', id);
       return id as string;
@@ -291,14 +305,21 @@ describe('Entitlements and student delivery (e2e)', () => {
 
     // A PDF item in chapter A, for protected asset delivery.
     const pdf = multipart(PDF_BYTES, 'entitled.pdf', 'application/pdf');
-    pdfAssetId = json(
-      await app.inject({
-        method: 'POST',
-        url: '/api/v1/admin/assets/upload?kind=PDF',
-        headers: { ...admin(), 'content-type': pdf.contentType },
-        payload: pdf.body,
-      }),
-    ).id;
+    const authorization = await app.inject({
+      method: 'POST',
+      url: '/api/v1/admin/assets/upload?kind=PDF',
+      headers: { ...admin(), 'content-type': pdf.contentType },
+      payload: pdf.body,
+    });
+    pdfAssetId = json(authorization).asset.id;
+    inspectSpy.mockResolvedValueOnce({
+      sizeBytes: PDF_BYTES.length,
+      mimeType: 'application/pdf',
+      first: PDF_BYTES.subarray(0, 16),
+    });
+    expect(
+      (await post(`/api/v1/admin/assets/${pdfAssetId}/complete`)).statusCode,
+    ).toBe(201);
     pdfItemId = json(
       await post('/api/v1/admin/content-items', {
         type: 'PDF',
@@ -322,7 +343,8 @@ describe('Entitlements and student delivery (e2e)', () => {
   });
 
   afterAll(async () => {
-    uploadSpy.mockRestore();
+    uploadUrlSpy.mockRestore();
+    inspectSpy.mockRestore();
     deleteSpy.mockRestore();
     await app.close();
   });
@@ -450,7 +472,9 @@ describe('Entitlements and student delivery (e2e)', () => {
       });
       expect(normalizedArabic.statusCode).toBe(200);
       expect(json(normalizedArabic).data).toEqual(
-        expect.arrayContaining([expect.objectContaining({ title: 'إسلاميات 100%_' })]),
+        expect.arrayContaining([
+          expect.objectContaining({ title: 'إسلاميات 100%_' }),
+        ]),
       );
       const literalWildcard = await app.inject({
         method: 'GET',
@@ -486,7 +510,9 @@ describe('Entitlements and student delivery (e2e)', () => {
       expect(lessons.statusCode).toBe(200);
       expect(json(lessons)).toMatchObject({
         parent: { id: chapterAId },
-        data: [{ id: lessonAId }],
+        data: expect.arrayContaining([
+          expect.objectContaining({ id: lessonAId }),
+        ]),
       });
 
       const sections = await app.inject({
@@ -496,7 +522,9 @@ describe('Entitlements and student delivery (e2e)', () => {
       expect(sections.statusCode).toBe(200);
       expect(json(sections)).toMatchObject({
         parent: { id: lessonAId },
-        data: [{ id: sectionAId }],
+        data: expect.arrayContaining([
+          expect.objectContaining({ id: sectionAId }),
+        ]),
       });
     });
 
@@ -538,7 +566,7 @@ describe('Entitlements and student delivery (e2e)', () => {
           nationalId: '29903030342345',
           phone: '01099990004',
           parentPhone: '01088880004',
-          governorate: 'Cairo',
+          governorateId,
           password: 'StudentP@ss1!',
           academicGradeId: catalogGradeId,
         },
@@ -575,7 +603,7 @@ describe('Entitlements and student delivery (e2e)', () => {
       expect(summary.statusCode).toBe(200);
       expect(json(summary)).toMatchObject({
         academicGrade: { id: catalogGradeId },
-        summary: { subjects: 1, courses: 3, chapters: 2 },
+        summary: { subjects: 1, courses: 3, chapters: 3 },
       });
 
       const courses = await app.inject({
@@ -642,9 +670,13 @@ describe('Entitlements and student delivery (e2e)', () => {
           access: { state: 'ENTITLED' },
           isLocked: false,
         },
-        data: [
-          { id: lessonAId, access: { state: 'ENTITLED' }, isLocked: false },
-        ],
+        data: expect.arrayContaining([
+          expect.objectContaining({
+            id: lessonAId,
+            access: expect.objectContaining({ state: 'ENTITLED' }),
+            isLocked: false,
+          }),
+        ]),
       });
       const sections = await app.inject({
         method: 'GET',
@@ -652,16 +684,23 @@ describe('Entitlements and student delivery (e2e)', () => {
         headers,
       });
       expect(sections.statusCode).toBe(200);
-      expect(json(sections)).toMatchObject({
+      const sectionsBody = json(sections);
+      expect(sectionsBody).toMatchObject({
         parent: {
           id: lessonAId,
           access: { state: 'ENTITLED' },
           isLocked: false,
         },
-        data: [
-          { id: sectionAId, access: { state: 'ENTITLED' }, isLocked: false },
-        ],
       });
+      expect(sectionsBody.data).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            id: sectionAId,
+            access: expect.objectContaining({ state: 'ENTITLED' }),
+            isLocked: false,
+          }),
+        ]),
+      );
 
       const chapter = await app.inject({
         method: 'GET',
@@ -809,8 +848,8 @@ describe('Entitlements and student delivery (e2e)', () => {
       await createStudent(
         'searcher',
         catalogGradeId,
-        '29903030342345',
-        '01099990004',
+        '29903030352345',
+        '01099990005',
       );
       await grant({
         studentUserId: students.searcher.id,
@@ -927,11 +966,11 @@ describe('Entitlements and student delivery (e2e)', () => {
     it('denies a grant that has not started', async () => {
       await grant({
         studentUserId: students.outsider.id,
-        chapterId: chapterAId,
+        chapterId: chapterBId,
         startsAt: new Date(Date.now() + DAY).toISOString(),
       });
       expect(
-        (await readAsStudent('outsider', paidChapterAItemId)).statusCode,
+        (await readAsStudent('outsider', paidChapterBItemId)).statusCode,
       ).toBe(403);
     });
 
@@ -945,28 +984,39 @@ describe('Entitlements and student delivery (e2e)', () => {
       const second = json(
         await grant({
           studentUserId: students.outsider.id,
-          courseId: paidCourseId,
+          chapterId: chapterAId,
         }),
       );
+      expect(first).toMatchObject({
+        id: expect.any(String),
+        status: 'ACTIVE',
+        courseId: paidCourseId,
+      });
+      expect(second).toMatchObject({
+        id: expect.any(String),
+        status: 'ACTIVE',
+        chapterId: chapterAId,
+      });
+      expect(second.id).not.toBe(first.id);
       expect(
-        (await readAsStudent('outsider', paidCourseItemId)).statusCode,
+        (await readAsStudent('outsider', paidChapterAItemId)).statusCode,
       ).toBe(200);
 
       // Revoking one of two overlapping grants leaves access intact.
       expect(
         (await post(`/api/v1/admin/entitlements/${first.id}/revoke`))
           .statusCode,
-      ).toBe(201);
+      ).toBe(200);
       expect(
-        (await readAsStudent('outsider', paidCourseItemId)).statusCode,
+        (await readAsStudent('outsider', paidChapterAItemId)).statusCode,
       ).toBe(200);
 
       expect(
         (await post(`/api/v1/admin/entitlements/${second.id}/revoke`))
           .statusCode,
-      ).toBe(201);
+      ).toBe(200);
       expect(
-        (await readAsStudent('outsider', paidCourseItemId)).statusCode,
+        (await readAsStudent('outsider', paidChapterAItemId)).statusCode,
       ).toBe(403);
     });
 

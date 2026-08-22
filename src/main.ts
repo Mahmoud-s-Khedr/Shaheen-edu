@@ -3,7 +3,11 @@ import type { AppConfig } from './config/configuration';
 import { createApp } from './app.factory';
 
 async function bootstrap() {
-  const app = await createApp({ enableSwagger: true });
+  const enableSwagger =
+    process.env.API_DOCS_ENABLED !== undefined
+      ? process.env.API_DOCS_ENABLED === 'true'
+      : process.env.NODE_ENV !== 'production';
+  const app = await createApp({ enableSwagger });
   const configService = app.get(ConfigService<AppConfig, true>);
   app.enableShutdownHooks();
 

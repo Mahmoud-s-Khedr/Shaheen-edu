@@ -4,6 +4,7 @@ import { createTestApp } from './utils/create-test-app';
 import {
   cleanDatabase,
   flushTestRedis,
+  seedGovernorate,
   seedDraftAcademicGrade,
   seedPublishedAcademicGrade,
 } from './utils/db';
@@ -14,13 +15,18 @@ const baseRegisterPayload = {
   nationalId: '29902020212345',
   phone: '01099998888',
   parentPhone: '01088887777',
-  governorate: 'Cairo',
   password: 'StudentP@ss1!',
 };
 
 describe('Student (e2e)', () => {
   let app: NestFastifyApplication;
   let academicGradeId: string;
+  let governorateId: string;
+
+  const registrationPayload = () => ({
+    ...baseRegisterPayload,
+    governorateId,
+  });
 
   beforeAll(async () => {
     app = await createTestApp();
@@ -29,6 +35,7 @@ describe('Student (e2e)', () => {
     academicGradeId = (
       await seedPublishedAcademicGrade(app, 'student-e2e-grade')
     ).id;
+    governorateId = (await seedGovernorate(app, 'Cairo')).id;
   });
 
   afterAll(async () => {
@@ -39,7 +46,7 @@ describe('Student (e2e)', () => {
     const response = await app.inject({
       method: 'POST',
       url: '/api/v1/auth/students/register',
-      payload: { ...baseRegisterPayload, academicGradeId },
+      payload: { ...registrationPayload(), academicGradeId },
     });
     expect(response.statusCode).toBe(201);
     const body = JSON.parse(response.body);
@@ -55,7 +62,7 @@ describe('Student (e2e)', () => {
       method: 'POST',
       url: '/api/v1/auth/students/register',
       payload: {
-        ...baseRegisterPayload,
+        ...registrationPayload(),
         nationalId: '29902020211111',
         phone: '01077776666',
         parentPhone: '01066665555',
@@ -76,7 +83,7 @@ describe('Student (e2e)', () => {
       method: 'POST',
       url: '/api/v1/auth/students/register',
       payload: {
-        ...baseRegisterPayload,
+        ...registrationPayload(),
         nationalId: '29902020255555',
         phone: '01055556666',
         parentPhone: '01066667777',
@@ -88,7 +95,7 @@ describe('Student (e2e)', () => {
       method: 'POST',
       url: '/api/v1/auth/students/register',
       payload: {
-        ...baseRegisterPayload,
+        ...registrationPayload(),
         nationalId: '29902020266666',
         phone: '01066667777',
         parentPhone: '01077778888',
@@ -104,7 +111,7 @@ describe('Student (e2e)', () => {
       method: 'POST',
       url: '/api/v1/auth/students/register',
       payload: {
-        ...baseRegisterPayload,
+        ...registrationPayload(),
         nationalId: '29902020277777',
         phone: '01077778888',
         parentPhone: '01088889999',
@@ -119,7 +126,7 @@ describe('Student (e2e)', () => {
       method: 'POST',
       url: '/api/v1/auth/students/register',
       payload: {
-        ...baseRegisterPayload,
+        ...registrationPayload(),
         nationalId: '29902020222222',
         academicGradeId,
         phone: '+20 10 1111 2222',
@@ -135,7 +142,7 @@ describe('Student (e2e)', () => {
       method: 'POST',
       url: '/api/v1/auth/students/register',
       payload: {
-        ...baseRegisterPayload,
+        ...registrationPayload(),
         academicGradeId,
         nationalId: '29902020233333',
         phone: '01312345678',
@@ -147,7 +154,7 @@ describe('Student (e2e)', () => {
       method: 'POST',
       url: '/api/v1/auth/students/register',
       payload: {
-        ...baseRegisterPayload,
+        ...registrationPayload(),
         academicGradeId,
         nationalId: '29902020244444',
         phone: '01044445555',
@@ -162,7 +169,7 @@ describe('Student (e2e)', () => {
       method: 'POST',
       url: '/api/v1/auth/students/register',
       payload: {
-        ...baseRegisterPayload,
+        ...registrationPayload(),
         academicGradeId,
         nationalId: '29902020298765',
       },
@@ -175,7 +182,7 @@ describe('Student (e2e)', () => {
       method: 'POST',
       url: '/api/v1/auth/students/register',
       payload: {
-        ...baseRegisterPayload,
+        ...registrationPayload(),
         academicGradeId,
         phone: '01011112222',
       },

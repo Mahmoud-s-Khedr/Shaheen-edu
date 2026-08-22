@@ -1,7 +1,12 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/require-await -- e2e tests parse raw JSON response bodies */
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import { createTestApp } from './utils/create-test-app';
-import { cleanDatabase, flushTestRedis, seedSuperAdmin } from './utils/db';
+import {
+  cleanDatabase,
+  flushTestRedis,
+  seedGovernorate,
+  seedSuperAdmin,
+} from './utils/db';
 
 describe('Academic hierarchy (e2e)', () => {
   let app: NestFastifyApplication;
@@ -53,7 +58,9 @@ describe('Academic hierarchy (e2e)', () => {
       method: 'POST',
       url: '/api/v1/admin/academic-grades',
       headers: { authorization: `Bearer ${adminToken}` },
-      payload: { title: 'Registration Grade' },
+      payload: {
+        title: { ar: 'Registration Grade', en: 'Registration Grade' },
+      },
     });
     const registrationGradeBody = await json(registrationGrade);
     registrationGradeId = registrationGradeBody.id;
@@ -72,7 +79,7 @@ describe('Academic hierarchy (e2e)', () => {
         nationalId: '29902020299999',
         phone: '01055559999',
         parentPhone: '01066668888',
-        governorate: 'Cairo',
+        governorateId: (await seedGovernorate(app, 'Cairo')).id,
         academicGradeId: registrationGradeBody.id,
         password: 'StudentP@ss1!',
       },
@@ -122,7 +129,7 @@ describe('Academic hierarchy (e2e)', () => {
         method: 'POST',
         url: '/api/v1/admin/academic-grades',
         headers: authHeader(adminToken),
-        payload: { title: 'Grade 10' },
+        payload: { title: { ar: 'Grade 10', en: 'Grade 10' } },
       });
       expect(response.statusCode).toBe(201);
       const body = await json(response);
@@ -276,7 +283,7 @@ describe('Academic hierarchy (e2e)', () => {
         method: 'POST',
         url: '/api/v1/admin/academic-grades',
         headers: authHeader(adminToken),
-        payload: { title: 'Grade 11' },
+        payload: { title: { ar: 'Grade 11', en: 'Grade 11' } },
       });
       gradeId = (await json(response)).id;
     });
@@ -320,7 +327,7 @@ describe('Academic hierarchy (e2e)', () => {
         method: 'POST',
         url: '/api/v1/admin/academic-grades',
         headers: authHeader(adminToken),
-        payload: { title: 'Grade 12' },
+        payload: { title: { ar: 'Grade 12', en: 'Grade 12' } },
       });
       const otherGradeId = (await json(otherGrade)).id;
 
@@ -370,7 +377,7 @@ describe('Academic hierarchy (e2e)', () => {
         method: 'POST',
         url: '/api/v1/admin/academic-grades',
         headers: authHeader(studentToken),
-        payload: { title: 'Blocked' },
+        payload: { title: { ar: 'Blocked', en: 'Blocked' } },
       });
       expect(asStudent.statusCode).toBe(403);
 
@@ -378,14 +385,14 @@ describe('Academic hierarchy (e2e)', () => {
         method: 'POST',
         url: '/api/v1/admin/academic-grades',
         headers: authHeader(partnerToken),
-        payload: { title: 'Blocked' },
+        payload: { title: { ar: 'Blocked', en: 'Blocked' } },
       });
       expect(asPartner.statusCode).toBe(403);
 
       const unauthenticated = await app.inject({
         method: 'POST',
         url: '/api/v1/admin/academic-grades',
-        payload: { title: 'Blocked' },
+        payload: { title: { ar: 'Blocked', en: 'Blocked' } },
       });
       expect(unauthenticated.statusCode).toBe(401);
     });
@@ -402,7 +409,7 @@ describe('Academic hierarchy (e2e)', () => {
         method: 'POST',
         url: '/api/v1/admin/academic-grades',
         headers: authHeader(adminToken),
-        payload: { title: 'Reorder Grade' },
+        payload: { title: { ar: 'Reorder Grade', en: 'Reorder Grade' } },
       });
       gradeId = (await json(grade)).id;
 
@@ -496,7 +503,9 @@ describe('Academic hierarchy (e2e)', () => {
         method: 'POST',
         url: '/api/v1/admin/academic-grades',
         headers: authHeader(adminToken),
-        payload: { title: 'Move Target Grade' },
+        payload: {
+          title: { ar: 'Move Target Grade', en: 'Move Target Grade' },
+        },
       });
       const targetGradeId = (await json(targetGrade)).id;
 
@@ -548,7 +557,7 @@ describe('Academic hierarchy (e2e)', () => {
         method: 'POST',
         url: '/api/v1/admin/academic-grades',
         headers: authHeader(adminToken),
-        payload: { title: 'Archive Grade' },
+        payload: { title: { ar: 'Archive Grade', en: 'Archive Grade' } },
       });
       gradeId = (await json(grade)).id;
 
@@ -669,7 +678,9 @@ describe('Academic hierarchy (e2e)', () => {
         method: 'POST',
         url: '/api/v1/admin/academic-grades',
         headers: authHeader(adminToken),
-        payload: { title: 'Delete Blocked Grade' },
+        payload: {
+          title: { ar: 'Delete Blocked Grade', en: 'Delete Blocked Grade' },
+        },
       });
       const body = await json(grade);
 

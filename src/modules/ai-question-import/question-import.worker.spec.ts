@@ -31,12 +31,27 @@ describe('QuestionImportWorker', () => {
     pdfTranscriptionModel: 'test/pdf-model',
     pdfTranscriptionFallbackModel: 'test/fallback-model',
     pdfTranscriptionTimeoutMs: 120_000,
+    pdfMaxPages: 500,
     segmentationSplitThresholdTokens: 120_000,
     segmentationChildTargetTokens: 12_000,
     extractionTargetTokens: 30_000,
     extractionMaxQuestions: 10,
     pdfSplitOverlapPages: 2,
   };
+
+  it('rejects PDFs that would create an unbounded number of page jobs', async () => {
+    const { worker, prisma, storage, pdfRanges } = workerWith();
+    storage.download.mockResolvedValue(Buffer.from('pdf'));
+    pdfRanges.pageCount.mockResolvedValue(501);
+
+    await expect(
+      (worker as any).transcribePdf({
+        id: 'batch-1',
+        sourceAsset: { storageKey: 'source.pdf' },
+      }),
+    ).rejects.toThrow('configured maximum is 500');
+    expect(prisma.questionImportPage.createMany).not.toHaveBeenCalled();
+  });
 
   function workerWith(overrides: Record<string, any> = {}) {
     const questionImportItem = {
@@ -51,7 +66,7 @@ describe('QuestionImportWorker', () => {
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       questionImportItem,
-      questionImportBatch: { update: jest.fn() },
+      questionImportBatch: { update: jest.fn(), findUnique: jest.fn() },
       questionImportPage: {
         createMany: jest.fn(),
         findMany: jest.fn().mockResolvedValue([]),

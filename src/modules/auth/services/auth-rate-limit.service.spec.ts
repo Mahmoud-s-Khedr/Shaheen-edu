@@ -9,14 +9,14 @@ class InMemoryRedis {
     return value === undefined ? null : String(value);
   }
 
-  async incr(key: string): Promise<number> {
+  async eval(
+    _script: string,
+    _numberOfKeys: number,
+    key: string,
+  ): Promise<number> {
     const value = (this.values.get(key) ?? 0) + 1;
     this.values.set(key, value);
     return value;
-  }
-
-  async expire(): Promise<number> {
-    return 1;
   }
 
   async ttl(): Promise<number> {
