@@ -2,7 +2,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsArray, IsDateString, IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
 import { PaginationQueryDto } from '../../../common/dto/pagination-query.dto';
 
-export const REPORT_TYPES = ['COMMERCE', 'PARTNER_OBLIGATIONS', 'ENTITLEMENTS'] as const;
+export const REPORT_TYPES = ['COMMERCE', 'PARTNER_OBLIGATIONS', 'REFERRAL_ALLOCATIONS', 'REFERRAL_SETTLEMENTS', 'ENTITLEMENTS'] as const;
 export type ReportType = (typeof REPORT_TYPES)[number];
 
 export class PlatformReportQueryDto {

@@ -130,6 +130,7 @@ export const envValidationSchema = Joi.object({
   PRIVACY_REQUIRE_SENSITIVE_360_REASON: Joi.boolean().default(true),
   PRIVACY_REQUIRE_PRIVILEGED_EXPORT_REASON: Joi.boolean().default(true),
   PRIVACY_SUPPORT_REASON_ALLOWLIST: Joi.string().allow('').default(''),
+  REFERRAL_PARTNER_MINIMUM_COHORT: Joi.number().integer().min(2).max(100).default(5),
   PAYMOB_BASE_URL: Joi.string().uri().default('https://accept.paymob.com'),
   PAYMOB_SECRET_KEY: Joi.string().allow('').optional(),
   PAYMOB_PUBLIC_KEY: Joi.string().allow('').optional(),

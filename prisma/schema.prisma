@@ -161,6 +161,37 @@ enum ReferralCommissionKind {
   PERCENTAGE_CAPPED
 }
 
+// A hard checkout block rejects use of a code. Queue rules preserve the
+// checkout and create an operator-visible flag after the attribution exists.
+enum ReferralReviewRuleKind {
+  STUDENT_PROGRAM_APPROVED_SALES
+  STUDENT_CODE_APPROVED_SALES
+}
+
+enum ReferralReviewAction {
+  BLOCK_CHECKOUT
+  QUEUE_REVIEW
+}
+
+enum ReferralReviewFlagSource {
+  AUTOMATED
+  MANUAL
+}
+
+enum ReferralReviewStatus {
+  OPEN
+  ASSIGNED
+  RESOLVED
+  ACCEPTED
+}
+
+enum ReferralReviewDisposition {
+  CLEARED
+  CONFIRMED_FRAUD
+  NO_ACTION
+  ESCALATED
+}
+
 enum AssessmentAttributionRole {
   PRIMARY
   CONTRIBUTOR
@@ -515,6 +546,10 @@ model User {
   reconciliationRunsCreated           PartnerFinanceReconciliationRun[] @relation("ReconciliationRunCreatedBy")
   reconciliationDiscrepanciesAssigned PartnerFinanceDiscrepancy[]       @relation("ReconciliationDiscrepancyAssignedTo")
   reconciliationDiscrepanciesResolved PartnerFinanceDiscrepancy[]       @relation("ReconciliationDiscrepancyResolvedBy")
+  referralReviewRulesCreated        ReferralReviewRule[]                @relation("ReferralReviewRuleCreatedBy")
+  referralReviewFlagsAssigned       ReferralReviewFlag[]                @relation("ReferralReviewFlagAssignedTo")
+  referralReviewFlagsResolved       ReferralReviewFlag[]                @relation("ReferralReviewFlagResolvedBy")
+  referralReviewNotesCreated        ReferralReviewNote[]                @relation("ReferralReviewNoteCreatedBy")
   reportExportsRequested              ReportExportJob[]                 @relation("ReportExportRequestedBy")
 
   academicGradesCreated     AcademicGrade[]           @relation("AcademicGradeCreatedBy")
@@ -2728,6 +2763,7 @@ model ReferralProgram {
   updatedAt            DateTime                   @updatedAt
   codes                ReferralCode[]
   rules                ReferralCommissionRule[]
+  reviewRules          ReferralReviewRule[]
   attributions         OrderReferralAttribution[]
 
   @@index([partnerUserId, status, startsAt, endsAt])
@@ -2772,6 +2808,24 @@ model ReferralCommissionRule {
   @@index([programId, isActive, startsAt, endsAt])
 }
 
+model ReferralReviewRule {
+  id          String                 @id @default(cuid())
+  programId   String
+  program     ReferralProgram        @relation(fields: [programId], references: [id], onDelete: Cascade)
+  name        String
+  kind        ReferralReviewRuleKind
+  action      ReferralReviewAction
+  threshold   Int
+  isActive    Boolean                @default(true)
+  createdById String
+  createdBy   User                   @relation("ReferralReviewRuleCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  createdAt   DateTime               @default(now())
+  updatedAt   DateTime               @updatedAt
+  flags       ReferralReviewFlag[]
+
+  @@index([programId, isActive])
+}
+
 model OrderReferralAttribution {
   id                String                 @id @default(cuid())
   orderId           String                 @unique
@@ -2786,10 +2840,51 @@ model OrderReferralAttribution {
   rule              ReferralCommissionRule @relation(fields: [ruleId], references: [id], onDelete: Restrict)
   snapshot          Json
   createdAt         DateTime               @default(now())
+  reviewFlags       ReferralReviewFlag[]
 
   @@index([referralProgramId, createdAt])
   @@index([referralCodeId, createdAt])
   @@index([studentUserId, createdAt])
+}
+
+model ReferralReviewFlag {
+  id            String                    @id @default(cuid())
+  attributionId String
+  attribution   OrderReferralAttribution  @relation(fields: [attributionId], references: [id], onDelete: Restrict)
+  ruleId        String?
+  rule          ReferralReviewRule?       @relation(fields: [ruleId], references: [id], onDelete: SetNull)
+  source        ReferralReviewFlagSource
+  type          String
+  action        ReferralReviewAction
+  observedValue Int?
+  threshold     Int?
+  metadata      Json?
+  status        ReferralReviewStatus      @default(OPEN)
+  assignedToId  String?
+  assignedTo    User?                     @relation("ReferralReviewFlagAssignedTo", fields: [assignedToId], references: [id], onDelete: Restrict)
+  disposition   ReferralReviewDisposition?
+  resolvedById  String?
+  resolvedBy    User?                     @relation("ReferralReviewFlagResolvedBy", fields: [resolvedById], references: [id], onDelete: Restrict)
+  resolvedAt    DateTime?
+  createdAt     DateTime                  @default(now())
+  updatedAt     DateTime                  @updatedAt
+  notes         ReferralReviewNote[]
+
+  @@index([status, createdAt])
+  @@index([attributionId])
+  @@index([assignedToId, status])
+}
+
+model ReferralReviewNote {
+  id          String              @id @default(cuid())
+  flagId      String
+  flag        ReferralReviewFlag  @relation(fields: [flagId], references: [id], onDelete: Cascade)
+  body        String
+  createdById String
+  createdBy   User                @relation("ReferralReviewNoteCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  createdAt   DateTime            @default(now())
+
+  @@index([flagId, createdAt])
 }
 
 model PartnerAllocation {

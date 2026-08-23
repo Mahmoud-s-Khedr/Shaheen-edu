@@ -234,13 +234,13 @@ attribution data for representative fixtures.
 **Goal:** Turn the existing referral attribution and commission foundation
 into a supportable partner program.
 
-- [ ] Add referral conversion, approved-sales, commission-state, trend, and
+- [x] Add referral conversion, approved-sales, commission-state, trend, and
   product/category reporting for partners and administrators.
-- [ ] Add referral-specific allocation/settlement views and exports, reusing
+- [x] Add referral-specific allocation/settlement views and exports, reusing
   the same immutable ledger and export controls as Phase 2.
-- [ ] Apply small-cohort suppression or bucketing to partner-facing breakdowns
+- [x] Apply small-cohort suppression or bucketing to partner-facing breakdowns
   and test that learner or order-level data cannot be inferred.
-- [ ] Add fraud flags, configurable review rules, code/program suspension,
+- [x] Add fraud flags, configurable review rules, code/program suspension,
   assignee, disposition, notes, and audited operator workflow. Define which
   checks block checkout versus merely queue review.
 
@@ -248,6 +248,19 @@ into a supportable partner program.
 administrators can investigate and resolve a flagged referral without editing
 historical allocations; settlement and reporting totals reconcile to approved
 orders and reversal rows.
+
+**Implementation status (2026-08-23):** Complete in code, pending migration
+deployment and operational rollout. Partner reporting is aggregate-only and
+suppresses the entire period below `REFERRAL_PARTNER_MINIMUM_COHORT` (default
+5), then omits any smaller product, category, or trend breakdown. Admins can
+filter the existing immutable ledger/settlement views to referral commissions
+and request `REFERRAL_ALLOCATIONS` or `REFERRAL_SETTLEMENTS` through the
+existing audited private-export workflow. Automated review rules are scoped to
+a referral program and support `BLOCK_CHECKOUT` or `QUEUE_REVIEW`; self-
+referral remains an unconditional checkout block. Queued flags are assigned,
+noted, resolved or accepted with a disposition, and every operator action is
+audited. Program and code suspend/resume actions do not modify any existing
+attribution or allocation.
 
 #### Phase 4 — Complete platform reporting and export catalogue
 

@@ -63,7 +63,7 @@ export class PartnerFinanceService {
     return settlement;
   }
   async settlements(actor: RequestUser, query: SettlementsQueryDto) {
-    this.admin(actor); const createdAt = this.dateRange(query.from, query.to); const where = { ...(query.partnerUserId ? { partnerUserId: query.partnerUserId } : {}), ...(createdAt ? { createdAt } : {}) };
+    this.admin(actor); const createdAt = this.dateRange(query.from, query.to); const where = { ...(query.partnerUserId ? { partnerUserId: query.partnerUserId } : {}), ...(query.kind ? { lines: { some: { allocation: { kind: query.kind } } } } : {}), ...(createdAt ? { createdAt } : {}) };
     const [data, total] = await this.prisma.$transaction([this.prisma.partnerSettlement.findMany({ where, include: { partner: { select: { displayName: true } }, _count: { select: { lines: true } } }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], skip: (query.page - 1) * query.limit, take: query.limit }), this.prisma.partnerSettlement.count({ where })]);
     return { data, meta: toPaginationMeta(query.page, query.limit, total) };
   }

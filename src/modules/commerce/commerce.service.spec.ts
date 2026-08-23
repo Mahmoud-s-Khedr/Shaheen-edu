@@ -1,9 +1,11 @@
-import { BadRequestException, ConflictException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException } from '@nestjs/common';
 import {
   AssetKind,
   AssetStatus,
   ManualPaymentSubmissionStatus,
   OrderStatus,
+  ReferralReviewAction,
+  ReferralReviewRuleKind,
   Role,
 } from '../../common/types/roles.enum';
 import { CommerceService } from './commerce.service';
@@ -233,5 +235,33 @@ describe('CommerceService payment proofs', () => {
       3, 4, 1, 2,
     ]);
     expect(tx.$executeRaw).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('CommerceService referral review rules', () => {
+  const program = {
+    id: 'program-1', partnerUserId: 'partner-1', status: 'ACTIVE', startsAt: new Date('2026-01-01'), endsAt: null, appliesToAll: true,
+    usageLimit: null, perStudentUsageLimit: null,
+    rules: [{ id: 'commission-1', version: 1, kind: 'PERCENTAGE', percentageBps: 1000, fixedCommissionMinor: null, maximumCommissionMinor: null, currency: 'EGP' }],
+    reviewRules: [{ id: 'review-1', kind: ReferralReviewRuleKind.STUDENT_CODE_APPROVED_SALES, action: ReferralReviewAction.QUEUE_REVIEW, threshold: 2 }],
+  };
+  function build() {
+    const prisma: any = {
+      referralCode: { findUnique: jest.fn().mockResolvedValue({ id: 'code-1', code: 'PARTNER', isActive: true, startsAt: null, endsAt: null, usageLimit: null, perStudentUsageLimit: null, programId: program.id, program }) },
+      orderReferralAttribution: { count: jest.fn().mockResolvedValue(1) },
+    };
+    const service = new CommerceService(prisma, {} as any, {} as any, undefined, undefined, undefined, { get: jest.fn().mockReturnValue({ referralsEnabled: true, referralAllowedStudentIds: [], partnerLedgerEnabled: false, partnerLedgerAllowedUserIds: [], reportExportsEnabled: false }) } as any);
+    return { prisma, service };
+  }
+  it('queues a review flag without blocking checkout when a queue rule threshold is reached', async () => {
+    const { service } = build();
+    const referral = await (service as any).resolveReferral('partner', 'student-1', [{ courseForCoverage: 'course-1' }]);
+    expect(referral.reviewFlags).toEqual([expect.objectContaining({ ruleId: 'review-1', observedValue: 2, threshold: 2, action: ReferralReviewAction.QUEUE_REVIEW })]);
+  });
+  it('blocks checkout when a configured rule is a hard block', async () => {
+    const { service } = build();
+    program.reviewRules[0] = { ...program.reviewRules[0], action: ReferralReviewAction.BLOCK_CHECKOUT } as any;
+    await expect((service as any).resolveReferral('partner', 'student-1', [{ courseForCoverage: 'course-1' }])).rejects.toBeInstanceOf(ForbiddenException);
+    program.reviewRules[0] = { ...program.reviewRules[0], action: ReferralReviewAction.QUEUE_REVIEW } as any;
   });
 });

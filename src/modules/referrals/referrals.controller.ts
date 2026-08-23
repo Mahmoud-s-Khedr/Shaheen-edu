@@ -5,7 +5,7 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { ReferralProgramStatus, Role } from '../../common/types/roles.enum';
 import type { RequestUser } from '../../common/types/request-with-user.types';
-import { CreateReferralCodeDto, CreateReferralCommissionRuleDto, CreateReferralProgramDto, ReferralProgramsQueryDto, UpdateReferralCodeDto, UpdateReferralProgramDto } from './dto/referrals.dto';
+import { AddReferralReviewNoteDto, AssignReferralReviewFlagDto, CreateManualReferralReviewFlagDto, CreateReferralCodeDto, CreateReferralCommissionRuleDto, CreateReferralProgramDto, CreateReferralReviewRuleDto, ReferralReviewFlagsQueryDto, ReferralProgramsQueryDto, ResolveReferralReviewFlagDto, UpdateReferralCodeDto, UpdateReferralProgramDto, UpdateReferralReviewRuleDto } from './dto/referrals.dto';
 import { ReferralsService } from './referrals.service';
 
 @ApiTags('admin/referral-programs')
@@ -21,9 +21,19 @@ export class ReferralsController {
   @Patch(':id') @ApiOperation({ summary: 'Update a draft referral program' }) update(@CurrentUser() actor: RequestUser, @Param('id') id: string, @Body() dto: UpdateReferralProgramDto) { return this.referrals.updateProgram(actor, id, dto); }
   @Post(':id/activate') activate(@CurrentUser() actor: RequestUser, @Param('id') id: string) { return this.referrals.activateProgram(actor, id); }
   @Post(':id/suspend') suspend(@CurrentUser() actor: RequestUser, @Param('id') id: string) { return this.referrals.setProgramStatus(actor, id, ReferralProgramStatus.SUSPENDED); }
+  @Post(':id/resume') resume(@CurrentUser() actor: RequestUser, @Param('id') id: string) { return this.referrals.resumeProgram(actor, id); }
   @Post(':id/end') end(@CurrentUser() actor: RequestUser, @Param('id') id: string) { return this.referrals.setProgramStatus(actor, id, ReferralProgramStatus.ENDED); }
   @Post(':id/codes') createCode(@CurrentUser() actor: RequestUser, @Param('id') id: string, @Body() dto: CreateReferralCodeDto) { return this.referrals.createCode(actor, id, dto); }
   @Patch('codes/:id') updateCode(@CurrentUser() actor: RequestUser, @Param('id') id: string, @Body() dto: UpdateReferralCodeDto) { return this.referrals.updateCode(actor, id, dto); }
+  @Post('codes/:id/suspend') suspendCode(@CurrentUser() actor: RequestUser, @Param('id') id: string) { return this.referrals.setCodeActive(actor, id, false); }
+  @Post('codes/:id/resume') resumeCode(@CurrentUser() actor: RequestUser, @Param('id') id: string) { return this.referrals.setCodeActive(actor, id, true); }
   @Post(':id/rules') createRule(@CurrentUser() actor: RequestUser, @Param('id') id: string, @Body() dto: CreateReferralCommissionRuleDto) { return this.referrals.createRule(actor, id, dto); }
   @Post(':id/rules/:ruleId/activate') activateRule(@CurrentUser() actor: RequestUser, @Param('id') id: string, @Param('ruleId') ruleId: string) { return this.referrals.activateRule(actor, id, ruleId); }
+  @Post(':id/review-rules') createReviewRule(@CurrentUser() actor: RequestUser, @Param('id') id: string, @Body() dto: CreateReferralReviewRuleDto) { return this.referrals.createReviewRule(actor, id, dto); }
+  @Patch('review-rules/:id') updateReviewRule(@CurrentUser() actor: RequestUser, @Param('id') id: string, @Body() dto: UpdateReferralReviewRuleDto) { return this.referrals.updateReviewRule(actor, id, dto); }
+  @Get('review-flags') reviewFlags(@CurrentUser() actor: RequestUser, @Query() query: ReferralReviewFlagsQueryDto) { return this.referrals.listReviewFlags(actor, query); }
+  @Post('attributions/:id/review-flags') createManualFlag(@CurrentUser() actor: RequestUser, @Param('id') id: string, @Body() dto: CreateManualReferralReviewFlagDto) { return this.referrals.createManualFlag(actor, id, dto); }
+  @Patch('review-flags/:id/assign') assignFlag(@CurrentUser() actor: RequestUser, @Param('id') id: string, @Body() dto: AssignReferralReviewFlagDto) { return this.referrals.assignReviewFlag(actor, id, dto); }
+  @Post('review-flags/:id/notes') addFlagNote(@CurrentUser() actor: RequestUser, @Param('id') id: string, @Body() dto: AddReferralReviewNoteDto) { return this.referrals.addReviewNote(actor, id, dto); }
+  @Patch('review-flags/:id/resolve') resolveFlag(@CurrentUser() actor: RequestUser, @Param('id') id: string, @Body() dto: ResolveReferralReviewFlagDto) { return this.referrals.resolveReviewFlag(actor, id, dto); }
 }

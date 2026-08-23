@@ -71,6 +71,16 @@ export const REPORT_EXPORT_POLICIES: Record<ReportType, ReportExportPolicy> = {
     retentionMs: 24 * 60 * 60 * 1000,
     signedUrlMs: 15 * 60 * 1000,
   },
+  REFERRAL_ALLOCATIONS: {
+    classification: ReportDataClassification.NON_PII,
+    columns: ['createdAt', 'partnerUserId', 'state', 'basisMinor', 'amountMinor', 'currency', 'payableAt', 'paidAt', 'reversedAt'],
+    roles: [Role.ADMIN, Role.SUPER_ADMIN], privileged: true, retentionMs: 24 * 60 * 60 * 1000, signedUrlMs: 15 * 60 * 1000,
+  },
+  REFERRAL_SETTLEMENTS: {
+    classification: ReportDataClassification.NON_PII,
+    columns: ['createdAt', 'partnerUserId', 'paymentReference', 'currency', 'referralTotalMinor', 'paidAt', 'referralAllocationCount'],
+    roles: [Role.ADMIN, Role.SUPER_ADMIN], privileged: true, retentionMs: 24 * 60 * 60 * 1000, signedUrlMs: 15 * 60 * 1000,
+  },
   ENTITLEMENTS: {
     classification: ReportDataClassification.NON_PII,
     columns: [
@@ -500,6 +510,18 @@ export class ReportsService {
           currency: true,
         },
       });
+    if (reportType === 'REFERRAL_ALLOCATIONS')
+      return this.prisma.partnerAllocation.findMany({
+        where: { kind: 'REFERRAL_COMMISSION', ...(filters.partnerUserId ? { partnerUserId: filters.partnerUserId } : {}), ...dateFilter },
+        select: { createdAt: true, partnerUserId: true, state: true, basisMinor: true, amountMinor: true, currency: true, payableAt: true, paidAt: true, reversedAt: true },
+      });
+    if (reportType === 'REFERRAL_SETTLEMENTS') {
+      const rows = await this.prisma.partnerSettlement.findMany({
+        where: { ...(filters.partnerUserId ? { partnerUserId: filters.partnerUserId } : {}), ...dateFilter, lines: { some: { allocation: { kind: 'REFERRAL_COMMISSION' } } } },
+        select: { createdAt: true, partnerUserId: true, paymentReference: true, currency: true, paidAt: true, lines: { where: { allocation: { kind: 'REFERRAL_COMMISSION' } }, select: { allocation: { select: { amountMinor: true } } } } },
+      });
+      return rows.map((row) => ({ createdAt: row.createdAt, partnerUserId: row.partnerUserId, paymentReference: row.paymentReference, currency: row.currency, paidAt: row.paidAt, referralAllocationCount: row.lines.length, referralTotalMinor: row.lines.reduce((sum, line) => sum + line.allocation.amountMinor, 0) }));
+    }
     return this.prisma.studentEntitlement.findMany({
       where: dateFilter,
       select: {

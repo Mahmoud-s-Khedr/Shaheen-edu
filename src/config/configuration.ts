@@ -67,6 +67,7 @@ export interface AppConfig {
     requireReasonForSensitive360: boolean;
     requireReasonForPrivilegedExports: boolean;
     supportReasonAllowlist: string[];
+    referralPartnerMinimumCohort: number;
   };
   commerce: {
     paymobBaseUrl: string;
@@ -263,6 +264,7 @@ export default (): AppConfig => ({
       .split(',')
       .map((value) => value.trim())
       .filter(Boolean),
+    referralPartnerMinimumCohort: envInteger('REFERRAL_PARTNER_MINIMUM_COHORT', 5),
   },
   commerce: {
     paymobBaseUrl: process.env.PAYMOB_BASE_URL ?? 'https://accept.paymob.com',

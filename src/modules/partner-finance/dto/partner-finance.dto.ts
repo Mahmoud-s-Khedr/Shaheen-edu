@@ -22,6 +22,7 @@ export class SettlementsQueryDto extends PaginationQueryDto {
   @ApiPropertyOptional() @IsOptional() @IsString() partnerUserId?: string;
   @ApiPropertyOptional() @IsOptional() @IsDateString() from?: string;
   @ApiPropertyOptional() @IsOptional() @IsDateString() to?: string;
+  @ApiPropertyOptional({ enum: PartnerAllocationKind }) @IsOptional() @IsEnum(PartnerAllocationKind) kind?: PartnerAllocationKind;
 }
 
 export class CreateReconciliationRunDto {

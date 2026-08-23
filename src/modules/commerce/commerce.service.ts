@@ -18,6 +18,8 @@ import {
   PaymentAttemptStatus,
   PaymentChannel,
   Role,
+  ReferralReviewAction,
+  ReferralReviewRuleKind,
 } from '../../common/types/roles.enum';
 import {
   toPaginationMeta,
@@ -276,7 +278,7 @@ export class CommerceService {
     if (!this.features.referralsEnabled || (this.features.referralAllowedStudentIds.length && !this.features.referralAllowedStudentIds.includes('*') && !this.features.referralAllowedStudentIds.includes(studentUserId))) throw new ConflictException('Referral codes are not enabled for this account');
     const now = new Date(); const normalized = code.trim().toUpperCase();
     const referral = await client.referralCode.findUnique({ where: { code: normalized }, include: {
-      program: { include: { rules: { where: { isActive: true, startsAt: { lte: now }, OR: [{ endsAt: null }, { endsAt: { gt: now } }] }, orderBy: { version: 'desc' }, take: 1 } } },
+      program: { include: { rules: { where: { isActive: true, startsAt: { lte: now }, OR: [{ endsAt: null }, { endsAt: { gt: now } }] }, orderBy: { version: 'desc' }, take: 1 }, reviewRules: { where: { isActive: true } } } },
     } });
     if (!referral || !referral.isActive || (referral.startsAt && referral.startsAt > now) || (referral.endsAt && referral.endsAt <= now) ||
       referral.program.status !== 'ACTIVE' || referral.program.startsAt > now || (referral.program.endsAt && referral.program.endsAt <= now))
@@ -297,6 +299,15 @@ export class CommerceService {
       (referral.perStudentUsageLimit !== null && referral.perStudentUsageLimit !== undefined && codeStudentUses >= referral.perStudentUsageLimit))
       throw new BadRequestException('Referral code usage limit has been reached');
     const rule = referral.program.rules[0]; if (!rule) throw new BadRequestException('Referral code has no active commission rule');
+    // Self-referral is always a hard block. Configured frequency rules are
+    // evaluated before an order is created; only queue rules are persisted as
+    // flags on the new immutable attribution.
+    const reviewFlags = referral.program.reviewRules.flatMap((reviewRule: any) => {
+      const observedValue = reviewRule.kind === ReferralReviewRuleKind.STUDENT_PROGRAM_APPROVED_SALES ? programStudentUses : codeStudentUses;
+      if (observedValue + 1 < reviewRule.threshold) return [];
+      if (reviewRule.action === ReferralReviewAction.BLOCK_CHECKOUT) throw new ForbiddenException('Referral code requires fraud review before checkout');
+      return [{ ruleId: reviewRule.id, source: 'AUTOMATED', type: reviewRule.kind, action: reviewRule.action, observedValue: observedValue + 1, threshold: reviewRule.threshold, metadata: { programId: referral.programId, referralCodeId: referral.id } }];
+    });
     return {
       code: referral.code, codeId: referral.id, programId: referral.programId, rule,
       partnerUserId: referral.program.partnerUserId,
@@ -307,6 +318,7 @@ export class CommerceService {
         fixedCommissionMinor: rule.fixedCommissionMinor,
         maximumCommissionMinor: rule.maximumCommissionMinor, currency: rule.currency,
       },
+      reviewFlags,
     };
   }
   async cart(studentUserId: string) {
@@ -481,9 +493,10 @@ export class CommerceService {
               referralAttribution: referral ? { create: {
                 studentUserId, referralCodeId: referral.codeId, referralProgramId: referral.programId,
                 ruleId: referral.rule.id, snapshot: referral.snapshot,
+                ...(referral.reviewFlags.length ? { reviewFlags: { create: referral.reviewFlags } } : {}),
               } } : undefined,
             },
-            include: { items: true },
+            include: { items: true, referralAttribution: { include: { reviewFlags: { select: { id: true, type: true, action: true } } } } },
           });
           // Remove only the snapshot that was purchased. A concurrently added
           // cart item must survive this checkout.
@@ -509,6 +522,9 @@ export class CommerceService {
         targetId: order.id,
         metadata: { paymentChannel },
       });
+      for (const flag of order.referralAttribution?.reviewFlags ?? []) {
+        await this.audit.record({ actorUserId: studentUserId, action: 'REFERRAL_REVIEW_FLAG_QUEUED', targetType: 'ReferralReviewFlag', targetId: flag.id, metadata: { orderId: order.id, type: flag.type, action: flag.action } });
+      }
       const response = await this.order(studentUserId, order.id);
       if (paymentChannel === PaymentChannel.PAYMOB)
         return {
