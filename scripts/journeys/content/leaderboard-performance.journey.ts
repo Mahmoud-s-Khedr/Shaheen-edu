@@ -274,8 +274,16 @@ export const leaderboardPerformanceJourney: JourneyDefinition = {
             leaderboard.body.data.some(
               (row: any) =>
                 row.rank === 1 && typeof row.smartScore === 'number',
-            ),
-          'The weekly leaderboard must return ranked Smart Scores',
+            ) &&
+            leaderboard.body.data.every((row: any) => {
+              const accuracy = row.answeredQuestions
+                ? (row.correctAnswers / row.answeredQuestions) * 100
+                : 0;
+              const expectedSmartScore =
+                accuracy * 0.6 + row.totalQuestions * 0.4;
+              return Math.abs(row.smartScore - expectedSmartScore) < 1e-9;
+            }),
+          'The weekly leaderboard must return PDF-formula Smart Scores',
         );
         const currentWeek = new Date(
           `${leaderboard.body.week.key}T00:00:00.000Z`,

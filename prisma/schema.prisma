@@ -2050,6 +2050,7 @@ model LeaderboardEntry {
 
   @@unique([weekId, studentUserId])
   @@index([weekId, academicGradeId, rank])
+  @@index([weekId, rank])
 }
 
 model LeaderboardAward {

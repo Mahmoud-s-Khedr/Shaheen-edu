@@ -1,123 +1,172 @@
 # Backend Feature Gap Analysis
 
-**Review date:** 2026-08-22  
-**Scope:** Backend only. Frontend/UI requirements are deliberately excluded.
+**Review date:** 2026-08-23
 
-## Completion assessment
+**Reviewed revision:** `ce1b3723`, plus the uncommitted leaderboard formula
+correction described below.
 
-The backend is approximately **83% complete**, weighted against the functional
-requirements in `docs/MohamedDiab-Req.pdf`.
+**Scope:** Backend implementation only. UI composition, player rendering, client
+navigation, and operational deployment configuration are excluded unless they
+prevent a backend flow from operating.
 
-- **35 of 49** capability areas are fully implemented.
-- **11 of 49** are partially implemented.
-- **3 of 49** are absent.
+## Executive summary
 
-This includes the current implementation, rather than every statement in
-`docs/original.md`: recent code adds scanned-PDF OCR and visual review for AI
-question import, per-item AI-import accept/reject controls, and assessment
-question video-timestamp snapshots.
+The previous report was materially stale. It correctly described the older
+manual-payment implementation, but the current codebase now also contains
+Paymob checkout attempts and signed webhooks, promotions and coupons, unpaid
+order expiry, immutable receipts, AI-prompt quizzes, ranked community
+incorrect-question discovery, question reporting, and parent performance
+analytics.
 
-The codebase builds successfully and its unit suite passes: **305 tests in 43
-suites**.
+Consequently, **do not plan Paymob, coupons, timed discounts, payment expiry,
+AI-prompt quizzes, community-most-incorrect, or parent assessment/performance
+monitoring as new backend features**. They are implemented in code. Paymob
+still needs production credentials, URLs, and a provider acceptance test before
+launch.
 
-## Missing and partial backend features
+The material remaining work is concentrated in these areas:
 
-### 1. Course subscription and learning
+1. AI-credit infrastructure before leaderboard credit rewards.
+2. Refunds and the remaining post-payment commercial lifecycle.
+3. Durable parent accounts/relationships, parent commerce views, and parent
+   administration.
+4. Consolidated admin reporting/exports and the referral-partner model.
+5. A business decision on subject-level products; the current commercial model
+   deliberately sells courses and chapters only.
 
-| Feature                                       | Current state                                                                                        | Required backend work                                                                                                                         |
-| --------------------------------------------- | ---------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| Subject-level subscription                    | Course and chapter purchases are supported.                                                          | Deliberately deferred: subjects are not purchasable products in the current commercial model.                                                 |
-| Complete chapter, lesson, or section directly | Individual content-item completion is persisted; hierarchy completion is derived automatically.      | No direct hierarchy-completion command is required. A populated node is complete when every accessible published descendant item is complete. |
-| Video topics and concepts                     | Optional ordered video outlines are admin-authored and can include timestamped topics plus concepts. | Clients opt in through `includeVideoOutline=true`; ordinary delivery remains unchanged.                                                       |
+No replacement percentage is stated here. The former `49 capability areas`
+denominator combines overlapping PDF statements with deliberate product-scope
+choices, so a percentage would obscure the actionable backlog below.
 
-### 2. AI quiz and question-bank intelligence
+## Verified delivered since the previous report
 
-| Feature                                   | Current state                                                     | Required backend work                                                                                                                                                               |
-| ----------------------------------------- | ----------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| AI-prompt quiz                            | Implemented.                                                      | A student prompt is constrained to entitled, published questions; the normalized selection, rationale, model output, and frozen assessment are retained.                            |
-| Reusable AI question explanations         | Admin-controlled generation and re-answer review are implemented. | Explanations are generated once per question/import, reviewed by admins, and reused through normal answer-reveal rules; per-student AI chat/hints remain deliberately out of scope. |
-| Ranked community-most-incorrect questions | Implemented.                                                      | Student-safe question cards require 20 responses, use a smoothed incorrect-rate rank, respect entitlement/scope filters, and can become a tutor assessment.                         |
-| Student question reporting                | Implemented.                                                      | Students can report six issue types; admins moderate through recorded state transitions and resolution notes.                                                                       |
+| Capability                             | Evidence in the current backend                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Hosted online payment                  | Student checkout accepts `PAYMOB`, creates retryable payment attempts, and `POST /payments/paymob/webhook` verifies the provider HMAC, records an idempotent webhook event, fulfils the order, and grants entitlements. See [`commerce.controller.ts`](../src/modules/commerce/commerce.controller.ts), [`commerce.service.ts`](../src/modules/commerce/commerce.service.ts), and [`paymob.service.ts`](../src/modules/commerce/paymob.service.ts).                                                                |
+| Discounts and coupons                  | Admin CRUD/activation routes, date windows, priorities, product targeting, usage/per-student limits, server-side previews, reservation/release/redeem handling, and immutable order-item promotion snapshots are implemented. See [`pricing.service.ts`](../src/modules/commerce/pricing.service.ts).                                                                                                                                                                                                              |
+| Payment expiry and receipts            | A five-minute scheduled job expires unpaid/rejected orders and pending attempts, releases coupon reservations, and order fulfilment creates one immutable receipt snapshot/reference. See [`commerce-expiry.service.ts`](../src/modules/commerce/commerce-expiry.service.ts) and [`fulfilment.service.ts`](../src/modules/commerce/fulfilment.service.ts).                                                                                                                                                         |
+| AI quiz and question intelligence      | Student AI-prompt assessment generation, constrained to permitted questions; a ranked, entitlement-safe community-incorrect feed; tutor assessment creation; and student question reporting/admin moderation are implemented. See [`assessments.controller.ts`](../src/modules/assessments/assessments.controller.ts), [`question-intelligence.controller.ts`](../src/modules/assessments/question-intelligence.controller.ts), and [`assessments.service.ts`](../src/modules/assessments/assessments.service.ts). |
+| AI explanation and review support      | Admin-generated/reviewed question explanations, AI re-answer review, long-answer transcription/grading, and video-timestamp snapshots are implemented. This is not a per-student AI chat/hint service. See [`ai-question-explanations`](../src/modules/ai-question-explanations) and [`assessments.service.ts`](../src/modules/assessments/assessments.service.ts).                                                                                                                                                |
+| Parent learning/performance monitoring | A selected-child parent session can retrieve progress, assessment/practice analytics, unified performance overview, analysis, trends, and insights. See [`learning.controller.ts`](../src/modules/learning/learning.controller.ts) and [`parent-performance.controller.ts`](../src/modules/performance/parent-performance.controller.ts).                                                                                                                                                                          |
 
-PDF/scanned-document OCR, AI question import, visual extraction, and human
-accept/reject review are implemented. Assessment snapshots now also retain
-linked video timestamps.
+## Remaining feature gaps
 
-Long-answer assessments additionally accept an editable OpenRouter-transcribed
-voice response. The raw recording is sent directly to transcription and not
-retained. Rubric-backed responses are AI-graded in either assessment mode,
-with student-directed feedback and non-overlapping correct/language/factual
-highlight spans. Failed runs remain retriable and an admin can override every
-AI score with an audit record.
+### 1. Leaderboard parity
 
-### 3. Leaderboard
+| Priority | Gap                        | Current state                                                                                                                                                                                   | Required backend work                                                                                                                                                                   |
+| -------- | -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| P0       | Smart Score formula parity | Implemented as `accuracyPercent * 0.6 + totalQuestions * 0.4`, matching the PDF's percentage-based accuracy component. Rankings are platform-wide, rather than grade-scoped.                    | Release after migration and verification.                                                                                                                                               |
+| P2       | Top-five AI-credit rewards | Friday/Cairo weekly windows, persisted history, honor board, and gold/silver/bronze labels for the top three exist. AI credits, their ledger, and student AI-service charging do not yet exist. | Defer credit awards until the AI-credit system is available. Then grant the top five through its immutable, idempotent ledger rather than creating a separate reward-fulfilment system. |
 
-| Feature                    | Current state                                                              | Required backend work                                                                                                                                      |
-| -------------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Smart Score formula parity | The current formula is `correctAnswers * 0.6 + totalQuestions * 0.4`.      | Align it with the requirement's normalized accuracy component and define a normalized questions-solved component, caps, and historic-data migration rules. |
-| Top-five reward system     | A top-five honor board exists, but only the first three have medal labels. | Add prize configuration, winner eligibility, reward ledger, fulfilment status, audit trail, and notification hooks.                                        |
+Evidence: [`leaderboard.service.ts`](../src/modules/leaderboard/leaderboard.service.ts).
 
-### 4. Performance and peer analytics
+#### Smart Score implementation decisions
 
-| Feature                               | Current state                                                                                                                        | Required backend work                                                                     |
-| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------- |
-| Unified performance history           | Implemented. Overview, analysis, trends, peers, and insights use completed assessment answers plus every direct-practice submission. | Accuracy is consistently `correct / answered`; omissions remain explicit.                 |
-| Topic-level peer comparison           | Implemented using the existing curriculum section as the topic level.                                                                | Video-outline topics are not question scopes and remain excluded.                         |
-| Bell-curve/distribution data          | Implemented. Peer comparison returns a privacy-safe ten-point histogram and student-vs-cohort metrics.                               | Raw peer scores and identities are deliberately not returned.                             |
-| Best/worst/needs-improvement insights | Implemented at `GET /student/performance/insights`.                                                                                  | Includes strongest/weakest scopes, omissions, repeated errors, and recommendation labels. |
-| Richer trend insights                 | Implemented. Unified daily trends include 28-day improving/stable/declining classification.                                          | Both windows require sufficient answered activity.                                        |
+The source PDF defines Smart Score as `(Accuracy × 60%) + (Total Questions
+Solved × 40%)`, and defines Accuracy as `(Correct Answers / Answered
+Questions) × 100`. The implementation adopts the following unambiguous backend
+contract:
 
-### 5. Parent features
+- The `totalQuestions` snapshot from completed assessments is the existing
+  representation of the PDF's "Total Questions Solved" term. It remains an
+  uncapped raw-volume component, as specified by the formula.
+- Accuracy is calculated at full precision for ranking; `accuracyPercent` is
+  rounded to one decimal place only for the API response and stored snapshot.
+  A student with no answered questions has zero accuracy.
+- The ranking is platform-wide, as required by the PDF. Ties are ordered by
+  Smart Score, full-precision accuracy, correct-answer count, total-question
+  count, then stable student ID.
+- Completed attempts containing answers pending human or AI grading are not
+  eligible until every answer has a final outcome. This avoids freezing a
+  weekly result using an ungraded answer as incorrect.
+- There is no historical leaderboard data to preserve. The corrected,
+  platform-wide calculation applies to current and historical views after this
+  deployment; no formula versioning or backfill is required.
 
-| Feature                           | Current state                                                                       | Required backend work                                                                                   |
-| --------------------------------- | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| Registered parent accounts        | Parent access is a lightweight session based on child National ID and parent phone. | Add parent account lifecycle, registration/login/recovery, and durable parent-child relationships.      |
-| Parent relationship field         | Not stored.                                                                         | Capture relationship type, consent/verification state, and relationship changes.                        |
-| Parent assessment monitoring      | Basic selected-child content progress and direct-practice summary are available.    | Add assessment history/results, weak-area and activity summaries, with appropriate authorization.       |
-| Parent subscriptions and payments | Not available.                                                                      | Expose authorized child orders, active entitlements, payment status/history, and receipts.              |
-| Admin parent management           | Not implemented.                                                                    | Add parent directory/detail, linked-child management, suspension/revocation, and support audit actions. |
+Medals remain recognition only. The live board derives gold, silver, and bronze
+labels from ranks one through three, while finalized history retains its
+persisted labels.
 
-### 6. Administration and reporting
+#### Deferred AI-credit reward design
 
-| Feature                                | Current state                                                              | Required backend work                                                                                                  |
-| -------------------------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| Consolidated student admin dashboard   | Student, payments, entitlements, and performance data are separate APIs.   | Provide an authorized student 360-degree endpoint joining profile, access, orders, performance, and audit data.        |
-| Subscriber Excel export                | Not implemented.                                                           | Add filtered CSV/XLSX export jobs, secure expiring downloads, access controls, and audit logs.                         |
-| Platform payment/revenue reports       | Manual-payment review and content-publisher estimates exist.               | Add platform-level revenue, payment-status, refund, sales, entitlement, and period-based reporting/export APIs.        |
-| Referral-partner reporting             | Content-publisher reporting exists; referral network reporting does not.   | Model referral attribution and expose partner-scoped student counts, conversion, payment, and revenue-share reporting. |
-| Partner assigned subject/student views | Content-publisher agreements are covered; referral network data is absent. | Add explicit partner assignment/attribution views when required by the business model.                                 |
+Do not create credit awards until students have a usable credit balance. The
+future credit system must provide a per-student account, immutable and
+idempotent grant/consumption/reversal entries, atomic reservation or debit
+around AI-service calls, service pricing, and admin audit/support visibility.
+Once it exists, a rank-one-through-five rule can create a ledger grant keyed by
+week, rank, and student; retries must never double-credit a winner.
 
-### 7. Commerce lifecycle
+### 2. Parent identity and administration
 
-| Feature                                | Current state                                                                | Required backend work                                                                                            |
-| -------------------------------------- | ---------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| Online payment provider                | Manual payment proof and admin approval are implemented.                     | Integrate PSP checkout, signed webhooks, transaction records, retry/recovery, and reconciliation.                |
-| Subject purchases                      | Only courses and chapters are purchasable.                                   | Add subject product, pricing, cart, and entitlement support.                                                     |
-| Coupons                                | Not implemented.                                                             | Add coupon validation, scope, expiry, usage limits, discount calculation, and audit data.                        |
-| Timed discounts                        | Not implemented.                                                             | Add effective-date pricing rules, precedence rules, and immutable order-price snapshots.                         |
-| Refunds                                | Not implemented.                                                             | Add refund request/approval/provider flows, entitlement reversal rules, partial-refund handling, and audit data. |
-| Payment expiry                         | No complete commercial expiry workflow.                                      | Expire unpaid orders/payment instructions, define cart/stock behaviour, and add scheduled cleanup.               |
-| Automated entitlement expiry           | Entitlements have `expiresAt`, but there is no complete automatic lifecycle. | Add scheduled expiry enforcement, renew/reactivate rules, reporting, and notification hooks.                     |
-| Invoices, receipts, and reconciliation | Manual proof records exist only.                                             | Produce immutable receipt/invoice references and reconciliation/reporting workflows.                             |
+| Priority | Gap                                       | Current state                                                                                                                                                                             | Required backend work                                                                                                                                                      |
+| -------- | ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| P1       | Durable parent accounts and relationships | Parent access is a short-lived session authenticated with a child National ID plus parent phone. The child record stores the shared parent phone; there is no parent user/account entity. | Model parent accounts, registration/login/recovery, durable parent-child links, relationship type, consent/verification state, and relationship change/revocation history. |
+| P1       | Parent payments, orders, and entitlements | Parent monitoring now covers learning and performance, but parents cannot view an authorized child's orders, active access, payment state, or receipt details.                            | Add selected-child, authorization-checked commerce read routes and define which financial information is visible to each parent relationship.                              |
+| P2       | Parent administration                     | No parent directory, support detail view, link management, or account/session revocation workflow exists for admins.                                                                      | Add an admin parent directory/detail, linked-child management, suspension/revocation, support actions, and audit records.                                                  |
 
-## Recommended operational backlog
+Evidence: [`parent-auth.controller.ts`](../src/modules/auth/controllers/parent-auth.controller.ts), [`parent-session.service.ts`](../src/modules/auth/services/parent-session.service.ts), and the parent controllers listed above.
 
-These items are not direct requirements in the PDF, so they are not included
-in the 78% completion score. They are nevertheless important before a public
-launch:
+### 3. Administration, exports, and partner model
 
-- Notification service, opt-in preferences, and delivery audit records.
-- Product, error, latency, media-provider, and queue monitoring/alerting.
-- Scheduled reports, backup/restore verification, and operational runbooks.
-- Production acceptance tests for payments and Bunny media.
-- Load testing for concurrent timed assessments.
-- Curriculum versioning and learning-objective mapping if adaptive learning or
-  annual Egyptian curriculum changes are in scope.
+| Priority | Gap                                       | Current state                                                                                                                                                           | Required backend work                                                                                                                                                                          |
+| -------- | ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| P1       | Consolidated student 360 view             | Student administration, orders, entitlements, audit records, and performance are separate APIs.                                                                         | Add an authorized student-detail composition endpoint with explicit PII rules, summary/performance/access/orders data, pagination for large collections, and audit logging.                    |
+| P1       | Subscriber export and platform reporting  | There is no CSV/XLSX export or platform-wide revenue/payment/refund/sales/entitlement report. Publisher reporting is separate and partner-scoped.                       | Specify report dimensions and retention; add filtered export jobs, secure expiring download delivery, authorization/audit logs, and platform financial aggregates.                             |
+| P2       | Referral-partner reporting and assignment | The implemented partner model supports content publishers, agreements, and aggregate earnings only. It has no referral attribution or learner-level partner assignment. | Only if this is the intended partner business model: add attribution at registration/order time, conversion/revenue-share rules, partner-scoped aggregated reporting, and privacy constraints. |
+
+Evidence: [`students.controller.ts`](../src/modules/students/students.controller.ts), [`partner-analytics.controller.ts`](../src/modules/partner-analytics/partner-analytics.controller.ts), and [`publisher-agreements.controller.ts`](../src/modules/publisher-agreements/publisher-agreements.controller.ts).
+
+### 4. Commerce gaps
+
+| Priority | Gap                                 | Current state                                                                                                                                                                                                                          | Required backend work                                                                                                                                                                                  |
+| -------- | ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| P1       | Refunds and reversals               | There is no refund request, approval, Paymob refund/void integration, partial-refund record, or policy for reversing access after a refund.                                                                                            | Define refund eligibility and access-revocation policy; model requests/decisions/transactions; integrate provider refunds; make operations idempotent; handle partial refunds and audit everything.    |
+| P2       | Subject-level subscription/product  | Courses and chapters are intentionally the only purchasable target types. A `Subject` is not priced, cartable, or grantable.                                                                                                           | Make a product decision. If subjects must be sold, extend pricing, cart/order item, promotion target, entitlement, coverage/access policy, and overlap rules to `SUBJECT`.                             |
+| P2       | Entitlement-expiry lifecycle        | Access is already denied automatically when `expiresAt` has passed, and new fulfilment replaces expired matching access. There is no scheduled state transition, renewal/reactivation workflow, reporting event, or notification hook. | Add these only for time-limited subscriptions: expiry job/state policy, renewal/reactivation rules, reporting/audit events, and notifications. Do not duplicate the existing access-time expiry check. |
+| P2       | Reconciliation and receipt delivery | Payment attempts, signed webhook events, order snapshots, and an immutable receipt reference/snapshot exist. There is no admin reconciliation workflow, receipt document/download endpoint, or provider-settlement comparison.         | Add operational reconciliation views/jobs, exception states, receipt rendering/download if required, and settlement import/compare procedures.                                                         |
+| Launch   | Paymob production validation        | The integration is implemented, but correctness against a live merchant configuration is not established by the repository's unit suite.                                                                                               | Configure secrets/integration IDs/callback URLs, run sandbox then live acceptance tests, verify webhook reachability/HMAC fields, retry/timeout paths, and reconciliation.                             |
+
+### 5. Explicit product-scope decisions, not defects
+
+These features are absent by design today. Keep them out of sprint work unless
+the business confirms that they are required:
+
+| Item                                                  | Current decision                                                                                |
+| ----------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| Per-student AI chat, hints, or explanation generation | AI explanations are generated and reviewed by admins, then reused through normal answer reveal. |
+| Subject products                                      | The commercial model sells courses/chapters rather than a subject subscription.                 |
+| Referral network                                      | Partners are content publishers; there is no referral-attribution model.                        |
+| Video-outline topics as assessment scopes             | Curriculum sections are the supported topic scope; video outlines are delivery metadata.        |
 
 ## Recommended implementation order
 
-1. Correct Smart Score and add the ranked community-incorrect feed.
-2. Implement PSP commerce, refunds, discounts, expiry, and reconciliation.
-3. Complete parent accounts, parent monitoring, and consolidated admin reports.
-4. Add AI-prompt quiz generation and student AI explanations with safety/audit controls.
-5. Unified performance analytics, richer peer comparison, and insights are implemented.
+1. Specify and implement refunds/reversals, then perform Paymob sandbox/live
+   acceptance and reconciliation work.
+2. Build parent accounts/relationships and parent commerce views, followed by
+   admin parent management.
+3. Add the student 360 view and platform reporting/export pipeline.
+4. Make a product decision on subject subscriptions and referral partners before
+   designing their data models.
+5. Build the AI-credit ledger and student AI-service charging path. Only then
+   enable top-five leaderboard credit awards.
+
+## Verification performed
+
+- `pnpm build` passed on the reviewed revision.
+- `pnpm exec jest --runInBand` passed: **45 suites, 308 tests**.
+- After the leaderboard formula correction: local `prisma migrate deploy`,
+  `pnpm exec prisma validate`, the full unit suite (**45 suites, 312 tests**),
+  `pnpm build`, and the local `CONTENT-017` leaderboard/performance journey
+  passed. The journey verifies the exact PDF Smart Score arithmetic returned by
+  the live API.
+
+## Operational backlog (outside the PDF feature checklist)
+
+- Notification preferences/delivery records and production alerts for errors,
+  latency, queue workers, and media/payment providers.
+- Backup/restore verification, scheduled-report runbooks, and payment/media
+  incident procedures.
+- Load testing for concurrent timed assessments and full provider/media
+  acceptance journeys.
+- Curriculum versioning and learning-objective mapping if annual curriculum
+  changes or adaptive learning enter scope.

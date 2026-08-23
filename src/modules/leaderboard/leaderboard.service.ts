@@ -1,12 +1,12 @@
-import {
-  ConflictException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { Prisma } from '@prisma/client';
 import { DateTime } from 'luxon';
-import { AssessmentAttemptStatus, Role } from '../../common/types/roles.enum';
+import {
+  AssessmentAttemptStatus,
+  AssessmentQuestionOutcome,
+  Role,
+} from '../../common/types/roles.enum';
 import {
   PaginationQueryDto,
   toPaginationMeta,
@@ -49,7 +49,6 @@ export class LeaderboardService {
 
   private async rows(
     week: Week,
-    gradeId: string,
     db: Pick<Prisma.TransactionClient, 'assessmentAttempt'> = this.prisma,
   ) {
     const attempts = await db.assessmentAttempt.findMany({
@@ -57,8 +56,19 @@ export class LeaderboardService {
         status: AssessmentAttemptStatus.COMPLETED,
         submittedAt: { gte: week.startsAt, lt: week.endsAt },
         student: {
-          academicGradeId: gradeId,
           user: { role: Role.STUDENT, deletedAt: null, status: 'ACTIVE' },
+        },
+        // A score that is still awaiting a human or AI grade cannot fairly be
+        // ranked. It becomes eligible once every answer has a final outcome.
+        answers: {
+          none: {
+            outcome: {
+              in: [
+                AssessmentQuestionOutcome.PENDING_GRADING,
+                AssessmentQuestionOutcome.PENDING_AI_GRADING,
+              ],
+            },
+          },
         },
       },
       include: {
@@ -82,22 +92,39 @@ export class LeaderboardService {
       row.quizzesCompleted++;
       row.totalQuestions += attempt.totalQuestions;
       for (const answer of attempt.answers) {
-        if (answer.outcome !== 'OMITTED') row.answeredQuestions++;
-        if (answer.outcome === 'CORRECT') row.correctAnswers++;
+        if (
+          (
+            [
+              AssessmentQuestionOutcome.CORRECT,
+              AssessmentQuestionOutcome.PARTIALLY_CORRECT,
+              AssessmentQuestionOutcome.INCORRECT,
+            ] as AssessmentQuestionOutcome[]
+          ).includes(answer.outcome as AssessmentQuestionOutcome)
+        )
+          row.answeredQuestions++;
+        if (answer.outcome === AssessmentQuestionOutcome.CORRECT)
+          row.correctAnswers++;
       }
       byStudent.set(attempt.studentUserId, row);
     }
     return [...byStudent.values()]
-      .map((row) => ({
-        ...row,
-        smartScore: row.correctAnswers * 0.6 + row.totalQuestions * 0.4,
-        accuracyPercent: row.answeredQuestions
-          ? Math.round((row.correctAnswers / row.answeredQuestions) * 1000) / 10
-          : 0,
-      }))
+      .map((row) => {
+        const rawAccuracyPercent = row.answeredQuestions
+          ? (row.correctAnswers / row.answeredQuestions) * 100
+          : 0;
+        return {
+          ...row,
+          // The source document's percentage-based accuracy component is not
+          // rounded before ranking.
+          smartScore: rawAccuracyPercent * 0.6 + row.totalQuestions * 0.4,
+          rawAccuracyPercent,
+          accuracyPercent: Math.round(rawAccuracyPercent * 10) / 10,
+        };
+      })
       .sort(
         (a, b) =>
           b.smartScore - a.smartScore ||
+          b.rawAccuracyPercent - a.rawAccuracyPercent ||
           b.correctAnswers - a.correctAnswers ||
           b.totalQuestions - a.totalQuestions ||
           a.studentUserId.localeCompare(b.studentUserId),
@@ -106,6 +133,11 @@ export class LeaderboardService {
   }
 
   private entryDto(entry: any) {
+    const medals: Record<number, { tier: string; label: string }> = {
+      1: { tier: 'GOLD', label: 'Gold Medal' },
+      2: { tier: 'SILVER', label: 'Silver Medal' },
+      3: { tier: 'BRONZE', label: 'Bronze Medal' },
+    };
     return {
       rank: entry.rank,
       student: { displayName: entry.displayName },
@@ -117,27 +149,29 @@ export class LeaderboardService {
       smartScore: entry.smartScore,
       award: entry.award
         ? { tier: entry.award.tier, label: entry.award.label }
-        : null,
+        : (medals[entry.rank] ?? null),
     };
   }
 
   async current(studentId: string, query: PaginationQueryDto) {
     const student = await this.prisma.studentProfile.findUnique({
       where: { userId: studentId },
-      select: { academicGradeId: true },
+      select: { userId: true },
     });
     if (!student) throw new NotFoundException('Student not found');
-    if (!student.academicGradeId)
-      throw new ConflictException('Student academic grade is required');
     const week = this.weekFor();
     // A request after a missed scheduler run safely materializes the prior week.
     await this.finalize(this.weekFor(new Date(week.startsAt.getTime() - 1)));
-    const rows = await this.rows(week, student.academicGradeId);
+    const rows = await this.rows(week);
     const mine = rows.find((row) => row.studentUserId === studentId) ?? null;
     const page = query.page ?? 1,
       limit = query.limit ?? 20;
     return {
-      week: { key: week.key, startsAt: week.startsAt, endsAt: week.endsAt },
+      week: {
+        key: week.key,
+        startsAt: week.startsAt,
+        endsAt: week.endsAt,
+      },
       honorBoard: rows.slice(0, 5).map(this.entryDto),
       data: rows.slice((page - 1) * limit, page * limit).map(this.entryDto),
       myRank: mine ? this.entryDto(mine) : null,
@@ -148,15 +182,13 @@ export class LeaderboardService {
   async history(studentId: string, weekKey: string, query: PaginationQueryDto) {
     const student = await this.prisma.studentProfile.findUnique({
       where: { userId: studentId },
-      select: { academicGradeId: true },
+      select: { userId: true },
     });
-    if (!student?.academicGradeId)
-      throw new ConflictException('Student academic grade is required');
+    if (!student) throw new NotFoundException('Student not found');
     const week = await this.prisma.leaderboardWeek.findUnique({
       where: { weekKey },
       include: {
         entries: {
-          where: { academicGradeId: student.academicGradeId },
           include: { award: true },
           orderBy: { rank: 'asc' },
         },
@@ -166,8 +198,9 @@ export class LeaderboardService {
       throw new NotFoundException('Leaderboard week not found');
     const page = query.page ?? 1,
       limit = query.limit ?? 20;
+    const entries = week.entries;
     const mine =
-      week.entries.find((entry) => entry.studentUserId === studentId) ?? null;
+      entries.find((entry) => entry.studentUserId === studentId) ?? null;
     return {
       week: {
         key: week.weekKey,
@@ -175,12 +208,12 @@ export class LeaderboardService {
         endsAt: week.endsAt,
         finalizedAt: week.finalizedAt,
       },
-      honorBoard: week.entries.slice(0, 5).map((entry) => this.entryDto(entry)),
-      data: week.entries
+      honorBoard: entries.slice(0, 5).map((entry) => this.entryDto(entry)),
+      data: entries
         .slice((page - 1) * limit, page * limit)
         .map((entry) => this.entryDto(entry)),
       myRank: mine ? this.entryDto(mine) : null,
-      meta: toPaginationMeta(page, limit, week.entries.length),
+      meta: toPaginationMeta(page, limit, entries.length),
     };
   }
 
@@ -205,33 +238,25 @@ export class LeaderboardService {
         `,
       );
       if (locked[0]?.finalizedAt) return;
-      const grades = await tx.studentProfile.findMany({
-        where: {
-          academicGradeId: { not: null },
-          user: { role: Role.STUDENT, deletedAt: null, status: 'ACTIVE' },
-        },
-        distinct: ['academicGradeId'],
-        select: { academicGradeId: true },
-      });
-      for (const grade of grades)
-        for (const row of await this.rows(week, grade.academicGradeId!, tx)) {
-          const entry = await tx.leaderboardEntry.create({
-            data: { weekId: persisted.id, ...row },
+      for (const row of await this.rows(week, tx)) {
+        const { rawAccuracyPercent: _rawAccuracyPercent, ...entryData } = row;
+        const entry = await tx.leaderboardEntry.create({
+          data: { weekId: persisted.id, ...entryData },
+        });
+        const awards: Record<number, [string, string]> = {
+          1: ['GOLD', 'Gold Medal'],
+          2: ['SILVER', 'Silver Medal'],
+          3: ['BRONZE', 'Bronze Medal'],
+        };
+        if (awards[row.rank])
+          await tx.leaderboardAward.create({
+            data: {
+              entryId: entry.id,
+              tier: awards[row.rank][0],
+              label: awards[row.rank][1],
+            },
           });
-          const awards: Record<number, [string, string]> = {
-            1: ['GOLD', 'Gold Medal'],
-            2: ['SILVER', 'Silver Medal'],
-            3: ['BRONZE', 'Bronze Medal'],
-          };
-          if (awards[row.rank])
-            await tx.leaderboardAward.create({
-              data: {
-                entryId: entry.id,
-                tier: awards[row.rank][0],
-                label: awards[row.rank][1],
-              },
-            });
-        }
+      }
       await tx.leaderboardWeek.update({
         where: { id: persisted.id },
         data: { finalizedAt: new Date() },
