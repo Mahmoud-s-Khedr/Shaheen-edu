@@ -19,12 +19,18 @@ export const partnerOperationsJourney: JourneyDefinition = {
     );
     let referralPartnerId = '';
     let referralToken = '';
+    let referralProgramId = '';
+    let referralCodeId = '';
     let referralCode = '';
     let referralRuleId = '';
     let studentToken = '';
+    let studentUserId = '';
     let orderId = '';
     let orderItemId = '';
     let referralAllocationId = '';
+    let settlementId = '';
+    let refundId = '';
+    let reconciliationId = '';
 
     const student = <T>(
       method: 'GET' | 'POST',
@@ -63,6 +69,13 @@ export const partnerOperationsJourney: JourneyDefinition = {
           },
         );
         expectStatus(program, 201);
+        referralProgramId = program.body.id;
+        expectStatus(
+          await admin.request('PATCH', `/admin/referral-programs/${referralProgramId}`, {
+            name: factory.title('Phase 5 referral program updated'),
+          }),
+          200,
+        );
 
         referralCode = factory.slug('phase5-referral').toUpperCase();
         const code = await admin.request<any>(
@@ -71,6 +84,21 @@ export const partnerOperationsJourney: JourneyDefinition = {
           { code: referralCode },
         );
         expectStatus(code, 201);
+        referralCodeId = code.body.id;
+        expectStatus(
+          await admin.request('PATCH', `/admin/referral-programs/codes/${referralCodeId}`, {
+            usageLimit: 10,
+          }),
+          200,
+        );
+        expectStatus(
+          await admin.request('POST', `/admin/referral-programs/codes/${referralCodeId}/suspend`),
+          201,
+        );
+        expectStatus(
+          await admin.request('POST', `/admin/referral-programs/codes/${referralCodeId}/resume`),
+          201,
+        );
 
         const rule = await admin.request<any>(
           'POST',
@@ -86,6 +114,18 @@ export const partnerOperationsJourney: JourneyDefinition = {
           ),
           201,
         );
+        const reviewRule = await admin.request<any>(
+          'POST',
+          `/admin/referral-programs/${referralProgramId}/review-rules`,
+          { name: factory.title('Phase 5 review rule'), kind: 'STUDENT_PROGRAM_APPROVED_SALES', action: 'QUEUE_REVIEW', threshold: 1 },
+        );
+        expectStatus(reviewRule, 201);
+        expectStatus(
+          await admin.request('PATCH', `/admin/referral-programs/review-rules/${reviewRule.body.id}`, {
+            threshold: 1,
+          }),
+          200,
+        );
         const activated = await admin.request<any>(
           'POST',
           `/admin/referral-programs/${program.body.id}/activate`,
@@ -95,6 +135,8 @@ export const partnerOperationsJourney: JourneyDefinition = {
           activated.body.status === 'ACTIVE',
           'Referral program must be active before a code can be used',
         );
+        expectStatus(await admin.request('GET', '/admin/referral-programs?limit=100'), 200);
+        expectStatus(await admin.request('GET', `/admin/referral-programs/${referralProgramId}`), 200);
 
         const login = await clients.public.request<any>(
           'POST',
@@ -124,6 +166,7 @@ export const partnerOperationsJourney: JourneyDefinition = {
         );
         expectStatus(registration, 201);
         studentToken = registration.body.accessToken;
+        studentUserId = registration.body.user.id;
 
         const preview = await student<any>('POST', '/student/price-preview', {
           targets: [{ targetType: 'COURSE', targetId: courseId }],
@@ -233,6 +276,7 @@ export const partnerOperationsJourney: JourneyDefinition = {
           },
         );
         expectStatus(settlement, 201);
+        settlementId = settlement.body.id;
         expectStatus(
           await admin.request<any>(
             'POST',
@@ -250,6 +294,7 @@ export const partnerOperationsJourney: JourneyDefinition = {
           },
         );
         expectStatus(refund, 201);
+        refundId = refund.body.id;
         assert(
           refund.body.status === 'PENDING',
           'Fresh unused content must be refund eligible',
@@ -292,6 +337,7 @@ export const partnerOperationsJourney: JourneyDefinition = {
           },
         );
         expectStatus(reconciliation, 201);
+        reconciliationId = reconciliation.body.id;
         const run = await admin.request<any>(
           'POST',
           `/admin/partner-finance/reconciliation-runs/${reconciliation.body.id}/run`,
@@ -307,6 +353,57 @@ export const partnerOperationsJourney: JourneyDefinition = {
     await step(
       'Proving partner isolation, cohort suppression, and secure export completion',
       async () => {
+        expectStatus(await admin.request('GET', `/admin/partners/${referralPartnerId}/detail`), 200);
+        expectStatus(await admin.request('GET', '/admin/referral-reporting'), 200);
+        const flags = await admin.request<any>('GET', `/admin/referral-programs/review-flags?programId=${referralProgramId}&limit=100`);
+        expectStatus(flags, 200);
+        const flag = flags.body.data[0];
+        assert(flag?.id, 'The threshold-one review rule must create an automated review flag');
+        expectStatus(await admin.request('PATCH', `/admin/referral-programs/review-flags/${flag.id}/assign`, {
+          assigneeUserId: String(context.admin.id),
+        }), 200);
+        expectStatus(await admin.request('POST', `/admin/referral-programs/review-flags/${flag.id}/notes`, {
+          body: 'Phase 5 referral review coverage note',
+        }), 201);
+        expectStatus(await admin.request('PATCH', `/admin/referral-programs/review-flags/${flag.id}/resolve`, {
+          status: 'ACCEPTED', disposition: 'NO_ACTION', note: 'Phase 5 referral review coverage resolved',
+        }), 200);
+        expectStatus(await admin.request('POST', '/admin/referral-programs/attributions/missing-attribution/review-flags', {
+          type: 'COVERAGE', note: 'Missing attribution validation coverage',
+        }), 404);
+        expectStatus(await admin.request('GET', '/admin/partner-finance/settlements?limit=100'), 200);
+        expectStatus(await admin.request('GET', '/admin/partner-finance/reconciliation-runs?limit=100'), 200);
+        expectStatus(await admin.request('GET', `/admin/partner-finance/reconciliation-runs/${reconciliationId}`), 200);
+        expectStatus(await admin.request('GET', `/admin/partner-finance/reconciliation-runs/${reconciliationId}/discrepancies?limit=100`), 200);
+        expectStatus(await admin.request('PATCH', '/admin/partner-finance/reconciliation-discrepancies/missing-discrepancy/assign', {
+          assigneeUserId: String(context.admin.id), notes: 'Missing discrepancy validation coverage',
+        }), 404);
+        expectStatus(await admin.request('PATCH', '/admin/partner-finance/reconciliation-discrepancies/missing-discrepancy/resolve', {
+          status: 'ACCEPTED', resolutionNote: 'Missing discrepancy validation coverage',
+        }), 404);
+        expectStatus(await admin.request('POST', '/admin/partner-finance/usage-rollups/rebuild', {
+          from: new Date().toISOString().slice(0, 10), to: new Date().toISOString().slice(0, 10), publisherUserId: String(context.partner.id),
+        }), 201);
+        expectStatus(await admin.request('GET', '/admin/refunds?limit=100'), 200);
+        const policy = await admin.request<any>('GET', '/admin/refunds/policy');
+        expectStatus(policy, 200);
+        expectStatus(await admin.request('PATCH', '/admin/refunds/policy', {
+          eligibilityWindowDays: policy.body.eligibilityWindowDays,
+          maximumConsumptionBps: policy.body.maximumConsumptionBps,
+        }), 200);
+        expectStatus(await student('GET', '/student/refund-requests?limit=100'), 200);
+        // The completed refund cannot be rejected again; this verifies its
+        // terminal-state protection while retaining endpoint coverage.
+        expectStatus(await admin.request('POST', `/admin/refunds/${refundId}/reject`, {
+          rejectionReason: 'Already completed refund coverage check',
+        }), 409);
+        for (const path of [
+          '/admin/reports/commerce', '/admin/reports/revenue', '/admin/reports/refunds',
+          '/admin/reports/payments', '/admin/reports/registrations', '/admin/reports/active-purchasers',
+          '/admin/reports/entitlements', '/admin/reports/partner-obligations',
+        ]) expectStatus(await admin.request('GET', path), 200);
+        for (const suffix of ['', '/assessments', '/audit-events', '/entitlements', '/orders'])
+          expectStatus(await admin.request('GET', `/admin/students/${studentUserId}/360${suffix}?reason=phase5-acceptance-coverage`), 200);
         const referralReport = await clients.public.request<any>(
           'GET',
           '/partners/referrals/report',
@@ -314,6 +411,10 @@ export const partnerOperationsJourney: JourneyDefinition = {
           { accessToken: referralToken },
         );
         expectStatus(referralReport, 200);
+        expectStatus(
+          await clients.public.request('GET', '/partners/referrals/settlements', undefined, { accessToken: referralToken }),
+          200,
+        );
         assert(
           referralReport.body.privacy?.suppressed === true &&
             !JSON.stringify(referralReport.body).includes(
@@ -386,6 +487,22 @@ export const partnerOperationsJourney: JourneyDefinition = {
           typeof download.body.url === 'string' &&
             !download.body.url.includes('Phase 5 referral student'),
           'Export download must use a protected URL without learner identity',
+        );
+        expectStatus(
+          await admin.request('POST', `/admin/reports/exports/${queued.body.id}/cancel`),
+          409,
+        );
+        expectStatus(
+          await admin.request('POST', `/admin/referral-programs/${referralProgramId}/suspend`),
+          201,
+        );
+        expectStatus(
+          await admin.request('POST', `/admin/referral-programs/${referralProgramId}/resume`),
+          201,
+        );
+        expectStatus(
+          await admin.request('POST', `/admin/referral-programs/${referralProgramId}/end`),
+          201,
         );
       },
     );

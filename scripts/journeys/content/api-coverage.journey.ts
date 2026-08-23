@@ -286,7 +286,11 @@ export const apiCoverageJourney: JourneyDefinition = {
       const agreement = await create('/admin/publisher-agreements', { lessonId: lesson, publisherUserId: String(context.partner.id), revenueShareBps: 1000, startsAt: new Date().toISOString(), isPrimary: false });
       expectStatus(await admin.request('PATCH', `/admin/publisher-agreements/${agreement.id}`, { revenueShareBps: 1200 }), 200);
       expectStatus(await admin.request('POST', `/admin/publisher-agreements/${agreement.id}/activate`), 201);
-      expectStatus(await admin.request('POST', `/admin/publisher-agreements/${agreement.id}/end`, { endsAt: new Date().toISOString() }), 201);
+      const replacement = await admin.request<any>('POST', `/admin/publisher-agreements/${agreement.id}/replace`, {
+        lessonId: lesson, publisherUserId: String(context.partner.id), revenueShareBps: 1300, startsAt: new Date().toISOString(), isPrimary: false, activateImmediately: true,
+      });
+      expectStatus(replacement, 201);
+      expectStatus(await admin.request('POST', `/admin/publisher-agreements/${replacement.body.id}/end`, { endsAt: new Date().toISOString() }), 201);
       expectStatus(await admin.request('GET', `/admin/publisher-agreements/effective?lessonId=${lesson}`), 200);
       expectStatus(await admin.request('POST', `/admin/pricing/lesson/${lesson}`, { isPurchasable: false }), 201);
       // Keep video referenced in the coverage record so the variable is intentionally checked.

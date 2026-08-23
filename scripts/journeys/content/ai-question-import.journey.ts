@@ -205,6 +205,36 @@ export const aiQuestionImportJourney: JourneyDefinition = {
         }),
         400,
       );
+      // The default real fixture is raw text. These PDF-only and retry routes
+      // must reject it without changing the completed import; they also retain
+      // coverage of every review-operation contract.
+      if (!fixture.isPdf) {
+        expectStatus(
+          await admin.request('PATCH', `/admin/ai/question-imports/${importId}/source-text`, {
+            normalizedText: 'This completed real import must not be edited through the retry path.',
+          }),
+          409,
+        );
+        expectStatus(await admin.request('POST', `/admin/ai/question-imports/${importId}/chunks/missing-chunk/retry`), 404);
+        expectStatus(await admin.request('POST', `/admin/ai/question-imports/${importId}/pages/1/retry`), 409);
+        expectStatus(await admin.request('POST', `/admin/ai/question-imports/${importId}/children/missing-child/retry`), 404);
+        expectStatus(await admin.request('POST', `/admin/ai/question-imports/${importId}/items/missing-item/retry`), 409);
+        expectStatus(await admin.request('GET', `/admin/ai/question-imports/${importId}/media`), 409);
+        expectStatus(await admin.request('POST', `/admin/ai/question-imports/${importId}/media`, {
+          pageNumber: 1, type: 'DIAGRAM', bounds: { left: 0, top: 0, right: 100, bottom: 100 }, description: 'Not available for raw-text imports',
+        }), 409);
+        expectStatus(await admin.request('PATCH', `/admin/ai/question-imports/${importId}/media/MISSING`, { description: 'Not available for raw-text imports' }), 409);
+        expectStatus(await admin.request('POST', `/admin/ai/question-imports/${importId}/media/MISSING/retry`), 409);
+        expectStatus(await admin.request('PATCH', `/admin/ai/question-imports/${importId}/items/missing-item/media`, { assignments: [] }), 409);
+        expectStatus(await admin.request('POST', `/admin/ai/question-imports/${importId}/items/missing-item/reject`, { reason: 'Not a review candidate' }), 409);
+        // Keep this state-changing call last: a completed import with
+        // invalid/reviewable candidates may be retried (201), while an import
+        // with no retryable work is rejected (409). Both outcomes are valid.
+        expectStatus(
+          await admin.request('POST', `/admin/ai/question-imports/${importId}/retry`),
+          [201, 409],
+        );
+      }
       expectStatus(
         await clients.partner.request('GET', '/admin/ai/question-imports'),
         403,

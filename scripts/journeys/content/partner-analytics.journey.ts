@@ -53,6 +53,16 @@ export const partnerAnalyticsJourney: JourneyDefinition = {
             earnings.body.metricDefinitions?.net?.includes('Signed financial'),
           'Earnings endpoint must document signed ledger netting',
         );
+        expectStatus(
+          await partner.request('GET', '/partners/analytics/allocations?limit=100'),
+          200,
+        );
+        for (const path of [
+          '/partners/analytics/question-usage',
+          '/partners/analytics/question-usage/sources?limit=100',
+          '/partners/analytics/question-usage/questions?limit=100',
+        ])
+          expectStatus(await partner.request('GET', path), 200);
       },
     );
 
