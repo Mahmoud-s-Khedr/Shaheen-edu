@@ -18,7 +18,10 @@ import type { UpdateStudentDto } from './dto/update-student.dto';
 import type { QueryAdminStudentsDto } from './dto/query-admin-students.dto';
 import type { DeleteStudentDto } from './dto/delete-student.dto';
 import type { RequestUser } from '../../common/types/request-with-user.types';
-import { toPaginationMeta, type PaginationQueryDto } from '../../common/dto/pagination-query.dto';
+import {
+  toPaginationMeta,
+  type PaginationQueryDto,
+} from '../../common/dto/pagination-query.dto';
 import {
   arabicMatch,
   paginateArabicSearch,
@@ -26,6 +29,13 @@ import {
   sqlAnd,
 } from '../../common/search/arabic-search';
 import { Prisma } from '@prisma/client';
+import { ConfigService } from '@nestjs/config';
+import type { AppConfig } from '../../config/configuration';
+import {
+  PrivacyPolicy,
+  STUDENT_360_SECTIONS,
+  type Student360Section,
+} from '../../common/privacy/privacy-policy';
 import {
   isValidEgyptianPhone,
   normalizeEgyptianPhone,
@@ -37,7 +47,12 @@ export class StudentsService {
     private readonly prisma: PrismaService,
     private readonly passwordService: PasswordService,
     private readonly auditService: AuditService,
-  ) {}
+    config?: ConfigService<AppConfig, true>,
+  ) {
+    this.privacy = new PrivacyPolicy(config?.get('privacy', { infer: true }));
+  }
+
+  private readonly privacy: PrivacyPolicy;
 
   /** Ownership is structural: userId always comes from req.user.id, never a param. */
   async getOwnProfile(userId: string) {
@@ -78,7 +93,7 @@ export class StudentsService {
       academicGrade,
       ...profile
     } = studentProfile;
-      studentProfile;
+    studentProfile;
     return {
       ...user,
       studentProfile: {
@@ -256,45 +271,289 @@ export class StudentsService {
     return this.toAdminStudent(student);
   }
 
-  async student360(actor: RequestUser, targetId: string, reason?: string) {
+  async student360(
+    actor: RequestUser,
+    targetId: string,
+    reason?: string,
+    requestedSections?: string,
+  ) {
     this.assertAdmin(actor);
-    const student = await this.prisma.user.findFirst({ where: { id: targetId, role: Role.STUDENT }, select: this.adminStudentSelect });
+    const sections = this.parseStudent360Sections(
+      actor.role,
+      requestedSections,
+    );
+    const policyReason = this.privacy.assertStudent360Access(
+      actor.role,
+      sections,
+      reason,
+    );
+    const student = await this.prisma.user.findFirst({
+      where: { id: targetId, role: Role.STUDENT },
+      select: this.adminStudentSelect,
+    });
     if (!student) throw new NotFoundException('Student not found');
     const now = new Date();
     const [access, commerce, assessments] = await Promise.all([
-      this.prisma.studentEntitlement.count({ where: { studentUserId: targetId, status: 'ACTIVE', startsAt: { lte: now }, OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] } }),
-      this.prisma.order.aggregate({ where: { studentUserId: targetId }, _count: true, _sum: { totalMinor: true }, }),
-      this.prisma.assessmentAttempt.aggregate({ where: { studentUserId: targetId }, _count: true, _avg: { score: true }, }),
+      sections.includes('ACCESS')
+        ? this.prisma.studentEntitlement.count({
+            where: {
+              studentUserId: targetId,
+              status: 'ACTIVE',
+              startsAt: { lte: now },
+              OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+            },
+          })
+        : Promise.resolve(undefined),
+      sections.includes('COMMERCE')
+        ? this.prisma.order.aggregate({
+            where: { studentUserId: targetId },
+            _count: true,
+            _sum: { totalMinor: true },
+          })
+        : Promise.resolve(undefined),
+      sections.includes('PERFORMANCE')
+        ? this.prisma.assessmentAttempt.aggregate({
+            where: { studentUserId: targetId },
+            _count: true,
+            _avg: { score: true },
+          })
+        : Promise.resolve(undefined),
     ]);
-    await this.auditService.record({ actorUserId: actor.id, action: 'STUDENT_360_VIEWED', targetType: 'User', targetId, metadata: { sections: ['profile', 'access', 'commerce', 'performance'], ...(reason?.trim() ? { reason: reason.trim() } : {}) } });
-    return { profile: this.toAdminStudent(student), access: { activeEntitlements: access }, commerce: { orders: commerce._count, totalMinor: commerce._sum.totalMinor ?? 0, currency: 'EGP' }, performance: { assessmentAttempts: assessments._count, averageScore: assessments._avg.score } };
+    await this.auditService.record({
+      actorUserId: actor.id,
+      action: 'STUDENT_360_VIEWED',
+      targetType: 'User',
+      targetId,
+      metadata: { sections, ...(policyReason ? { reason: policyReason } : {}) },
+    });
+    return {
+      sections,
+      ...(sections.includes('PROFILE')
+        ? { profile: this.toStudent360Profile(student) }
+        : {}),
+      ...(sections.includes('CONTACT')
+        ? { contact: this.toStudent360Contact(student) }
+        : {}),
+      ...(sections.includes('ACCESS')
+        ? { access: { activeEntitlements: access } }
+        : {}),
+      ...(sections.includes('COMMERCE')
+        ? {
+            commerce: {
+              orders: commerce!._count,
+              totalMinor: commerce!._sum.totalMinor ?? 0,
+              currency: 'EGP',
+            },
+          }
+        : {}),
+      ...(sections.includes('PERFORMANCE')
+        ? {
+            performance: {
+              assessmentAttempts: assessments!._count,
+              averageScore: assessments!._avg.score,
+            },
+          }
+        : {}),
+    };
   }
 
-  async student360Orders(actor: RequestUser, targetId: string, query: PaginationQueryDto, reason?: string) {
-    this.assertAdmin(actor); await this.getStudentOrThrow(targetId);
-    const where = { studentUserId: targetId }; const [data, total] = await this.prisma.$transaction([this.prisma.order.findMany({ where, select: { id: true, paymentChannel: true, subtotalMinor: true, discountMinor: true, totalMinor: true, currency: true, status: true, createdAt: true, approvedAt: true, cancelledAt: true, items: { select: { id: true, targetType: true, titleSnapshot: true, priceMinor: true, currency: true } } }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], skip: (query.page - 1) * query.limit, take: query.limit }), this.prisma.order.count({ where })]);
-    await this.auditService.record({ actorUserId: actor.id, action: 'STUDENT_360_ORDERS_VIEWED', targetType: 'User', targetId, metadata: { page: query.page, ...(reason?.trim() ? { reason: reason.trim() } : {}) } });
+  async student360Orders(
+    actor: RequestUser,
+    targetId: string,
+    query: PaginationQueryDto,
+    reason?: string,
+  ) {
+    this.assertAdmin(actor);
+    const policyReason = this.privacy.assertStudent360Access(
+      actor.role,
+      ['COMMERCE'],
+      reason,
+    );
+    await this.getStudentOrThrow(targetId);
+    const where = { studentUserId: targetId };
+    const [data, total] = await this.prisma.$transaction([
+      this.prisma.order.findMany({
+        where,
+        select: {
+          id: true,
+          paymentChannel: true,
+          subtotalMinor: true,
+          discountMinor: true,
+          totalMinor: true,
+          currency: true,
+          status: true,
+          createdAt: true,
+          approvedAt: true,
+          cancelledAt: true,
+          items: {
+            select: {
+              id: true,
+              targetType: true,
+              titleSnapshot: true,
+              priceMinor: true,
+              currency: true,
+            },
+          },
+        },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        skip: (query.page - 1) * query.limit,
+        take: query.limit,
+      }),
+      this.prisma.order.count({ where }),
+    ]);
+    await this.auditService.record({
+      actorUserId: actor.id,
+      action: 'STUDENT_360_ORDERS_VIEWED',
+      targetType: 'User',
+      targetId,
+      metadata: {
+        sections: ['COMMERCE'],
+        page: query.page,
+        ...(policyReason ? { reason: policyReason } : {}),
+      },
+    });
     return { data, meta: toPaginationMeta(query.page, query.limit, total) };
   }
 
-  async student360Entitlements(actor: RequestUser, targetId: string, query: PaginationQueryDto, reason?: string) {
-    this.assertAdmin(actor); await this.getStudentOrThrow(targetId);
-    const where = { studentUserId: targetId }; const [data, total] = await this.prisma.$transaction([this.prisma.studentEntitlement.findMany({ where, select: { id: true, source: true, status: true, startsAt: true, expiresAt: true, revokedAt: true, createdAt: true, course: { select: { title: true } }, chapter: { select: { title: true } } }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], skip: (query.page - 1) * query.limit, take: query.limit }), this.prisma.studentEntitlement.count({ where })]);
-    await this.auditService.record({ actorUserId: actor.id, action: 'STUDENT_360_ENTITLEMENTS_VIEWED', targetType: 'User', targetId, metadata: { page: query.page, ...(reason?.trim() ? { reason: reason.trim() } : {}) } });
+  async student360Entitlements(
+    actor: RequestUser,
+    targetId: string,
+    query: PaginationQueryDto,
+    reason?: string,
+  ) {
+    this.assertAdmin(actor);
+    const policyReason = this.privacy.assertStudent360Access(
+      actor.role,
+      ['ACCESS'],
+      reason,
+    );
+    await this.getStudentOrThrow(targetId);
+    const where = { studentUserId: targetId };
+    const [data, total] = await this.prisma.$transaction([
+      this.prisma.studentEntitlement.findMany({
+        where,
+        select: {
+          id: true,
+          source: true,
+          status: true,
+          startsAt: true,
+          expiresAt: true,
+          revokedAt: true,
+          createdAt: true,
+          course: { select: { title: true } },
+          chapter: { select: { title: true } },
+        },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        skip: (query.page - 1) * query.limit,
+        take: query.limit,
+      }),
+      this.prisma.studentEntitlement.count({ where }),
+    ]);
+    await this.auditService.record({
+      actorUserId: actor.id,
+      action: 'STUDENT_360_ENTITLEMENTS_VIEWED',
+      targetType: 'User',
+      targetId,
+      metadata: {
+        sections: ['ACCESS'],
+        page: query.page,
+        ...(policyReason ? { reason: policyReason } : {}),
+      },
+    });
     return { data, meta: toPaginationMeta(query.page, query.limit, total) };
   }
 
-  async student360Assessments(actor: RequestUser, targetId: string, query: PaginationQueryDto, reason?: string) {
-    this.assertAdmin(actor); await this.getStudentOrThrow(targetId);
-    const where = { studentUserId: targetId }; const [data, total] = await this.prisma.$transaction([this.prisma.assessmentAttempt.findMany({ where, select: { id: true, status: true, startedAt: true, submittedAt: true, score: true, totalPoints: true, totalQuestions: true, assessment: { select: { id: true, title: true, mode: true, generationType: true } } }, orderBy: [{ startedAt: 'desc' }, { id: 'desc' }], skip: (query.page - 1) * query.limit, take: query.limit }), this.prisma.assessmentAttempt.count({ where })]);
-    await this.auditService.record({ actorUserId: actor.id, action: 'STUDENT_360_ASSESSMENTS_VIEWED', targetType: 'User', targetId, metadata: { page: query.page, ...(reason?.trim() ? { reason: reason.trim() } : {}) } });
+  async student360Assessments(
+    actor: RequestUser,
+    targetId: string,
+    query: PaginationQueryDto,
+    reason?: string,
+  ) {
+    this.assertAdmin(actor);
+    const policyReason = this.privacy.assertStudent360Access(
+      actor.role,
+      ['PERFORMANCE'],
+      reason,
+    );
+    await this.getStudentOrThrow(targetId);
+    const where = { studentUserId: targetId };
+    const [data, total] = await this.prisma.$transaction([
+      this.prisma.assessmentAttempt.findMany({
+        where,
+        select: {
+          id: true,
+          status: true,
+          startedAt: true,
+          submittedAt: true,
+          score: true,
+          totalPoints: true,
+          totalQuestions: true,
+          assessment: {
+            select: { id: true, title: true, mode: true, generationType: true },
+          },
+        },
+        orderBy: [{ startedAt: 'desc' }, { id: 'desc' }],
+        skip: (query.page - 1) * query.limit,
+        take: query.limit,
+      }),
+      this.prisma.assessmentAttempt.count({ where }),
+    ]);
+    await this.auditService.record({
+      actorUserId: actor.id,
+      action: 'STUDENT_360_ASSESSMENTS_VIEWED',
+      targetType: 'User',
+      targetId,
+      metadata: {
+        sections: ['PERFORMANCE'],
+        page: query.page,
+        ...(policyReason ? { reason: policyReason } : {}),
+      },
+    });
     return { data, meta: toPaginationMeta(query.page, query.limit, total) };
   }
 
-  async student360AuditEvents(actor: RequestUser, targetId: string, query: PaginationQueryDto, reason?: string) {
-    this.assertAdmin(actor); await this.getStudentOrThrow(targetId);
-    const where = { targetId }; const [data, total] = await this.prisma.$transaction([this.prisma.adminAuditLog.findMany({ where, select: { id: true, action: true, targetType: true, createdAt: true, correlationId: true, actor: { select: { id: true, loginIdentifier: true } } }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], skip: (query.page - 1) * query.limit, take: query.limit }), this.prisma.adminAuditLog.count({ where })]);
-    await this.auditService.record({ actorUserId: actor.id, action: 'STUDENT_360_AUDIT_VIEWED', targetType: 'User', targetId, metadata: { page: query.page, ...(reason?.trim() ? { reason: reason.trim() } : {}) } });
+  async student360AuditEvents(
+    actor: RequestUser,
+    targetId: string,
+    query: PaginationQueryDto,
+    reason?: string,
+  ) {
+    this.assertAdmin(actor);
+    const policyReason = this.privacy.assertStudent360Access(
+      actor.role,
+      ['AUDIT_EVENTS'],
+      reason,
+    );
+    await this.getStudentOrThrow(targetId);
+    const where = { targetId };
+    const [data, total] = await this.prisma.$transaction([
+      this.prisma.adminAuditLog.findMany({
+        where,
+        select: {
+          id: true,
+          action: true,
+          targetType: true,
+          createdAt: true,
+          correlationId: true,
+          actor: { select: { id: true, loginIdentifier: true } },
+        },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        skip: (query.page - 1) * query.limit,
+        take: query.limit,
+      }),
+      this.prisma.adminAuditLog.count({ where }),
+    ]);
+    await this.auditService.record({
+      actorUserId: actor.id,
+      action: 'STUDENT_360_AUDIT_VIEWED',
+      targetType: 'User',
+      targetId,
+      metadata: {
+        sections: ['AUDIT_EVENTS'],
+        page: query.page,
+        ...(policyReason ? { reason: policyReason } : {}),
+      },
+    });
     return { data, meta: toPaginationMeta(query.page, query.limit, total) };
   }
 
@@ -483,6 +742,33 @@ export class StudentsService {
     return randomBytes(24).toString('base64url');
   }
 
+  private parseStudent360Sections(
+    role: Role,
+    requestedSections?: string,
+  ): Student360Section[] {
+    const sections = requestedSections
+      ? [
+          ...new Set(
+            requestedSections
+              .split(',')
+              .map((section) => section.trim().toUpperCase()),
+          ),
+        ]
+      : [...this.privacy.student360DefaultSections(role)];
+    if (
+      !sections.length ||
+      sections.some(
+        (section) =>
+          !STUDENT_360_SECTIONS.includes(section as Student360Section),
+      )
+    ) {
+      throw new BadRequestException(
+        'One or more Student 360 sections are invalid',
+      );
+    }
+    return sections as Student360Section[];
+  }
+
   private readonly adminStudentSelect = {
     id: true,
     status: true,
@@ -520,6 +806,34 @@ export class StudentsService {
       createdAt: student.createdAt,
       lastLoginAt: student.lastLoginAt,
       deletedAt: student.deletedAt,
+    };
+  }
+
+  private toStudent360Profile(student: any) {
+    const profile = student.studentProfile;
+    return {
+      id: student.id,
+      fullName: profile.fullName,
+      status: student.status,
+      academicGradeId: profile.academicGradeId,
+      academicGrade: profile.academicGrade && {
+        ar: profile.academicGrade.titleAr,
+        en: profile.academicGrade.titleEn,
+      },
+      governorate: this.geographyDto(profile.governorateRef),
+      center: this.geographyDto(profile.centerRef),
+      createdAt: student.createdAt,
+      lastLoginAt: student.lastLoginAt,
+      deletedAt: student.deletedAt,
+    };
+  }
+
+  private toStudent360Contact(student: any) {
+    return {
+      phone: student.loginIdentifier,
+      // This is intentionally the only national-ID representation in every
+      // support response. Raw and encrypted values are not selected at all.
+      nationalIdLast4: student.studentProfile.nationalIdLast4,
     };
   }
 

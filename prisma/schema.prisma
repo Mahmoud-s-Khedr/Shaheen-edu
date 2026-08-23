@@ -176,6 +176,11 @@ enum ReportExportStatus {
   EXPIRED
 }
 
+enum ReportDataClassification {
+  NON_PII
+  PII_RESTRICTED
+}
+
 enum AssetProvider {
   BUNNY_STORAGE
   BUNNY_STREAM
@@ -2942,6 +2947,7 @@ model ReportExportJob {
   columns       Json
   reason        String?
   containsPii   Boolean            @default(false)
+  classification ReportDataClassification @default(NON_PII)
   status        ReportExportStatus @default(QUEUED)
   storageKey    String?
   rowCount      Int?

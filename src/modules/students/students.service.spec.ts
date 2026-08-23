@@ -204,16 +204,108 @@ describe('StudentsService self-service profile updates', () => {
 describe('StudentsService Student 360', () => {
   it('audits a sensitive Student 360 summary read without exposing a full national ID', async () => {
     const prisma: any = {
-      user: { findFirst: jest.fn().mockResolvedValue({ id: 'student-1', role: Role.STUDENT, status: AccountStatus.ACTIVE, loginIdentifier: 'student@example.test', createdAt: new Date(), studentProfile: { fullName: 'Student', nationalIdLast4: '1234', governorateRef: null, centerRef: null, academicGrade: null } }) },
+      user: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: 'student-1',
+          role: Role.STUDENT,
+          status: AccountStatus.ACTIVE,
+          loginIdentifier: 'student@example.test',
+          createdAt: new Date(),
+          studentProfile: {
+            fullName: 'Student',
+            nationalIdLast4: '1234',
+            governorateRef: null,
+            centerRef: null,
+            academicGrade: null,
+          },
+        }),
+      },
       studentEntitlement: { count: jest.fn().mockResolvedValue(2) },
-      order: { aggregate: jest.fn().mockResolvedValue({ _count: 3, _sum: { totalMinor: 1200 } }) },
-      assessmentAttempt: { aggregate: jest.fn().mockResolvedValue({ _count: 4, _avg: { score: 82 } }) },
+      order: {
+        aggregate: jest
+          .fn()
+          .mockResolvedValue({ _count: 3, _sum: { totalMinor: 1200 } }),
+      },
+      assessmentAttempt: {
+        aggregate: jest
+          .fn()
+          .mockResolvedValue({ _count: 4, _avg: { score: 82 } }),
+      },
     };
     const audit = { record: jest.fn() };
     const service = new StudentsService(prisma, {} as any, audit as any);
-    const result = await service.student360(actor, 'student-1', 'support request');
-    expect(result.profile).toMatchObject({ nationalIdLast4: '1234' });
+    const result = await service.student360(
+      actor,
+      'student-1',
+      'support request',
+    );
+    expect(result.contact).toMatchObject({ nationalIdLast4: '1234' });
+    expect(result.profile).not.toHaveProperty('nationalIdLast4');
+    expect(result.profile).not.toHaveProperty('phone');
     expect(result.profile).not.toHaveProperty('nationalIdEncrypted');
-    expect(audit.record).toHaveBeenCalledWith(expect.objectContaining({ action: 'STUDENT_360_VIEWED', targetId: 'student-1', metadata: expect.objectContaining({ reason: 'support request' }) }));
+    expect(
+      prisma.user.findFirst.mock.calls[0][0].select.studentProfile.select,
+    ).not.toHaveProperty('nationalIdEncrypted');
+    expect(audit.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'STUDENT_360_VIEWED',
+        targetId: 'student-1',
+        metadata: expect.objectContaining({ reason: 'support request' }),
+      }),
+    );
+  });
+
+  it('denies sensitive sections without a reason and audit events to an admin', async () => {
+    const prisma: any = { user: { findFirst: jest.fn() } };
+    const service = new StudentsService(
+      prisma,
+      {} as any,
+      { record: jest.fn() } as any,
+    );
+    await expect(
+      service.student360(actor, 'student-1', undefined, 'CONTACT'),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    await expect(
+      service.student360(actor, 'student-1', 'support request', 'AUDIT_EVENTS'),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(prisma.user.findFirst).not.toHaveBeenCalled();
+  });
+
+  it('permits a non-sensitive, field-minimized section without support contact data', async () => {
+    const prisma: any = {
+      user: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: 'student-1',
+          role: Role.STUDENT,
+          status: AccountStatus.ACTIVE,
+          loginIdentifier: '01000000000',
+          createdAt: new Date(),
+          studentProfile: {
+            fullName: 'Student',
+            nationalIdLast4: '1234',
+            governorateRef: null,
+            centerRef: null,
+            academicGrade: null,
+          },
+        }),
+      },
+    };
+    const audit = { record: jest.fn() };
+    const service = new StudentsService(prisma, {} as any, audit as any);
+    const result = await service.student360(
+      actor,
+      'student-1',
+      undefined,
+      'PROFILE',
+    );
+    expect(result).toHaveProperty('profile');
+    expect(result).not.toHaveProperty('contact');
+    expect(JSON.stringify(result)).not.toContain('01000000000');
+    expect(JSON.stringify(result)).not.toContain('1234');
+    expect(audit.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        metadata: expect.objectContaining({ sections: ['PROFILE'] }),
+      }),
+    );
   });
 });

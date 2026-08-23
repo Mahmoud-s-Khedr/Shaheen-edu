@@ -38,7 +38,12 @@ export class BunnyStorageProvider implements FileStorageProvider {
     });
   }
 
-  async upload(key: string, body: Readable, mimeType: string): Promise<void> {
+  async upload(
+    key: string,
+    body: Readable,
+    mimeType: string,
+    metadata?: Record<string, string>,
+  ): Promise<void> {
     // Bunny rejects a PutObject whose body length is unknown, so unbounded streams go through
     // multipart upload, which sizes each part before signing it (and aborts the upload on failure).
     await new Upload({
@@ -48,6 +53,7 @@ export class BunnyStorageProvider implements FileStorageProvider {
         Key: key,
         Body: body,
         ContentType: mimeType,
+        Metadata: metadata,
       },
     }).done();
   }

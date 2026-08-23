@@ -157,16 +157,50 @@ are available to operations.
 **Goal:** Establish the access and PII controls that later reporting and
 support features rely on.
 
-- [ ] Make support reasons configurable and mandatory for sensitive Student
+- [x] Make support reasons configurable and mandatory for sensitive Student
   360 views and privileged exports where policy requires them.
-- [ ] Define and enforce a field- and section-level Student 360 PII policy;
+- [x] Define and enforce a field- and section-level Student 360 PII policy;
   retain masked national ID behaviour and prohibit raw/encrypted national-ID
   disclosure. Audit the actor, target, sections, and reason.
-- [ ] Add policy tests for role, section, field, reason, and audit behaviour.
-- [ ] Add PII export classifications, report-specific column allowlists,
+- [x] Add policy tests for role, section, field, reason, and audit behaviour.
+- [x] Add PII export classifications, report-specific column allowlists,
   shorter retention/URL expiry, watermark/metadata, and audited download and
   expiry behaviour. Do not add learner/contact-data exports until these
   controls exist.
+
+**Implementation status (2026-08-23):** Code and unit coverage are complete;
+deploy the additive `20260823110000_privacy_safe_administration_exports`
+migration before enabling report exports in an environment.
+
+The current enforced policy is:
+
+- `PROFILE`, `CONTACT`, `ACCESS`, `COMMERCE`, `PERFORMANCE`, and
+  `AUDIT_EVENTS` are explicit Student 360 sections. `ADMIN` can request every
+  section except `AUDIT_EVENTS`; `SUPER_ADMIN` can request all sections, with
+  audit events exposed through the paginated audit-events subresource.
+- `CONTACT`, `COMMERCE`, and `AUDIT_EVENTS` require a support reason by
+  default. `PRIVACY_REQUIRE_SENSITIVE_360_REASON`,
+  `PRIVACY_REQUIRE_PRIVILEGED_EXPORT_REASON`, and the optional comma-separated
+  `PRIVACY_SUPPORT_REASON_ALLOWLIST` make the requirement and approved reason
+  values operationally configurable.
+- Contact fields are returned only in the `CONTACT` section. The response can
+  contain `nationalIdLast4`, but the raw and encrypted national-ID fields are
+  not selected or represented by the policy for any role.
+- Every Student 360 read records the actor, student target, requested sections,
+  and supplied reason. The paginated commerce, access, performance, and audit
+  subresources apply the same section policy.
+- Current export types are explicitly `NON_PII`; there is no learner or contact
+  export. Each type has a fixed column allowlist and role policy. Commerce and
+  partner-obligation exports are privileged and require a reason by default.
+  A `PII_RESTRICTED` classification is persisted for any future PII report,
+  which must first receive an explicit policy entry.
+- Private export artifacts expire after 24 hours and signed download URLs after
+  15 minutes. CSVs and object metadata carry a requester/job/classification
+  watermark; request, download, cancellation, and expiry are audited.
+
+Verification completed in the repository: Student 360 role/section/field/reason
+and audit tests, export allowlist/classification/watermark/download-expiry and
+cancellation-race tests, the full 336-test unit suite, and a production build.
 
 **Exit criteria:** Sensitive views and PII exports are denied without the
 required policy context; tests prove that no prohibited field reaches an
@@ -484,19 +518,19 @@ commission ledger/settlement controls, and full audit trails.
 
 ## Workstream E — Student 360 view
 
-Create an admin-only composition API rather than exposing a large unbounded
-join:
+The implemented admin-only composition API avoids a large unbounded join:
 
 - `GET /v1/admin/students/:id/360` returns profile summary, account status,
   academic/geographic metadata, current access summary, commerce summary, and
   performance summary;
 - subresources use independent pagination/cursors:
   `/orders`, `/entitlements`, `/assessments`, `/audit-events`;
-- response fields have an explicit PII policy: administrators can view contact
-  data necessary for support, but national ID is masked to last four digits;
-  encrypted/raw national ID is never returned;
-- every 360 view and export request writes an audit event containing actor,
-  target, fields/section requested, and reason where configured.
+- response fields have an explicit section policy: `PROFILE` is field-minimized
+  and `CONTACT` contains the support contact fields. National ID is limited to
+  its stored last four digits; encrypted/raw national ID is never selected or
+  returned;
+- every 360 view and subresource read writes an audit event containing actor,
+  target, requested sections, and reason where configured.
 
 Do not make partner reports depend on this endpoint or expose it to partners.
 
@@ -520,16 +554,24 @@ long as the corresponding raw or financial record is retained.
 
 ### F2. Export pipeline
 
-Use asynchronous `ReportExportJob` records rather than synchronous downloads:
+The implemented export baseline uses asynchronous `ReportExportJob` records
+rather than synchronous downloads:
 
 - requesting admin, report type, normalized filters, selected columns,
   format (`CSV` initially; XLSX only when a required formatting use case is
   confirmed), state, row count, expiry, and failure metadata;
 - worker/queue writes a private object-store file;
 - authorized requester receives a short-lived signed download URL;
-- download, expiry, cancellation, and failed generation are audited;
-- exports containing PII use tighter expiry, visible watermark/metadata, and
-  column allowlists.
+- download, expiry, and cancellation are audited; failed generation is
+  retained as job state/error metadata, with a separate audit event to be
+  added if operational review requires one;
+- report classification and report-specific column allowlists are persisted and
+  enforced before queueing. Current reports are `NON_PII`; a future
+  `PII_RESTRICTED` report must add an explicit policy entry before it can be
+  requested;
+- private artifacts currently expire after 24 hours and signed URLs after 15
+  minutes. CSVs/object metadata carry a visible classification/requester/job
+  watermark.
 
 Never place report data in a public URL or application logs.
 

@@ -25,6 +25,7 @@ export {
   ReferralCommissionKind,
   AssessmentAttributionRole,
   ReportExportStatus,
+  ReportDataClassification,
   AssetProvider,
   AssetKind,
   AssetStatus,
