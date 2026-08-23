@@ -1,5 +1,11 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { PartnerAllocationState, Role } from '../../common/types/roles.enum';
+import {
+  ManualPaymentSubmissionStatus,
+  PartnerAllocationState,
+  PaymentAttemptStatus,
+  PaymentChannel,
+  Role,
+} from '../../common/types/roles.enum';
 import { toPaginationMeta } from '../../common/dto/pagination-query.dto';
 import type { RequestUser } from '../../common/types/request-with-user.types';
 import { PrismaService } from '../../database/prisma.service';
@@ -102,7 +108,9 @@ export class PartnerFinanceService {
               include: {
                 receipt: true,
                 referralAttribution: true,
-                refundRequests: { where: { status: 'APPROVED' }, select: { id: true } },
+                submissions: { select: { id: true, status: true } },
+                paymentAttempts: { select: { id: true, status: true, merchantReference: true, providerTransactionId: true } },
+                refundRequests: { where: { status: 'APPROVED' }, select: { id: true, manualRefundReference: true, items: { select: { orderItemId: true } } } },
                 items: { include: { chapter: { select: { courseId: true } }, entitlement: true, allocations: true } },
               },
             },
@@ -114,14 +122,61 @@ export class PartnerFinanceService {
     if (run.status === 'RUNNING') throw new ConflictException('Reconciliation run is already running');
     await this.prisma.partnerFinanceReconciliationRun.update({ where: { id }, data: { status: 'RUNNING', startedAt: now, completedAt: null, summary: undefined } });
     const orderIds = run.orders.map((row) => row.orderId);
+    const paymobTransactionIds = run.orders.flatMap((row: any) =>
+      row.order.paymentAttempts
+        .map((attempt: any) => attempt.providerTransactionId)
+        .filter((transactionId: string | null): transactionId is string => Boolean(transactionId)),
+    );
+    const paymobEvents = paymobTransactionIds.length
+      ? await this.prisma.paymobWebhookEvent.findMany({
+          where: { externalTransactionId: { in: paymobTransactionIds } },
+          select: { externalTransactionId: true, merchantReference: true, verified: true, processedAt: true, processingError: true, payload: true },
+        })
+      : [];
+    const paymobEventByTransactionId = new Map(
+      paymobEvents.map((event) => [event.externalTransactionId, event]),
+    );
     const agreements = await this.prisma.publisherAgreement.findMany({ where: { status: { in: ['ACTIVE', 'ENDED'] }, isPrimary: true, startsAt: { lte: now }, OR: [{ endsAt: null }, { endsAt: { gt: new Date(0) } }] } });
     const findings: any[] = [];
     for (const selected of run.orders) {
       const order: any = selected.order;
       if (order.status !== 'APPROVED' || !order.approvedAt) { findings.push(this.discrepancy({ type: 'ORDER_NOT_APPROVED', orderItemId: null })); continue; }
       if (!order.receipt) findings.push(this.discrepancy({ type: 'MISSING_RECEIPT' }));
+      if (order.receipt) {
+        const receiptSnapshot = order.receipt.snapshot as any;
+        if (receiptSnapshot?.orderId !== order.id || receiptSnapshot?.totalMinor !== order.totalMinor || receiptSnapshot?.currency !== order.currency) {
+          findings.push(this.discrepancy({ type: 'RECEIPT_SNAPSHOT_MISMATCH', expectedAmountMinor: order.totalMinor, actualAmountMinor: receiptSnapshot?.totalMinor ?? null, currency: order.currency }));
+        }
+      }
+      if (order.paymentChannel === PaymentChannel.MANUAL) {
+        if (!order.submissions.some((submission: any) => submission.status === ManualPaymentSubmissionStatus.APPROVED)) findings.push(this.discrepancy({ type: 'MISSING_APPROVED_MANUAL_PAYMENT_SUBMISSION' }));
+        if (order.receipt?.paymentAttemptId) findings.push(this.discrepancy({ type: 'MANUAL_RECEIPT_HAS_PAYMENT_ATTEMPT' }));
+      }
+      if (order.paymentChannel === PaymentChannel.PAYMOB) {
+        const paidAttempts = order.paymentAttempts.filter((attempt: any) => attempt.status === PaymentAttemptStatus.PAID);
+        if (paidAttempts.length !== 1) findings.push(this.discrepancy({ type: paidAttempts.length ? 'MULTIPLE_PAID_PAYMOB_ATTEMPTS' : 'MISSING_PAID_PAYMOB_ATTEMPT' }));
+        const paidAttempt = paidAttempts[0];
+        if (paidAttempt) {
+          if (order.receipt?.paymentAttemptId !== paidAttempt.id) findings.push(this.discrepancy({ type: 'PAYMOB_RECEIPT_ATTEMPT_MISMATCH' }));
+          if (!paidAttempt.providerTransactionId) findings.push(this.discrepancy({ type: 'MISSING_PAYMOB_PROVIDER_TRANSACTION_ID' }));
+          else {
+            const event = paymobEventByTransactionId.get(paidAttempt.providerTransactionId);
+            if (!event) findings.push(this.discrepancy({ type: 'MISSING_VERIFIED_PAYMOB_CALLBACK' }));
+            else {
+              const providerPayload = event.payload as any;
+              if (!event.verified || !event.processedAt || event.processingError) findings.push(this.discrepancy({ type: 'UNPROCESSED_PAYMOB_CALLBACK' }));
+              if (event.merchantReference !== paidAttempt.merchantReference) findings.push(this.discrepancy({ type: 'PAYMOB_CALLBACK_REFERENCE_MISMATCH' }));
+              if (Number(providerPayload?.amount_cents) !== order.totalMinor) findings.push(this.discrepancy({ type: 'PAYMOB_CALLBACK_AMOUNT_MISMATCH', expectedAmountMinor: order.totalMinor, actualAmountMinor: Number.isFinite(Number(providerPayload?.amount_cents)) ? Number(providerPayload.amount_cents) : null, currency: order.currency }));
+              if (providerPayload?.currency !== order.currency) findings.push(this.discrepancy({ type: 'PAYMOB_CALLBACK_CURRENCY_MISMATCH', currency: order.currency }));
+            }
+          }
+        }
+      }
+      const refundedItemIds = new Set(order.refundRequests.flatMap((request: any) => request.items.map((item: any) => item.orderItemId)));
+      for (const refund of order.refundRequests) if (!refund.manualRefundReference?.trim()) findings.push(this.discrepancy({ type: 'MISSING_MANUAL_REFUND_REFERENCE' }));
       for (const item of order.items) {
-        const expectedEntitlementStatus = order.refundRequests.length ? 'REVOKED' : 'ACTIVE';
+        const refunded = refundedItemIds.has(item.id);
+        const expectedEntitlementStatus = refunded ? 'REVOKED' : 'ACTIVE';
         if (!item.entitlement || item.entitlement.status !== expectedEntitlementStatus) findings.push(this.discrepancy({ type: `ENTITLEMENT_${expectedEntitlementStatus}_MISMATCH`, orderItemId: item.id }));
         // Re-resolve historical agreement terms without reading any ledger row.
         const applicable = agreements.filter((agreement: any) => agreement.startsAt <= order.approvedAt && (!agreement.endsAt || agreement.endsAt > order.approvedAt));
@@ -134,7 +189,7 @@ export class PartnerFinanceService {
           for (const allocation of matching.slice(0, 1)) {
             if (allocation.basisMinor !== expectation.basisMinor) findings.push(this.discrepancy({ type: 'INCORRECT_ALLOCATION_BASIS', orderItemId: item.id, allocationId: allocation.id, partnerUserId: allocation.partnerUserId, expectedBasisMinor: expectation.basisMinor, actualBasisMinor: allocation.basisMinor, currency: allocation.currency }));
             if (allocation.amountMinor !== expectation.amountMinor) findings.push(this.discrepancy({ type: 'INCORRECT_ALLOCATION_AMOUNT', orderItemId: item.id, allocationId: allocation.id, partnerUserId: allocation.partnerUserId, expectedAmountMinor: expectation.amountMinor, actualAmountMinor: allocation.amountMinor, currency: allocation.currency }));
-            if (order.refundRequests.length && (allocation.state !== PartnerAllocationState.REVERSED || !item.allocations.some((candidate: any) => candidate.reversedAllocationId === allocation.id && candidate.amountMinor === -Math.abs(allocation.amountMinor)))) findings.push(this.discrepancy({ type: 'MISSING_REFUND_REVERSAL', orderItemId: item.id, allocationId: allocation.id, partnerUserId: allocation.partnerUserId, expectedAmountMinor: -Math.abs(allocation.amountMinor), currency: allocation.currency }));
+            if (refunded && (allocation.state !== PartnerAllocationState.REVERSED || !item.allocations.some((candidate: any) => candidate.reversedAllocationId === allocation.id && candidate.amountMinor === -Math.abs(allocation.amountMinor)))) findings.push(this.discrepancy({ type: 'MISSING_REFUND_REVERSAL', orderItemId: item.id, allocationId: allocation.id, partnerUserId: allocation.partnerUserId, expectedAmountMinor: -Math.abs(allocation.amountMinor), currency: allocation.currency }));
           }
         }
         for (const allocation of item.allocations.filter((row: any) => row.amountMinor > 0 && !expected.some((expectation) => expectation.kind === row.kind && expectation.partnerUserId === row.partnerUserId))) findings.push(this.discrepancy({ type: 'UNEXPECTED_ALLOCATION', orderItemId: item.id, allocationId: allocation.id, partnerUserId: allocation.partnerUserId, actualAmountMinor: allocation.amountMinor, actualBasisMinor: allocation.basisMinor, currency: allocation.currency }));

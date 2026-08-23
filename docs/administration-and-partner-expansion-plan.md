@@ -1,9 +1,10 @@
 # Administration, reporting, and partner expansion plan
 
-**Status:** Foundation implemented and migrated locally — the assessment
-attribution backfill completed with 12 resolvable snapshots and zero unknown
-rows. Controlled pilot rollout, live reconciliation data, refunds/reversals,
-and broader reporting remain.  
+**Status:** The financial/referral foundation, manual refund lifecycle,
+reconciliation tooling, Student 360 baseline, and private CSV-export baseline
+are implemented and migrated locally. The assessment-attribution backfill
+completed with 12 resolvable snapshots and zero unknown rows. The phased plan
+below takes the implementation from this foundation to operational completion.
 **Date:** 2026-08-23  
 **Scope:** Student administration, platform reporting/exports, content-publisher
 contracts and analytics, and referral partners.
@@ -33,8 +34,9 @@ contracts and analytics, and referral partners.
   data, version metadata, fulfilment-time allocations, and an immutable
   successor replacement workflow.
 - [x] New approved orders produce immutable allocations rather than relying on
-  mutable agreement resolution. Legacy statements and the existing estimated
-  earnings view remain until ledger-backed settlement/reporting replaces them.
+  mutable agreement resolution. Ledger allocations are now the reporting
+  source of record; legacy statements and estimate calculations have been
+  retired.
 - [x] New assessment snapshots retain source/publisher attribution. Historical
   assessment attribution backfill has been applied: 12 resolved, 0 unknown.
 - An assessment already supports multiple question sources; the new snapshot
@@ -114,38 +116,151 @@ the backend application:
   apply the assessment-attribution backfill (12 rows resolved, 0 unknown).
 - [x] Add focused unit coverage for referral limits/allocation idempotency,
   export lifecycle, settlements, agreement replacement, Student 360, and
-  attribution backfill. The current suite has 50 suites / 323 tests.
+  attribution backfill. The current suite has 52 suites / 330 tests.
 
-### Still missing / next work
+### Phased completion plan
 
-- [x] Add persistent reconciliation runs scoped to explicit approved orders,
-  independent historical-term calculation, durable discrepancy investigation,
-  and an operator-friendly read-only runner. Staging pilot execution and
-  finance/engineering sign-off remain operational prerequisites.
-- [x] Retire legacy statements and estimate calculations; ledger allocations
-  are now the reporting source of record.
-- [ ] Run a controlled pilot with an approved purchase, reconcile actual
-  publisher/referral allocations, and record sign-off before widening
-  allow-lists.
-- [ ] Operationally review the active database refund policy and train
-  administrators on recording the off-platform reimbursement reference. The
-  implemented model supports partial *orders* by refunding whole order items;
-  fractional refunds for a single course/chapter remain out of scope.
-- [ ] Expand partner administration with detailed partner history, agreement /
-  program history, allocation totals, and audit summaries.
-- [ ] Expand finance-specific allocation and settlement exports.
-- [ ] Add publisher usage daily/monthly trends, hierarchy filters, zero-solved
-  earnings indicators, and rollups for ranges beyond 93 days.
-- [ ] Add referral conversion/product reporting, privacy bucketing, fraud
-  review flags/rules, and referral-specific settlement/reporting views.
-- [ ] Harden Student 360 policy with configurable required reasons and
-  field/section-level PII enforcement tests.
-- [ ] Expand platform report families and filters (refunds, payments,
-  registrations, hierarchy, geography, promotions, coupons, referrals), plus
-  PII export retention/watermark controls.
-- [ ] Add e2e coverage for the new referral, allocation, settlement, export,
-  backfill, and rollout paths; only the health e2e smoke test has exercised
-  the migrated application so far.
+The phases below are ordered by dependency and risk. A phase is not complete
+when its code merges; it is complete only when its exit criteria have been
+met in the intended environment. End-to-end coverage is added with each phase,
+then exercised together in Phase 5.
+
+#### Phase 0 — Operational baseline and controlled pilot
+
+**Goal:** Prove that the already-implemented financial lifecycle is safe with
+realistic data before expanding feature allow-lists or exposing finance
+operations broadly.
+
+- [ ] Set and review the active production refund policy. Train administrators
+  to record the off-platform reimbursement reference and document that a
+  request can refund whole order items only; fractional item refunds are out
+  of scope.
+- [ ] Run a controlled approved-purchase pilot using the intended payment
+  channel(s). Reconcile publisher and referral allocations, entitlement,
+  receipt, settlement state, and any refund reversal using the persistent
+  reconciliation run.
+- [ ] Record finance and engineering sign-off for the pilot, resolve every
+  discrepancy, and define the rollback/incident owner before widening the
+  referral and partner-ledger allow-lists.
+- [ ] Complete Paymob sandbox and live acceptance: callback reachability,
+  HMAC validation, retry/timeout behaviour, expiry, and a provider-settlement
+  comparison. Provider refunds remain out of scope because reimbursement is
+  manual.
+
+**Exit criteria:** An approved purchase and a refund reversal have been
+reconciled end-to-end; no unexplained allocation or entitlement discrepancy
+remains; the active refund policy, runbook, owners, and signed pilot record
+are available to operations.
+
+#### Phase 1 — Privacy-safe administration and export controls
+
+**Goal:** Establish the access and PII controls that later reporting and
+support features rely on.
+
+- [ ] Make support reasons configurable and mandatory for sensitive Student
+  360 views and privileged exports where policy requires them.
+- [ ] Define and enforce a field- and section-level Student 360 PII policy;
+  retain masked national ID behaviour and prohibit raw/encrypted national-ID
+  disclosure. Audit the actor, target, sections, and reason.
+- [ ] Add policy tests for role, section, field, reason, and audit behaviour.
+- [ ] Add PII export classifications, report-specific column allowlists,
+  shorter retention/URL expiry, watermark/metadata, and audited download and
+  expiry behaviour. Do not add learner/contact-data exports until these
+  controls exist.
+
+**Exit criteria:** Sensitive views and PII exports are denied without the
+required policy context; tests prove that no prohibited field reaches an
+unauthorized role or export; operations can audit every privileged access.
+
+#### Phase 2 — Publisher finance operations and usage analytics
+
+**Goal:** Make the ledger useful for finance and publishers without creating a
+second mutable earnings source of truth.
+
+- [ ] Add an admin partner detail/history view: capability and account state,
+  current and historical agreements/programs, allocation totals by state, and
+  audit summary. Keep raw learner/order data out of partner-facing responses.
+- [ ] Add finance-specific allocation and settlement exports, using the Phase
+  1 export controls and immutable allocation/settlement rows as the source of
+  truth.
+- [ ] Extend publisher **usage** analytics with daily/monthly trends,
+  hierarchy filters, zero-usage/zero-solved earnings indicators, and range
+  rollups beyond the current 93-day on-demand limit.
+- [ ] Define rollup freshness, correction/rebuild, retention, and drill-down
+  rules. Earnings trends and agreement/target ledger breakdowns already exist;
+  this phase extends usage reporting rather than duplicating them.
+
+**Exit criteria:** Finance can export and reconcile a settlement from ledger
+rows; a publisher can view aggregate usage and earnings across supported date
+ranges and hierarchy scopes without learner PII; rollup totals agree with raw
+attribution data for representative fixtures.
+
+#### Phase 3 — Referral operations and reporting
+
+**Goal:** Turn the existing referral attribution and commission foundation
+into a supportable partner program.
+
+- [ ] Add referral conversion, approved-sales, commission-state, trend, and
+  product/category reporting for partners and administrators.
+- [ ] Add referral-specific allocation/settlement views and exports, reusing
+  the same immutable ledger and export controls as Phase 2.
+- [ ] Apply small-cohort suppression or bucketing to partner-facing breakdowns
+  and test that learner or order-level data cannot be inferred.
+- [ ] Add fraud flags, configurable review rules, code/program suspension,
+  assignee, disposition, notes, and audited operator workflow. Define which
+  checks block checkout versus merely queue review.
+
+**Exit criteria:** Referral partners receive privacy-safe aggregate reporting;
+administrators can investigate and resolve a flagged referral without editing
+historical allocations; settlement and reporting totals reconcile to approved
+orders and reversal rows.
+
+#### Phase 4 — Complete platform reporting and export catalogue
+
+**Goal:** Provide the operations and finance report set on top of the Phase 1
+privacy model and Phases 2–3 ledger reporting.
+
+- [ ] Add aggregate report families for refunds, payments, registrations,
+  active purchasers, entitlement grants/revocations/expiry, and platform
+  revenue/discounts.
+- [ ] Add supported filters for Cairo date range, product hierarchy, grade,
+  governorate/center, payment channel/status, promotion, coupon, referral
+  code, and partner. Specify metric definitions, empty-result behaviour, and
+  pagination/rollup boundaries for every report.
+- [ ] Make each approved report exportable through the private asynchronous
+  export pipeline, with normalized filters and a report-specific column
+  policy. CSV remains the initial format; add XLSX only for a confirmed
+  formatting requirement.
+- [ ] Publish retention and deletion runbooks: financial allocations/receipts
+  and audit events for seven years; learner and derived-report data according
+  to the approved privacy policy.
+
+**Exit criteria:** The approved operational report catalogue is documented,
+authorized, auditable, reproducible from its source records, and exportable
+without creating public URLs or logging report contents.
+
+#### Phase 5 — End-to-end hardening, rollout, and handover
+
+**Goal:** Verify the complete system in a production-like environment and
+make its operation repeatable.
+
+- [ ] Add e2e coverage for referral program/code creation and use, checkout
+  attribution, allocation creation/idempotency, settlement creation/payment,
+  export lifecycle, assessment-attribution backfill, feature-flag/allow-list
+  paths, and the full refund-reversal journey.
+- [ ] Run authorization/isolation tests proving that publishers and referral
+  partners cannot access another partner's data or learner identity, including
+  suppressed small cohorts.
+- [ ] Run migration, worker, queue, export-expiry, reconciliation, and
+  rollback drills on staging. Exercise failed webhooks, retries, cancelled
+  exports, expired URLs, and partial operational failures.
+- [ ] Roll out in cohorts behind the existing controls; monitor discrepancies,
+  export failures, payment failures, and access denials. Widen allow-lists
+  only after the agreed observation window and sign-off.
+
+**Exit criteria:** All phased acceptance tests pass in staging; the controlled
+pilot and cohort rollout are signed off; runbooks, dashboards, alert owners,
+and rollback steps are handed to the operating team.
 
 ## Workstream A — Partner-domain foundation
 
@@ -418,56 +533,62 @@ Use asynchronous `ReportExportJob` records rather than synchronous downloads:
 
 Never place report data in a public URL or application logs.
 
-## Delivery sequence
+## Phase dependencies and release boundaries
 
-1. **Foundation and migration:** **partially complete** — partner ledger
-   schema, contract payout kinds, validation, referral schema, and frozen
-   assessment attribution are delivered; audit expansion and feature flags are pending.
-2. **Publisher finance:** **partially complete** — fulfilment-time allocation
-   creation is delivered; historical backfill/reconciliation and settlement
-   administration remain pending.
-3. **Publisher usage:** **partially complete** — new assessment-attribution
-   snapshots are delivered; backfill and
-   usage aggregations, partner dashboards and pagination.
-4. **Referral model:** referral programs/codes/rules, checkout attribution,
-   fulfilment commission allocations, aggregate referral reports.
-5. **Administration:** student 360 composition/subresources and audit policy.
-6. **Platform reporting:** report aggregates, export-job worker, signed
-   delivery, retention and operational runbook.
-7. **Refund integration:** add compensating publisher/referral reversals when
-   the refund lifecycle is implemented.
+| Phase | Depends on | May be released when | Must not wait for |
+| --- | --- | --- | --- |
+| 0 — Operational baseline | Existing foundation | Pilot/sign-off exit criteria are met; allow-lists remain narrow until then. | No later reporting UI or export work. |
+| 1 — Privacy controls | Existing Student 360/export baseline | Policy enforcement and PII tests pass. | Phase 0's live-payment sign-off, although both should run in parallel. |
+| 2 — Publisher operations | Phase 1 for exports; Phase 0 for wider finance rollout | Ledger exports and aggregate usage reports reconcile. | Referral reporting. |
+| 3 — Referral operations | Phase 0; Phase 1 for privacy/export controls | Aggregate reports, suppression, and fraud workflow pass their tests. | Broader platform-report catalogue. |
+| 4 — Platform reports | Phase 1; reuse Phase 2/3 sources where applicable | Each report has definitions, authorization, retention, and export policy. | The Phase 5 final rollout gate. |
+| 5 — Hardening and handover | Phases 0–4 | Staging verification, cohort rollout, and operational handover are signed off. | Nothing; this is the completion gate. |
+
+Phases 2 and 3 can proceed in parallel after their shared prerequisites. Phase
+4 can add independent report families incrementally, but must not expose PII
+until Phase 1 is complete.
 
 ## Migration and rollout safeguards
 
-- Deploy additive schema first; do not alter existing statement history in
-  place.
-- Backfill publisher allocation rows only after producing a discrepancy report
-  against existing approved orders/statements; preserve a source marker on
-  imported rows.
-- Keep legacy earnings screens read-only during reconciliation, then switch
-  dashboards to ledger-backed data behind a feature flag.
+- For any new schema work, deploy additive schema first; do not alter financial
+  history in place.
+- If historical publisher allocation import is ever approved, first produce a
+  discrepancy report against approved orders and preserve a source marker on
+  imported rows. It is not part of the current rollout by default.
+- Ledger allocations are the reporting source of record. Do not introduce a
+  mutable earnings calculation or restore legacy statements as a competing
+  source.
 - Backfill assessment attribution only where a live source can be resolved;
   preserve unknown legacy attribution explicitly.
-- Run dual calculations for publisher estimates during a bounded verification
-  window and investigate every variance before enabling payout operations.
-- Enable referral programs only after the checkout idempotency and code
-  collision tests pass.
+- Use the reconciliation run and representative pilot orders to investigate
+  every variance before enabling or widening payout operations; do not revive
+  a mutable estimate calculation for this purpose.
+- Keep referral programs behind their rollout control until checkout
+  idempotency, code-collision, privacy, and controlled-pilot checks pass.
 
 ## Required verification
 
-- Contract activation, overlap, versioning, fixed/percentage calculation, and
-  no-retroactive-change unit/e2e tests.
-- Fulfilment idempotency tests proving one allocation per order item despite
-  webhook/manual-approval retries.
-- Refund/reversal tests once refunds exist, including partial refunds.
-- Assessment tests with questions from multiple sources/publishers, historical
-  source changes, deleted sources, pending grading, and no-attempt cases.
-- Authorization tests proving publishers/referral partners cannot access each
-  other’s data or any learner identity.
-- Export authorization, expiring URL, audit, filter/column allowlist, and
-  large-data pagination/worker tests.
-- Reconciliation fixture comparing approved sales, allocations, payout
-  statements, receipts, and platform totals.
+Run the phase-specific exit checks above, plus the following regression suite
+before every rollout expansion:
+
+- Contract activation, overlap, replacement/versioning, fixed/percentage
+  calculation, and no-retroactive-change tests.
+- Fulfilment idempotency proving at most one allocation per eligible order item
+  despite webhook/manual-approval retries; full refund/reversal coverage for
+  whole order items.
+- Assessment attribution tests with multiple sources/publishers, historical
+  source changes, deleted sources, pending grading, no-attempt cases, and
+  long-range usage rollups.
+- Authorization/isolation tests proving publishers and referral partners
+  cannot access another partner's data, learner identity, or a disclosure-prone
+  small cohort.
+- Student 360 and export policy tests for field/section access, required
+  reasons, masking, audit records, column allowlists, retention, expiry, and
+  cancellation races.
+- Report metric fixtures comparing approved sales, refunds, allocations,
+  settlements, receipts, entitlement state, and platform totals.
+- Staging e2e journeys for feature flags/allow-lists, queue/worker recovery,
+  payment retries, reconciliation discrepancies, and rollback.
 
 ## Acceptance criteria
 
@@ -481,5 +602,13 @@ Never place report data in a public URL or application logs.
   aggregates accurately across all sources.
 - Referral commission calculation exactly supports percentage, fixed, and
   capped-percentage rules, including a 10%-up-to-EGP-100 example.
-- Admins can retrieve a properly audited Student 360 view and request secure,
-  expiring platform exports.
+- Admins can retrieve a policy-enforced, properly audited Student 360 view and
+  request secure, expiring platform exports only within their approved PII
+  permissions.
+- Finance can trace every settlement and exported total to immutable ledger
+  rows, and controlled-pilot reconciliation has recorded no unexplained
+  discrepancy.
+- Publisher and referral reporting remains aggregate-only, applies small
+  cohort protection, and has an audited fraud-review workflow.
+- The complete phased e2e suite and the production-like rollout drill have
+  passed before unrestricted feature enablement.
