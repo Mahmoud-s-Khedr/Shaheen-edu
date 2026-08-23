@@ -218,15 +218,15 @@ export const aiQuestionImportJourney: JourneyDefinition = {
         expectStatus(await admin.request('POST', `/admin/ai/question-imports/${importId}/chunks/missing-chunk/retry`), 404);
         expectStatus(await admin.request('POST', `/admin/ai/question-imports/${importId}/pages/1/retry`), 409);
         expectStatus(await admin.request('POST', `/admin/ai/question-imports/${importId}/children/missing-child/retry`), 404);
-        expectStatus(await admin.request('POST', `/admin/ai/question-imports/${importId}/items/missing-item/retry`), 409);
+        expectStatus(await admin.request('POST', `/admin/ai/question-imports/${importId}/items/missing-item/retry`), 404);
         expectStatus(await admin.request('GET', `/admin/ai/question-imports/${importId}/media`), 409);
         expectStatus(await admin.request('POST', `/admin/ai/question-imports/${importId}/media`, {
           pageNumber: 1, type: 'DIAGRAM', bounds: { left: 0, top: 0, right: 100, bottom: 100 }, description: 'Not available for raw-text imports',
         }), 409);
         expectStatus(await admin.request('PATCH', `/admin/ai/question-imports/${importId}/media/MISSING`, { description: 'Not available for raw-text imports' }), 409);
         expectStatus(await admin.request('POST', `/admin/ai/question-imports/${importId}/media/MISSING/retry`), 409);
-        expectStatus(await admin.request('PATCH', `/admin/ai/question-imports/${importId}/items/missing-item/media`, { assignments: [] }), 409);
-        expectStatus(await admin.request('POST', `/admin/ai/question-imports/${importId}/items/missing-item/reject`, { reason: 'Not a review candidate' }), 409);
+        expectStatus(await admin.request('PATCH', `/admin/ai/question-imports/${importId}/items/missing-item/media`, { assignments: [] }), 404);
+        expectStatus(await admin.request('POST', `/admin/ai/question-imports/${importId}/items/missing-item/reject`, { reason: 'Not a review candidate' }), 404);
         // Keep this state-changing call last: a completed import with
         // invalid/reviewable candidates may be retried (201), while an import
         // with no retryable work is rejected (409). Both outcomes are valid.
