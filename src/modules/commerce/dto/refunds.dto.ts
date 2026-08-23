@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { ArrayMinSize, IsArray, IsEnum, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import { ArrayMinSize, IsArray, IsEnum, IsInt, IsOptional, IsString, Max, MaxLength, Min, MinLength } from 'class-validator';
 import { PaginationQueryDto } from '../../../common/dto/pagination-query.dto';
 import { RefundRequestStatus } from '../../../common/types/roles.enum';
 
@@ -58,4 +58,18 @@ export class RejectRefundDto {
   @IsString()
   @MaxLength(2000)
   reviewNote?: string;
+}
+
+export class RefundPolicyDto {
+  @ApiProperty({ minimum: 1, maximum: 365 })
+  @IsInt()
+  @Min(1)
+  @Max(365)
+  eligibilityWindowDays!: number;
+
+  @ApiProperty({ minimum: 1, maximum: 10000, description: 'Maximum completed-content consumption in basis points.' })
+  @IsInt()
+  @Min(1)
+  @Max(10_000)
+  maximumConsumptionBps!: number;
 }

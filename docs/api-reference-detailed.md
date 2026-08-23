@@ -2,6 +2,58 @@
 
 Implementation-backed API contract. Every endpoint below is self-contained: its authorization, parameter/body fields, and success response fields appear in the same section. Base URL is `/api/v1`; `/health` and `/health/ready` are unversioned. Unknown JSON fields are rejected. Errors use `{ statusCode, code, message: { ar, en }, error: { ar, en }, details?, correlationId }`; `details` contains field-level bilingual validation feedback.
 
+## Generated operations inventory
+
+The OpenAPI document in `docs-json.json` is the authoritative schema. The
+following recently added operations are listed here to keep this reference's
+operation inventory aligned with that document.
+
+### `GET /api/v1/admin/partner-finance/allocations`
+### `GET /api/v1/admin/partner-finance/reconciliation-runs`
+### `GET /api/v1/admin/partner-finance/reconciliation-runs/{id}`
+### `GET /api/v1/admin/partner-finance/reconciliation-runs/{id}/discrepancies`
+### `GET /api/v1/admin/partner-finance/settlements`
+### `GET /api/v1/admin/referral-programs`
+### `GET /api/v1/admin/referral-programs/{id}`
+### `GET /api/v1/admin/refunds`
+### `GET /api/v1/admin/refunds/policy`
+### `GET /api/v1/admin/reports/commerce`
+### `GET /api/v1/admin/reports/exports`
+### `GET /api/v1/admin/reports/exports/{id}/download`
+### `GET /api/v1/admin/reports/partner-obligations`
+### `GET /api/v1/admin/students/{id}/360`
+### `GET /api/v1/admin/students/{id}/360/assessments`
+### `GET /api/v1/admin/students/{id}/360/audit-events`
+### `GET /api/v1/admin/students/{id}/360/entitlements`
+### `GET /api/v1/admin/students/{id}/360/orders`
+### `GET /api/v1/partners/analytics/allocations`
+### `GET /api/v1/partners/analytics/question-usage`
+### `GET /api/v1/partners/analytics/question-usage/questions`
+### `GET /api/v1/partners/analytics/question-usage/sources`
+### `GET /api/v1/student/refund-requests`
+### `PATCH /api/v1/admin/partner-finance/reconciliation-discrepancies/{id}/assign`
+### `PATCH /api/v1/admin/partner-finance/reconciliation-discrepancies/{id}/resolve`
+### `PATCH /api/v1/admin/referral-programs/codes/{id}`
+### `PATCH /api/v1/admin/referral-programs/{id}`
+### `PATCH /api/v1/admin/refunds/policy`
+### `POST /api/v1/admin/partner-finance/reconciliation-runs`
+### `POST /api/v1/admin/partner-finance/reconciliation-runs/{id}/run`
+### `POST /api/v1/admin/partner-finance/settlements`
+### `POST /api/v1/admin/partner-finance/settlements/{id}/mark-paid`
+### `POST /api/v1/admin/publisher-agreements/{id}/replace`
+### `POST /api/v1/admin/referral-programs`
+### `POST /api/v1/admin/referral-programs/{id}/activate`
+### `POST /api/v1/admin/referral-programs/{id}/codes`
+### `POST /api/v1/admin/referral-programs/{id}/end`
+### `POST /api/v1/admin/referral-programs/{id}/rules`
+### `POST /api/v1/admin/referral-programs/{id}/rules/{ruleId}/activate`
+### `POST /api/v1/admin/referral-programs/{id}/suspend`
+### `POST /api/v1/admin/refunds/{id}/approve`
+### `POST /api/v1/admin/refunds/{id}/reject`
+### `POST /api/v1/admin/reports/exports`
+### `POST /api/v1/admin/reports/exports/{id}/cancel`
+### `POST /api/v1/student/orders/{orderId}/refund-requests`
+
 ## Health
 
 ## Student learning
@@ -5270,7 +5322,7 @@ No path, query, or header input.
 }
 ```
 
-### `POST /api/v1/admin/publisher-agreements/earnings-statements`
+#### Retired: `POST /api/v1/admin/publisher-agreements/earnings-statements`
 
 **Authorization:** Bearer token; role must be `ADMIN` or `SUPER_ADMIN`
 
@@ -5306,7 +5358,7 @@ No path, query, or header input.
 }
 ```
 
-### `GET /api/v1/admin/publisher-agreements/earnings-statements`
+#### Retired: `GET /api/v1/admin/publisher-agreements/earnings-statements`
 
 **Authorization:** Bearer token; role must be `ADMIN` or `SUPER_ADMIN`
 
@@ -6719,7 +6771,7 @@ No path, query, or header input.
 
 **Success response — HTTP 200**
 
-Returns Cairo-period KPIs, including separate realized statement values and approved-order estimates, compact daily earnings trends, agreement/content counts, and latest issued statements. All money is EGP minor units; no learner-identifying data is returned.
+Returns Cairo-period immutable-ledger totals, agreement breakdowns, and daily trends. Earned is positive allocation value, reversals are compensating negative rows, and net is the signed financial total. Reversed original rows remain audit history and are not counted a second time. All money is EGP minor units; no learner-identifying data is returned.
 
 ### `GET /api/v1/partners/analytics/earnings`
 
@@ -6732,7 +6784,7 @@ Returns Cairo-period KPIs, including separate realized statement values and appr
 
 **Success response — HTTP 200**
 
-Returns date-bucketed estimated approved-order gross/earnings and realized statement gross/earnings. Estimated values are explicitly not settlement records.
+Returns day or month Cairo buckets and agreement/target breakdowns derived solely from immutable publisher allocation rows, including earned, reversals, net, payable, and paid values.
 
 ### `GET /api/v1/partners/analytics/content`
 
@@ -6747,7 +6799,7 @@ Returns date-bucketed estimated approved-order gross/earnings and realized state
 
 Returns the authenticated publisher's course, chapter, and lesson agreements with target hierarchy context, revenue-share terms, historical status, and current-activity state.
 
-### `GET /api/v1/partners/earnings-statements`
+#### Retired: `GET /api/v1/partners/earnings-statements`
 
 **Authorization:** Bearer token; role must be `PARTNER` with type `CONTENT_PUBLISHER`
 

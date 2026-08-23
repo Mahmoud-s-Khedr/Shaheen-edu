@@ -77,8 +77,6 @@ export class CommerceService {
       paymobTimeoutMs: 15000,
       paymobOrderExpirySeconds: 1800,
       manualOrderExpirySeconds: 86400,
-      refundEligibilityWindowDays: 7,
-      refundMaximumConsumptionBps: 1000,
     };
     this.features = config?.get('features', { infer: true }) ?? {
       referralsEnabled: false, referralAllowedStudentIds: [], partnerLedgerEnabled: false,

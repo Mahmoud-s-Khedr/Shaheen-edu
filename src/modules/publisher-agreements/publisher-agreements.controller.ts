@@ -14,10 +14,8 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Role } from '../../common/types/roles.enum';
 import type { RequestUser } from '../../common/types/request-with-user.types';
-import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
 import {
   AgreementTargetDto,
-  CreateEarningsStatementDto,
   CreatePublisherAgreementDto,
   EndPublisherAgreementDto,
   SetPricingDto,
@@ -86,19 +84,6 @@ export class PublisherAgreementsController {
     @Query('at') at?: string,
   ) {
     return this.service.resolve(actor, dto, at ? new Date(at) : new Date());
-  }
-  @Post('earnings-statements')
-  @ApiOperation({ summary: 'Create a publisher earnings statement' })
-  statement(
-    @CurrentUser() actor: RequestUser,
-    @Body() dto: CreateEarningsStatementDto,
-  ) {
-    return this.service.createStatement(actor, dto);
-  }
-  @Get('earnings-statements')
-  @ApiOperation({ summary: 'List publisher earnings statements' })
-  statements(@CurrentUser() actor: RequestUser, @Query() query: PaginationQueryDto) {
-    return this.service.listStatements(actor, query);
   }
 }
 

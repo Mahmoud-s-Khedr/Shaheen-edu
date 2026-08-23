@@ -4,7 +4,7 @@ import { toPaginationMeta } from '../../common/dto/pagination-query.dto';
 import type { RequestUser } from '../../common/types/request-with-user.types';
 import { PrismaService } from '../../database/prisma.service';
 import { AuditService } from '../audit/audit.service';
-import type { AdminAllocationsQueryDto, CreateSettlementDto, SettlementsQueryDto } from './dto/partner-finance.dto';
+import type { AdminAllocationsQueryDto, AssignReconciliationDiscrepancyDto, CreateReconciliationRunDto, CreateSettlementDto, ReconciliationDiscrepanciesQueryDto, ReconciliationRunsQueryDto, ResolveReconciliationDiscrepancyDto, SettlementsQueryDto } from './dto/partner-finance.dto';
 
 @Injectable()
 export class PartnerFinanceService {
@@ -61,4 +61,103 @@ export class PartnerFinanceService {
     const [data, total] = await this.prisma.$transaction([this.prisma.partnerSettlement.findMany({ where, include: { partner: { select: { displayName: true } }, _count: { select: { lines: true } } }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], skip: (query.page - 1) * query.limit, take: query.limit }), this.prisma.partnerSettlement.count({ where })]);
     return { data, meta: toPaginationMeta(query.page, query.limit, total) };
   }
+
+  async createReconciliationRun(actor: RequestUser, dto: CreateReconciliationRunDto) {
+    this.admin(actor);
+    const orderIds = [...new Set(dto.orderIds)];
+    if (orderIds.length !== dto.orderIds.length) throw new BadRequestException('Each approved order can be selected only once');
+    const orders = await this.prisma.order.findMany({ where: { id: { in: orderIds }, status: 'APPROVED' }, select: { id: true } });
+    if (orders.length !== orderIds.length) throw new BadRequestException('Reconciliation runs require explicitly selected approved orders');
+    const run = await this.prisma.partnerFinanceReconciliationRun.create({ data: { pilotLabel: dto.pilotLabel.trim(), createdById: actor.id, orders: { create: orderIds.map((orderId) => ({ orderId })) } }, include: { orders: true } });
+    await this.audit.record({ actorUserId: actor.id, action: 'PARTNER_FINANCE_RECONCILIATION_CREATED', targetType: 'PartnerFinanceReconciliationRun', targetId: run.id, metadata: { pilotLabel: run.pilotLabel, orderIds } });
+    return run;
+  }
+
+  private publisherExpected(item: any, agreements: any[]) {
+    const candidates = item.chapterId ? [{ chapterId: item.chapterId }, { courseId: item.chapter?.courseId }] : [{ courseId: item.courseId }];
+    const agreement = agreements.find((row) => candidates.some((target) => Object.entries(target).every(([key, value]) => value && row[key] === value)));
+    if (!agreement) return null;
+    const amount = agreement.payoutKind === 'PERCENTAGE' ? Math.floor(item.priceMinor * (agreement.revenueShareBps ?? 0) / 10_000) : agreement.fixedPayoutMinor ?? 0;
+    return amount > 0 && amount <= item.priceMinor ? { kind: 'PUBLISHER_SALE', partnerUserId: agreement.publisherUserId, sourceId: agreement.id, basisMinor: item.priceMinor, amountMinor: amount, currency: item.currency } : null;
+  }
+
+  private referralExpected(item: any, attribution: any) {
+    if (!attribution) return null;
+    const terms = attribution.snapshot as any;
+    const amount = terms.kind === 'FIXED_PER_SALE' ? terms.fixedCommissionMinor ?? 0 : terms.kind === 'PERCENTAGE_CAPPED' ? Math.min(Math.floor(item.priceMinor * (terms.percentageBps ?? 0) / 10_000), terms.maximumCommissionMinor ?? 0) : Math.floor(item.priceMinor * (terms.percentageBps ?? 0) / 10_000);
+    return amount > 0 && amount <= item.priceMinor && terms.partnerUserId ? { kind: 'REFERRAL_COMMISSION', partnerUserId: terms.partnerUserId, sourceId: attribution.ruleId, basisMinor: item.priceMinor, amountMinor: amount, currency: item.currency } : null;
+  }
+
+  private discrepancy(input: any) { return { severity: 'ERROR', ...input }; }
+
+  async runReconciliation(actor: RequestUser, id: string) {
+    this.admin(actor);
+    const now = new Date();
+    const run = await this.prisma.partnerFinanceReconciliationRun.findUnique({
+      where: { id },
+      include: {
+        orders: {
+          include: {
+            order: {
+              include: {
+                receipt: true,
+                referralAttribution: true,
+                refundRequests: { where: { status: 'APPROVED' }, select: { id: true } },
+                items: { include: { chapter: { select: { courseId: true } }, entitlement: true, allocations: true } },
+              },
+            },
+          },
+        },
+      },
+    });
+    if (!run) throw new NotFoundException('Reconciliation run not found');
+    if (run.status === 'RUNNING') throw new ConflictException('Reconciliation run is already running');
+    await this.prisma.partnerFinanceReconciliationRun.update({ where: { id }, data: { status: 'RUNNING', startedAt: now, completedAt: null, summary: undefined } });
+    const orderIds = run.orders.map((row) => row.orderId);
+    const agreements = await this.prisma.publisherAgreement.findMany({ where: { status: { in: ['ACTIVE', 'ENDED'] }, isPrimary: true, startsAt: { lte: now }, OR: [{ endsAt: null }, { endsAt: { gt: new Date(0) } }] } });
+    const findings: any[] = [];
+    for (const selected of run.orders) {
+      const order: any = selected.order;
+      if (order.status !== 'APPROVED' || !order.approvedAt) { findings.push(this.discrepancy({ type: 'ORDER_NOT_APPROVED', orderItemId: null })); continue; }
+      if (!order.receipt) findings.push(this.discrepancy({ type: 'MISSING_RECEIPT' }));
+      for (const item of order.items) {
+        const expectedEntitlementStatus = order.refundRequests.length ? 'REVOKED' : 'ACTIVE';
+        if (!item.entitlement || item.entitlement.status !== expectedEntitlementStatus) findings.push(this.discrepancy({ type: `ENTITLEMENT_${expectedEntitlementStatus}_MISMATCH`, orderItemId: item.id }));
+        // Re-resolve historical agreement terms without reading any ledger row.
+        const applicable = agreements.filter((agreement: any) => agreement.startsAt <= order.approvedAt && (!agreement.endsAt || agreement.endsAt > order.approvedAt));
+        const expected = [this.publisherExpected(item, applicable), this.referralExpected(item, order.referralAttribution)].filter(Boolean) as any[];
+        for (const expectation of expected) {
+          const matching = item.allocations.filter((allocation: any) => allocation.kind === expectation.kind && allocation.partnerUserId === expectation.partnerUserId && (expectation.kind === 'PUBLISHER_SALE' ? allocation.publisherAgreementId === expectation.sourceId : allocation.referralRuleId === expectation.sourceId) && allocation.amountMinor > 0);
+          for (const allocation of item.allocations.filter((row: any) => row.kind === expectation.kind && row.partnerUserId === expectation.partnerUserId && row.amountMinor > 0 && (expectation.kind === 'PUBLISHER_SALE' ? row.publisherAgreementId !== expectation.sourceId : row.referralRuleId !== expectation.sourceId))) findings.push(this.discrepancy({ type: expectation.kind === 'PUBLISHER_SALE' ? 'INCORRECT_PUBLISHER_AGREEMENT' : 'INCORRECT_REFERRAL_RULE', orderItemId: item.id, allocationId: allocation.id, partnerUserId: allocation.partnerUserId, expectedAmountMinor: expectation.amountMinor, actualAmountMinor: allocation.amountMinor, expectedBasisMinor: expectation.basisMinor, actualBasisMinor: allocation.basisMinor, currency: allocation.currency }));
+          if (!matching.length) findings.push(this.discrepancy({ type: `MISSING_${expectation.kind}`, orderItemId: item.id, partnerUserId: expectation.partnerUserId, expectedAmountMinor: expectation.amountMinor, expectedBasisMinor: expectation.basisMinor, currency: expectation.currency }));
+          if (matching.length > 1) for (const allocation of matching.slice(1)) findings.push(this.discrepancy({ type: 'DUPLICATE_ALLOCATION', orderItemId: item.id, allocationId: allocation.id, partnerUserId: allocation.partnerUserId, actualAmountMinor: allocation.amountMinor, actualBasisMinor: allocation.basisMinor, currency: allocation.currency }));
+          for (const allocation of matching.slice(0, 1)) {
+            if (allocation.basisMinor !== expectation.basisMinor) findings.push(this.discrepancy({ type: 'INCORRECT_ALLOCATION_BASIS', orderItemId: item.id, allocationId: allocation.id, partnerUserId: allocation.partnerUserId, expectedBasisMinor: expectation.basisMinor, actualBasisMinor: allocation.basisMinor, currency: allocation.currency }));
+            if (allocation.amountMinor !== expectation.amountMinor) findings.push(this.discrepancy({ type: 'INCORRECT_ALLOCATION_AMOUNT', orderItemId: item.id, allocationId: allocation.id, partnerUserId: allocation.partnerUserId, expectedAmountMinor: expectation.amountMinor, actualAmountMinor: allocation.amountMinor, currency: allocation.currency }));
+            if (order.refundRequests.length && (allocation.state !== PartnerAllocationState.REVERSED || !item.allocations.some((candidate: any) => candidate.reversedAllocationId === allocation.id && candidate.amountMinor === -Math.abs(allocation.amountMinor)))) findings.push(this.discrepancy({ type: 'MISSING_REFUND_REVERSAL', orderItemId: item.id, allocationId: allocation.id, partnerUserId: allocation.partnerUserId, expectedAmountMinor: -Math.abs(allocation.amountMinor), currency: allocation.currency }));
+          }
+        }
+        for (const allocation of item.allocations.filter((row: any) => row.amountMinor > 0 && !expected.some((expectation) => expectation.kind === row.kind && expectation.partnerUserId === row.partnerUserId))) findings.push(this.discrepancy({ type: 'UNEXPECTED_ALLOCATION', orderItemId: item.id, allocationId: allocation.id, partnerUserId: allocation.partnerUserId, actualAmountMinor: allocation.amountMinor, actualBasisMinor: allocation.basisMinor, currency: allocation.currency }));
+      }
+    }
+    const settlementIssues = await this.prisma.partnerSettlementLine.findMany({ where: { allocation: { orderItem: { orderId: { in: orderIds } } } }, include: { allocation: true, settlement: true } });
+    for (const line of settlementIssues) if (line.settlement.paidAt && (line.allocation.state !== PartnerAllocationState.PAID || line.allocation.paidAt === null)) findings.push(this.discrepancy({ type: 'SETTLEMENT_STATE_MISMATCH', allocationId: line.allocationId, partnerUserId: line.allocation.partnerUserId, actualAmountMinor: line.allocation.amountMinor, currency: line.allocation.currency }));
+    const completedAt = new Date();
+    const saved = await this.prisma.$transaction(async (tx) => {
+      await tx.partnerFinanceDiscrepancy.deleteMany({ where: { runId: id } });
+      if (findings.length) await tx.partnerFinanceDiscrepancy.createMany({ data: findings.map((finding) => ({ runId: id, ...finding })) });
+      return tx.partnerFinanceReconciliationRun.update({ where: { id }, data: { status: 'COMPLETED', completedAt, summary: { ordersScanned: orderIds.length, discrepancyCount: findings.length } }, include: { discrepancies: true, orders: true } });
+    });
+    await this.audit.record({ actorUserId: actor.id, action: 'PARTNER_FINANCE_RECONCILIATION_COMPLETED', targetType: 'PartnerFinanceReconciliationRun', targetId: id, metadata: saved.summary as any });
+    return saved;
+  }
+
+  async reconciliationRuns(actor: RequestUser, query: ReconciliationRunsQueryDto) {
+    this.admin(actor); const [data, total] = await this.prisma.$transaction([this.prisma.partnerFinanceReconciliationRun.findMany({ include: { _count: { select: { discrepancies: true, orders: true } } }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], skip: (query.page - 1) * query.limit, take: query.limit }), this.prisma.partnerFinanceReconciliationRun.count()]); return { data, meta: toPaginationMeta(query.page, query.limit, total) };
+  }
+
+  async reconciliationRun(actor: RequestUser, id: string) { this.admin(actor); const run = await this.prisma.partnerFinanceReconciliationRun.findUnique({ where: { id }, include: { orders: true, discrepancies: { orderBy: [{ severity: 'desc' }, { createdAt: 'asc' }] } } }); if (!run) throw new NotFoundException('Reconciliation run not found'); return run; }
+  async discrepancies(actor: RequestUser, id: string, query: ReconciliationDiscrepanciesQueryDto) { this.admin(actor); const where = { runId: id, ...(query.status ? { status: query.status as any } : {}) }; const [data, total] = await this.prisma.$transaction([this.prisma.partnerFinanceDiscrepancy.findMany({ where, orderBy: [{ severity: 'desc' }, { createdAt: 'asc' }], skip: (query.page - 1) * query.limit, take: query.limit }), this.prisma.partnerFinanceDiscrepancy.count({ where })]); return { data, meta: toPaginationMeta(query.page, query.limit, total) }; }
+  async assignDiscrepancy(actor: RequestUser, id: string, dto: AssignReconciliationDiscrepancyDto) { this.admin(actor); const row = await this.prisma.partnerFinanceDiscrepancy.update({ where: { id }, data: { assignedToId: dto.assigneeUserId, status: 'ASSIGNED', notes: dto.notes?.trim() } }); await this.audit.record({ actorUserId: actor.id, action: 'PARTNER_FINANCE_DISCREPANCY_ASSIGNED', targetType: 'PartnerFinanceDiscrepancy', targetId: id, metadata: { assigneeUserId: dto.assigneeUserId } }); return row; }
+  async resolveDiscrepancy(actor: RequestUser, id: string, dto: ResolveReconciliationDiscrepancyDto) { this.admin(actor); const row = await this.prisma.partnerFinanceDiscrepancy.update({ where: { id }, data: { status: dto.status, resolutionNote: dto.resolutionNote.trim(), resolvedById: actor.id, resolvedAt: new Date() } }); await this.audit.record({ actorUserId: actor.id, action: 'PARTNER_FINANCE_DISCREPANCY_RESOLVED', targetType: 'PartnerFinanceDiscrepancy', targetId: id, metadata: { status: dto.status } }); return row; }
 }

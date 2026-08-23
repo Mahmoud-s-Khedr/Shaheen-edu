@@ -973,24 +973,6 @@ class Seed {
       ).body;
     }
     this.record('agreement.ended', ended, 'reused');
-    const statements = (
-      await this.call<any>(
-        'GET',
-        '/admin/publisher-agreements/earnings-statements',
-      )
-    ).body;
-    if (!statements.some((x: any) => x.lessonId === lesson.id))
-      await this.call(
-        'POST',
-        '/admin/publisher-agreements/earnings-statements',
-        {
-          lessonId: lesson.id,
-          periodStartsAt: startsAt,
-          periodEndsAt: now.toISOString(),
-          grossRevenueMinor: 10000,
-          currency: 'EGP',
-        },
-      );
     const retained = this.states['student.retained'];
     const grants = (
       await this.call<any>(

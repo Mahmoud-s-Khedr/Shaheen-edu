@@ -26,14 +26,12 @@ describe('Publisher agreements and pricing (e2e)', () => {
   });
   afterAll(async () => { await app.close(); });
 
-  it('inherits pricing and resolves a lesson agreement into a calculated statement', async () => {
+  it('inherits pricing and resolves a lesson agreement', async () => {
     await service.setPricing(actor, { courseId: ids.courseId }, { isPurchasable: true, priceMinor: 20_000, currency: 'EGP' });
     expect(await service.resolvePricing(actor, { lessonId: ids.lessonId })).toMatchObject({ isPurchasable: true, priceMinor: 20_000, resolvedFrom: { courseId: ids.courseId } });
     const agreement = await service.create(actor, { lessonId: ids.lessonId, publisherUserId: ids.publisherId, revenueShareBps: 2_500, startsAt: new Date('2026-06-01T00:00:00.000Z') });
     await service.activate(actor, agreement.id);
     const resolved = await service.resolve(actor, { lessonId: ids.lessonId }, new Date('2026-06-15T00:00:00.000Z'));
     expect(resolved.agreement?.id).toBe(agreement.id);
-    const statement = await service.createStatement(actor, { lessonId: ids.lessonId, periodStartsAt: new Date('2026-06-01T00:00:00.000Z'), periodEndsAt: new Date('2026-07-01T00:00:00.000Z'), grossRevenueMinor: 8_000, currency: 'EGP' });
-    expect(statement.publisherEarningsMinor).toBe(2_000);
   });
 });

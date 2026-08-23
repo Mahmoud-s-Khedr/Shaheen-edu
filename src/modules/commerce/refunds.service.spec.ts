@@ -5,7 +5,7 @@ describe('RefundsService', () => {
   const studentUserId = 'student-1';
   const actor = { id: 'admin-1', role: Role.ADMIN } as any;
 
-  function build(policy = { refundEligibilityWindowDays: 7, refundMaximumConsumptionBps: 1_000 }) {
+  function build(policy = { eligibilityWindowDays: 7, maximumConsumptionBps: 1_000 }) {
     const tx: any = {
       order: { findFirst: jest.fn() },
       contentItem: { count: jest.fn() },
@@ -13,11 +13,11 @@ describe('RefundsService', () => {
       refundRequest: { create: jest.fn(), findUnique: jest.fn(), findUniqueOrThrow: jest.fn(), updateMany: jest.fn() },
       studentEntitlement: { updateMany: jest.fn() },
       partnerAllocation: { create: jest.fn(), updateMany: jest.fn() },
+      refundPolicy: { findFirst: jest.fn().mockResolvedValue({ id: 'policy-1', version: 1, ...policy }) },
     };
     const prisma: any = { $transaction: jest.fn((callback: any) => callback(tx)) };
     const audit = { record: jest.fn() };
-    const config: any = { get: jest.fn().mockReturnValue({ ...policy }) };
-    return { tx, audit, service: new RefundsService(prisma, audit as any, config) };
+    return { tx, audit, service: new RefundsService(prisma, audit as any) };
   }
 
   const approvedOrder = {

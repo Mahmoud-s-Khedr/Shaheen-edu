@@ -2364,6 +2364,279 @@
         ]
       }
     },
+    "/api/v1/admin/students/{id}/360": {
+      "get": {
+        "operationId": "AdminStudentsController_student360_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "reason",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get an audited Student 360 summary; national ID is limited to the stored last four digits",
+        "tags": [
+          "admin/students"
+        ]
+      }
+    },
+    "/api/v1/admin/students/{id}/360/orders": {
+      "get": {
+        "operationId": "AdminStudentsController_orders_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "One-based page number.",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Maximum records to return per page.",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "reason",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "admin/students"
+        ]
+      }
+    },
+    "/api/v1/admin/students/{id}/360/entitlements": {
+      "get": {
+        "operationId": "AdminStudentsController_entitlements_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "One-based page number.",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Maximum records to return per page.",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "reason",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "admin/students"
+        ]
+      }
+    },
+    "/api/v1/admin/students/{id}/360/assessments": {
+      "get": {
+        "operationId": "AdminStudentsController_assessments_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "One-based page number.",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Maximum records to return per page.",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "reason",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "admin/students"
+        ]
+      }
+    },
+    "/api/v1/admin/students/{id}/360/audit-events": {
+      "get": {
+        "operationId": "AdminStudentsController_auditEvents_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "One-based page number.",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Maximum records to return per page.",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "reason",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "admin/students"
+        ]
+      }
+    },
     "/api/v1/admin/students/{id}/suspend": {
       "post": {
         "operationId": "AdminStudentsController_suspend_v1",
@@ -10600,6 +10873,45 @@
         ]
       }
     },
+    "/api/v1/admin/publisher-agreements/{id}/replace": {
+      "post": {
+        "operationId": "PublisherAgreementsController_replace_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReplacePublisherAgreementDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create an immutable successor version for an active publisher agreement",
+        "tags": [
+          "admin/publisher-agreements"
+        ]
+      }
+    },
     "/api/v1/admin/publisher-agreements/{id}/end": {
       "post": {
         "operationId": "PublisherAgreementsController_end_v1",
@@ -10693,78 +11005,6 @@
           }
         ],
         "summary": "Resolve the effective publisher agreement",
-        "tags": [
-          "admin/publisher-agreements"
-        ]
-      }
-    },
-    "/api/v1/admin/publisher-agreements/earnings-statements": {
-      "post": {
-        "operationId": "PublisherAgreementsController_statement_v1",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateEarningsStatementDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Create a publisher earnings statement",
-        "tags": [
-          "admin/publisher-agreements"
-        ]
-      },
-      "get": {
-        "operationId": "PublisherAgreementsController_statements_v1",
-        "parameters": [
-          {
-            "name": "page",
-            "required": false,
-            "in": "query",
-            "description": "One-based page number.",
-            "schema": {
-              "minimum": 1,
-              "default": 1,
-              "type": "number"
-            }
-          },
-          {
-            "name": "limit",
-            "required": false,
-            "in": "query",
-            "description": "Maximum records to return per page.",
-            "schema": {
-              "minimum": 1,
-              "maximum": 100,
-              "default": 20,
-              "type": "number"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "List publisher earnings statements",
         "tags": [
           "admin/publisher-agreements"
         ]
@@ -14722,6 +14962,293 @@
         ]
       }
     },
+    "/api/v1/student/orders/{orderId}/refund-requests": {
+      "post": {
+        "operationId": "StudentRefundsController_request_v1",
+        "parameters": [
+          {
+            "name": "orderId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateRefundRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Request a manual refund for complete approved order items; ineligible requests are rejected automatically.",
+        "tags": [
+          "student/refunds"
+        ]
+      }
+    },
+    "/api/v1/student/refund-requests": {
+      "get": {
+        "operationId": "StudentRefundsController_list_v1",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "One-based page number.",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Maximum records to return per page.",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "PENDING",
+                "APPROVED",
+                "REJECTED"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the authenticated student’s refund requests.",
+        "tags": [
+          "student/refunds"
+        ]
+      }
+    },
+    "/api/v1/admin/refunds": {
+      "get": {
+        "operationId": "AdminRefundsController_list_v1",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "One-based page number.",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Maximum records to return per page.",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "PENDING",
+                "APPROVED",
+                "REJECTED"
+              ]
+            }
+          },
+          {
+            "name": "studentUserId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List manual refund requests and their policy snapshot.",
+        "tags": [
+          "admin/refunds"
+        ]
+      }
+    },
+    "/api/v1/admin/refunds/policy": {
+      "get": {
+        "operationId": "AdminRefundsController_policy_v1",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get the active versioned refund eligibility policy.",
+        "tags": [
+          "admin/refunds"
+        ]
+      },
+      "patch": {
+        "operationId": "AdminRefundsController_updatePolicy_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefundPolicyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Activate a new versioned refund eligibility policy; existing request snapshots are unchanged.",
+        "tags": [
+          "admin/refunds"
+        ]
+      }
+    },
+    "/api/v1/admin/refunds/{id}/approve": {
+      "post": {
+        "operationId": "AdminRefundsController_approve_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApproveRefundDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Record a completed manual refund, revoke associated access, and create partner-ledger reversals.",
+        "tags": [
+          "admin/refunds"
+        ]
+      }
+    },
+    "/api/v1/admin/refunds/{id}/reject": {
+      "post": {
+        "operationId": "AdminRefundsController_reject_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RejectRefundDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Manually reject an otherwise eligible refund request.",
+        "tags": [
+          "admin/refunds"
+        ]
+      }
+    },
     "/api/v1/student/content-items/{id}/complete": {
       "post": {
         "operationId": "LearningController_complete_v1",
@@ -18483,7 +19010,7 @@
         ],
         "responses": {
           "200": {
-            "description": "All money is EGP minor units. Issued statements are realized; approved-order metrics are estimates."
+            "description": "All money is EGP minor units and is derived solely from immutable allocation ledger rows."
           },
           "400": {
             "description": "",
@@ -18602,7 +19129,281 @@
             "bearer": []
           }
         ],
-        "summary": "Get realized statement and estimated approved-order earnings trends",
+        "summary": "Get immutable-ledger publisher earnings trends",
+        "tags": [
+          "partners/analytics"
+        ]
+      }
+    },
+    "/api/v1/partners/analytics/allocations": {
+      "get": {
+        "operationId": "PartnerAnalyticsController_allocations_v1",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "One-based page number.",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Maximum records to return per page.",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "Cairo calendar date.",
+            "schema": {
+              "example": "2026-08-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "Cairo calendar date.",
+            "schema": {
+              "example": "2026-08-31",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List immutable ledger allocations for the authenticated partner",
+        "tags": [
+          "partners/analytics"
+        ]
+      }
+    },
+    "/api/v1/partners/analytics/question-usage": {
+      "get": {
+        "operationId": "PartnerAnalyticsController_questionUsage_v1",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "One-based page number.",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Maximum records to return per page.",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "2026-08-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "2026-08-31",
+              "type": "string"
+            }
+          },
+          {
+            "name": "sourceId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get aggregate-only publisher question usage and correctness metrics",
+        "tags": [
+          "partners/analytics"
+        ]
+      }
+    },
+    "/api/v1/partners/analytics/question-usage/sources": {
+      "get": {
+        "operationId": "PartnerAnalyticsController_questionUsageSources_v1",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "One-based page number.",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Maximum records to return per page.",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "2026-08-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "2026-08-31",
+              "type": "string"
+            }
+          },
+          {
+            "name": "sourceId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get a paginated source breakdown without learner identity",
+        "tags": [
+          "partners/analytics"
+        ]
+      }
+    },
+    "/api/v1/partners/analytics/question-usage/questions": {
+      "get": {
+        "operationId": "PartnerAnalyticsController_questionUsageQuestions_v1",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "One-based page number.",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Maximum records to return per page.",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "2026-08-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "2026-08-31",
+              "type": "string"
+            }
+          },
+          {
+            "name": "sourceId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get a paginated frozen-question usage breakdown without learner identity",
         "tags": [
           "partners/analytics"
         ]
@@ -18692,9 +19493,37 @@
         ]
       }
     },
-    "/api/v1/partners/earnings-statements": {
+    "/api/v1/admin/referral-programs": {
+      "post": {
+        "operationId": "ReferralsController_create_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateReferralProgramDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create a draft referral program",
+        "tags": [
+          "admin/referral-programs"
+        ]
+      },
       "get": {
-        "operationId": "PartnerAnalyticsController_statements_v1",
+        "operationId": "ReferralsController_list_v1",
         "parameters": [
           {
             "name": "page",
@@ -18720,56 +19549,17 @@
             }
           },
           {
-            "name": "from",
+            "name": "partnerUserId",
             "required": false,
             "in": "query",
-            "description": "Filters by statement period end in Cairo time.",
             "schema": {
-              "example": "2026-08-01",
-              "type": "string"
-            }
-          },
-          {
-            "name": "to",
-            "required": false,
-            "in": "query",
-            "description": "Filters by statement period end in Cairo time.",
-            "schema": {
-              "example": "2026-08-31",
               "type": "string"
             }
           }
         ],
         "responses": {
-          "400": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponseDto"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponseDto"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponseDto"
-                }
-              }
-            }
+          "200": {
+            "description": ""
           }
         },
         "security": [
@@ -18777,9 +19567,1029 @@
             "bearer": []
           }
         ],
-        "summary": "List the authenticated publisher issued earnings statements",
+        "summary": "List referral programs",
         "tags": [
-          "partners/analytics"
+          "admin/referral-programs"
+        ]
+      }
+    },
+    "/api/v1/admin/referral-programs/{id}": {
+      "get": {
+        "operationId": "ReferralsController_get_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get a referral program with codes and rules",
+        "tags": [
+          "admin/referral-programs"
+        ]
+      },
+      "patch": {
+        "operationId": "ReferralsController_update_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateReferralProgramDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update a draft referral program",
+        "tags": [
+          "admin/referral-programs"
+        ]
+      }
+    },
+    "/api/v1/admin/referral-programs/{id}/activate": {
+      "post": {
+        "operationId": "ReferralsController_activate_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "admin/referral-programs"
+        ]
+      }
+    },
+    "/api/v1/admin/referral-programs/{id}/suspend": {
+      "post": {
+        "operationId": "ReferralsController_suspend_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "admin/referral-programs"
+        ]
+      }
+    },
+    "/api/v1/admin/referral-programs/{id}/end": {
+      "post": {
+        "operationId": "ReferralsController_end_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "admin/referral-programs"
+        ]
+      }
+    },
+    "/api/v1/admin/referral-programs/{id}/codes": {
+      "post": {
+        "operationId": "ReferralsController_createCode_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateReferralCodeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "admin/referral-programs"
+        ]
+      }
+    },
+    "/api/v1/admin/referral-programs/codes/{id}": {
+      "patch": {
+        "operationId": "ReferralsController_updateCode_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateReferralCodeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "admin/referral-programs"
+        ]
+      }
+    },
+    "/api/v1/admin/referral-programs/{id}/rules": {
+      "post": {
+        "operationId": "ReferralsController_createRule_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateReferralCommissionRuleDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "admin/referral-programs"
+        ]
+      }
+    },
+    "/api/v1/admin/referral-programs/{id}/rules/{ruleId}/activate": {
+      "post": {
+        "operationId": "ReferralsController_activateRule_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "ruleId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "admin/referral-programs"
+        ]
+      }
+    },
+    "/api/v1/admin/partner-finance/allocations": {
+      "get": {
+        "operationId": "PartnerFinanceController_allocations_v1",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "One-based page number.",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Maximum records to return per page.",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "partnerUserId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "kind",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "PUBLISHER_SALE",
+                "REFERRAL_COMMISSION"
+              ]
+            }
+          },
+          {
+            "name": "state",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "PENDING",
+                "PAYABLE",
+                "PAID",
+                "REVERSED"
+              ]
+            }
+          },
+          {
+            "name": "publisherAgreementId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "referralRuleId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List allocation-ledger rows with administrative filters",
+        "tags": [
+          "admin/partner-finance"
+        ]
+      }
+    },
+    "/api/v1/admin/partner-finance/settlements": {
+      "post": {
+        "operationId": "PartnerFinanceController_createSettlement_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSettlementDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create a settlement for a selected immutable set of payable allocations",
+        "tags": [
+          "admin/partner-finance"
+        ]
+      },
+      "get": {
+        "operationId": "PartnerFinanceController_settlements_v1",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "One-based page number.",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Maximum records to return per page.",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "partnerUserId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List partner settlements",
+        "tags": [
+          "admin/partner-finance"
+        ]
+      }
+    },
+    "/api/v1/admin/partner-finance/settlements/{id}/mark-paid": {
+      "post": {
+        "operationId": "PartnerFinanceController_markPaid_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Mark every allocation in a settlement paid",
+        "tags": [
+          "admin/partner-finance"
+        ]
+      }
+    },
+    "/api/v1/admin/partner-finance/reconciliation-runs": {
+      "post": {
+        "operationId": "PartnerFinanceController_createReconciliationRun_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateReconciliationRunDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create a reconciliation scoped to explicit approved pilot order IDs",
+        "tags": [
+          "admin/partner-finance"
+        ]
+      },
+      "get": {
+        "operationId": "PartnerFinanceController_reconciliationRuns_v1",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "One-based page number.",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Maximum records to return per page.",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List persistent partner-finance reconciliation runs",
+        "tags": [
+          "admin/partner-finance"
+        ]
+      }
+    },
+    "/api/v1/admin/partner-finance/reconciliation-runs/{id}/run": {
+      "post": {
+        "operationId": "PartnerFinanceController_runReconciliation_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Run independent expected-allocation and lifecycle checks for a reconciliation",
+        "tags": [
+          "admin/partner-finance"
+        ]
+      }
+    },
+    "/api/v1/admin/partner-finance/reconciliation-runs/{id}": {
+      "get": {
+        "operationId": "PartnerFinanceController_reconciliationRun_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get a reconciliation run and its discrepancies",
+        "tags": [
+          "admin/partner-finance"
+        ]
+      }
+    },
+    "/api/v1/admin/partner-finance/reconciliation-runs/{id}/discrepancies": {
+      "get": {
+        "operationId": "PartnerFinanceController_discrepancies_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "One-based page number.",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Maximum records to return per page.",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List discrepancies for a reconciliation run",
+        "tags": [
+          "admin/partner-finance"
+        ]
+      }
+    },
+    "/api/v1/admin/partner-finance/reconciliation-discrepancies/{id}/assign": {
+      "patch": {
+        "operationId": "PartnerFinanceController_assign_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignReconciliationDiscrepancyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Assign a reconciliation discrepancy",
+        "tags": [
+          "admin/partner-finance"
+        ]
+      }
+    },
+    "/api/v1/admin/partner-finance/reconciliation-discrepancies/{id}/resolve": {
+      "patch": {
+        "operationId": "PartnerFinanceController_resolve_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResolveReconciliationDiscrepancyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Resolve or accept a reconciliation discrepancy",
+        "tags": [
+          "admin/partner-finance"
+        ]
+      }
+    },
+    "/api/v1/admin/reports/commerce": {
+      "get": {
+        "operationId": "ReportsController_commerce_v1",
+        "parameters": [
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "partnerUserId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get aggregate platform commerce totals",
+        "tags": [
+          "admin/reports"
+        ]
+      }
+    },
+    "/api/v1/admin/reports/partner-obligations": {
+      "get": {
+        "operationId": "ReportsController_obligations_v1",
+        "parameters": [
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "partnerUserId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get aggregate publisher and referral obligation totals",
+        "tags": [
+          "admin/reports"
+        ]
+      }
+    },
+    "/api/v1/admin/reports/exports": {
+      "post": {
+        "operationId": "ReportsController_createExport_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateReportExportDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Queue a secure CSV report export",
+        "tags": [
+          "admin/reports"
+        ]
+      },
+      "get": {
+        "operationId": "ReportsController_exports_v1",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "One-based page number.",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Maximum records to return per page.",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "admin/reports"
+        ]
+      }
+    },
+    "/api/v1/admin/reports/exports/{id}/download": {
+      "get": {
+        "operationId": "ReportsController_download_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "admin/reports"
+        ]
+      }
+    },
+    "/api/v1/admin/reports/exports/{id}/cancel": {
+      "post": {
+        "operationId": "ReportsController_cancel_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "admin/reports"
         ]
       }
     },
@@ -23577,12 +25387,23 @@
             "type": "string",
             "example": "publisher-user-id"
           },
+          "payoutKind": {
+            "type": "string",
+            "enum": [
+              "PERCENTAGE",
+              "FIXED_PER_SALE"
+            ]
+          },
           "revenueShareBps": {
             "type": "number",
             "example": 2500,
             "minimum": 0,
-            "maximum": 10000,
-            "description": "Revenue share in basis points; 2500 = 25%."
+            "maximum": 10000
+          },
+          "fixedPayoutMinor": {
+            "type": "number",
+            "example": 1500,
+            "minimum": 1
           },
           "startsAt": {
             "type": "string",
@@ -23598,11 +25419,26 @@
             "type": "boolean",
             "example": true,
             "default": true
+          },
+          "currency": {
+            "type": "string",
+            "example": "EGP",
+            "default": "EGP"
+          },
+          "contractReference": {
+            "type": "string",
+            "example": "PUB-2026-001"
+          },
+          "signedDocumentAssetId": {
+            "type": "string",
+            "example": "asset-id"
+          },
+          "internalNote": {
+            "type": "string"
           }
         },
         "required": [
           "publisherUserId",
-          "revenueShareBps",
           "startsAt"
         ]
       },
@@ -23632,25 +25468,35 @@
           "isPrimary": {
             "type": "boolean",
             "example": true
-          }
-        }
-      },
-      "EndPublisherAgreementDto": {
-        "type": "object",
-        "properties": {
-          "endsAt": {
+          },
+          "payoutKind": {
             "type": "string",
-            "format": "date-time",
-            "example": "2026-12-31T23:59:59.000Z",
-            "description": "Defaults to the current time when omitted."
+            "enum": [
+              "PERCENTAGE",
+              "FIXED_PER_SALE"
+            ]
+          },
+          "fixedPayoutMinor": {
+            "type": "number"
+          },
+          "currency": {
+            "type": "string",
+            "example": "EGP"
+          },
+          "contractReference": {
+            "type": "string",
+            "example": "PUB-2026-001"
+          },
+          "signedDocumentAssetId": {
+            "type": "string",
+            "example": "asset-id"
+          },
+          "internalNote": {
+            "type": "string"
           }
         }
       },
-      "Object": {
-        "type": "object",
-        "properties": {}
-      },
-      "CreateEarningsStatementDto": {
+      "ReplacePublisherAgreementDto": {
         "type": "object",
         "properties": {
           "courseId": {
@@ -23668,32 +25514,84 @@
             "example": "lesson-id",
             "description": "Provide exactly one target ID."
           },
-          "periodStartsAt": {
+          "publisherUserId": {
+            "type": "string",
+            "example": "publisher-user-id"
+          },
+          "payoutKind": {
+            "type": "string",
+            "enum": [
+              "PERCENTAGE",
+              "FIXED_PER_SALE"
+            ]
+          },
+          "revenueShareBps": {
+            "type": "number",
+            "example": 2500,
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "fixedPayoutMinor": {
+            "type": "number",
+            "example": 1500,
+            "minimum": 1
+          },
+          "startsAt": {
             "type": "string",
             "format": "date-time",
             "example": "2026-08-01T00:00:00.000Z"
           },
-          "periodEndsAt": {
+          "endsAt": {
             "type": "string",
             "format": "date-time",
-            "example": "2026-08-31T23:59:59.000Z"
+            "example": "2026-12-31T23:59:59.000Z"
           },
-          "grossRevenueMinor": {
-            "type": "number",
-            "example": 100000,
-            "minimum": 0
+          "isPrimary": {
+            "type": "boolean",
+            "example": true,
+            "default": true
           },
           "currency": {
             "type": "string",
-            "example": "EGP"
+            "example": "EGP",
+            "default": "EGP"
+          },
+          "contractReference": {
+            "type": "string",
+            "example": "PUB-2026-001"
+          },
+          "signedDocumentAssetId": {
+            "type": "string",
+            "example": "asset-id"
+          },
+          "internalNote": {
+            "type": "string"
+          },
+          "activateImmediately": {
+            "type": "object",
+            "description": "Activate the new version in the same transaction.",
+            "default": true
           }
         },
         "required": [
-          "periodStartsAt",
-          "periodEndsAt",
-          "grossRevenueMinor",
-          "currency"
+          "publisherUserId",
+          "startsAt"
         ]
+      },
+      "EndPublisherAgreementDto": {
+        "type": "object",
+        "properties": {
+          "endsAt": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-12-31T23:59:59.000Z",
+            "description": "Defaults to the current time when omitted."
+          }
+        }
+      },
+      "Object": {
+        "type": "object",
+        "properties": {}
       },
       "SetPricingDto": {
         "type": "object",
@@ -24488,6 +26386,9 @@
           },
           "couponCode": {
             "type": "string"
+          },
+          "referralCode": {
+            "type": "string"
           }
         },
         "required": [
@@ -24526,6 +26427,10 @@
           "couponCode": {
             "type": "string",
             "example": "MIDTERMS25"
+          },
+          "referralCode": {
+            "type": "string",
+            "example": "PARTNER10"
           }
         }
       },
@@ -25429,6 +27334,75 @@
             "type": "number"
           }
         }
+      },
+      "CreateRefundRequestDto": {
+        "type": "object",
+        "properties": {
+          "orderItemIds": {
+            "description": "Omit to request refunds for every item in the approved order.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "reason": {
+            "type": "string",
+            "description": "Why the student is requesting a refund."
+          }
+        },
+        "required": [
+          "reason"
+        ]
+      },
+      "RefundPolicyDto": {
+        "type": "object",
+        "properties": {
+          "eligibilityWindowDays": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 365
+          },
+          "maximumConsumptionBps": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 10000,
+            "description": "Maximum completed-content consumption in basis points."
+          }
+        },
+        "required": [
+          "eligibilityWindowDays",
+          "maximumConsumptionBps"
+        ]
+      },
+      "ApproveRefundDto": {
+        "type": "object",
+        "properties": {
+          "manualRefundReference": {
+            "type": "string",
+            "description": "Manual reimbursement reference, such as an email or transfer reference."
+          },
+          "reviewNote": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "manualRefundReference"
+        ]
+      },
+      "RejectRefundDto": {
+        "type": "object",
+        "properties": {
+          "rejectionReason": {
+            "type": "string",
+            "description": "Reason communicated to the student."
+          },
+          "reviewNote": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "rejectionReason"
+        ]
       },
       "UpdateContentStudyStateDto": {
         "type": "object",
@@ -26744,6 +28718,281 @@
             "type": "number"
           }
         }
+      },
+      "CreateReferralProgramDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "partnerUserId": {
+            "type": "string"
+          },
+          "startsAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "endsAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "appliesToAll": {
+            "type": "boolean",
+            "default": true
+          },
+          "courseId": {
+            "type": "string"
+          },
+          "chapterId": {
+            "type": "string"
+          },
+          "usageLimit": {
+            "type": "number"
+          },
+          "perStudentUsageLimit": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "name",
+          "partnerUserId",
+          "startsAt"
+        ]
+      },
+      "UpdateReferralProgramDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "startsAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "endsAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "appliesToAll": {
+            "type": "boolean"
+          },
+          "courseId": {
+            "type": "object"
+          },
+          "chapterId": {
+            "type": "object"
+          },
+          "usageLimit": {
+            "type": "object"
+          },
+          "perStudentUsageLimit": {
+            "type": "object"
+          }
+        }
+      },
+      "CreateReferralCodeDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "example": "PARTNER10"
+          },
+          "isActive": {
+            "type": "boolean",
+            "default": true
+          },
+          "startsAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "endsAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "usageLimit": {
+            "type": "number"
+          },
+          "perStudentUsageLimit": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "code"
+        ]
+      },
+      "UpdateReferralCodeDto": {
+        "type": "object",
+        "properties": {
+          "isActive": {
+            "type": "boolean"
+          },
+          "startsAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "endsAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "usageLimit": {
+            "type": "object"
+          },
+          "perStudentUsageLimit": {
+            "type": "object"
+          }
+        }
+      },
+      "CreateReferralCommissionRuleDto": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "PERCENTAGE",
+              "FIXED_PER_SALE",
+              "PERCENTAGE_CAPPED"
+            ]
+          },
+          "percentageBps": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "fixedCommissionMinor": {
+            "type": "number",
+            "minimum": 1
+          },
+          "maximumCommissionMinor": {
+            "type": "number",
+            "minimum": 1
+          },
+          "currency": {
+            "type": "string",
+            "default": "EGP"
+          },
+          "startsAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "endsAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "kind",
+          "startsAt"
+        ]
+      },
+      "CreateSettlementDto": {
+        "type": "object",
+        "properties": {
+          "allocationIds": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "paymentReference": {
+            "type": "string",
+            "example": "BANK-TRANSFER-20260823-001"
+          }
+        },
+        "required": [
+          "allocationIds",
+          "paymentReference"
+        ]
+      },
+      "CreateReconciliationRunDto": {
+        "type": "object",
+        "properties": {
+          "pilotLabel": {
+            "type": "string",
+            "example": "staging-pilot-manual-and-paymob"
+          },
+          "orderIds": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "pilotLabel",
+          "orderIds"
+        ]
+      },
+      "AssignReconciliationDiscrepancyDto": {
+        "type": "object",
+        "properties": {
+          "assigneeUserId": {
+            "type": "string",
+            "description": "Administrator user ID assigned to investigate."
+          },
+          "notes": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "assigneeUserId"
+        ]
+      },
+      "ResolveReconciliationDiscrepancyDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "RESOLVED",
+              "ACCEPTED"
+            ]
+          },
+          "resolutionNote": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "resolutionNote"
+        ]
+      },
+      "CreateReportExportDto": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          },
+          "partnerUserId": {
+            "type": "string"
+          },
+          "reportType": {
+            "type": "string",
+            "enum": [
+              "COMMERCE",
+              "PARTNER_OBLIGATIONS",
+              "ENTITLEMENTS"
+            ]
+          },
+          "columns": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "reason": {
+            "type": "string",
+            "description": "Required by operational policy for a privileged export."
+          }
+        },
+        "required": [
+          "reportType",
+          "columns"
+        ]
       },
       "CreateQuestionImportDto": {
         "type": "object",

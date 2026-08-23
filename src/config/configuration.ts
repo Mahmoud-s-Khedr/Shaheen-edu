@@ -74,8 +74,6 @@ export interface AppConfig {
     paymobTimeoutMs: number;
     paymobOrderExpirySeconds: number;
     manualOrderExpirySeconds: number;
-    refundEligibilityWindowDays: number;
-    refundMaximumConsumptionBps: number;
   };
   ai: {
     openRouterApiKey: string;
@@ -251,10 +249,6 @@ export default (): AppConfig => ({
     paymobTimeoutMs: envInteger('PAYMOB_TIMEOUT_MS', 15_000),
     paymobOrderExpirySeconds: envInteger('PAYMOB_ORDER_EXPIRY_SECONDS', 1800),
     manualOrderExpirySeconds: envInteger('MANUAL_ORDER_EXPIRY_SECONDS', 86_400),
-    // These defaults are intentionally configuration, not code policy. Set
-    // production values explicitly before enabling refund requests.
-    refundEligibilityWindowDays: envInteger('REFUND_ELIGIBILITY_WINDOW_DAYS', 7),
-    refundMaximumConsumptionBps: envInteger('REFUND_MAXIMUM_CONSUMPTION_BPS', 1_000),
   },
   ai: {
     openRouterApiKey: process.env.OPENROUTER_API_KEY ?? '',

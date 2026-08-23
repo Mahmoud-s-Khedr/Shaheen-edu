@@ -239,8 +239,6 @@ Request cheat sheet for the implementation-backed API contract. Base URL is `/ap
 | `POST /api/v1/admin/publisher-agreements/{id}/activate`       | Activate a publisher agreement            | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id               |
 | `POST /api/v1/admin/publisher-agreements/{id}/end`            | End a publisher agreement                 | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id<br>body: body |
 | `GET /api/v1/admin/publisher-agreements/effective`            | Resolve the effective publisher agreement | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | query: at              |
-| `POST /api/v1/admin/publisher-agreements/earnings-statements` | Create a publisher earnings statement     | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | body: body             |
-| `GET /api/v1/admin/publisher-agreements/earnings-statements`  | List publisher earnings statements        | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | —                      |
 | `POST /api/v1/admin/pricing/course/{id}`                      | Set course pricing                        | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id<br>body: body |
 | `POST /api/v1/admin/pricing/chapter/{id}`                     | Set chapter pricing                       | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id<br>body: body |
 | `POST /api/v1/admin/pricing/lesson/{id}`                      | Set lesson pricing                        | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id<br>body: body |

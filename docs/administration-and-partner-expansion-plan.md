@@ -118,21 +118,22 @@ the backend application:
 
 ### Still missing / next work
 
-- [ ] Run a controlled pilot with an approved purchase, then reconcile actual
-  publisher/referral allocations and compare them with legacy earnings
-  statements before widening allow-lists.
-- [ ] Add dual-calculation comparison and durable discrepancy-investigation
-  tooling; the current reconciliation script checks allocation integrity but
-  cannot compare legacy statements until pilot data exists.
-- [ ] Operationally configure the refund time/consumption thresholds and train
+- [x] Add persistent reconciliation runs scoped to explicit approved orders,
+  independent historical-term calculation, durable discrepancy investigation,
+  and an operator-friendly read-only runner. Staging pilot execution and
+  finance/engineering sign-off remain operational prerequisites.
+- [x] Retire legacy statements and estimate calculations; ledger allocations
+  are now the reporting source of record.
+- [ ] Run a controlled pilot with an approved purchase, reconcile actual
+  publisher/referral allocations, and record sign-off before widening
+  allow-lists.
+- [ ] Operationally review the active database refund policy and train
   administrators on recording the off-platform reimbursement reference. The
   implemented model supports partial *orders* by refunding whole order items;
   fractional refunds for a single course/chapter remain out of scope.
 - [ ] Expand partner administration with detailed partner history, agreement /
   program history, allocation totals, and audit summaries.
-- [ ] Finish ledger-backed publisher reporting: agreement/target breakdowns,
-  statement retirement/reconciliation, and finance-specific allocation /
-  settlement exports.
+- [ ] Expand finance-specific allocation and settlement exports.
 - [ ] Add publisher usage daily/monthly trends, hierarchy filters, zero-solved
   earnings indicators, and rollups for ranges beyond 93 days.
 - [ ] Add referral conversion/product reporting, privacy bucketing, fraud

@@ -129,6 +129,25 @@ enum PartnerAllocationState {
   REVERSED
 }
 
+enum PartnerFinanceReconciliationStatus {
+  DRAFT
+  RUNNING
+  COMPLETED
+}
+
+enum PartnerFinanceDiscrepancySeverity {
+  INFO
+  WARNING
+  ERROR
+}
+
+enum PartnerFinanceDiscrepancyStatus {
+  OPEN
+  ASSIGNED
+  RESOLVED
+  ACCEPTED
+}
+
 enum ReferralProgramStatus {
   DRAFT
   ACTIVE
@@ -476,19 +495,22 @@ model User {
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
 
-  studentProfile                   StudentProfile?
-  partnerProfile                   PartnerProfile?
-  authSessions                     AuthSession[]
-  auditLogsActor                   AdminAuditLog[]
-  partnerProfilesCreated           PartnerProfile[]             @relation("PartnerProfileCreatedBy")
-  entitlementsGranted              StudentEntitlement[]         @relation("EntitlementGrantedBy")
-  entitlementsRevoked              StudentEntitlement[]         @relation("EntitlementRevokedBy")
-  manualPaymentMethodsCreated      ManualPaymentMethod[]        @relation("ManualPaymentMethodCreatedBy")
-  manualPaymentSubmissionsReviewed ManualPaymentSubmission[]    @relation("ManualPaymentSubmissionReviewedBy")
-  refundRequestsReviewed          RefundRequest[]               @relation("RefundRequestReviewedBy")
-  publisherAgreementsCreated       PublisherAgreement[]         @relation("PublisherAgreementCreatedBy")
-  earningsStatementsCreated        PublisherEarningsStatement[] @relation("EarningsStatementCreatedBy")
-  reportExportsRequested           ReportExportJob[]            @relation("ReportExportRequestedBy")
+  studentProfile                      StudentProfile?
+  partnerProfile                      PartnerProfile?
+  authSessions                        AuthSession[]
+  auditLogsActor                      AdminAuditLog[]
+  partnerProfilesCreated              PartnerProfile[]                  @relation("PartnerProfileCreatedBy")
+  entitlementsGranted                 StudentEntitlement[]              @relation("EntitlementGrantedBy")
+  entitlementsRevoked                 StudentEntitlement[]              @relation("EntitlementRevokedBy")
+  manualPaymentMethodsCreated         ManualPaymentMethod[]             @relation("ManualPaymentMethodCreatedBy")
+  manualPaymentSubmissionsReviewed    ManualPaymentSubmission[]         @relation("ManualPaymentSubmissionReviewedBy")
+  refundRequestsReviewed              RefundRequest[]                   @relation("RefundRequestReviewedBy")
+  publisherAgreementsCreated          PublisherAgreement[]              @relation("PublisherAgreementCreatedBy")
+  refundPoliciesUpdated               RefundPolicy[]                    @relation("RefundPolicyUpdatedBy")
+  reconciliationRunsCreated           PartnerFinanceReconciliationRun[] @relation("ReconciliationRunCreatedBy")
+  reconciliationDiscrepanciesAssigned PartnerFinanceDiscrepancy[]       @relation("ReconciliationDiscrepancyAssignedTo")
+  reconciliationDiscrepanciesResolved PartnerFinanceDiscrepancy[]       @relation("ReconciliationDiscrepancyResolvedBy")
+  reportExportsRequested              ReportExportJob[]                 @relation("ReportExportRequestedBy")
 
   academicGradesCreated     AcademicGrade[]           @relation("AcademicGradeCreatedBy")
   academicGradesUpdated     AcademicGrade[]           @relation("AcademicGradeUpdatedBy")
@@ -733,18 +755,17 @@ model Course {
 
   chapters            Chapter[]
   questions           Question[]
-  questionPlacements  QuestionPlacement[]          @relation("QuestionPlacementCourse")
-  assessmentScopes    AssessmentScope[]            @relation("AssessmentScopeCourse")
+  questionPlacements  QuestionPlacement[]      @relation("QuestionPlacementCourse")
+  assessmentScopes    AssessmentScope[]        @relation("AssessmentScopeCourse")
   entitlements        StudentEntitlement[]
-  cartItems           CartItem[]                   @relation("CartItemCourse")
-  orderItems          OrderItem[]                  @relation("OrderItemCourse")
-  discountTargets     DiscountCampaignTarget[]     @relation("DiscountCampaignTargetCourse")
-  couponTargets       CouponTarget[]               @relation("CouponTargetCourse")
-  publisherAgreements PublisherAgreement[]         @relation("PublisherAgreementCourse")
-  referralPrograms    ReferralProgram[]            @relation("ReferralProgramCourse")
-  earningsStatements  PublisherEarningsStatement[] @relation("EarningsCourse")
-  contentPlacements   ContentPlacement[]           @relation("ContentPlacementCourse")
-  coverAsset          Asset?                       @relation("CourseCover", fields: [coverAssetId], references: [id], onDelete: Restrict)
+  cartItems           CartItem[]               @relation("CartItemCourse")
+  orderItems          OrderItem[]              @relation("OrderItemCourse")
+  discountTargets     DiscountCampaignTarget[] @relation("DiscountCampaignTargetCourse")
+  couponTargets       CouponTarget[]           @relation("CouponTargetCourse")
+  publisherAgreements PublisherAgreement[]     @relation("PublisherAgreementCourse")
+  referralPrograms    ReferralProgram[]        @relation("ReferralProgramCourse")
+  contentPlacements   ContentPlacement[]       @relation("ContentPlacementCourse")
+  coverAsset          Asset?                   @relation("CourseCover", fields: [coverAssetId], references: [id], onDelete: Restrict)
   coverAssetId        String?
 
   @@unique([subjectId, slug])
@@ -779,17 +800,16 @@ model Chapter {
 
   lessons             Lesson[]
   entitlements        StudentEntitlement[]
-  cartItems           CartItem[]                   @relation("CartItemChapter")
-  orderItems          OrderItem[]                  @relation("OrderItemChapter")
-  discountTargets     DiscountCampaignTarget[]     @relation("DiscountCampaignTargetChapter")
-  couponTargets       CouponTarget[]               @relation("CouponTargetChapter")
-  publisherAgreements PublisherAgreement[]         @relation("PublisherAgreementChapter")
-  referralPrograms    ReferralProgram[]            @relation("ReferralProgramChapter")
-  earningsStatements  PublisherEarningsStatement[] @relation("EarningsChapter")
-  contentPlacements   ContentPlacement[]           @relation("ContentPlacementChapter")
-  questionPlacements  QuestionPlacement[]          @relation("QuestionPlacementChapter")
-  assessmentScopes    AssessmentScope[]            @relation("AssessmentScopeChapter")
-  coverAsset          Asset?                       @relation("ChapterCover", fields: [coverAssetId], references: [id], onDelete: Restrict)
+  cartItems           CartItem[]               @relation("CartItemChapter")
+  orderItems          OrderItem[]              @relation("OrderItemChapter")
+  discountTargets     DiscountCampaignTarget[] @relation("DiscountCampaignTargetChapter")
+  couponTargets       CouponTarget[]           @relation("CouponTargetChapter")
+  publisherAgreements PublisherAgreement[]     @relation("PublisherAgreementChapter")
+  referralPrograms    ReferralProgram[]        @relation("ReferralProgramChapter")
+  contentPlacements   ContentPlacement[]       @relation("ContentPlacementChapter")
+  questionPlacements  QuestionPlacement[]      @relation("QuestionPlacementChapter")
+  assessmentScopes    AssessmentScope[]        @relation("AssessmentScopeChapter")
+  coverAsset          Asset?                   @relation("ChapterCover", fields: [coverAssetId], references: [id], onDelete: Restrict)
   coverAssetId        String?
 
   @@unique([courseId, slug])
@@ -823,13 +843,12 @@ model Lesson {
   updatedBy User @relation("LessonUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
 
   sections            Section[]
-  publisherAgreements PublisherAgreement[]         @relation("PublisherAgreementLesson")
-  earningsStatements  PublisherEarningsStatement[] @relation("EarningsLesson")
-  contentPlacements   ContentPlacement[]           @relation("ContentPlacementLesson")
-  coverAsset          Asset?                       @relation("LessonCover", fields: [coverAssetId], references: [id], onDelete: Restrict)
+  publisherAgreements PublisherAgreement[] @relation("PublisherAgreementLesson")
+  contentPlacements   ContentPlacement[]   @relation("ContentPlacementLesson")
+  coverAsset          Asset?               @relation("LessonCover", fields: [coverAssetId], references: [id], onDelete: Restrict)
   coverAssetId        String?
-  questionPlacements  QuestionPlacement[]          @relation("QuestionPlacementLesson")
-  assessmentScopes    AssessmentScope[]            @relation("AssessmentScopeLesson")
+  questionPlacements  QuestionPlacement[]  @relation("QuestionPlacementLesson")
+  assessmentScopes    AssessmentScope[]    @relation("AssessmentScopeLesson")
 
   @@unique([chapterId, slug])
   @@unique([chapterId, sortOrder])
@@ -2359,18 +2378,18 @@ model ManualPaymentMethod {
 }
 
 model Order {
-  id                    String                    @id @default(cuid())
+  id                    String                              @id @default(cuid())
   studentUserId         String
-  student               StudentProfile            @relation(fields: [studentUserId], references: [userId], onDelete: Restrict)
+  student               StudentProfile                      @relation(fields: [studentUserId], references: [userId], onDelete: Restrict)
   manualPaymentMethodId String?
-  manualPaymentMethod   ManualPaymentMethod?      @relation(fields: [manualPaymentMethodId], references: [id], onDelete: Restrict)
-  paymentChannel        PaymentChannel            @default(MANUAL)
+  manualPaymentMethod   ManualPaymentMethod?                @relation(fields: [manualPaymentMethodId], references: [id], onDelete: Restrict)
+  paymentChannel        PaymentChannel                      @default(MANUAL)
   paymentMethodSnapshot Json
-  subtotalMinor         Int                       @default(0)
-  discountMinor         Int                       @default(0)
+  subtotalMinor         Int                                 @default(0)
+  discountMinor         Int                                 @default(0)
   totalMinor            Int
   currency              String
-  status                OrderStatus               @default(AWAITING_PAYMENT)
+  status                OrderStatus                         @default(AWAITING_PAYMENT)
   items                 OrderItem[]
   submissions           ManualPaymentSubmission[]
   paymentAttempts       PaymentAttempt[]
@@ -2378,8 +2397,9 @@ model Order {
   receipt               PaymentReceipt?
   referralAttribution   OrderReferralAttribution?
   refundRequests        RefundRequest[]
-  createdAt             DateTime                  @default(now())
-  updatedAt             DateTime                  @updatedAt
+  reconciliationOrders  PartnerFinanceReconciliationOrder[]
+  createdAt             DateTime                            @default(now())
+  updatedAt             DateTime                            @updatedAt
   approvedAt            DateTime?
   cancelledAt           DateTime?
   paymentExpiresAt      DateTime?
@@ -2392,24 +2412,25 @@ model Order {
 }
 
 model OrderItem {
-  id                       String              @id @default(cuid())
-  orderId                  String
-  order                    Order               @relation(fields: [orderId], references: [id], onDelete: Restrict)
-  targetType               CommerceTargetType
-  courseId                 String?
-  course                   Course?             @relation("OrderItemCourse", fields: [courseId], references: [id], onDelete: Restrict)
-  chapterId                String?
-  chapter                  Chapter?            @relation("OrderItemChapter", fields: [chapterId], references: [id], onDelete: Restrict)
-  titleSnapshot            String
-  basePriceMinor           Int
-  discountMinor            Int                 @default(0)
-  priceMinor               Int
-  currency                 String
-  appliedPromotionSnapshot Json?
-  entitlement              StudentEntitlement?
-  allocations              PartnerAllocation[]
-  refundRequestItem        RefundRequestItem?
-  createdAt                DateTime            @default(now())
+  id                          String                      @id @default(cuid())
+  orderId                     String
+  order                       Order                       @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  targetType                  CommerceTargetType
+  courseId                    String?
+  course                      Course?                     @relation("OrderItemCourse", fields: [courseId], references: [id], onDelete: Restrict)
+  chapterId                   String?
+  chapter                     Chapter?                    @relation("OrderItemChapter", fields: [chapterId], references: [id], onDelete: Restrict)
+  titleSnapshot               String
+  basePriceMinor              Int
+  discountMinor               Int                         @default(0)
+  priceMinor                  Int
+  currency                    String
+  appliedPromotionSnapshot    Json?
+  entitlement                 StudentEntitlement?
+  allocations                 PartnerAllocation[]
+  refundRequestItem           RefundRequestItem?
+  reconciliationDiscrepancies PartnerFinanceDiscrepancy[]
+  createdAt                   DateTime                    @default(now())
 
   @@index([orderId])
   @@index([courseId])
@@ -2594,24 +2615,24 @@ model ManualPaymentSubmission {
 /// multiple items so a student may refund part of a multi-item order without a
 /// fractional refund or ambiguous entitlement state.
 model RefundRequest {
-  id                  String              @id @default(cuid())
-  orderId             String
-  order               Order               @relation(fields: [orderId], references: [id], onDelete: Restrict)
-  studentUserId       String
-  student             StudentProfile      @relation(fields: [studentUserId], references: [userId], onDelete: Restrict)
-  status              RefundRequestStatus @default(PENDING)
-  reason              String
-  eligibilitySnapshot Json
-  rejectionReason     String?
-  reviewNote          String?
+  id                    String              @id @default(cuid())
+  orderId               String
+  order                 Order               @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  studentUserId         String
+  student               StudentProfile      @relation(fields: [studentUserId], references: [userId], onDelete: Restrict)
+  status                RefundRequestStatus @default(PENDING)
+  reason                String
+  eligibilitySnapshot   Json
+  rejectionReason       String?
+  reviewNote            String?
   manualRefundReference String?
-  reviewedById        String?
-  reviewedBy          User?               @relation("RefundRequestReviewedBy", fields: [reviewedById], references: [id], onDelete: Restrict)
-  requestedAt         DateTime            @default(now())
-  reviewedAt          DateTime?
-  createdAt           DateTime            @default(now())
-  updatedAt           DateTime            @updatedAt
-  items               RefundRequestItem[]
+  reviewedById          String?
+  reviewedBy            User?               @relation("RefundRequestReviewedBy", fields: [reviewedById], references: [id], onDelete: Restrict)
+  requestedAt           DateTime            @default(now())
+  reviewedAt            DateTime?
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+  items                 RefundRequestItem[]
 
   @@index([studentUserId, requestedAt, id])
   @@index([orderId, status, requestedAt])
@@ -2673,8 +2694,7 @@ model PublisherAgreement {
   createdAt             DateTime                 @default(now())
   updatedAt             DateTime                 @updatedAt
 
-  earningsStatements PublisherEarningsStatement[]
-  allocations        PartnerAllocation[]          @relation("AllocationPublisherAgreement")
+  allocations PartnerAllocation[] @relation("AllocationPublisherAgreement")
 
   @@index([courseId, status, isPrimary, startsAt, endsAt])
   @@index([chapterId, status, isPrimary, startsAt, endsAt])
@@ -2768,34 +2788,106 @@ model OrderReferralAttribution {
 }
 
 model PartnerAllocation {
-  id                   String                  @id @default(cuid())
-  kind                 PartnerAllocationKind
-  state                PartnerAllocationState  @default(PAYABLE)
-  partnerUserId        String
-  partner              PartnerProfile          @relation("AllocationPartner", fields: [partnerUserId], references: [userId], onDelete: Restrict)
-  orderItemId          String
-  orderItem            OrderItem               @relation(fields: [orderItemId], references: [id], onDelete: Restrict)
-  publisherAgreementId String?
-  publisherAgreement   PublisherAgreement?     @relation("AllocationPublisherAgreement", fields: [publisherAgreementId], references: [id], onDelete: Restrict)
-  referralRuleId       String?
-  referralRule         ReferralCommissionRule? @relation("AllocationReferralRule", fields: [referralRuleId], references: [id], onDelete: Restrict)
-  basisMinor           Int
-  amountMinor          Int
-  currency             String
-  snapshot             Json
-  idempotencyKey       String                  @unique
-  reversedAllocationId String?                 @unique
-  reversedAllocation   PartnerAllocation?      @relation("PartnerAllocationReversal", fields: [reversedAllocationId], references: [id], onDelete: Restrict)
-  reversalOf           PartnerAllocation?      @relation("PartnerAllocationReversal")
-  payableAt            DateTime                @default(now())
-  paidAt               DateTime?
-  reversedAt           DateTime?
-  createdAt            DateTime                @default(now())
-  settlementLines      PartnerSettlementLine[]
+  id                          String                      @id @default(cuid())
+  kind                        PartnerAllocationKind
+  state                       PartnerAllocationState      @default(PAYABLE)
+  partnerUserId               String
+  partner                     PartnerProfile              @relation("AllocationPartner", fields: [partnerUserId], references: [userId], onDelete: Restrict)
+  orderItemId                 String
+  orderItem                   OrderItem                   @relation(fields: [orderItemId], references: [id], onDelete: Restrict)
+  publisherAgreementId        String?
+  publisherAgreement          PublisherAgreement?         @relation("AllocationPublisherAgreement", fields: [publisherAgreementId], references: [id], onDelete: Restrict)
+  referralRuleId              String?
+  referralRule                ReferralCommissionRule?     @relation("AllocationReferralRule", fields: [referralRuleId], references: [id], onDelete: Restrict)
+  basisMinor                  Int
+  amountMinor                 Int
+  currency                    String
+  snapshot                    Json
+  idempotencyKey              String                      @unique
+  reversedAllocationId        String?                     @unique
+  reversedAllocation          PartnerAllocation?          @relation("PartnerAllocationReversal", fields: [reversedAllocationId], references: [id], onDelete: Restrict)
+  reversalOf                  PartnerAllocation?          @relation("PartnerAllocationReversal")
+  payableAt                   DateTime                    @default(now())
+  paidAt                      DateTime?
+  reversedAt                  DateTime?
+  createdAt                   DateTime                    @default(now())
+  settlementLines             PartnerSettlementLine[]
+  reconciliationDiscrepancies PartnerFinanceDiscrepancy[] @relation("ReconciliationAllocation")
 
   @@index([partnerUserId, state, createdAt])
   @@index([publisherAgreementId])
   @@index([referralRuleId])
+}
+
+model RefundPolicy {
+  id                    String   @id @default(cuid())
+  version               Int      @unique
+  eligibilityWindowDays Int
+  maximumConsumptionBps Int
+  isActive              Boolean  @default(true)
+  updatedById           String
+  updatedBy             User     @relation("RefundPolicyUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
+  createdAt             DateTime @default(now())
+
+  @@index([isActive, createdAt])
+}
+
+model PartnerFinanceReconciliationRun {
+  id            String                              @id @default(cuid())
+  pilotLabel    String
+  status        PartnerFinanceReconciliationStatus  @default(DRAFT)
+  summary       Json?
+  createdById   String
+  createdBy     User                                @relation("ReconciliationRunCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  startedAt     DateTime?
+  completedAt   DateTime?
+  createdAt     DateTime                            @default(now())
+  updatedAt     DateTime                            @updatedAt
+  orders        PartnerFinanceReconciliationOrder[]
+  discrepancies PartnerFinanceDiscrepancy[]
+
+  @@index([status, createdAt])
+}
+
+model PartnerFinanceReconciliationOrder {
+  runId   String
+  orderId String
+  run     PartnerFinanceReconciliationRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  order   Order                           @relation(fields: [orderId], references: [id], onDelete: Restrict)
+
+  @@id([runId, orderId])
+}
+
+model PartnerFinanceDiscrepancy {
+  id                  String                            @id @default(cuid())
+  runId               String
+  run                 PartnerFinanceReconciliationRun   @relation(fields: [runId], references: [id], onDelete: Cascade)
+  type                String
+  expectedAmountMinor Int?
+  actualAmountMinor   Int?
+  expectedBasisMinor  Int?
+  actualBasisMinor    Int?
+  currency            String?
+  orderItemId         String?
+  orderItem           OrderItem?                        @relation(fields: [orderItemId], references: [id], onDelete: Restrict)
+  allocationId        String?
+  allocation          PartnerAllocation?                @relation("ReconciliationAllocation", fields: [allocationId], references: [id], onDelete: Restrict)
+  partnerUserId       String?
+  severity            PartnerFinanceDiscrepancySeverity
+  status              PartnerFinanceDiscrepancyStatus   @default(OPEN)
+  assignedToId        String?
+  assignedTo          User?                             @relation("ReconciliationDiscrepancyAssignedTo", fields: [assignedToId], references: [id], onDelete: Restrict)
+  notes               String?
+  resolutionNote      String?
+  resolvedById        String?
+  resolvedBy          User?                             @relation("ReconciliationDiscrepancyResolvedBy", fields: [resolvedById], references: [id], onDelete: Restrict)
+  resolvedAt          DateTime?
+  createdAt           DateTime                          @default(now())
+  updatedAt           DateTime                          @updatedAt
+
+  @@index([runId, status, severity])
+  @@index([orderItemId])
+  @@index([allocationId])
 }
 
 model PartnerSettlement {
@@ -2862,32 +2954,6 @@ model ReportExportJob {
 
   @@index([requestedById, status, createdAt])
   @@index([status, createdAt])
-}
-
-model PublisherEarningsStatement {
-  id                     String             @id @default(cuid())
-  agreementId            String
-  agreement              PublisherAgreement @relation(fields: [agreementId], references: [id], onDelete: Restrict)
-  courseId               String?
-  course                 Course?            @relation("EarningsCourse", fields: [courseId], references: [id], onDelete: Restrict)
-  chapterId              String?
-  chapter                Chapter?           @relation("EarningsChapter", fields: [chapterId], references: [id], onDelete: Restrict)
-  lessonId               String?
-  lesson                 Lesson?            @relation("EarningsLesson", fields: [lessonId], references: [id], onDelete: Restrict)
-  periodStartsAt         DateTime
-  periodEndsAt           DateTime
-  grossRevenueMinor      Int
-  currency               String
-  revenueShareBps        Int
-  publisherEarningsMinor Int
-  createdById            String
-  createdBy              User               @relation("EarningsStatementCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
-  createdAt              DateTime           @default(now())
-
-  @@index([agreementId, periodStartsAt, periodEndsAt])
-  @@index([courseId, periodStartsAt])
-  @@index([chapterId, periodStartsAt])
-  @@index([lessonId, periodStartsAt])
 }
 
 model Governorate {

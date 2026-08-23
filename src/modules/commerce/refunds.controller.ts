@@ -1,11 +1,11 @@
-import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Role } from '../../common/types/roles.enum';
 import type { RequestUser } from '../../common/types/request-with-user.types';
-import { ApproveRefundDto, AdminRefundRequestsQueryDto, CreateRefundRequestDto, RefundRequestsQueryDto, RejectRefundDto } from './dto/refunds.dto';
+import { ApproveRefundDto, AdminRefundRequestsQueryDto, CreateRefundRequestDto, RefundPolicyDto, RefundRequestsQueryDto, RejectRefundDto } from './dto/refunds.dto';
 import { RefundsService } from './refunds.service';
 
 @ApiTags('student/refunds')
@@ -42,6 +42,14 @@ export class AdminRefundsController {
   list(@CurrentUser() user: RequestUser, @Query() query: AdminRefundRequestsQueryDto) {
     return this.refunds.list(user, query);
   }
+
+  @Get('policy')
+  @ApiOperation({ summary: 'Get the active versioned refund eligibility policy.' })
+  policy(@CurrentUser() user: RequestUser) { return this.refunds.policy(user); }
+
+  @Patch('policy')
+  @ApiOperation({ summary: 'Activate a new versioned refund eligibility policy; existing request snapshots are unchanged.' })
+  updatePolicy(@CurrentUser() user: RequestUser, @Body() dto: RefundPolicyDto) { return this.refunds.updatePolicy(user, dto); }
 
   @Post(':id/approve')
   @ApiOperation({ summary: 'Record a completed manual refund, revoke associated access, and create partner-ledger reversals.' })

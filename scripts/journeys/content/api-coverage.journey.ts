@@ -289,9 +289,6 @@ export const apiCoverageJourney: JourneyDefinition = {
       expectStatus(await admin.request('POST', `/admin/publisher-agreements/${agreement.id}/end`, { endsAt: new Date().toISOString() }), 201);
       expectStatus(await admin.request('GET', `/admin/publisher-agreements/effective?lessonId=${lesson}`), 200);
       expectStatus(await admin.request('POST', `/admin/pricing/lesson/${lesson}`, { isPurchasable: false }), 201);
-      const statement = await create('/admin/publisher-agreements/earnings-statements', { lessonId: lesson, periodStartsAt: new Date(Date.now() - 60_000).toISOString(), periodEndsAt: new Date().toISOString(), grossRevenueMinor: 1000, currency: 'EGP' });
-      assert(statement.id, 'Statement creation must return an ID');
-      expectStatus(await admin.request('GET', '/admin/publisher-agreements/earnings-statements'), 200);
       // Keep video referenced in the coverage record so the variable is intentionally checked.
       assert(typeof video.id === 'string', 'Video asset ID must be present');
     });

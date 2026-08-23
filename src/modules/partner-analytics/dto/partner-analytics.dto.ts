@@ -49,24 +49,6 @@ export class PartnerContentQueryDto extends PaginationQueryDto {
   status?: PublisherAgreementStatus;
 }
 
-export class PartnerStatementsQueryDto extends PaginationQueryDto {
-  @ApiPropertyOptional({
-    example: '2026-08-01',
-    description: 'Filters by statement period end in Cairo time.',
-  })
-  @IsOptional()
-  @IsDateString()
-  from?: string;
-
-  @ApiPropertyOptional({
-    example: '2026-08-31',
-    description: 'Filters by statement period end in Cairo time.',
-  })
-  @IsOptional()
-  @IsDateString()
-  to?: string;
-}
-
 export class PartnerQuestionUsageQueryDto extends PaginationQueryDto {
   @ApiPropertyOptional({ example: '2026-08-01' }) @IsOptional() @IsDateString() from?: string;
   @ApiPropertyOptional({ example: '2026-08-31' }) @IsOptional() @IsDateString() to?: string;

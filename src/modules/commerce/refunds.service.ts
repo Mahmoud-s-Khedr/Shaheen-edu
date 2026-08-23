@@ -1,33 +1,26 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { ContentStatus, EntitlementStatus, OrderStatus, PartnerAllocationState, RefundRequestStatus, Role } from '../../common/types/roles.enum';
 import { toPaginationMeta } from '../../common/dto/pagination-query.dto';
 import type { RequestUser } from '../../common/types/request-with-user.types';
-import type { AppConfig } from '../../config/configuration';
 import { PrismaService } from '../../database/prisma.service';
 import { AuditService } from '../audit/audit.service';
-import type { AdminRefundRequestsQueryDto, ApproveRefundDto, CreateRefundRequestDto, RefundRequestsQueryDto, RejectRefundDto } from './dto/refunds.dto';
+import type { AdminRefundRequestsQueryDto, ApproveRefundDto, CreateRefundRequestDto, RefundPolicyDto, RefundRequestsQueryDto, RejectRefundDto } from './dto/refunds.dto';
 
 @Injectable()
 export class RefundsService {
-  private readonly policy: Pick<AppConfig['commerce'], 'refundEligibilityWindowDays' | 'refundMaximumConsumptionBps'>;
-
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly audit: AuditService,
-    config?: ConfigService<AppConfig, true>,
-  ) {
-    const commerce = config?.get('commerce', { infer: true });
-    this.policy = commerce
-      ? { refundEligibilityWindowDays: commerce.refundEligibilityWindowDays, refundMaximumConsumptionBps: commerce.refundMaximumConsumptionBps }
-      : { refundEligibilityWindowDays: 7, refundMaximumConsumptionBps: 1_000 };
-  }
+  constructor(private readonly prisma: PrismaService, private readonly audit: AuditService) {}
 
   private admin(actor: RequestUser) {
     if (actor.role !== Role.ADMIN && actor.role !== Role.SUPER_ADMIN) throw new ForbiddenException('Forbidden');
   }
 
-  private async eligibility(tx: any, studentUserId: string, approvedAt: Date, item: any, now: Date) {
+  private async activePolicy(tx: any) {
+    const policy = await tx.refundPolicy.findFirst({ where: { isActive: true }, orderBy: { version: 'desc' } });
+    if (!policy) throw new ConflictException('Refund operations require an active database refund policy');
+    return policy;
+  }
+
+  private async eligibility(tx: any, policy: { eligibilityWindowDays: number; maximumConsumptionBps: number }, studentUserId: string, approvedAt: Date, item: any, now: Date) {
     const placement = item.chapterId ? { resolvedChapterId: item.chapterId } : { resolvedCourseId: item.courseId };
     const contentWhere = { status: ContentStatus.PUBLISHED, placement: { is: placement } };
     const [totalItems, completedItems] = await Promise.all([
@@ -35,10 +28,10 @@ export class RefundsService {
       tx.studentContentProgress.count({ where: { studentUserId, contentItem: { is: contentWhere } } }),
     ]);
     const consumptionBps = totalItems ? Math.floor((completedItems * 10_000) / totalItems) : 0;
-    const windowEndsAt = new Date(approvedAt.getTime() + this.policy.refundEligibilityWindowDays * 86_400_000);
+    const windowEndsAt = new Date(approvedAt.getTime() + policy.eligibilityWindowDays * 86_400_000);
     const reasons: string[] = [];
     if (now >= windowEndsAt) reasons.push('REFUND_WINDOW_EXPIRED');
-    if (consumptionBps >= this.policy.refundMaximumConsumptionBps) reasons.push('MAXIMUM_CONSUMPTION_REACHED');
+    if (consumptionBps >= policy.maximumConsumptionBps) reasons.push('MAXIMUM_CONSUMPTION_REACHED');
     return {
       orderItemId: item.id,
       targetType: item.targetType,
@@ -82,7 +75,8 @@ export class RefundsService {
         const items = order.items.filter((item: any) => requestedIds.includes(item.id));
         if (items.length !== requestedIds.length) throw new BadRequestException('One or more order items do not belong to this order');
         if (items.some((item: any) => item.refundRequestItem)) throw new ConflictException('A selected order item already has a refund request');
-        const eligibility = await Promise.all(items.map((item: any) => this.eligibility(tx, studentUserId, order.approvedAt!, item, now)));
+        const policy = await this.activePolicy(tx);
+        const eligibility = await Promise.all(items.map((item: any) => this.eligibility(tx, policy, studentUserId, order.approvedAt!, item, now)));
         const rejectionReasons = eligibility.flatMap((item) => item.reasons.map((reason) => `${item.orderItemId}:${reason}`));
         const automaticallyRejected = rejectionReasons.length > 0;
         return tx.refundRequest.create({
@@ -92,7 +86,7 @@ export class RefundsService {
             status: automaticallyRejected ? RefundRequestStatus.REJECTED : RefundRequestStatus.PENDING,
             reason: dto.reason.trim(),
             eligibilitySnapshot: {
-              policy: { eligibilityWindowDays: this.policy.refundEligibilityWindowDays, maximumConsumptionBps: this.policy.refundMaximumConsumptionBps },
+              policy: { id: policy.id, version: policy.version, eligibilityWindowDays: policy.eligibilityWindowDays, maximumConsumptionBps: policy.maximumConsumptionBps },
               checkedAt: now.toISOString(),
               items: eligibility,
             },
@@ -128,6 +122,22 @@ export class RefundsService {
       this.prisma.refundRequest.count({ where }),
     ]);
     return { data: data.map((row) => this.response(row)), meta: toPaginationMeta(query.page, query.limit, total) };
+  }
+
+  async policy(actor: RequestUser) {
+    this.admin(actor);
+    return this.prisma.refundPolicy.findFirst({ where: { isActive: true }, orderBy: { version: 'desc' } });
+  }
+
+  async updatePolicy(actor: RequestUser, dto: RefundPolicyDto) {
+    this.admin(actor);
+    const policy = await this.prisma.$transaction(async (tx) => {
+      const prior = await tx.refundPolicy.findFirst({ where: { isActive: true }, orderBy: { version: 'desc' } });
+      if (prior) await tx.refundPolicy.update({ where: { id: prior.id }, data: { isActive: false } });
+      return tx.refundPolicy.create({ data: { version: (prior?.version ?? 0) + 1, eligibilityWindowDays: dto.eligibilityWindowDays, maximumConsumptionBps: dto.maximumConsumptionBps, updatedById: actor.id } });
+    }, { isolationLevel: 'Serializable' });
+    await this.audit.record({ actorUserId: actor.id, action: 'REFUND_POLICY_UPDATED', targetType: 'RefundPolicy', targetId: policy.id, metadata: { version: policy.version, eligibilityWindowDays: policy.eligibilityWindowDays, maximumConsumptionBps: policy.maximumConsumptionBps } });
+    return policy;
   }
 
   async approve(actor: RequestUser, refundId: string, dto: ApproveRefundDto) {

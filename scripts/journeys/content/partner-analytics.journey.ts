@@ -26,24 +26,17 @@ export const partnerAnalyticsJourney: JourneyDefinition = {
           'Dashboard must state that reporting dates use Cairo time',
         );
         assert(
-          dashboard.body.kpis?.estimated?.approvedOrders >= 1 &&
-            dashboard.body.kpis.estimated.grossRevenue?.amountMinor >= 10_000 &&
-            dashboard.body.kpis.estimated.earnings?.amountMinor >= 2_500,
-          'Dashboard estimates must include the approved publisher chapter order',
-        );
-        assert(
-          dashboard.body.kpis?.realizedEarnings?.amountMinor >= 2_000 &&
-            dashboard.body.kpis?.realizedGrossRevenue?.amountMinor >= 8_000,
-          'Dashboard realized metrics must include the admin-issued statement',
+          dashboard.body.totals?.earned?.amountMinor >= 2_500 &&
+            dashboard.body.totals?.net?.amountMinor >= 2_500,
+          'Dashboard must derive earned and net amounts from publisher allocation rows',
         );
         assert(
           Array.isArray(dashboard.body.trend) &&
             dashboard.body.trend.some(
               (row: any) =>
-                row.estimatedEarnings?.currency === 'EGP' &&
-                row.realizedEarnings?.currency === 'EGP',
+                row.earned?.currency === 'EGP' && row.net?.currency === 'EGP',
             ),
-          'Dashboard trend must separate estimated and realized EGP earnings',
+          'Dashboard trend must expose ledger-earned and net EGP amounts',
         );
         assert(
           !JSON.stringify(dashboard.body).includes('Manual payment student'),
@@ -57,16 +50,14 @@ export const partnerAnalyticsJourney: JourneyDefinition = {
         expectStatus(earnings, 200);
         assert(
           earnings.body.granularity === 'day' &&
-            earnings.body.metricDefinitions?.estimated?.includes(
-              'not a settlement',
-            ),
-          'Earnings endpoint must label approved-order figures as estimates',
+            earnings.body.metricDefinitions?.net?.includes('Signed financial'),
+          'Earnings endpoint must document signed ledger netting',
         );
       },
     );
 
     await step(
-      'Listing agreement-covered content and issued statements',
+      'Listing agreement-covered content and ledger agreement breakdowns',
       async () => {
         const content = await partner.request<any>(
           'GET',
@@ -93,19 +84,13 @@ export const partnerAnalyticsJourney: JourneyDefinition = {
           'Publisher content must retain pagination metadata',
         );
 
-        const statements = await partner.request<any>(
-          'GET',
-          '/partners/earnings-statements?limit=100',
-        );
-        expectStatus(statements, 200);
+        const earnings = await partner.request<any>('GET', '/partners/analytics/earnings?granularity=month');
+        expectStatus(earnings, 200);
         assert(
-          statements.body.data.some(
-            (statement: any) =>
-              statement.grossRevenue?.amountMinor === 8_000 &&
-              statement.earnings?.amountMinor === 2_000 &&
-              statement.revenueShareBps === 2_500,
+          earnings.body.agreements.some(
+            (agreement: any) => agreement.net?.currency === 'EGP',
           ),
-          'Publisher statements must expose only the issued agreement settlement values',
+          'Publisher earnings must include an agreement-level ledger breakdown',
         );
       },
     );

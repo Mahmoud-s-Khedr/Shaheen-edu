@@ -17,7 +17,6 @@ import {
   PartnerAllocationsQueryDto,
   PartnerEarningsQueryDto,
   PartnerPeriodQueryDto,
-  PartnerStatementsQueryDto,
   PartnerQuestionUsageQueryDto,
 } from './dto/partner-analytics.dto';
 
@@ -35,8 +34,7 @@ export class PartnerAnalyticsController {
       'Get content publisher dashboard metrics and compact earnings trend',
   })
   @ApiOkResponse({
-    description:
-      'All money is EGP minor units. Issued statements are realized; approved-order metrics are estimates.',
+    description: 'All money is EGP minor units and is derived solely from immutable allocation ledger rows.',
   })
   @ApiStandardErrors(400, 401, 403)
   dashboard(
@@ -48,8 +46,7 @@ export class PartnerAnalyticsController {
 
   @Get('analytics/earnings')
   @ApiOperation({
-    summary:
-      'Get realized statement and estimated approved-order earnings trends',
+    summary: 'Get immutable-ledger publisher earnings trends',
   })
   @ApiStandardErrors(400, 401, 403)
   earnings(
@@ -63,12 +60,6 @@ export class PartnerAnalyticsController {
   @ApiOperation({ summary: 'List immutable ledger allocations for the authenticated partner' })
   allocations(@CurrentUser() user: RequestUser, @Query() query: PartnerAllocationsQueryDto) {
     return this.analytics.allocations(user.id, query);
-  }
-
-  @Get('analytics/ledger-dashboard')
-  @ApiOperation({ summary: 'Get aggregate-only allocation totals and trend for the authenticated partner' })
-  ledgerDashboard(@CurrentUser() user: RequestUser, @Query() query: PartnerPeriodQueryDto) {
-    return this.analytics.ledgerDashboard(user.id, query);
   }
 
   @Get('analytics/question-usage')
@@ -95,15 +86,4 @@ export class PartnerAnalyticsController {
     return this.analytics.content(user.id, query);
   }
 
-  @Get('earnings-statements')
-  @ApiOperation({
-    summary: 'List the authenticated publisher issued earnings statements',
-  })
-  @ApiStandardErrors(400, 401, 403)
-  statements(
-    @CurrentUser() user: RequestUser,
-    @Query() query: PartnerStatementsQueryDto,
-  ) {
-    return this.analytics.statements(user.id, query);
-  }
 }

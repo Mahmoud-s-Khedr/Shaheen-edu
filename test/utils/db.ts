@@ -13,6 +13,9 @@ export async function cleanDatabase(
   app: NestFastifyApplication,
 ): Promise<void> {
   const prisma = app.get(PrismaService);
+  await prisma.partnerFinanceDiscrepancy.deleteMany();
+  await prisma.partnerFinanceReconciliationOrder.deleteMany();
+  await prisma.partnerFinanceReconciliationRun.deleteMany();
   await prisma.reportExportJob.deleteMany();
   await prisma.adminAuditLog.deleteMany();
   await prisma.authSession.deleteMany();
@@ -47,7 +50,6 @@ export async function cleanDatabase(
   await prisma.cartItem.deleteMany();
   await prisma.cart.deleteMany();
   await prisma.manualPaymentMethod.deleteMany();
-  await prisma.publisherEarningsStatement.deleteMany();
   await prisma.publisherAgreement.deleteMany();
   await prisma.referralCommissionRule.deleteMany();
   await prisma.referralCode.deleteMany();
@@ -73,6 +75,7 @@ export async function cleanDatabase(
   // StudentProfile holds restrictive FKs to both, and Center to Governorate.
   await prisma.center.deleteMany();
   await prisma.governorate.deleteMany();
+  await prisma.refundPolicy.deleteMany();
   // Assets and their references are gated behind restrictive FKs (uploadedById ->
   // User, coverAssetId/primaryAssetId -> Asset), so they must be cleared after the
   // hierarchy/content rows above and before User below.
@@ -106,6 +109,16 @@ export async function seedSuperAdmin(
       passwordHash,
     },
   });
+  if (!(await prisma.refundPolicy.findFirst({ where: { isActive: true } }))) {
+    await prisma.refundPolicy.create({
+      data: {
+        version: 1,
+        eligibilityWindowDays: 7,
+        maximumConsumptionBps: 1_000,
+        updatedById: user.id,
+      },
+    });
+  }
   return { id: user.id, loginIdentifier: user.loginIdentifier };
 }
 

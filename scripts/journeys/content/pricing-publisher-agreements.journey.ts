@@ -15,8 +15,6 @@ export const pricingPublisherAgreementsJourney: JourneyDefinition = {
     const lessonId = String(context.academic.lessonId);
     const publisherUserId = String(context.partner.id);
     const startsAt = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-    const periodStartsAt = new Date(Date.now() - 30 * 60 * 1000).toISOString();
-    const periodEndsAt = new Date().toISOString();
     let courseAgreementId = '';
 
     await step('Configuring inherited course pricing and a chapter override', async () => {
@@ -67,19 +65,13 @@ export const pricingPublisherAgreementsJourney: JourneyDefinition = {
       assert(resolved.body.agreement?.id === chapter.body.id && resolved.body.agreement.revenueShareBps === 2_500 && resolved.body.agreement.publisherUserId === publisherUserId && typeof resolved.body.agreement.publisherName === 'string' && resolved.body.resolvedFrom.chapterId === chapterId && typeof resolved.body.resolvedFrom.chapterName === 'string', 'Chapter agreement must return paired publisher and resolved-target labels');
     });
 
-    await step('Rejecting an overlapping primary agreement and calculating publisher earnings', async () => {
+    await step('Rejecting an overlapping primary agreement while retaining agreement history', async () => {
       const overlapping = await admin.request<any>('POST', '/admin/publisher-agreements', { chapterId, publisherUserId, revenueShareBps: 3_000, startsAt, isPrimary: true });
       expectStatus(overlapping, 201);
       expectStatus(await admin.request<any>('POST', `/admin/publisher-agreements/${overlapping.body.id}/activate`), 409);
-      const statement = await admin.request<any>('POST', '/admin/publisher-agreements/earnings-statements', { lessonId, periodStartsAt, periodEndsAt, grossRevenueMinor: 8_000, currency: 'EGP' });
-      expectStatus(statement, 201);
-      assert(statement.body.publisherEarningsMinor === 2_000 && statement.body.revenueShareBps === 2_500, 'Earnings statement must calculate the chapter publisher share');
       const history = await admin.request<any>('GET', '/admin/publisher-agreements?history=true');
       expectStatus(history, 200);
       assert(history.body.data.some((agreement: any) => agreement.id === courseAgreementId && agreement.courseId === courseId && typeof agreement.courseName === 'string' && agreement.publisherUserId === publisherUserId && typeof agreement.publisherName === 'string') && history.body.meta.total >= 1, 'Agreement history must retain related IDs with display names');
-      const statements = await admin.request<any>('GET', '/admin/publisher-agreements/earnings-statements?limit=1');
-      expectStatus(statements, 200);
-      assert(statements.body.data.length >= 1 && statements.body.meta.limit === 1, 'Earnings statements must be paginated');
     });
   },
 };

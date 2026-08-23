@@ -63,10 +63,3 @@ export class SetPricingDto {
   @ApiPropertyOptional({ example: 15000, minimum: 0, description: 'Required when isPurchasable is true; omit otherwise.' }) @ValidateIf((dto: SetPricingDto) => dto.isPurchasable) @IsInt() @Min(0) priceMinor?: number;
   @ApiPropertyOptional({ example: 'EGP', description: 'Required when isPurchasable is true; omit otherwise.' }) @ValidateIf((dto: SetPricingDto) => dto.isPurchasable) @IsString() currency?: string;
 }
-
-export class CreateEarningsStatementDto extends AgreementTargetDto {
-  @ApiProperty({ type: String, format: 'date-time', example: '2026-08-01T00:00:00.000Z' }) @Type(() => Date) @IsDate() periodStartsAt!: Date;
-  @ApiProperty({ type: String, format: 'date-time', example: '2026-08-31T23:59:59.000Z' }) @Type(() => Date) @IsDate() periodEndsAt!: Date;
-  @ApiProperty({ example: 100000, minimum: 0 }) @IsInt() @Min(0) grossRevenueMinor!: number;
-  @ApiProperty({ example: 'EGP' }) @IsString() currency!: string;
-}

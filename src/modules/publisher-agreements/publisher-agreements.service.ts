@@ -3,8 +3,8 @@ import { PartnerType, PublisherAgreementStatus, Role } from '../../common/types/
 import { PrismaService } from '../../database/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import type { RequestUser } from '../../common/types/request-with-user.types';
-import { toPaginationMeta, type PaginationQueryDto } from '../../common/dto/pagination-query.dto';
-import type { CreateEarningsStatementDto, CreatePublisherAgreementDto, EndPublisherAgreementDto, PublisherAgreementsQueryDto, ReplacePublisherAgreementDto, SetPricingDto, UpdatePublisherAgreementDto } from './dto/publisher-agreements.dto';
+import { toPaginationMeta } from '../../common/dto/pagination-query.dto';
+import type { CreatePublisherAgreementDto, EndPublisherAgreementDto, PublisherAgreementsQueryDto, ReplacePublisherAgreementDto, SetPricingDto, UpdatePublisherAgreementDto } from './dto/publisher-agreements.dto';
 
 type Target = { courseId?: string; chapterId?: string; lessonId?: string };
 
@@ -167,12 +167,4 @@ export class PublisherAgreementsService {
     throw new NotFoundException('Content not found');
   }
 
-  async createStatement(actor: RequestUser, dto: CreateEarningsStatementDto) {
-    this.assertAdmin(actor); await this.assertTargetExists(dto); this.assertDates(dto.periodStartsAt, dto.periodEndsAt); if (dto.currency !== 'EGP') throw new BadRequestException('Only EGP is supported');
-    const resolution = await this.resolve(actor, { courseId: dto.courseId, chapterId: dto.chapterId, lessonId: dto.lessonId }, dto.periodStartsAt); if (!resolution.agreement) throw new BadRequestException('No active primary publisher agreement covers this period'); const agreement = resolution.agreement;
-    if (agreement.endsAt && dto.periodEndsAt > agreement.endsAt) throw new BadRequestException('Earning period crosses an agreement boundary; split the period');
-    const publisherEarningsMinor = Math.floor((dto.grossRevenueMinor * agreement.revenueShareBps) / 10_000);
-    const statement = await this.prisma.publisherEarningsStatement.create({ data: { ...dto, agreementId: agreement.id, revenueShareBps: agreement.revenueShareBps, publisherEarningsMinor, createdById: actor.id } }); await this.audit.record({ actorUserId: actor.id, action: 'PUBLISHER_EARNINGS_STATEMENT_CREATED', targetType: 'PublisherEarningsStatement', targetId: statement.id, metadata: { agreementId: agreement.id } }); return statement;
-  }
-  async listStatements(actor: RequestUser, query: PaginationQueryDto) { this.assertAdmin(actor); const [data, total] = await this.prisma.$transaction([this.prisma.publisherEarningsStatement.findMany({ include: { agreement: { include: { publisher: true } } }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], skip: (query.page - 1) * query.limit, take: query.limit }), this.prisma.publisherEarningsStatement.count()]); return { data, meta: toPaginationMeta(query.page, query.limit, total) }; }
 }

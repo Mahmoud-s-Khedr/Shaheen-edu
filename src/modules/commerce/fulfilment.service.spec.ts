@@ -3,7 +3,6 @@ import { FulfilmentService } from './fulfilment.service';
 import { OrderStatus, PartnerAllocationKind } from '../../common/types/roles.enum';
 
 describe('FulfilmentService partner allocations and referral limits', () => {
-  const now = new Date('2026-08-23T12:00:00.000Z');
   const order = (referralAttribution: any = null) => ({
     id: 'order-1', studentUserId: 'student-1', status: OrderStatus.SUBMITTED,
     paymentChannel: 'MANUAL', subtotalMinor: 1000, discountMinor: 0, totalMinor: 1000, currency: 'EGP',

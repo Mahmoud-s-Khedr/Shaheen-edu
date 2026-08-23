@@ -7,20 +7,17 @@ import { DateTime } from 'luxon';
 import {
   PartnerType,
   PublisherAgreementStatus,
-  OrderStatus,
 } from '../../common/types/roles.enum';
 import { toPaginationMeta } from '../../common/dto/pagination-query.dto';
 import { PrismaService } from '../../database/prisma.service';
-import { ConfigService } from '@nestjs/config';
-import type { AppConfig } from '../../config/configuration';
 import type {
   PartnerContentQueryDto,
   PartnerAllocationsQueryDto,
   PartnerEarningsQueryDto,
   PartnerPeriodQueryDto,
-  PartnerStatementsQueryDto,
   PartnerQuestionUsageQueryDto,
 } from './dto/partner-analytics.dto';
+import { LedgerPublisherEarningsService } from './ledger-publisher-earnings.service';
 
 const CAIRO = 'Africa/Cairo';
 const EGP = 'EGP';
@@ -33,13 +30,11 @@ type Agreement = {
   startsAt: Date;
   endsAt: Date | null;
   status: PublisherAgreementStatus;
-  revenueShareBps: number | null;
 };
 
 @Injectable()
 export class PartnerAnalyticsService {
-  private readonly ledgerFeature: AppConfig['features'];
-  constructor(private readonly prisma: PrismaService, config?: ConfigService<AppConfig, true>) { this.ledgerFeature = config?.get('features', { infer: true }) ?? { referralsEnabled: false, referralAllowedStudentIds: [], partnerLedgerEnabled: false, partnerLedgerAllowedUserIds: [], reportExportsEnabled: false }; }
+  constructor(private readonly prisma: PrismaService, private readonly ledger: LedgerPublisherEarningsService) {}
 
   private money(amountMinor = 0) {
     return { amountMinor, currency: EGP };
@@ -59,10 +54,6 @@ export class PartnerAnalyticsService {
   private async partner(userId: string) {
     const profile = await this.prisma.partnerProfile.findUnique({ where: { userId }, select: { userId: true } });
     if (!profile) throw new ForbiddenException('Partner reporting is not available for this account');
-  }
-  private assertLedgerAvailable(userId: string) {
-    const allowed = this.ledgerFeature.partnerLedgerAllowedUserIds;
-    if (!this.ledgerFeature.partnerLedgerEnabled || (allowed.length && !allowed.includes('*') && !allowed.includes(userId))) throw new ForbiddenException('Partner ledger reporting is not enabled for this account');
   }
 
   private period(query: PartnerPeriodQueryDto): Period {
@@ -84,13 +75,6 @@ export class PartnerAnalyticsService {
     };
   }
 
-  private label(date: Date, granularity: 'day' | 'month') {
-    const zoned = DateTime.fromJSDate(date).setZone(CAIRO);
-    return granularity === 'day'
-      ? zoned.toISODate()!
-      : zoned.toFormat('yyyy-LL');
-  }
-
   private isCurrent(agreement: Agreement, at = new Date()) {
     return (
       agreement.status === PublisherAgreementStatus.ACTIVE &&
@@ -99,230 +83,10 @@ export class PartnerAnalyticsService {
     );
   }
 
-  private resolve(
-    agreements: Agreement[],
-    courseId: string | null,
-    chapterId: string | null,
-    at: Date,
-  ) {
-    const keys = [
-      chapterId ? (['chapterId', chapterId] as const) : null,
-      courseId ? (['courseId', courseId] as const) : null,
-    ].filter(Boolean) as Array<readonly ['chapterId' | 'courseId', string]>;
-    for (const [field, id] of keys) {
-      const match = agreements.find(
-        (agreement) =>
-          agreement[field] === id &&
-          agreement.startsAt <= at &&
-          (!agreement.endsAt || agreement.endsAt > at),
-      );
-      if (match) return match;
-    }
-    return null;
-  }
-
-  private async agreementsFor(userId: string) {
-    return this.prisma.publisherAgreement.findMany({
-      where: {
-        publisherUserId: userId,
-        isPrimary: true,
-        status: {
-          in: [PublisherAgreementStatus.ACTIVE, PublisherAgreementStatus.ENDED],
-        },
-      },
-      orderBy: [{ startsAt: 'desc' }, { id: 'desc' }],
-    }) as Promise<Agreement[]>;
-  }
-
-  private async estimatedOrders(userId: string, period: Period) {
-    const [agreements, orders] = await Promise.all([
-      this.agreementsFor(userId),
-      this.prisma.order.findMany({
-        where: {
-          status: OrderStatus.APPROVED,
-          approvedAt: { gte: period.from, lt: period.to },
-        },
-        select: {
-          id: true,
-          studentUserId: true,
-          approvedAt: true,
-          items: {
-            select: {
-              priceMinor: true,
-              currency: true,
-              courseId: true,
-              chapterId: true,
-              chapter: { select: { courseId: true } },
-            },
-          },
-        },
-      }),
-    ]);
-    const rows: Array<{
-      orderId: string;
-      studentUserId: string;
-      approvedAt: Date;
-      grossRevenueMinor: number;
-      publisherEarningsMinor: number;
-    }> = [];
-    for (const order of orders) {
-      if (!order.approvedAt) continue;
-      for (const item of order.items) {
-        if (item.currency !== EGP) continue;
-        const agreement = this.resolve(
-          agreements,
-          item.courseId ?? item.chapter?.courseId ?? null,
-          item.chapterId,
-          order.approvedAt,
-        );
-        if (!agreement) continue;
-        rows.push({
-          orderId: order.id,
-          studentUserId: order.studentUserId,
-          approvedAt: order.approvedAt,
-          grossRevenueMinor: item.priceMinor,
-          publisherEarningsMinor: Math.floor(
-            (item.priceMinor * (agreement.revenueShareBps ?? 0)) / 10_000,
-          ),
-        });
-      }
-    }
-    return rows;
-  }
-
-  private async realizedStatements(userId: string, period: Period) {
-    return this.prisma.publisherEarningsStatement.findMany({
-      where: {
-        agreement: { publisherUserId: userId },
-        periodEndsAt: { gte: period.from, lt: period.to },
-      },
-      select: {
-        id: true,
-        periodStartsAt: true,
-        periodEndsAt: true,
-        grossRevenueMinor: true,
-        publisherEarningsMinor: true,
-        currency: true,
-      },
-    });
-  }
-
-  private summarizeEstimated(
-    rows: Awaited<ReturnType<PartnerAnalyticsService['estimatedOrders']>>,
-  ) {
-    return {
-      grossRevenue: this.money(
-        rows.reduce((sum, row) => sum + row.grossRevenueMinor, 0),
-      ),
-      earnings: this.money(
-        rows.reduce((sum, row) => sum + row.publisherEarningsMinor, 0),
-      ),
-      approvedOrders: new Set(rows.map((row) => row.orderId)).size,
-      customers: new Set(rows.map((row) => row.studentUserId)).size,
-    };
-  }
-
   async dashboard(userId: string, query: PartnerPeriodQueryDto) {
     await this.publisher(userId);
     const period = this.period(query);
-    const [agreements, estimated, statements] = await Promise.all([
-      this.agreementsFor(userId),
-      this.estimatedOrders(userId, period),
-      this.realizedStatements(userId, period),
-    ]);
-    const realizedGross = statements.reduce(
-      (sum, item) => sum + item.grossRevenueMinor,
-      0,
-    );
-    const realizedEarnings = statements.reduce(
-      (sum, item) => sum + item.publisherEarningsMinor,
-      0,
-    );
-    const trend = await this.earningsFor(userId, period, 'day');
-    const current = agreements.filter((agreement) => this.isCurrent(agreement));
-    const coveredContent = new Set(
-      agreements.map((agreement) =>
-        agreement.courseId
-          ? `course:${agreement.courseId}`
-          : agreement.chapterId
-            ? `chapter:${agreement.chapterId}`
-            : `lesson:${agreement.lessonId}`,
-      ),
-    );
-    return {
-      period: { from: period.fromDate, to: period.toDate, timeZone: CAIRO },
-      metricDefinitions: {
-        realized:
-          'Admin-issued earnings statements filtered by statement period end.',
-        estimated:
-          'Approved order items attributed using the publisher agreement effective at order approval time.',
-      },
-      kpis: {
-        realizedGrossRevenue: this.money(realizedGross),
-        realizedEarnings: this.money(realizedEarnings),
-        estimated: this.summarizeEstimated(estimated),
-        activeAgreements: current.length,
-        coveredContent: coveredContent.size,
-      },
-      trend: trend.data,
-      latestStatements: (await this.statements(userId, { page: 1, limit: 5 }))
-        .data,
-    };
-  }
-
-  private async earningsFor(
-    userId: string,
-    period: Period,
-    granularity: 'day' | 'month',
-  ) {
-    const [estimated, statements] = await Promise.all([
-      this.estimatedOrders(userId, period),
-      this.realizedStatements(userId, period),
-    ]);
-    const rows = new Map<
-      string,
-      {
-        period: string;
-        estimatedGrossRevenue: number;
-        estimatedEarnings: number;
-        realizedGrossRevenue: number;
-        realizedEarnings: number;
-      }
-    >();
-    const row = (key: string) =>
-      rows.get(key) ?? {
-        period: key,
-        estimatedGrossRevenue: 0,
-        estimatedEarnings: 0,
-        realizedGrossRevenue: 0,
-        realizedEarnings: 0,
-      };
-    for (const item of estimated) {
-      const key = this.label(item.approvedAt, granularity);
-      const value = row(key);
-      value.estimatedGrossRevenue += item.grossRevenueMinor;
-      value.estimatedEarnings += item.publisherEarningsMinor;
-      rows.set(key, value);
-    }
-    for (const item of statements) {
-      if (item.currency !== EGP) continue;
-      const key = this.label(item.periodEndsAt, granularity);
-      const value = row(key);
-      value.realizedGrossRevenue += item.grossRevenueMinor;
-      value.realizedEarnings += item.publisherEarningsMinor;
-      rows.set(key, value);
-    }
-    return {
-      data: [...rows.values()]
-        .sort((a, b) => a.period.localeCompare(b.period))
-        .map((item) => ({
-          period: item.period,
-          estimatedGrossRevenue: this.money(item.estimatedGrossRevenue),
-          estimatedEarnings: this.money(item.estimatedEarnings),
-          realizedGrossRevenue: this.money(item.realizedGrossRevenue),
-          realizedEarnings: this.money(item.realizedEarnings),
-        })),
-    };
+    return this.ledger.report(userId, period, 'day');
   }
 
   async earnings(userId: string, query: PartnerEarningsQueryDto) {
@@ -333,20 +97,11 @@ export class PartnerAnalyticsService {
       'days',
     ).days;
     const granularity = query.granularity ?? (days <= 93 ? 'day' : 'month');
-    return {
-      period: { from: period.fromDate, to: period.toDate, timeZone: CAIRO },
-      granularity,
-      metricDefinitions: {
-        realized: 'Admin-issued statements by period end.',
-        estimated:
-          'Approved order items attributed at approval time; not a settlement record.',
-      },
-      ...(await this.earningsFor(userId, period, granularity)),
-    };
+    return this.ledger.report(userId, period, granularity);
   }
 
   async allocations(userId: string, query: PartnerAllocationsQueryDto) {
-    await this.partner(userId); this.assertLedgerAvailable(userId);
+    await this.partner(userId);
     const period = this.period(query);
     const { page, limit } = query;
     const [data, total] = await this.prisma.$transaction([
@@ -358,28 +113,6 @@ export class PartnerAnalyticsService {
       this.prisma.partnerAllocation.count({ where: { partnerUserId: userId, createdAt: { gte: period.from, lt: period.to } } }),
     ]);
     return { data: data.map((row) => ({ ...row, basis: this.money(row.basisMinor), amount: this.money(row.amountMinor) })), meta: toPaginationMeta(page, limit, total) };
-  }
-
-  async ledgerDashboard(userId: string, query: PartnerPeriodQueryDto) {
-    await this.partner(userId); this.assertLedgerAvailable(userId); const period = this.period(query);
-    const rows = await this.prisma.partnerAllocation.findMany({ where: { partnerUserId: userId, createdAt: { gte: period.from, lt: period.to } }, select: { state: true, amountMinor: true, createdAt: true, currency: true } });
-    const totals = { pending: 0, payable: 0, paid: 0, reversed: 0, net: 0 };
-    const daily = new Map<string, { period: string; earnedMinor: number; paidMinor: number; reversedMinor: number }>();
-    for (const row of rows) {
-      if (row.currency !== EGP) continue;
-      const amount = row.amountMinor;
-      if (row.state === 'PENDING') totals.pending += amount;
-      if (row.state === 'PAYABLE') totals.payable += amount;
-      if (row.state === 'PAID') totals.paid += amount;
-      if (row.state === 'REVERSED') totals.reversed += amount;
-      totals.net += row.state === 'REVERSED' ? -amount : amount;
-      const key = this.label(row.createdAt, 'day'); const trend = daily.get(key) ?? { period: key, earnedMinor: 0, paidMinor: 0, reversedMinor: 0 };
-      if (row.state !== 'REVERSED') trend.earnedMinor += amount;
-      if (row.state === 'PAID') trend.paidMinor += amount;
-      if (row.state === 'REVERSED') trend.reversedMinor += amount;
-      daily.set(key, trend);
-    }
-    return { period: { from: period.fromDate, to: period.toDate, timeZone: CAIRO }, totals: Object.fromEntries(Object.entries(totals).map(([key, amountMinor]) => [key, this.money(amountMinor)])), trend: [...daily.values()].sort((a, b) => a.period.localeCompare(b.period)).map((row) => ({ period: row.period, earned: this.money(row.earnedMinor), paid: this.money(row.paidMinor), reversed: this.money(row.reversedMinor) })) };
   }
 
   private async usage(userId: string, query: PartnerQuestionUsageQueryDto) {
@@ -490,49 +223,4 @@ export class PartnerAnalyticsService {
     };
   }
 
-  async statements(userId: string, query: PartnerStatementsQueryDto) {
-    await this.publisher(userId);
-    const period = query.from || query.to ? this.period(query) : null;
-    const where = {
-      agreement: { publisherUserId: userId },
-      ...(period ? { periodEndsAt: { gte: period.from, lt: period.to } } : {}),
-    };
-    const [data, total] = await this.prisma.$transaction([
-      this.prisma.publisherEarningsStatement.findMany({
-        where,
-        include: {
-          agreement: true,
-          course: { select: { title: true } },
-          chapter: { select: { title: true } },
-          lesson: { select: { title: true } },
-        },
-        orderBy: [{ periodEndsAt: 'desc' }, { id: 'desc' }],
-        skip: (query.page - 1) * query.limit,
-        take: query.limit,
-      }),
-      this.prisma.publisherEarningsStatement.count({ where }),
-    ]);
-    return {
-      data: data.map((item) => ({
-        id: item.id,
-        periodStartsAt: item.periodStartsAt,
-        periodEndsAt: item.periodEndsAt,
-        grossRevenue: this.money(item.grossRevenueMinor),
-        earnings: this.money(item.publisherEarningsMinor),
-        revenueShareBps: item.revenueShareBps,
-        createdAt: item.createdAt,
-        agreementId: item.agreementId,
-        target: item.course
-          ? { type: 'COURSE', id: item.courseId, title: item.course.title }
-          : item.chapter
-            ? { type: 'CHAPTER', id: item.chapterId, title: item.chapter.title }
-            : {
-                type: 'LESSON',
-                id: item.lessonId,
-                title: item.lesson?.title ?? null,
-              },
-      })),
-      meta: toPaginationMeta(query.page, query.limit, total),
-    };
-  }
 }

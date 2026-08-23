@@ -32,7 +32,9 @@ async function main() {
       );
       process.exit(1);
     }
-    console.log('Super admin already exists, skipping (idempotent).');
+    const policy = await prisma.refundPolicy.findFirst({ where: { isActive: true } });
+    if (!policy) await prisma.refundPolicy.create({ data: { version: 1, eligibilityWindowDays: 7, maximumConsumptionBps: 1_000, updatedById: existing.id } });
+    console.log('Super admin already exists; ensured development refund policy.');
     return;
   }
 
@@ -52,6 +54,7 @@ async function main() {
         passwordHash,
       },
     });
+    await tx.refundPolicy.create({ data: { version: 1, eligibilityWindowDays: 7, maximumConsumptionBps: 1_000, updatedById: created.id } });
     await tx.adminAuditLog.create({
       data: {
         actorUserId: created.id,

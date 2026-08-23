@@ -21,6 +21,7 @@ describe('Content publisher partner analytics (e2e)', () => {
   let referralToken: string;
   let publisherId: string;
   let courseId: string;
+  let agreementId: string;
   const json = (response: { body: string }) => JSON.parse(response.body);
   const bearer = (token: string) => ({ authorization: `Bearer ${token}` });
 
@@ -120,6 +121,7 @@ describe('Content publisher partner analytics (e2e)', () => {
         createdById: admin.id,
       },
     });
+    agreementId = agreement.id;
     const student = await prisma.user.create({
       data: {
         role: Role.STUDENT,
@@ -148,7 +150,7 @@ describe('Content publisher partner analytics (e2e)', () => {
         createdById: admin.id,
       },
     });
-    await prisma.order.create({
+    const order = await prisma.order.create({
       data: {
         studentUserId: student.id,
         manualPaymentMethodId: method.id,
@@ -169,25 +171,26 @@ describe('Content publisher partner analytics (e2e)', () => {
           },
         },
       },
+      include: { items: true },
     });
-    await prisma.publisherEarningsStatement.create({
+    await prisma.partnerAllocation.create({
       data: {
-        agreementId: agreement.id,
-        courseId,
-        periodStartsAt: new Date('2026-08-01T00:00:00.000Z'),
-        periodEndsAt: new Date('2026-08-31T20:59:59.999Z'),
-        grossRevenueMinor: 8_000,
+        kind: 'PUBLISHER_SALE',
+        partnerUserId: publisher.id,
+        orderItemId: order.items[0].id,
+        publisherAgreementId: agreement.id,
+        basisMinor: 10_000,
+        amountMinor: 2_500,
         currency: 'EGP',
-        revenueShareBps: 2_500,
-        publisherEarningsMinor: 2_000,
-        createdById: admin.id,
+        idempotencyKey: `test-publisher-sale-${order.items[0].id}`,
+        snapshot: { agreementId: agreement.id, revenueShareBps: 2_500 },
       },
     });
   });
 
   afterAll(async () => app.close());
 
-  it('returns own realized and estimated dashboard metrics without learner identity', async () => {
+  it('returns own ledger-backed dashboard metrics without learner identity', async () => {
     const response = await app.inject({
       method: 'GET',
       url: '/api/v1/partners/dashboard?from=2026-08-01&to=2026-08-31',
@@ -195,26 +198,16 @@ describe('Content publisher partner analytics (e2e)', () => {
     });
     expect(response.statusCode).toBe(200);
     const body = json(response);
-    expect(body.kpis).toMatchObject({
-      realizedGrossRevenue: { amountMinor: 8_000, currency: 'EGP' },
-      realizedEarnings: { amountMinor: 2_000, currency: 'EGP' },
-      estimated: {
-        grossRevenue: { amountMinor: 10_000 },
-        earnings: { amountMinor: 2_500 },
-        approvedOrders: 1,
-        customers: 1,
-      },
-      activeAgreements: 1,
-      coveredContent: 1,
+    expect(body.totals).toMatchObject({
+      earned: { amountMinor: 2_500, currency: 'EGP' },
+      net: { amountMinor: 2_500, currency: 'EGP' },
+      payable: { amountMinor: 2_500, currency: 'EGP' },
     });
     expect(JSON.stringify(body)).not.toContain('Private Student');
-    expect(body.latestStatements[0]).toMatchObject({
-      grossRevenue: { amountMinor: 8_000 },
-      earnings: { amountMinor: 2_000 },
-    });
+    expect(body.agreements[0]).toMatchObject({ agreementId, net: { amountMinor: 2_500 } });
   });
 
-  it('scopes content and statements to the authenticated publisher and rejects referral partners', async () => {
+  it('scopes content and ledger earnings to the authenticated publisher and rejects referral partners', async () => {
     const own = await app.inject({
       method: 'GET',
       url: '/api/v1/partners/analytics/content',
@@ -233,11 +226,11 @@ describe('Content publisher partner analytics (e2e)', () => {
     );
     const other = await app.inject({
       method: 'GET',
-      url: '/api/v1/partners/earnings-statements',
+      url: '/api/v1/partners/analytics/earnings',
       headers: bearer(secondPublisherToken),
     });
     expect(other.statusCode).toBe(200);
-    expect(json(other).data).toHaveLength(0);
+    expect(json(other).totals.net.amountMinor).toBe(0);
     const referral = await app.inject({
       method: 'GET',
       url: '/api/v1/partners/dashboard',
