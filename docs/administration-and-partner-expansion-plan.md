@@ -105,6 +105,11 @@ the backend application:
 - [x] Add default-off referral, partner-ledger, and report-export rollout
   controls, including partner/student allow-lists where needed.
 - [x] Add a read-only allocation reconciliation command and a staging runbook.
+- [x] Add a manual refund-request lifecycle: configurable time and consumption
+  eligibility checks, automatic rejection of ineligible requests, admin
+  approval/rejection, manual reimbursement references, entitlement revocation,
+  and immutable publisher/referral compensating allocations. Refunds are
+  intentionally not sent through Paymob.
 - [x] Apply the migration locally, validate it on disposable PostgreSQL, and
   apply the assessment-attribution backfill (12 rows resolved, 0 unknown).
 - [x] Add focused unit coverage for referral limits/allocation idempotency,
@@ -119,9 +124,10 @@ the backend application:
 - [ ] Add dual-calculation comparison and durable discrepancy-investigation
   tooling; the current reconciliation script checks allocation integrity but
   cannot compare legacy statements until pilot data exists.
-- [ ] Implement refunds, partial-refund policy, payment-provider integration,
-  and linked publisher/referral reversal allocations, including settlement
-  behavior for already-paid allocations.
+- [ ] Operationally configure the refund time/consumption thresholds and train
+  administrators on recording the off-platform reimbursement reference. The
+  implemented model supports partial *orders* by refunding whole order items;
+  fractional refunds for a single course/chapter remain out of scope.
 - [ ] Expand partner administration with detailed partner history, agreement /
   program history, allocation totals, and audit summaries.
 - [ ] Finish ledger-backed publisher reporting: agreement/target breakdowns,

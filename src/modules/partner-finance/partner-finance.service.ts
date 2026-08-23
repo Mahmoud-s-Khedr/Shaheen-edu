@@ -36,7 +36,9 @@ export class PartnerFinanceService {
       if (!allocations.every((row) => row.partnerUserId === first.partnerUserId && row.currency === first.currency && row.state === PartnerAllocationState.PAYABLE)) throw new BadRequestException('A settlement requires payable allocations for one partner and currency');
       const assigned = await tx.partnerSettlementLine.count({ where: { allocationId: { in: ids } } });
       if (assigned) throw new ConflictException('One or more allocations are already in a settlement');
-      return tx.partnerSettlement.create({ data: { partnerUserId: first.partnerUserId, paymentReference: dto.paymentReference.trim(), currency: first.currency, totalMinor: allocations.reduce((sum, row) => sum + row.amountMinor, 0), createdById: actor.id, lines: { create: ids.map((allocationId) => ({ allocationId })) } }, include: { lines: { include: { allocation: true } } } });
+      const totalMinor = allocations.reduce((sum, row) => sum + row.amountMinor, 0);
+      if (totalMinor === 0) throw new BadRequestException('A settlement total cannot be zero');
+      return tx.partnerSettlement.create({ data: { partnerUserId: first.partnerUserId, paymentReference: dto.paymentReference.trim(), currency: first.currency, totalMinor, createdById: actor.id, lines: { create: ids.map((allocationId) => ({ allocationId })) } }, include: { lines: { include: { allocation: true } } } });
     }, { isolationLevel: 'Serializable' });
     await this.audit.record({ actorUserId: actor.id, action: 'PARTNER_SETTLEMENT_CREATED', targetType: 'PartnerSettlement', targetId: settlement.id, metadata: { partnerUserId: settlement.partnerUserId, allocationCount: settlement.lines.length, totalMinor: settlement.totalMinor } });
     return settlement;

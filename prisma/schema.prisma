@@ -105,6 +105,12 @@ enum ManualPaymentSubmissionStatus {
   REJECTED
 }
 
+enum RefundRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 enum PublisherAgreementStatus {
   DRAFT
   ACTIVE
@@ -479,6 +485,7 @@ model User {
   entitlementsRevoked              StudentEntitlement[]         @relation("EntitlementRevokedBy")
   manualPaymentMethodsCreated      ManualPaymentMethod[]        @relation("ManualPaymentMethodCreatedBy")
   manualPaymentSubmissionsReviewed ManualPaymentSubmission[]    @relation("ManualPaymentSubmissionReviewedBy")
+  refundRequestsReviewed          RefundRequest[]               @relation("RefundRequestReviewedBy")
   publisherAgreementsCreated       PublisherAgreement[]         @relation("PublisherAgreementCreatedBy")
   earningsStatementsCreated        PublisherEarningsStatement[] @relation("EarningsStatementCreatedBy")
   reportExportsRequested           ReportExportJob[]            @relation("ReportExportRequestedBy")
@@ -552,6 +559,7 @@ model StudentProfile {
   contentStudyStates      StudentContentStudyState[]
   cart                    Cart?
   orders                  Order[]
+  refundRequests          RefundRequest[]
   referralAttributions    OrderReferralAttribution[]
   parentAccessSessions    ParentAccessSession[]
   contentProgress         StudentContentProgress[]
@@ -2369,6 +2377,7 @@ model Order {
   couponReservation     CouponReservation?
   receipt               PaymentReceipt?
   referralAttribution   OrderReferralAttribution?
+  refundRequests        RefundRequest[]
   createdAt             DateTime                  @default(now())
   updatedAt             DateTime                  @updatedAt
   approvedAt            DateTime?
@@ -2399,6 +2408,7 @@ model OrderItem {
   appliedPromotionSnapshot Json?
   entitlement              StudentEntitlement?
   allocations              PartnerAllocation[]
+  refundRequestItem        RefundRequestItem?
   createdAt                DateTime            @default(now())
 
   @@index([orderId])
@@ -2580,6 +2590,47 @@ model ManualPaymentSubmission {
   @@index([transactionReference])
 }
 
+/// A refund always covers complete approved order items. A request can include
+/// multiple items so a student may refund part of a multi-item order without a
+/// fractional refund or ambiguous entitlement state.
+model RefundRequest {
+  id                  String              @id @default(cuid())
+  orderId             String
+  order               Order               @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  studentUserId       String
+  student             StudentProfile      @relation(fields: [studentUserId], references: [userId], onDelete: Restrict)
+  status              RefundRequestStatus @default(PENDING)
+  reason              String
+  eligibilitySnapshot Json
+  rejectionReason     String?
+  reviewNote          String?
+  manualRefundReference String?
+  reviewedById        String?
+  reviewedBy          User?               @relation("RefundRequestReviewedBy", fields: [reviewedById], references: [id], onDelete: Restrict)
+  requestedAt         DateTime            @default(now())
+  reviewedAt          DateTime?
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  items               RefundRequestItem[]
+
+  @@index([studentUserId, requestedAt, id])
+  @@index([orderId, status, requestedAt])
+  @@index([status, requestedAt, id])
+}
+
+model RefundRequestItem {
+  id              String        @id @default(cuid())
+  refundRequestId String
+  refundRequest   RefundRequest @relation(fields: [refundRequestId], references: [id], onDelete: Restrict)
+  orderItemId     String        @unique
+  orderItem       OrderItem     @relation(fields: [orderItemId], references: [id], onDelete: Restrict)
+  amountMinor     Int
+  currency        String
+  createdAt       DateTime      @default(now())
+
+  @@index([refundRequestId])
+}
+
 model CommerceIdempotencyKey {
   id            String   @id @default(cuid())
   studentUserId String
@@ -2742,7 +2793,6 @@ model PartnerAllocation {
   createdAt            DateTime                @default(now())
   settlementLines      PartnerSettlementLine[]
 
-  @@unique([orderItemId, kind])
   @@index([partnerUserId, state, createdAt])
   @@index([publisherAgreementId])
   @@index([referralRuleId])

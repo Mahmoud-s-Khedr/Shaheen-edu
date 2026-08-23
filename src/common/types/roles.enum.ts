@@ -17,6 +17,7 @@ export {
   PromotionKind,
   CouponReservationStatus,
   ManualPaymentSubmissionStatus,
+  RefundRequestStatus,
   PublisherAgreementStatus,
   PartnerAllocationKind,
   PartnerAllocationState,

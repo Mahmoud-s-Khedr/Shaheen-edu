@@ -11,6 +11,8 @@ import { PricingService } from './pricing.service';
 import { PaymobService } from './paymob.service';
 import { FulfilmentService } from './fulfilment.service';
 import { CommerceExpiryService } from './commerce-expiry.service';
+import { AdminRefundsController, StudentRefundsController } from './refunds.controller';
+import { RefundsService } from './refunds.service';
 
 @Module({
   imports: [AssetsModule, AuditModule],
@@ -18,6 +20,8 @@ import { CommerceExpiryService } from './commerce-expiry.service';
     CommerceController,
     ManualPaymentAdminController,
     PaymobWebhookController,
+    StudentRefundsController,
+    AdminRefundsController,
   ],
   providers: [
     CommerceService,
@@ -25,6 +29,7 @@ import { CommerceExpiryService } from './commerce-expiry.service';
     PaymobService,
     FulfilmentService,
     CommerceExpiryService,
+    RefundsService,
   ],
   exports: [PricingService],
 })

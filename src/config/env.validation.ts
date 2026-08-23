@@ -149,6 +149,12 @@ export const envValidationSchema = Joi.object({
     .min(300)
     .max(604800)
     .default(86400),
+  REFUND_ELIGIBILITY_WINDOW_DAYS: Joi.number().integer().min(1).max(365).default(7),
+  REFUND_MAXIMUM_CONSUMPTION_BPS: Joi.number()
+    .integer()
+    .min(0)
+    .max(10000)
+    .default(1000),
   OPENROUTER_API_KEY: Joi.string().min(1).optional(),
   AI_QUESTION_IMPORT_MODEL: Joi.string().min(1).optional(),
   AI_QUESTION_EXPLANATION_MODEL: Joi.string().min(1).optional(),
