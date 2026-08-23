@@ -1,8 +1,10 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { DateTime } from 'luxon';
 import {
   PartnerType,
@@ -11,6 +13,7 @@ import {
 } from '../../common/types/roles.enum';
 import { toPaginationMeta } from '../../common/dto/pagination-query.dto';
 import { PrismaService } from '../../database/prisma.service';
+import type { AppConfig } from '../../config/configuration';
 import type {
   PartnerContentQueryDto,
   PartnerAllocationsQueryDto,
@@ -35,10 +38,38 @@ type Agreement = {
 
 @Injectable()
 export class PartnerAnalyticsService {
+  private readonly partnerLedgerEnabled: boolean;
+  private readonly partnerLedgerAllowedUserIds: string[];
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly ledger: LedgerPublisherEarningsService,
-  ) {}
+    config?: ConfigService<AppConfig, true>,
+  ) {
+    const features = config?.get('features', { infer: true }) ?? {
+      // Focused service tests instantiate this class without application
+      // configuration. The running application always supplies configuration,
+      // whose default for this rollout control is off.
+      partnerLedgerEnabled: true,
+      partnerLedgerAllowedUserIds: [],
+    };
+    this.partnerLedgerEnabled = features.partnerLedgerEnabled;
+    this.partnerLedgerAllowedUserIds = features.partnerLedgerAllowedUserIds;
+  }
+
+  private assertPartnerLedgerAccess(userId: string) {
+    const allowlist = this.partnerLedgerAllowedUserIds;
+    if (
+      !this.partnerLedgerEnabled ||
+      (allowlist.length > 0 &&
+        !allowlist.includes('*') &&
+        !allowlist.includes(userId))
+    ) {
+      throw new ConflictException(
+        'Partner ledger reporting is disabled by rollout control',
+      );
+    }
+  }
 
   private money(amountMinor = 0) {
     return { amountMinor, currency: EGP };
@@ -54,6 +85,7 @@ export class PartnerAnalyticsService {
         'Content publisher reporting is not available for this partner',
       );
     }
+    this.assertPartnerLedgerAccess(userId);
   }
   private async partner(userId: string) {
     const profile = await this.prisma.partnerProfile.findUnique({
@@ -64,6 +96,7 @@ export class PartnerAnalyticsService {
       throw new ForbiddenException(
         'Partner reporting is not available for this account',
       );
+    this.assertPartnerLedgerAccess(userId);
   }
 
   private period(query: PartnerPeriodQueryDto): Period {

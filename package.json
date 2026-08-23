@@ -51,6 +51,7 @@
     "journey:content:ai-question-import": "tsx scripts/run-journey.ts CONTENT-019",
     "journey:content:ai-question-explanations": "tsx scripts/run-journey.ts CONTENT-021",
     "journey:content:video-outline": "tsx scripts/run-journey.ts CONTENT-020",
+    "journey:content:partner-operations": "tsx scripts/run-journey.ts CONTENT-022",
     "test:ai-question-import": "tsx scripts/real-ai-question-import-test.ts",
     "evaluate:shared-context-ab": "tsx scripts/evaluate-shared-context-ab.ts",
     "report:ai-model-comparison": "tsx scripts/generate-ai-model-comparison.ts",

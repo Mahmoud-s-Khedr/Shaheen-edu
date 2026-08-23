@@ -23,6 +23,12 @@ Bunny Storage and Stream resources, and provide a small valid MP4 via
 pnpm api:test:full
 ```
 
+The disposable Compose stack enables referral, partner-ledger, and export
+controls with `*` only inside its fresh test database so `CONTENT-022` can
+exercise the Phase 5 referral-to-refund and export-worker journey. Its separate
+worker container processes private export jobs. Do not copy those wildcard
+values to staging or production; use a named, approved allow-list there.
+
 The same file already supplies `BUNNY_STREAM_READ_ONLY_KEY`; the runner passes
 it only as `JOURNEY_BUNNY_READ_ONLY_KEY` to sign the direct webhook acceptance
 case. It is never sent to the API as an application credential, but is retained

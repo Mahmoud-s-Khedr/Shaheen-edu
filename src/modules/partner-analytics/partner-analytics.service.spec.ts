@@ -2,6 +2,31 @@ import { PartnerType } from '../../common/types/roles.enum';
 import { PartnerAnalyticsService } from './partner-analytics.service';
 
 describe('PartnerAnalyticsService publisher usage', () => {
+  it('denies a publisher that is outside the partner-ledger rollout allow-list', async () => {
+    const service = new PartnerAnalyticsService(
+      {
+        partnerProfile: {
+          findUnique: jest
+            .fn()
+            .mockResolvedValue({ partnerType: PartnerType.CONTENT_PUBLISHER }),
+        },
+      } as any,
+      { report: jest.fn() } as any,
+      {
+        get: jest.fn().mockReturnValue({
+          partnerLedgerEnabled: true,
+          partnerLedgerAllowedUserIds: ['other-publisher'],
+        }),
+      } as any,
+    );
+
+    await expect(
+      service.dashboard('publisher-1', { page: 1, limit: 20 }),
+    ).rejects.toThrow(
+      'Partner ledger reporting is disabled by rollout control',
+    );
+  });
+
   it('uses aggregate rollups for a long range and returns no learner identity', async () => {
     const prisma: any = {
       partnerProfile: {

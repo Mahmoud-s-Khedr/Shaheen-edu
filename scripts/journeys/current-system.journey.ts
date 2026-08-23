@@ -23,6 +23,7 @@ import { partnerAnalyticsJourney } from './content/partner-analytics.journey.js'
 import { aiQuestionImportJourney } from './content/ai-question-import.journey.js';
 import { aiQuestionExplanationsJourney } from './content/ai-question-explanations.journey.js';
 import { videoOutlineJourney } from './content/video-outline.journey.js';
+import { partnerOperationsJourney } from './content/partner-operations.journey.js';
 import type { JourneyDefinition } from './lib/types.js';
 
 export const journeys: JourneyDefinition[] = [
@@ -51,4 +52,5 @@ export const journeys: JourneyDefinition[] = [
   assetAccessJourney,
   assessmentsJourney,
   leaderboardPerformanceJourney,
+  partnerOperationsJourney,
 ];

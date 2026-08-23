@@ -38,6 +38,13 @@ services:
       COOKIE_SECURE: 'false'
       COOKIE_SAME_SITE: lax
       CORS_ORIGINS: http://localhost:${API_TEST_PORT:-3101}
+      FEATURE_REFERRALS_ENABLED: 'true'
+      FEATURE_REFERRAL_ALLOWED_STUDENT_IDS: '*'
+      FEATURE_PARTNER_LEDGER_ENABLED: 'true'
+      FEATURE_PARTNER_LEDGER_ALLOWED_USER_IDS: '*'
+      FEATURE_REPORT_EXPORTS_ENABLED: 'true'
+      RATE_LIMIT_ADMIN_LOGIN_MAX_ATTEMPTS: '100'
+      RATE_LIMIT_IP_MAX_ATTEMPTS: '100'
     ports:
       - '127.0.0.1:${API_TEST_PORT:-3101}:3000'
     depends_on:
@@ -53,3 +60,23 @@ services:
       interval: 3s
       timeout: 3s
       retries: 30
+
+  worker:
+    build:
+      context: .
+      target: development
+    env_file:
+      - .env.api-tests.local
+    environment:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://api_test:api_test_password@postgres:5432/api_test?schema=public
+      REDIS_URL: redis://redis:6379/0
+      FEATURE_REFERRALS_ENABLED: 'true'
+      FEATURE_REFERRAL_ALLOWED_STUDENT_IDS: '*'
+      FEATURE_PARTNER_LEDGER_ENABLED: 'true'
+      FEATURE_PARTNER_LEDGER_ALLOWED_USER_IDS: '*'
+      FEATURE_REPORT_EXPORTS_ENABLED: 'true'
+    command: node dist/worker
+    depends_on:
+      api:
+        condition: service_healthy
