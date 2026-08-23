@@ -6,7 +6,10 @@ COPY package.json pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile
 COPY . .
 RUN pnpm prisma generate
-RUN rm -rf dist tsconfig.build.tsbuildinfo && pnpm build
+# TypeScript compilation exceeds Node's automatic ~512 MB heap on small test
+# instances. Scope the allowance to this build layer so application containers
+# retain Node's normal runtime memory settings.
+RUN NODE_OPTIONS=--max-old-space-size=1024 rm -rf dist tsconfig.build.tsbuildinfo && pnpm build
 
 # Local development image. It intentionally retains development dependencies so
 # migrations and the TypeScript seed script can run inside the Compose stack.
