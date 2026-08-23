@@ -52,7 +52,15 @@ switch (command) {
   case 'update':
     ensureEnvFile();
     run(['up', '-d', '--wait', 'postgres', 'redis']);
-    run(['up', '-d', '--build', '--force-recreate', '--wait', 'api']);
+    run([
+      'up',
+      '-d',
+      '--build',
+      '--force-recreate',
+      '--wait',
+      'api',
+      'ai-question-import-worker',
+    ]);
     break;
   default:
     console.error('Usage: node scripts/dev.mjs <start|stop|clear|update>');

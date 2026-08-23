@@ -12,7 +12,13 @@ import { PrismaService } from '../../database/prisma.service';
 import { PasswordService } from '../auth/services/password.service';
 import { SessionService } from '../auth/services/session.service';
 import { AuditService } from '../audit/audit.service';
-import { Role, AccountStatus } from '../../common/types/roles.enum';
+import {
+  Role,
+  AccountStatus,
+  PartnerAllocationState,
+  PublisherAgreementStatus,
+  ReferralProgramStatus,
+} from '../../common/types/roles.enum';
 import type { CreatePartnerDto } from './dto/create-partner.dto';
 import type { UpdatePartnerDto } from './dto/update-partner.dto';
 import type { RequestUser } from '../../common/types/request-with-user.types';
@@ -118,6 +124,180 @@ export class PartnersService {
       throw new NotFoundException('Partner not found');
     }
     return this.toSummary(partner);
+  }
+
+  /**
+   * A finance/support history view for administrators. It deliberately returns
+   * only partner-domain records and ledger aggregates: learner identities and
+   * order rows are not selected, even though allocations are order-item based.
+   */
+  async detail(actor: RequestUser, id: string) {
+    const partner = await this.prisma.user.findUnique({
+      where: { id },
+      include: { partnerProfile: true },
+    });
+    if (!partner || partner.role !== Role.PARTNER) {
+      throw new NotFoundException('Partner not found');
+    }
+
+    const now = new Date();
+    const [agreements, programs, allocationTotals, auditEvents] =
+      await Promise.all([
+        this.prisma.publisherAgreement.findMany({
+          where: { publisherUserId: id },
+          select: {
+            id: true,
+            status: true,
+            payoutKind: true,
+            revenueShareBps: true,
+            fixedPayoutMinor: true,
+            currency: true,
+            contractReference: true,
+            version: true,
+            supersedesId: true,
+            startsAt: true,
+            endsAt: true,
+            isPrimary: true,
+            createdAt: true,
+            course: { select: { id: true, title: true } },
+            chapter: { select: { id: true, title: true, courseId: true } },
+            lesson: {
+              select: {
+                id: true,
+                title: true,
+                chapterId: true,
+                chapter: { select: { courseId: true } },
+              },
+            },
+          },
+          orderBy: [{ startsAt: 'desc' }, { id: 'desc' }],
+        }),
+        this.prisma.referralProgram.findMany({
+          where: { partnerUserId: id },
+          select: {
+            id: true,
+            name: true,
+            status: true,
+            startsAt: true,
+            endsAt: true,
+            usageLimit: true,
+            perStudentUsageLimit: true,
+            appliesToAll: true,
+            createdAt: true,
+            course: { select: { id: true, title: true } },
+            chapter: { select: { id: true, title: true, courseId: true } },
+            _count: { select: { codes: true, rules: true } },
+          },
+          orderBy: [{ startsAt: 'desc' }, { id: 'desc' }],
+        }),
+        this.prisma.partnerAllocation.groupBy({
+          by: ['state', 'currency'],
+          where: { partnerUserId: id },
+          _count: { _all: true },
+          _sum: { basisMinor: true, amountMinor: true },
+        }),
+        this.prisma.adminAuditLog.findMany({
+          where: { targetId: id },
+          select: {
+            id: true,
+            action: true,
+            targetType: true,
+            createdAt: true,
+            correlationId: true,
+            actorUserId: true,
+          },
+          orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+          take: 20,
+        }),
+      ]);
+
+    const byState = new Map(
+      allocationTotals.map((row) => [
+        `${row.state}:${row.currency}`,
+        {
+          state: row.state,
+          currency: row.currency,
+          allocationCount: row._count._all,
+          basisMinor: row._sum.basisMinor ?? 0,
+          amountMinor: row._sum.amountMinor ?? 0,
+        },
+      ]),
+    );
+    const allocationSummary = Object.values(PartnerAllocationState).flatMap(
+      (state) => {
+        const matching = [...byState.values()].filter(
+          (row) => row.state === state,
+        );
+        return matching.length
+          ? matching
+          : [
+              {
+                state,
+                currency: 'EGP',
+                allocationCount: 0,
+                basisMinor: 0,
+                amountMinor: 0,
+              },
+            ];
+      },
+    );
+
+    await this.auditService.record({
+      actorUserId: actor.id,
+      action: 'PARTNER_DETAIL_VIEWED',
+      targetType: 'User',
+      targetId: id,
+      metadata: {
+        agreementCount: agreements.length,
+        referralProgramCount: programs.length,
+        auditSummaryLimit: 20,
+      },
+    });
+
+    return {
+      account: this.toSummary(partner),
+      capability: {
+        partnerType: partner.partnerProfile?.partnerType ?? null,
+        canPublishContent:
+          partner.partnerProfile?.partnerType === 'CONTENT_PUBLISHER',
+        canReferCustomers:
+          partner.partnerProfile?.partnerType === 'REFERRAL_PARTNER',
+      },
+      publisherAgreements: agreements.map((agreement) => ({
+        ...agreement,
+        isCurrent:
+          agreement.status === PublisherAgreementStatus.ACTIVE &&
+          agreement.startsAt <= now &&
+          (!agreement.endsAt || agreement.endsAt > now),
+        target: agreement.course
+          ? { type: 'COURSE', ...agreement.course }
+          : agreement.chapter
+            ? { type: 'CHAPTER', ...agreement.chapter }
+            : agreement.lesson
+              ? {
+                  type: 'LESSON',
+                  id: agreement.lesson.id,
+                  title: agreement.lesson.title,
+                  chapterId: agreement.lesson.chapterId,
+                  courseId: agreement.lesson.chapter.courseId,
+                }
+              : null,
+      })),
+      referralPrograms: programs.map((program) => ({
+        ...program,
+        isCurrent:
+          program.status === ReferralProgramStatus.ACTIVE &&
+          program.startsAt <= now &&
+          (!program.endsAt || program.endsAt > now),
+        target: program.course
+          ? { type: 'COURSE', ...program.course }
+          : program.chapter
+            ? { type: 'CHAPTER', ...program.chapter }
+            : { type: 'ALL_CONTENT' },
+      })),
+      allocationTotalsByState: allocationSummary,
+      auditSummary: { recentEvents: auditEvents, limit: 20 },
+    };
   }
 
   async update(actor: RequestUser, id: string, dto: UpdatePartnerDto) {

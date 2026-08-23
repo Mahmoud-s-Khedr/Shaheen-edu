@@ -211,16 +211,16 @@ unauthorized role or export; operations can audit every privileged access.
 **Goal:** Make the ledger useful for finance and publishers without creating a
 second mutable earnings source of truth.
 
-- [ ] Add an admin partner detail/history view: capability and account state,
+- [x] Add an admin partner detail/history view: capability and account state,
   current and historical agreements/programs, allocation totals by state, and
   audit summary. Keep raw learner/order data out of partner-facing responses.
-- [ ] Add finance-specific allocation and settlement exports, using the Phase
+- [x] Add finance-specific allocation and settlement exports, using the Phase
   1 export controls and immutable allocation/settlement rows as the source of
   truth.
-- [ ] Extend publisher **usage** analytics with daily/monthly trends,
+- [x] Extend publisher **usage** analytics with daily/monthly trends,
   hierarchy filters, zero-usage/zero-solved earnings indicators, and range
   rollups beyond the current 93-day on-demand limit.
-- [ ] Define rollup freshness, correction/rebuild, retention, and drill-down
+- [x] Define rollup freshness, correction/rebuild, retention, and drill-down
   rules. Earnings trends and agreement/target ledger breakdowns already exist;
   this phase extends usage reporting rather than duplicating them.
 
@@ -228,6 +228,36 @@ second mutable earnings source of truth.
 rows; a publisher can view aggregate usage and earnings across supported date
 ranges and hierarchy scopes without learner PII; rollup totals agree with raw
 attribution data for representative fixtures.
+
+**Implementation status (2026-08-23):** The code, schema migration, focused
+fixtures, full unit suite (56 suites / 347 tests), and production build are
+complete. `GET /admin/partners/:id/detail` is an audited administrative
+history view with partner capability/account state, agreement/program history,
+allocation-state totals, and recent audit summary. The private export worker
+now supports `PUBLISHER_ALLOCATIONS` and `PUBLISHER_SETTLEMENTS`; both are
+non-PII, reason-gated privileged exports with fixed columns, watermarking,
+short-lived artifacts/URLs, cancellation, expiry, and audit behaviour. Their
+rows come only from immutable allocation, settlement, and settlement-line
+records, never orders or learner data.
+
+Publisher question usage now returns aggregate daily/monthly trends and
+supports source plus frozen subject/course/chapter/lesson/section filters.
+Short question-level drill-down remains deliberately capped at 93 days;
+long-range summaries and source breakdowns use rebuildable Cairo-day rollups.
+The response marks `zeroUsage`, `zeroSolved`, and publisher-wide ledger
+`earningsDespiteZeroSolved` explicitly, so usage is never mistaken for a
+usage-based payout. `PublisherUsageDailyRollup` is derived from frozen
+attribution/attempt/answer rows, while an internal HMAC-fingerprint presence
+index preserves exact distinct-solver counts across periods without exposing
+learner identity. The hourly refresh includes the current and prior two Cairo
+days for late-grading correction; privileged range rebuilds are audited and
+bounded to 367 days. The full operational policy is in
+[`publisher-usage-rollups.md`](publisher-usage-rollups.md).
+
+Compose migration output currently reports all 62 migrations and no pending
+migrations. Phase exit is still operationally pending until finance records a
+representative settlement-export reconciliation and the staging run records
+raw-attribution versus rollup totals for the representative fixtures.
 
 #### Phase 3 — Referral operations and reporting
 

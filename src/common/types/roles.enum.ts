@@ -21,6 +21,7 @@ export {
   PublisherAgreementStatus,
   PartnerAllocationKind,
   PartnerAllocationState,
+  PublisherUsageScope,
   ReferralProgramStatus,
   ReferralCommissionKind,
   ReferralReviewRuleKind,

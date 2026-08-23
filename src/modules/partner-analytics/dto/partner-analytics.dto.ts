@@ -32,11 +32,17 @@ export class PartnerEarningsQueryDto extends PartnerPeriodQueryDto {
 }
 
 export class PartnerAllocationsQueryDto extends PaginationQueryDto {
-  @ApiPropertyOptional({ example: '2026-08-01', description: 'Cairo calendar date.' })
+  @ApiPropertyOptional({
+    example: '2026-08-01',
+    description: 'Cairo calendar date.',
+  })
   @IsOptional()
   @IsDateString()
   from?: string;
-  @ApiPropertyOptional({ example: '2026-08-31', description: 'Cairo calendar date.' })
+  @ApiPropertyOptional({
+    example: '2026-08-31',
+    description: 'Cairo calendar date.',
+  })
   @IsOptional()
   @IsDateString()
   to?: string;
@@ -50,7 +56,26 @@ export class PartnerContentQueryDto extends PaginationQueryDto {
 }
 
 export class PartnerQuestionUsageQueryDto extends PaginationQueryDto {
-  @ApiPropertyOptional({ example: '2026-08-01' }) @IsOptional() @IsDateString() from?: string;
-  @ApiPropertyOptional({ example: '2026-08-31' }) @IsOptional() @IsDateString() to?: string;
+  @ApiPropertyOptional({ example: '2026-08-01' })
+  @IsOptional()
+  @IsDateString()
+  from?: string;
+  @ApiPropertyOptional({ example: '2026-08-31' })
+  @IsOptional()
+  @IsDateString()
+  to?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() sourceId?: string;
+  @ApiPropertyOptional({
+    enum: ['day', 'month'],
+    description:
+      'Defaults to day for ranges up to 93 days and month afterwards.',
+  })
+  @IsOptional()
+  @IsEnum(['day', 'month'])
+  granularity?: 'day' | 'month';
+  @ApiPropertyOptional() @IsOptional() @IsString() subjectId?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() courseId?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() chapterId?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() lessonId?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() sectionId?: string;
 }

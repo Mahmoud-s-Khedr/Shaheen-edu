@@ -23,6 +23,8 @@ describe('ReportsService export lifecycle', () => {
         findMany: jest.fn(),
       },
       order: { findMany: jest.fn().mockResolvedValue([]) },
+      partnerAllocation: { findMany: jest.fn().mockResolvedValue([]) },
+      partnerSettlement: { findMany: jest.fn().mockResolvedValue([]) },
     };
     const storage = {
       upload: jest.fn(),
@@ -198,5 +200,102 @@ describe('ReportsService export lifecycle', () => {
       }),
     );
     jest.useRealTimers();
+  });
+
+  it('exports publisher allocation ledger rows with agreement and settlement references but no order data', async () => {
+    const { prisma, service } = build();
+    prisma.partnerAllocation.findMany.mockResolvedValue([
+      {
+        id: 'allocation-1',
+        createdAt: new Date('2026-08-01T00:00:00.000Z'),
+        partnerUserId: 'publisher-1',
+        publisherAgreementId: 'agreement-1',
+        state: 'PAID',
+        basisMinor: 10000,
+        amountMinor: 2500,
+        currency: 'EGP',
+        payableAt: new Date('2026-08-01T00:00:00.000Z'),
+        paidAt: new Date('2026-08-02T00:00:00.000Z'),
+        reversedAt: null,
+        reversedAllocationId: null,
+        publisherAgreement: { version: 2, contractReference: 'PUB-2026-02' },
+        settlementLines: [
+          {
+            settlement: {
+              id: 'settlement-1',
+              paymentReference: 'BANK-001',
+              paidAt: new Date('2026-08-02T00:00:00.000Z'),
+            },
+          },
+        ],
+      },
+    ]);
+
+    const rows = await (service as any).rowsFor(
+      'PUBLISHER_ALLOCATIONS',
+      {},
+      {},
+    );
+
+    expect(rows).toEqual([
+      expect.objectContaining({
+        id: 'allocation-1',
+        agreementVersion: 2,
+        contractReference: 'PUB-2026-02',
+        settlementId: 'settlement-1',
+        paymentReference: 'BANK-001',
+      }),
+    ]);
+    expect(prisma.partnerAllocation.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ kind: 'PUBLISHER_SALE' }),
+        select: expect.not.objectContaining({ orderItem: expect.anything() }),
+      }),
+    );
+    await expect(
+      service.requestExport(actor, {
+        reportType: 'PUBLISHER_ALLOCATIONS',
+        columns: ['orderItemId'],
+        reason: 'finance reconciliation',
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('exports publisher settlement totals from publisher ledger lines', async () => {
+    const { prisma, service } = build();
+    prisma.partnerSettlement.findMany.mockResolvedValue([
+      {
+        id: 'settlement-1',
+        createdAt: new Date('2026-08-02T00:00:00.000Z'),
+        partnerUserId: 'publisher-1',
+        paymentReference: 'BANK-001',
+        currency: 'EGP',
+        totalMinor: 3000,
+        paidAt: new Date('2026-08-03T00:00:00.000Z'),
+        lines: [{ allocation: { amountMinor: 2500 } }],
+      },
+    ]);
+
+    const rows = await (service as any).rowsFor(
+      'PUBLISHER_SETTLEMENTS',
+      {},
+      {},
+    );
+
+    expect(rows).toEqual([
+      expect.objectContaining({
+        id: 'settlement-1',
+        settlementTotalMinor: 3000,
+        publisherAllocationCount: 1,
+        publisherTotalMinor: 2500,
+      }),
+    ]);
+    expect(prisma.partnerSettlement.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          lines: { some: { allocation: { kind: 'PUBLISHER_SALE' } } },
+        }),
+      }),
+    );
   });
 });

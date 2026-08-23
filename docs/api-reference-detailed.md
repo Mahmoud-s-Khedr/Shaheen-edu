@@ -13,6 +13,7 @@ operation inventory aligned with that document.
 ### `GET /api/v1/admin/partner-finance/reconciliation-runs/{id}`
 ### `GET /api/v1/admin/partner-finance/reconciliation-runs/{id}/discrepancies`
 ### `GET /api/v1/admin/partner-finance/settlements`
+### `GET /api/v1/admin/partners/{id}/detail`
 ### `GET /api/v1/admin/referral-programs`
 ### `GET /api/v1/admin/referral-programs/{id}`
 ### `GET /api/v1/admin/refunds`
@@ -40,6 +41,7 @@ operation inventory aligned with that document.
 ### `POST /api/v1/admin/partner-finance/reconciliation-runs/{id}/run`
 ### `POST /api/v1/admin/partner-finance/settlements`
 ### `POST /api/v1/admin/partner-finance/settlements/{id}/mark-paid`
+### `POST /api/v1/admin/partner-finance/usage-rollups/rebuild`
 ### `POST /api/v1/admin/publisher-agreements/{id}/replace`
 ### `POST /api/v1/admin/referral-programs`
 ### `POST /api/v1/admin/referral-programs/{id}/activate`
@@ -6785,6 +6787,24 @@ Returns Cairo-period immutable-ledger totals, agreement breakdowns, and daily tr
 **Success response — HTTP 200**
 
 Returns day or month Cairo buckets and agreement/target breakdowns derived solely from immutable publisher allocation rows, including earned, reversals, net, payable, and paid values.
+
+### `GET /api/v1/partners/analytics/question-usage`
+
+**Authorization:** Bearer token; role must be `PARTNER` with type `CONTENT_PUBLISHER`
+
+**Request**
+
+- query `from` / `to` (optional inclusive `YYYY-MM-DD` Cairo dates)
+- query `granularity` (optional `day | month`; long ranges default to month)
+- query `sourceId`, `subjectId`, `courseId`, `chapterId`, `lessonId`, and `sectionId` (optional aggregate filters)
+
+**Success response — HTTP 200**
+
+Returns aggregate-only presented, solved, distinct-solver, correctness, and reattempt metrics plus daily/monthly trend buckets. Ranges longer than 93 days, and hierarchy-scoped summaries, use derived daily rollups and return their freshness timestamp. The response marks zero usage, zero solved questions, and ledger earnings despite zero solved questions. The latter is explicitly publisher-wide ledger context, never a usage-based payout calculation. No learner, attempt, answer text, order, or order-item field is returned.
+
+`/sources` supports the same aggregate range and hierarchy filters. The
+question-level drill-down intentionally remains an on-demand raw report and is
+limited to 93 days.
 
 ### `GET /api/v1/partners/analytics/content`
 

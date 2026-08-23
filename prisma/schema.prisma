@@ -129,6 +129,18 @@ enum PartnerAllocationState {
   REVERSED
 }
 
+/// The direct hierarchy scope represented by a publisher-usage rollup row.
+/// ALL is the canonical non-duplicated publisher/source total; narrower rows
+/// support a selected frozen curriculum node without changing raw attempts.
+enum PublisherUsageScope {
+  ALL
+  SUBJECT
+  COURSE
+  CHAPTER
+  LESSON
+  SECTION
+}
+
 enum PartnerFinanceReconciliationStatus {
   DRAFT
   RUNNING
@@ -546,10 +558,10 @@ model User {
   reconciliationRunsCreated           PartnerFinanceReconciliationRun[] @relation("ReconciliationRunCreatedBy")
   reconciliationDiscrepanciesAssigned PartnerFinanceDiscrepancy[]       @relation("ReconciliationDiscrepancyAssignedTo")
   reconciliationDiscrepanciesResolved PartnerFinanceDiscrepancy[]       @relation("ReconciliationDiscrepancyResolvedBy")
-  referralReviewRulesCreated        ReferralReviewRule[]                @relation("ReferralReviewRuleCreatedBy")
-  referralReviewFlagsAssigned       ReferralReviewFlag[]                @relation("ReferralReviewFlagAssignedTo")
-  referralReviewFlagsResolved       ReferralReviewFlag[]                @relation("ReferralReviewFlagResolvedBy")
-  referralReviewNotesCreated        ReferralReviewNote[]                @relation("ReferralReviewNoteCreatedBy")
+  referralReviewRulesCreated          ReferralReviewRule[]              @relation("ReferralReviewRuleCreatedBy")
+  referralReviewFlagsAssigned         ReferralReviewFlag[]              @relation("ReferralReviewFlagAssignedTo")
+  referralReviewFlagsResolved         ReferralReviewFlag[]              @relation("ReferralReviewFlagResolvedBy")
+  referralReviewNotesCreated          ReferralReviewNote[]              @relation("ReferralReviewNoteCreatedBy")
   reportExportsRequested              ReportExportJob[]                 @relation("ReportExportRequestedBy")
 
   academicGradesCreated     AcademicGrade[]           @relation("AcademicGradeCreatedBy")
@@ -639,21 +651,23 @@ model StudentProfile {
 }
 
 model PartnerProfile {
-  userId              String               @id
-  user                User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId              String                      @id
+  user                User                        @relation(fields: [userId], references: [id], onDelete: Cascade)
   partnerType         PartnerType
   displayName         String
   legalName           String?
   phone               String?
   createdByAdminId    String
-  createdByAdmin      User                 @relation("PartnerProfileCreatedBy", fields: [createdByAdminId], references: [id], onDelete: Restrict)
-  createdAt           DateTime             @default(now())
-  updatedAt           DateTime             @updatedAt
-  publisherAgreements PublisherAgreement[] @relation("AgreementPublisher")
-  questionSources     QuestionSource[]     @relation("QuestionSourcePublisher")
-  referralPrograms    ReferralProgram[]    @relation("ReferralProgramPartner")
-  allocations         PartnerAllocation[]  @relation("AllocationPartner")
-  settlements         PartnerSettlement[]  @relation("SettlementPartner")
+  createdByAdmin      User                        @relation("PartnerProfileCreatedBy", fields: [createdByAdminId], references: [id], onDelete: Restrict)
+  createdAt           DateTime                    @default(now())
+  updatedAt           DateTime                    @updatedAt
+  publisherAgreements PublisherAgreement[]        @relation("AgreementPublisher")
+  questionSources     QuestionSource[]            @relation("QuestionSourcePublisher")
+  referralPrograms    ReferralProgram[]           @relation("ReferralProgramPartner")
+  allocations         PartnerAllocation[]         @relation("AllocationPartner")
+  settlements         PartnerSettlement[]         @relation("SettlementPartner")
+  usageRollups        PublisherUsageDailyRollup[]
+  usageSolverPresence PublisherUsageDailySolver[]
 }
 
 model AuthSession {
@@ -2848,26 +2862,26 @@ model OrderReferralAttribution {
 }
 
 model ReferralReviewFlag {
-  id            String                    @id @default(cuid())
+  id            String                     @id @default(cuid())
   attributionId String
-  attribution   OrderReferralAttribution  @relation(fields: [attributionId], references: [id], onDelete: Restrict)
+  attribution   OrderReferralAttribution   @relation(fields: [attributionId], references: [id], onDelete: Restrict)
   ruleId        String?
-  rule          ReferralReviewRule?       @relation(fields: [ruleId], references: [id], onDelete: SetNull)
+  rule          ReferralReviewRule?        @relation(fields: [ruleId], references: [id], onDelete: SetNull)
   source        ReferralReviewFlagSource
   type          String
   action        ReferralReviewAction
   observedValue Int?
   threshold     Int?
   metadata      Json?
-  status        ReferralReviewStatus      @default(OPEN)
+  status        ReferralReviewStatus       @default(OPEN)
   assignedToId  String?
-  assignedTo    User?                     @relation("ReferralReviewFlagAssignedTo", fields: [assignedToId], references: [id], onDelete: Restrict)
+  assignedTo    User?                      @relation("ReferralReviewFlagAssignedTo", fields: [assignedToId], references: [id], onDelete: Restrict)
   disposition   ReferralReviewDisposition?
   resolvedById  String?
-  resolvedBy    User?                     @relation("ReferralReviewFlagResolvedBy", fields: [resolvedById], references: [id], onDelete: Restrict)
+  resolvedBy    User?                      @relation("ReferralReviewFlagResolvedBy", fields: [resolvedById], references: [id], onDelete: Restrict)
   resolvedAt    DateTime?
-  createdAt     DateTime                  @default(now())
-  updatedAt     DateTime                  @updatedAt
+  createdAt     DateTime                   @default(now())
+  updatedAt     DateTime                   @updatedAt
   notes         ReferralReviewNote[]
 
   @@index([status, createdAt])
@@ -2876,13 +2890,13 @@ model ReferralReviewFlag {
 }
 
 model ReferralReviewNote {
-  id          String              @id @default(cuid())
+  id          String             @id @default(cuid())
   flagId      String
-  flag        ReferralReviewFlag  @relation(fields: [flagId], references: [id], onDelete: Cascade)
+  flag        ReferralReviewFlag @relation(fields: [flagId], references: [id], onDelete: Cascade)
   body        String
   createdById String
-  createdBy   User                @relation("ReferralReviewNoteCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
-  createdAt   DateTime            @default(now())
+  createdBy   User               @relation("ReferralReviewNoteCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  createdAt   DateTime           @default(now())
 
   @@index([flagId, createdAt])
 }
@@ -3033,25 +3047,78 @@ model AssessmentQuestionAttribution {
   @@index([sourceId])
 }
 
+/// Rebuildable, Cairo-calendar daily aggregates derived from frozen question
+/// attribution and assessment attempts/answers. These rows are reporting
+/// accelerators only; AssessmentAttempt and AssessmentQuestionAttribution
+/// remain the audit source and PartnerAllocation remains the earnings source.
+model PublisherUsageDailyRollup {
+  id              String              @id @default(cuid())
+  usageDate       DateTime            @db.Date
+  publisherUserId String
+  publisher       PartnerProfile      @relation(fields: [publisherUserId], references: [userId], onDelete: Restrict)
+  sourceId        String?
+  sourceKey       String
+  sourceTitle     String?
+  scope           PublisherUsageScope
+  scopeId         String?
+  scopeKey        String
+  subjectId       String?
+  courseId        String?
+  chapterId       String?
+  lessonId        String?
+  sectionId       String?
+  presented       Int                 @default(0)
+  solved          Int                 @default(0)
+  uniqueSolvers   Int                 @default(0)
+  graded          Int                 @default(0)
+  correct         Int                 @default(0)
+  reattempts      Int                 @default(0)
+  inputUpdatedAt  DateTime
+  calculatedAt    DateTime            @default(now())
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  @@unique([usageDate, publisherUserId, sourceKey, scopeKey])
+  @@index([publisherUserId, usageDate, scope, scopeId])
+  @@index([publisherUserId, sourceKey, usageDate])
+}
+
+/// Internal pseudonymous presence rows make distinct-solver counts exact when
+/// daily rollups are combined into a monthly or arbitrary-range report. The
+/// stable HMAC fingerprint never leaves aggregate reporting services.
+model PublisherUsageDailySolver {
+  id                 String         @id @default(cuid())
+  usageDate          DateTime       @db.Date
+  publisherUserId    String
+  publisher          PartnerProfile @relation(fields: [publisherUserId], references: [userId], onDelete: Restrict)
+  sourceKey          String
+  scopeKey           String
+  studentFingerprint String
+  createdAt          DateTime       @default(now())
+
+  @@unique([usageDate, publisherUserId, sourceKey, scopeKey, studentFingerprint])
+  @@index([publisherUserId, sourceKey, scopeKey, usageDate])
+}
+
 model ReportExportJob {
-  id            String             @id @default(cuid())
-  requestedById String
-  requestedBy   User               @relation("ReportExportRequestedBy", fields: [requestedById], references: [id], onDelete: Restrict)
-  reportType    String
-  filters       Json
-  columns       Json
-  reason        String?
-  containsPii   Boolean            @default(false)
+  id             String                   @id @default(cuid())
+  requestedById  String
+  requestedBy    User                     @relation("ReportExportRequestedBy", fields: [requestedById], references: [id], onDelete: Restrict)
+  reportType     String
+  filters        Json
+  columns        Json
+  reason         String?
+  containsPii    Boolean                  @default(false)
   classification ReportDataClassification @default(NON_PII)
-  status        ReportExportStatus @default(QUEUED)
-  storageKey    String?
-  rowCount      Int?
-  error         String?
-  expiresAt     DateTime?
-  downloadedAt  DateTime?
-  cancelledAt   DateTime?
-  createdAt     DateTime           @default(now())
-  updatedAt     DateTime           @updatedAt
+  status         ReportExportStatus       @default(QUEUED)
+  storageKey     String?
+  rowCount       Int?
+  error          String?
+  expiresAt      DateTime?
+  downloadedAt   DateTime?
+  cancelledAt    DateTime?
+  createdAt      DateTime                 @default(now())
+  updatedAt      DateTime                 @updatedAt
 
   @@index([requestedById, status, createdAt])
   @@index([status, createdAt])

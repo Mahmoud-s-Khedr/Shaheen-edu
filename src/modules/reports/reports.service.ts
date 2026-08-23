@@ -71,15 +71,83 @@ export const REPORT_EXPORT_POLICIES: Record<ReportType, ReportExportPolicy> = {
     retentionMs: 24 * 60 * 60 * 1000,
     signedUrlMs: 15 * 60 * 1000,
   },
+  PUBLISHER_ALLOCATIONS: {
+    classification: ReportDataClassification.NON_PII,
+    columns: [
+      'id',
+      'createdAt',
+      'partnerUserId',
+      'publisherAgreementId',
+      'agreementVersion',
+      'contractReference',
+      'state',
+      'basisMinor',
+      'amountMinor',
+      'currency',
+      'payableAt',
+      'paidAt',
+      'reversedAt',
+      'reversedAllocationId',
+      'settlementId',
+      'paymentReference',
+      'settlementPaidAt',
+    ],
+    roles: [Role.ADMIN, Role.SUPER_ADMIN],
+    privileged: true,
+    retentionMs: 24 * 60 * 60 * 1000,
+    signedUrlMs: 15 * 60 * 1000,
+  },
+  PUBLISHER_SETTLEMENTS: {
+    classification: ReportDataClassification.NON_PII,
+    columns: [
+      'id',
+      'createdAt',
+      'partnerUserId',
+      'paymentReference',
+      'currency',
+      'settlementTotalMinor',
+      'paidAt',
+      'publisherAllocationCount',
+      'publisherTotalMinor',
+    ],
+    roles: [Role.ADMIN, Role.SUPER_ADMIN],
+    privileged: true,
+    retentionMs: 24 * 60 * 60 * 1000,
+    signedUrlMs: 15 * 60 * 1000,
+  },
   REFERRAL_ALLOCATIONS: {
     classification: ReportDataClassification.NON_PII,
-    columns: ['createdAt', 'partnerUserId', 'state', 'basisMinor', 'amountMinor', 'currency', 'payableAt', 'paidAt', 'reversedAt'],
-    roles: [Role.ADMIN, Role.SUPER_ADMIN], privileged: true, retentionMs: 24 * 60 * 60 * 1000, signedUrlMs: 15 * 60 * 1000,
+    columns: [
+      'createdAt',
+      'partnerUserId',
+      'state',
+      'basisMinor',
+      'amountMinor',
+      'currency',
+      'payableAt',
+      'paidAt',
+      'reversedAt',
+    ],
+    roles: [Role.ADMIN, Role.SUPER_ADMIN],
+    privileged: true,
+    retentionMs: 24 * 60 * 60 * 1000,
+    signedUrlMs: 15 * 60 * 1000,
   },
   REFERRAL_SETTLEMENTS: {
     classification: ReportDataClassification.NON_PII,
-    columns: ['createdAt', 'partnerUserId', 'paymentReference', 'currency', 'referralTotalMinor', 'paidAt', 'referralAllocationCount'],
-    roles: [Role.ADMIN, Role.SUPER_ADMIN], privileged: true, retentionMs: 24 * 60 * 60 * 1000, signedUrlMs: 15 * 60 * 1000,
+    columns: [
+      'createdAt',
+      'partnerUserId',
+      'paymentReference',
+      'currency',
+      'referralTotalMinor',
+      'paidAt',
+      'referralAllocationCount',
+    ],
+    roles: [Role.ADMIN, Role.SUPER_ADMIN],
+    privileged: true,
+    retentionMs: 24 * 60 * 60 * 1000,
+    signedUrlMs: 15 * 60 * 1000,
   },
   ENTITLEMENTS: {
     classification: ReportDataClassification.NON_PII,
@@ -510,17 +578,155 @@ export class ReportsService {
           currency: true,
         },
       });
+    if (reportType === 'PUBLISHER_ALLOCATIONS') {
+      const rows = await this.prisma.partnerAllocation.findMany({
+        where: {
+          kind: 'PUBLISHER_SALE',
+          ...(filters.partnerUserId
+            ? { partnerUserId: filters.partnerUserId }
+            : {}),
+          ...dateFilter,
+        },
+        select: {
+          id: true,
+          createdAt: true,
+          partnerUserId: true,
+          publisherAgreementId: true,
+          state: true,
+          basisMinor: true,
+          amountMinor: true,
+          currency: true,
+          payableAt: true,
+          paidAt: true,
+          reversedAt: true,
+          reversedAllocationId: true,
+          publisherAgreement: {
+            select: { version: true, contractReference: true },
+          },
+          settlementLines: {
+            select: {
+              settlement: {
+                select: { id: true, paymentReference: true, paidAt: true },
+              },
+            },
+          },
+        },
+      });
+      return rows.map((row) => {
+        const settlement = row.settlementLines[0]?.settlement ?? null;
+        return {
+          id: row.id,
+          createdAt: row.createdAt,
+          partnerUserId: row.partnerUserId,
+          publisherAgreementId: row.publisherAgreementId,
+          agreementVersion: row.publisherAgreement?.version ?? null,
+          contractReference: row.publisherAgreement?.contractReference ?? null,
+          state: row.state,
+          basisMinor: row.basisMinor,
+          amountMinor: row.amountMinor,
+          currency: row.currency,
+          payableAt: row.payableAt,
+          paidAt: row.paidAt,
+          reversedAt: row.reversedAt,
+          reversedAllocationId: row.reversedAllocationId,
+          settlementId: settlement?.id ?? null,
+          paymentReference: settlement?.paymentReference ?? null,
+          settlementPaidAt: settlement?.paidAt ?? null,
+        };
+      });
+    }
+    if (reportType === 'PUBLISHER_SETTLEMENTS') {
+      const rows = await this.prisma.partnerSettlement.findMany({
+        where: {
+          ...(filters.partnerUserId
+            ? { partnerUserId: filters.partnerUserId }
+            : {}),
+          ...dateFilter,
+          lines: { some: { allocation: { kind: 'PUBLISHER_SALE' } } },
+        },
+        select: {
+          id: true,
+          createdAt: true,
+          partnerUserId: true,
+          paymentReference: true,
+          currency: true,
+          totalMinor: true,
+          paidAt: true,
+          lines: {
+            where: { allocation: { kind: 'PUBLISHER_SALE' } },
+            select: { allocation: { select: { amountMinor: true } } },
+          },
+        },
+      });
+      return rows.map((row) => ({
+        id: row.id,
+        createdAt: row.createdAt,
+        partnerUserId: row.partnerUserId,
+        paymentReference: row.paymentReference,
+        currency: row.currency,
+        settlementTotalMinor: row.totalMinor,
+        paidAt: row.paidAt,
+        publisherAllocationCount: row.lines.length,
+        publisherTotalMinor: row.lines.reduce(
+          (sum, line) => sum + line.allocation.amountMinor,
+          0,
+        ),
+      }));
+    }
     if (reportType === 'REFERRAL_ALLOCATIONS')
       return this.prisma.partnerAllocation.findMany({
-        where: { kind: 'REFERRAL_COMMISSION', ...(filters.partnerUserId ? { partnerUserId: filters.partnerUserId } : {}), ...dateFilter },
-        select: { createdAt: true, partnerUserId: true, state: true, basisMinor: true, amountMinor: true, currency: true, payableAt: true, paidAt: true, reversedAt: true },
+        where: {
+          kind: 'REFERRAL_COMMISSION',
+          ...(filters.partnerUserId
+            ? { partnerUserId: filters.partnerUserId }
+            : {}),
+          ...dateFilter,
+        },
+        select: {
+          createdAt: true,
+          partnerUserId: true,
+          state: true,
+          basisMinor: true,
+          amountMinor: true,
+          currency: true,
+          payableAt: true,
+          paidAt: true,
+          reversedAt: true,
+        },
       });
     if (reportType === 'REFERRAL_SETTLEMENTS') {
       const rows = await this.prisma.partnerSettlement.findMany({
-        where: { ...(filters.partnerUserId ? { partnerUserId: filters.partnerUserId } : {}), ...dateFilter, lines: { some: { allocation: { kind: 'REFERRAL_COMMISSION' } } } },
-        select: { createdAt: true, partnerUserId: true, paymentReference: true, currency: true, paidAt: true, lines: { where: { allocation: { kind: 'REFERRAL_COMMISSION' } }, select: { allocation: { select: { amountMinor: true } } } } },
+        where: {
+          ...(filters.partnerUserId
+            ? { partnerUserId: filters.partnerUserId }
+            : {}),
+          ...dateFilter,
+          lines: { some: { allocation: { kind: 'REFERRAL_COMMISSION' } } },
+        },
+        select: {
+          createdAt: true,
+          partnerUserId: true,
+          paymentReference: true,
+          currency: true,
+          paidAt: true,
+          lines: {
+            where: { allocation: { kind: 'REFERRAL_COMMISSION' } },
+            select: { allocation: { select: { amountMinor: true } } },
+          },
+        },
       });
-      return rows.map((row) => ({ createdAt: row.createdAt, partnerUserId: row.partnerUserId, paymentReference: row.paymentReference, currency: row.currency, paidAt: row.paidAt, referralAllocationCount: row.lines.length, referralTotalMinor: row.lines.reduce((sum, line) => sum + line.allocation.amountMinor, 0) }));
+      return rows.map((row) => ({
+        createdAt: row.createdAt,
+        partnerUserId: row.partnerUserId,
+        paymentReference: row.paymentReference,
+        currency: row.currency,
+        paidAt: row.paidAt,
+        referralAllocationCount: row.lines.length,
+        referralTotalMinor: row.lines.reduce(
+          (sum, line) => sum + line.allocation.amountMinor,
+          0,
+        ),
+      }));
     }
     return this.prisma.studentEntitlement.findMany({
       where: dateFilter,

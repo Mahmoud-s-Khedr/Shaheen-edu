@@ -65,6 +65,18 @@ export class AdminPartnersController {
     return this.partnersService.getById(id);
   }
 
+  @Get(':id/detail')
+  @ApiOperation({
+    summary:
+      'Get administrative partner account, programme, ledger, and audit history',
+    description:
+      'Administrative aggregate history only. This response never includes learner identities or order records.',
+  })
+  @ApiStandardErrors(401, 403, 404)
+  detail(@CurrentUser() actor: RequestUser, @Param('id') id: string) {
+    return this.partnersService.detail(actor, id);
+  }
+
   @Patch(':id')
   @ApiOperation({ summary: 'Update a partner profile' })
   @ApiOkResponse({ type: PartnerSummaryDto })
