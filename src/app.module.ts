@@ -39,6 +39,9 @@ import { PerformanceModule } from './modules/performance/performance.module';
 import { PartnerAnalyticsModule } from './modules/partner-analytics/partner-analytics.module';
 import { QuestionImportModule } from './modules/ai-question-import/question-import.module';
 import { QuestionAiExplanationsModule } from './modules/ai-question-explanations/question-ai-explanations.module';
+import { ReferralsModule } from './modules/referrals/referrals.module';
+import { PartnerFinanceModule } from './modules/partner-finance/partner-finance.module';
+import { ReportsModule } from './modules/reports/reports.module';
 import { UserAuthGuard } from './common/guards/user-auth.guard';
 import type { IncomingMessage } from 'http';
 import { normalizeCorrelationId } from './common/logging/correlation-id';
@@ -102,6 +105,9 @@ import { normalizeCorrelationId } from './common/logging/correlation-id';
     LeaderboardModule,
     PerformanceModule,
     PartnerAnalyticsModule,
+    ReferralsModule,
+    PartnerFinanceModule,
+    ReportsModule,
     QuestionImportModule,
     QuestionAiExplanationsModule,
   ],

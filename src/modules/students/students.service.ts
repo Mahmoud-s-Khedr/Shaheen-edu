@@ -18,7 +18,7 @@ import type { UpdateStudentDto } from './dto/update-student.dto';
 import type { QueryAdminStudentsDto } from './dto/query-admin-students.dto';
 import type { DeleteStudentDto } from './dto/delete-student.dto';
 import type { RequestUser } from '../../common/types/request-with-user.types';
-import { toPaginationMeta } from '../../common/dto/pagination-query.dto';
+import { toPaginationMeta, type PaginationQueryDto } from '../../common/dto/pagination-query.dto';
 import {
   arabicMatch,
   paginateArabicSearch,
@@ -254,6 +254,48 @@ export class StudentsService {
     });
     if (!student) throw new NotFoundException('Student not found');
     return this.toAdminStudent(student);
+  }
+
+  async student360(actor: RequestUser, targetId: string, reason?: string) {
+    this.assertAdmin(actor);
+    const student = await this.prisma.user.findFirst({ where: { id: targetId, role: Role.STUDENT }, select: this.adminStudentSelect });
+    if (!student) throw new NotFoundException('Student not found');
+    const now = new Date();
+    const [access, commerce, assessments] = await Promise.all([
+      this.prisma.studentEntitlement.count({ where: { studentUserId: targetId, status: 'ACTIVE', startsAt: { lte: now }, OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] } }),
+      this.prisma.order.aggregate({ where: { studentUserId: targetId }, _count: true, _sum: { totalMinor: true }, }),
+      this.prisma.assessmentAttempt.aggregate({ where: { studentUserId: targetId }, _count: true, _avg: { score: true }, }),
+    ]);
+    await this.auditService.record({ actorUserId: actor.id, action: 'STUDENT_360_VIEWED', targetType: 'User', targetId, metadata: { sections: ['profile', 'access', 'commerce', 'performance'], ...(reason?.trim() ? { reason: reason.trim() } : {}) } });
+    return { profile: this.toAdminStudent(student), access: { activeEntitlements: access }, commerce: { orders: commerce._count, totalMinor: commerce._sum.totalMinor ?? 0, currency: 'EGP' }, performance: { assessmentAttempts: assessments._count, averageScore: assessments._avg.score } };
+  }
+
+  async student360Orders(actor: RequestUser, targetId: string, query: PaginationQueryDto, reason?: string) {
+    this.assertAdmin(actor); await this.getStudentOrThrow(targetId);
+    const where = { studentUserId: targetId }; const [data, total] = await this.prisma.$transaction([this.prisma.order.findMany({ where, select: { id: true, paymentChannel: true, subtotalMinor: true, discountMinor: true, totalMinor: true, currency: true, status: true, createdAt: true, approvedAt: true, cancelledAt: true, items: { select: { id: true, targetType: true, titleSnapshot: true, priceMinor: true, currency: true } } }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], skip: (query.page - 1) * query.limit, take: query.limit }), this.prisma.order.count({ where })]);
+    await this.auditService.record({ actorUserId: actor.id, action: 'STUDENT_360_ORDERS_VIEWED', targetType: 'User', targetId, metadata: { page: query.page, ...(reason?.trim() ? { reason: reason.trim() } : {}) } });
+    return { data, meta: toPaginationMeta(query.page, query.limit, total) };
+  }
+
+  async student360Entitlements(actor: RequestUser, targetId: string, query: PaginationQueryDto, reason?: string) {
+    this.assertAdmin(actor); await this.getStudentOrThrow(targetId);
+    const where = { studentUserId: targetId }; const [data, total] = await this.prisma.$transaction([this.prisma.studentEntitlement.findMany({ where, select: { id: true, source: true, status: true, startsAt: true, expiresAt: true, revokedAt: true, createdAt: true, course: { select: { title: true } }, chapter: { select: { title: true } } }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], skip: (query.page - 1) * query.limit, take: query.limit }), this.prisma.studentEntitlement.count({ where })]);
+    await this.auditService.record({ actorUserId: actor.id, action: 'STUDENT_360_ENTITLEMENTS_VIEWED', targetType: 'User', targetId, metadata: { page: query.page, ...(reason?.trim() ? { reason: reason.trim() } : {}) } });
+    return { data, meta: toPaginationMeta(query.page, query.limit, total) };
+  }
+
+  async student360Assessments(actor: RequestUser, targetId: string, query: PaginationQueryDto, reason?: string) {
+    this.assertAdmin(actor); await this.getStudentOrThrow(targetId);
+    const where = { studentUserId: targetId }; const [data, total] = await this.prisma.$transaction([this.prisma.assessmentAttempt.findMany({ where, select: { id: true, status: true, startedAt: true, submittedAt: true, score: true, totalPoints: true, totalQuestions: true, assessment: { select: { id: true, title: true, mode: true, generationType: true } } }, orderBy: [{ startedAt: 'desc' }, { id: 'desc' }], skip: (query.page - 1) * query.limit, take: query.limit }), this.prisma.assessmentAttempt.count({ where })]);
+    await this.auditService.record({ actorUserId: actor.id, action: 'STUDENT_360_ASSESSMENTS_VIEWED', targetType: 'User', targetId, metadata: { page: query.page, ...(reason?.trim() ? { reason: reason.trim() } : {}) } });
+    return { data, meta: toPaginationMeta(query.page, query.limit, total) };
+  }
+
+  async student360AuditEvents(actor: RequestUser, targetId: string, query: PaginationQueryDto, reason?: string) {
+    this.assertAdmin(actor); await this.getStudentOrThrow(targetId);
+    const where = { targetId }; const [data, total] = await this.prisma.$transaction([this.prisma.adminAuditLog.findMany({ where, select: { id: true, action: true, targetType: true, createdAt: true, correlationId: true, actor: { select: { id: true, loginIdentifier: true } } }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], skip: (query.page - 1) * query.limit, take: query.limit }), this.prisma.adminAuditLog.count({ where })]);
+    await this.auditService.record({ actorUserId: actor.id, action: 'STUDENT_360_AUDIT_VIEWED', targetType: 'User', targetId, metadata: { page: query.page, ...(reason?.trim() ? { reason: reason.trim() } : {}) } });
+    return { data, meta: toPaginationMeta(query.page, query.limit, total) };
   }
 
   async suspend(actor: RequestUser, targetId: string) {

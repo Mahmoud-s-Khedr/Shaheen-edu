@@ -13,6 +13,7 @@ export async function cleanDatabase(
   app: NestFastifyApplication,
 ): Promise<void> {
   const prisma = app.get(PrismaService);
+  await prisma.reportExportJob.deleteMany();
   await prisma.adminAuditLog.deleteMany();
   await prisma.authSession.deleteMany();
   await prisma.parentAccessSession.deleteMany();
@@ -23,6 +24,10 @@ export async function cleanDatabase(
   await prisma.archivedAccessSnapshot.deleteMany();
   // Entitlements hold restrictive FKs to Course, Chapter, and OrderItem, so they
   // must go before the hierarchy rows below and before the commerce rows.
+  await prisma.partnerSettlementLine.deleteMany();
+  await prisma.partnerSettlement.deleteMany();
+  await prisma.partnerAllocation.deleteMany();
+  await prisma.orderReferralAttribution.deleteMany();
   await prisma.studentEntitlement.deleteMany();
   await prisma.paymentReceipt.deleteMany();
   await prisma.paymobWebhookEvent.deleteMany();
@@ -44,6 +49,9 @@ export async function cleanDatabase(
   await prisma.manualPaymentMethod.deleteMany();
   await prisma.publisherEarningsStatement.deleteMany();
   await prisma.publisherAgreement.deleteMany();
+  await prisma.referralCommissionRule.deleteMany();
+  await prisma.referralCode.deleteMany();
+  await prisma.referralProgram.deleteMany();
   // Assessment cascades to its scopes/snapshot/attempts, but AssessmentScope
   // holds restrictive FKs to Course/Chapter/Lesson/Section, so it must go
   // before the hierarchy rows below. StudentQuestionAttempt and Question hold

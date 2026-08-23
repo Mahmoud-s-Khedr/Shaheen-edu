@@ -56,6 +56,13 @@ export interface AppConfig {
     ip: { maxAttempts: number; windowSeconds: number };
   };
   platformComparisonMinSample: number;
+  features: {
+    referralsEnabled: boolean;
+    referralAllowedStudentIds: string[];
+    partnerLedgerEnabled: boolean;
+    partnerLedgerAllowedUserIds: string[];
+    reportExportsEnabled: boolean;
+  };
   commerce: {
     paymobBaseUrl: string;
     paymobSecretKey: string;
@@ -221,6 +228,13 @@ export default (): AppConfig => ({
     },
   },
   platformComparisonMinSample: envInteger('PLATFORM_COMPARISON_MIN_SAMPLE', 10),
+  features: {
+    referralsEnabled: (process.env.FEATURE_REFERRALS_ENABLED ?? 'false') === 'true',
+    referralAllowedStudentIds: (process.env.FEATURE_REFERRAL_ALLOWED_STUDENT_IDS ?? '').split(',').map((value) => value.trim()).filter(Boolean),
+    partnerLedgerEnabled: (process.env.FEATURE_PARTNER_LEDGER_ENABLED ?? 'false') === 'true',
+    partnerLedgerAllowedUserIds: (process.env.FEATURE_PARTNER_LEDGER_ALLOWED_USER_IDS ?? '').split(',').map((value) => value.trim()).filter(Boolean),
+    reportExportsEnabled: (process.env.FEATURE_REPORT_EXPORTS_ENABLED ?? 'false') === 'true',
+  },
   commerce: {
     paymobBaseUrl: process.env.PAYMOB_BASE_URL ?? 'https://accept.paymob.com',
     paymobSecretKey: process.env.PAYMOB_SECRET_KEY ?? '',

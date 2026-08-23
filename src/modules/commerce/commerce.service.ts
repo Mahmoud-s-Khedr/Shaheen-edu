@@ -56,6 +56,7 @@ const published = ContentStatus.PUBLISHED;
 @Injectable()
 export class CommerceService {
   private readonly commerceConfig: AppConfig['commerce'];
+  private readonly features: AppConfig['features'];
   constructor(
     private readonly prisma: PrismaService,
     private readonly assets: AssetsService,
@@ -76,6 +77,10 @@ export class CommerceService {
       paymobTimeoutMs: 15000,
       paymobOrderExpirySeconds: 1800,
       manualOrderExpirySeconds: 86400,
+    };
+    this.features = config?.get('features', { infer: true }) ?? {
+      referralsEnabled: false, referralAllowedStudentIds: [], partnerLedgerEnabled: false,
+      partnerLedgerAllowedUserIds: [], reportExportsEnabled: false,
     };
   }
   private admin(actor: RequestUser) {
@@ -260,7 +265,49 @@ export class CommerceService {
     const targets = await Promise.all(
       dto.targets.map((target) => this.target(studentUserId, target)),
     );
-    return this.pricing!.quote(targets, dto.couponCode, studentUserId);
+    const quote = await this.pricing!.quote(targets, dto.couponCode, studentUserId);
+    const referral = dto.referralCode
+      ? await this.resolveReferral(dto.referralCode, studentUserId, targets)
+      : null;
+    return { ...quote, referral: referral ? { code: referral.code, programId: referral.programId } : null };
+  }
+
+  private async resolveReferral(code: string, studentUserId: string, targets: Target[], client: any = this.prisma) {
+    if (!this.features.referralsEnabled || (this.features.referralAllowedStudentIds.length && !this.features.referralAllowedStudentIds.includes('*') && !this.features.referralAllowedStudentIds.includes(studentUserId))) throw new ConflictException('Referral codes are not enabled for this account');
+    const now = new Date(); const normalized = code.trim().toUpperCase();
+    const referral = await client.referralCode.findUnique({ where: { code: normalized }, include: {
+      program: { include: { rules: { where: { isActive: true, startsAt: { lte: now }, OR: [{ endsAt: null }, { endsAt: { gt: now } }] }, orderBy: { version: 'desc' }, take: 1 } } },
+    } });
+    if (!referral || !referral.isActive || (referral.startsAt && referral.startsAt > now) || (referral.endsAt && referral.endsAt <= now) ||
+      referral.program.status !== 'ACTIVE' || referral.program.startsAt > now || (referral.program.endsAt && referral.program.endsAt <= now))
+      throw new BadRequestException('Referral code is not eligible');
+    if (referral.program.partnerUserId === studentUserId) throw new ForbiddenException('Self-referral is not allowed');
+    if (!referral.program.appliesToAll && !targets.some((target) => target.courseForCoverage === referral.program.courseId || target.chapterId === referral.program.chapterId))
+      throw new BadRequestException('Referral code is not eligible for this cart');
+    const approved = { order: { status: OrderStatus.APPROVED } };
+    const [programUses, codeUses, programStudentUses, codeStudentUses] = await Promise.all([
+      client.orderReferralAttribution.count({ where: { referralProgramId: referral.programId, ...approved } }),
+      client.orderReferralAttribution.count({ where: { referralCodeId: referral.id, ...approved } }),
+      client.orderReferralAttribution.count({ where: { referralProgramId: referral.programId, studentUserId, ...approved } }),
+      client.orderReferralAttribution.count({ where: { referralCodeId: referral.id, studentUserId, ...approved } }),
+    ]);
+    if ((referral.program.usageLimit !== null && referral.program.usageLimit !== undefined && programUses >= referral.program.usageLimit) ||
+      (referral.usageLimit !== null && referral.usageLimit !== undefined && codeUses >= referral.usageLimit) ||
+      (referral.program.perStudentUsageLimit !== null && referral.program.perStudentUsageLimit !== undefined && programStudentUses >= referral.program.perStudentUsageLimit) ||
+      (referral.perStudentUsageLimit !== null && referral.perStudentUsageLimit !== undefined && codeStudentUses >= referral.perStudentUsageLimit))
+      throw new BadRequestException('Referral code usage limit has been reached');
+    const rule = referral.program.rules[0]; if (!rule) throw new BadRequestException('Referral code has no active commission rule');
+    return {
+      code: referral.code, codeId: referral.id, programId: referral.programId, rule,
+      partnerUserId: referral.program.partnerUserId,
+      snapshot: {
+        code: referral.code, codeId: referral.id, programId: referral.programId,
+        partnerUserId: referral.program.partnerUserId, ruleId: rule.id, version: rule.version,
+        kind: rule.kind, percentageBps: rule.percentageBps,
+        fixedCommissionMinor: rule.fixedCommissionMinor,
+        maximumCommissionMinor: rule.maximumCommissionMinor, currency: rule.currency,
+      },
+    };
   }
   async cart(studentUserId: string) {
     const cart = await this.prisma.cart.findUnique({
@@ -385,6 +432,9 @@ export class CommerceService {
             studentUserId,
             tx,
           );
+          const referral = dto.referralCode
+            ? await this.resolveReferral(dto.referralCode, studentUserId, targets, tx)
+            : null;
           const paymentExpiresAt = new Date(
             Date.now() +
               (paymentChannel === PaymentChannel.PAYMOB
@@ -428,6 +478,10 @@ export class CommerceService {
                     },
                   }
                 : undefined,
+              referralAttribution: referral ? { create: {
+                studentUserId, referralCodeId: referral.codeId, referralProgramId: referral.programId,
+                ruleId: referral.rule.id, snapshot: referral.snapshot,
+              } } : undefined,
             },
             include: { items: true },
           });

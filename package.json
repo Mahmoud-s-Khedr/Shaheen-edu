@@ -64,6 +64,8 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:migrate:deploy": "prisma migrate deploy",
     "prisma:seed": "ts-node prisma/seed.ts",
+    "assessment-attribution:backfill": "tsx scripts/backfill-assessment-attribution.ts",
+    "partner-allocations:reconcile": "tsx scripts/reconcile-partner-allocations.ts",
     "question-banks:subjects:report": "tsx scripts/remediate-question-bank-subjects.ts --report",
     "question-banks:subjects:check": "tsx scripts/remediate-question-bank-subjects.ts --check",
     "docker:up": "docker compose up -d",

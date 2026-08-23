@@ -23,6 +23,7 @@ import {
   SetPricingDto,
   UpdatePublisherAgreementDto,
   PublisherAgreementsQueryDto,
+  ReplacePublisherAgreementDto,
 } from './dto/publisher-agreements.dto';
 import { PublisherAgreementsService } from './publisher-agreements.service';
 
@@ -54,6 +55,15 @@ export class PublisherAgreementsController {
   @ApiOperation({ summary: 'Activate a publisher agreement' })
   activate(@CurrentUser() actor: RequestUser, @Param('id') id: string) {
     return this.service.activate(actor, id);
+  }
+  @Post(':id/replace')
+  @ApiOperation({ summary: 'Create an immutable successor version for an active publisher agreement' })
+  replace(
+    @CurrentUser() actor: RequestUser,
+    @Param('id') id: string,
+    @Body() dto: ReplacePublisherAgreementDto,
+  ) {
+    return this.service.replace(actor, id, dto);
   }
   @Post(':id/end') @ApiOperation({ summary: 'End a publisher agreement' }) end(
     @CurrentUser() actor: RequestUser,

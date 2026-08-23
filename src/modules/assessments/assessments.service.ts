@@ -560,10 +560,24 @@ export class AssessmentsService {
     });
     for (let i = 0; i < params.questions.length; i++) {
       const question = params.questions[i];
+      const source = await tx.questionSource.findUnique({
+        where: { id: question.sourceId },
+        include: { publisher: { select: { displayName: true } } },
+      });
       const snapshotQuestion = await tx.assessmentQuestion.create({
         data: {
           assessmentId: assessment.id,
           sourceQuestionId: question.id,
+          attributions: {
+            create: {
+              sourceId: source?.id ?? null,
+              sourceTitle: source?.titleAr ?? null,
+              sourceType: source?.type ?? null,
+              publisherUserId: source?.publisherUserId ?? null,
+              publisherDisplayName: source?.publisher?.displayName ?? null,
+              role: source ? 'PRIMARY' : 'UNKNOWN_LEGACY',
+            },
+          },
           sortOrder: i + 1,
           type: question.type,
           body: question.body,

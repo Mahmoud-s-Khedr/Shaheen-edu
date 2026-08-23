@@ -11,11 +11,15 @@ import {
 } from '../../common/types/roles.enum';
 import { toPaginationMeta } from '../../common/dto/pagination-query.dto';
 import { PrismaService } from '../../database/prisma.service';
+import { ConfigService } from '@nestjs/config';
+import type { AppConfig } from '../../config/configuration';
 import type {
   PartnerContentQueryDto,
+  PartnerAllocationsQueryDto,
   PartnerEarningsQueryDto,
   PartnerPeriodQueryDto,
   PartnerStatementsQueryDto,
+  PartnerQuestionUsageQueryDto,
 } from './dto/partner-analytics.dto';
 
 const CAIRO = 'Africa/Cairo';
@@ -29,12 +33,13 @@ type Agreement = {
   startsAt: Date;
   endsAt: Date | null;
   status: PublisherAgreementStatus;
-  revenueShareBps: number;
+  revenueShareBps: number | null;
 };
 
 @Injectable()
 export class PartnerAnalyticsService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly ledgerFeature: AppConfig['features'];
+  constructor(private readonly prisma: PrismaService, config?: ConfigService<AppConfig, true>) { this.ledgerFeature = config?.get('features', { infer: true }) ?? { referralsEnabled: false, referralAllowedStudentIds: [], partnerLedgerEnabled: false, partnerLedgerAllowedUserIds: [], reportExportsEnabled: false }; }
 
   private money(amountMinor = 0) {
     return { amountMinor, currency: EGP };
@@ -50,6 +55,14 @@ export class PartnerAnalyticsService {
         'Content publisher reporting is not available for this partner',
       );
     }
+  }
+  private async partner(userId: string) {
+    const profile = await this.prisma.partnerProfile.findUnique({ where: { userId }, select: { userId: true } });
+    if (!profile) throw new ForbiddenException('Partner reporting is not available for this account');
+  }
+  private assertLedgerAvailable(userId: string) {
+    const allowed = this.ledgerFeature.partnerLedgerAllowedUserIds;
+    if (!this.ledgerFeature.partnerLedgerEnabled || (allowed.length && !allowed.includes('*') && !allowed.includes(userId))) throw new ForbiddenException('Partner ledger reporting is not enabled for this account');
   }
 
   private period(query: PartnerPeriodQueryDto): Period {
@@ -169,7 +182,7 @@ export class PartnerAnalyticsService {
           approvedAt: order.approvedAt,
           grossRevenueMinor: item.priceMinor,
           publisherEarningsMinor: Math.floor(
-            (item.priceMinor * agreement.revenueShareBps) / 10_000,
+            (item.priceMinor * (agreement.revenueShareBps ?? 0)) / 10_000,
           ),
         });
       }
@@ -332,6 +345,75 @@ export class PartnerAnalyticsService {
     };
   }
 
+  async allocations(userId: string, query: PartnerAllocationsQueryDto) {
+    await this.partner(userId); this.assertLedgerAvailable(userId);
+    const period = this.period(query);
+    const { page, limit } = query;
+    const [data, total] = await this.prisma.$transaction([
+      this.prisma.partnerAllocation.findMany({
+        where: { partnerUserId: userId, createdAt: { gte: period.from, lt: period.to } },
+        select: { id: true, kind: true, state: true, basisMinor: true, amountMinor: true, currency: true, createdAt: true, paidAt: true, reversedAt: true, publisherAgreementId: true },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], skip: (page - 1) * limit, take: limit,
+      }),
+      this.prisma.partnerAllocation.count({ where: { partnerUserId: userId, createdAt: { gte: period.from, lt: period.to } } }),
+    ]);
+    return { data: data.map((row) => ({ ...row, basis: this.money(row.basisMinor), amount: this.money(row.amountMinor) })), meta: toPaginationMeta(page, limit, total) };
+  }
+
+  async ledgerDashboard(userId: string, query: PartnerPeriodQueryDto) {
+    await this.partner(userId); this.assertLedgerAvailable(userId); const period = this.period(query);
+    const rows = await this.prisma.partnerAllocation.findMany({ where: { partnerUserId: userId, createdAt: { gte: period.from, lt: period.to } }, select: { state: true, amountMinor: true, createdAt: true, currency: true } });
+    const totals = { pending: 0, payable: 0, paid: 0, reversed: 0, net: 0 };
+    const daily = new Map<string, { period: string; earnedMinor: number; paidMinor: number; reversedMinor: number }>();
+    for (const row of rows) {
+      if (row.currency !== EGP) continue;
+      const amount = row.amountMinor;
+      if (row.state === 'PENDING') totals.pending += amount;
+      if (row.state === 'PAYABLE') totals.payable += amount;
+      if (row.state === 'PAID') totals.paid += amount;
+      if (row.state === 'REVERSED') totals.reversed += amount;
+      totals.net += row.state === 'REVERSED' ? -amount : amount;
+      const key = this.label(row.createdAt, 'day'); const trend = daily.get(key) ?? { period: key, earnedMinor: 0, paidMinor: 0, reversedMinor: 0 };
+      if (row.state !== 'REVERSED') trend.earnedMinor += amount;
+      if (row.state === 'PAID') trend.paidMinor += amount;
+      if (row.state === 'REVERSED') trend.reversedMinor += amount;
+      daily.set(key, trend);
+    }
+    return { period: { from: period.fromDate, to: period.toDate, timeZone: CAIRO }, totals: Object.fromEntries(Object.entries(totals).map(([key, amountMinor]) => [key, this.money(amountMinor)])), trend: [...daily.values()].sort((a, b) => a.period.localeCompare(b.period)).map((row) => ({ period: row.period, earned: this.money(row.earnedMinor), paid: this.money(row.paidMinor), reversed: this.money(row.reversedMinor) })) };
+  }
+
+  private async usage(userId: string, query: PartnerQuestionUsageQueryDto) {
+    await this.publisher(userId); const period = this.period(query);
+    if (DateTime.fromJSDate(period.to).diff(DateTime.fromJSDate(period.from), 'days').days > 93) throw new BadRequestException('Question-usage ranges are limited to 93 days');
+    const attempts = await this.prisma.assessmentAttempt.findMany({ where: { startedAt: { gte: period.from, lt: period.to } }, select: {
+      studentUserId: true, startedAt: true,
+      assessment: { select: { questions: { select: { id: true, sourceQuestionId: true, body: true, attributions: { where: { publisherUserId: userId, ...(query.sourceId ? { sourceId: query.sourceId } : {}) }, select: { sourceId: true, sourceTitle: true } } } } } },
+      answers: { select: { assessmentQuestionId: true, isCorrect: true, gradedAt: true } },
+    } });
+    const sources = new Map<string, any>(); const questions = new Map<string, any>(); const occurrences = new Map<string, Array<{ startedAt: Date; sourceId: string }>>();
+    const source = (id: string, title: string | null) => sources.get(id) ?? { sourceId: id, sourceTitle: title, presented: 0, solved: 0, correct: 0, graded: 0, unique: new Set<string>(), reattempts: 0 };
+    for (const attempt of attempts) {
+      const answers = new Map(attempt.answers.map((answer) => [answer.assessmentQuestionId, answer]));
+      for (const question of attempt.assessment.questions) for (const attribution of question.attributions) {
+        const sourceId = attribution.sourceId ?? 'unknown'; const row = source(sourceId, attribution.sourceTitle); row.presented += 1; sources.set(sourceId, row);
+        const questionKey = `${sourceId}:${question.sourceQuestionId}`; const questionRow = questions.get(questionKey) ?? { sourceId, sourceTitle: attribution.sourceTitle, sourceQuestionId: question.sourceQuestionId, presented: 0, solved: 0, correct: 0, graded: 0, unique: new Set<string>(), reattempts: 0 };
+        questionRow.presented += 1; questions.set(questionKey, questionRow);
+        const answer = answers.get(question.id); if (!answer) continue;
+        row.solved += 1; row.unique.add(attempt.studentUserId); questionRow.solved += 1; questionRow.unique.add(attempt.studentUserId);
+        if (answer.isCorrect !== null) { row.graded += 1; questionRow.graded += 1; if (answer.isCorrect) { row.correct += 1; questionRow.correct += 1; } }
+        const occurrenceKey = `${attempt.studentUserId}:${questionKey}`; const list = occurrences.get(occurrenceKey) ?? []; list.push({ startedAt: attempt.startedAt, sourceId }); occurrences.set(occurrenceKey, list);
+      }
+    }
+    for (const list of occurrences.values()) if (list.length > 1) { list.sort((a, b) => a.startedAt.valueOf() - b.startedAt.valueOf()); const sourceRow = sources.get(list[0].sourceId); if (sourceRow) sourceRow.reattempts += list.length - 1; }
+    const available = await this.prisma.question.count({ where: { source: { publisherUserId: userId, status: 'PUBLISHED' }, status: 'PUBLISHED', ...(query.sourceId ? { sourceId: query.sourceId } : {}) } });
+    const normalize = (row: any) => ({ ...row, uniqueSolvers: row.unique.size, usageRate: { numerator: row.solved, denominator: row.presented, value: row.presented ? row.solved / row.presented : 0 }, correctRate: { numerator: row.correct, denominator: row.graded, value: row.graded ? row.correct / row.graded : null } });
+    const sourceRows = [...sources.values()].map(normalize); const questionRows = [...questions.values()].map(normalize);
+    return { period, available, sourceRows, questionRows, totals: normalize(sourceRows.reduce((total: any, row: any) => ({ sourceId: 'all', sourceTitle: null, presented: total.presented + row.presented, solved: total.solved + row.solved, correct: total.correct + row.correct, graded: total.graded + row.graded, unique: new Set([...total.unique, ...row.unique]), reattempts: total.reattempts + row.reattempts }), { sourceId: 'all', sourceTitle: null, presented: 0, solved: 0, correct: 0, graded: 0, unique: new Set<string>(), reattempts: 0 })) };
+  }
+  async questionUsage(userId: string, query: PartnerQuestionUsageQueryDto) { const usage = await this.usage(userId, query); return { period: { from: usage.period.fromDate, to: usage.period.toDate, timeZone: CAIRO }, availableQuestions: usage.available, ...usage.totals, metricDefinitions: { presented: 'Frozen publisher-attributed assessment questions in started attempts.', solved: 'Presented questions with a submitted answer.', uniqueSolvers: 'Distinct students with at least one submitted answer.', correctRate: 'Correct final answers divided by graded answers.', usageRate: 'Solved questions divided by presented questions.' } }; }
+  async questionUsageSources(userId: string, query: PartnerQuestionUsageQueryDto) { const usage = await this.usage(userId, query); const data = usage.sourceRows.sort((a, b) => b.solved - a.solved || a.sourceId.localeCompare(b.sourceId)); return { data: data.slice((query.page - 1) * query.limit, query.page * query.limit), meta: toPaginationMeta(query.page, query.limit, data.length) }; }
+  async questionUsageQuestions(userId: string, query: PartnerQuestionUsageQueryDto) { const usage = await this.usage(userId, query); const data = usage.questionRows.sort((a, b) => b.solved - a.solved || a.sourceQuestionId.localeCompare(b.sourceQuestionId)); return { data: data.slice((query.page - 1) * query.limit, query.page * query.limit), meta: toPaginationMeta(query.page, query.limit, data.length) }; }
+
   async content(userId: string, query: PartnerContentQueryDto) {
     await this.publisher(userId);
     const where = {
@@ -376,7 +458,7 @@ export class PartnerAnalyticsService {
       data: data.map((item) => ({
         id: item.id,
         status: item.status,
-        revenueShareBps: item.revenueShareBps,
+        revenueShareBps: item.revenueShareBps ?? 0,
         startsAt: item.startsAt,
         endsAt: item.endsAt,
         isCurrentlyActive: this.isCurrent(item),

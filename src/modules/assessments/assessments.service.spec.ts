@@ -30,6 +30,7 @@ describe('AssessmentsService', () => {
       lesson: { findUnique: jest.fn() },
       section: { findUnique: jest.fn() },
       question: { findMany: jest.fn().mockResolvedValue([]) },
+      questionSource: { findUnique: jest.fn().mockResolvedValue(null) },
       questionBank: {
         findMany: jest.fn().mockResolvedValue([]),
         findFirst: jest.fn(),

@@ -39,6 +39,11 @@ export class PricePreviewDto {
   @IsString()
   @MaxLength(80)
   couponCode?: string;
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  referralCode?: string;
 }
 export class CheckoutDto {
   @ApiPropertyOptional({ enum: PaymentChannel, default: PaymentChannel.MANUAL })
@@ -55,6 +60,12 @@ export class CheckoutDto {
   @MinLength(2)
   @MaxLength(80)
   couponCode?: string;
+  @ApiPropertyOptional({ example: 'PARTNER10' })
+  @IsOptional()
+  @IsString()
+  @MinLength(2)
+  @MaxLength(80)
+  referralCode?: string;
 }
 export class PromotionTargetDto {
   @ApiPropertyOptional() @IsOptional() @IsString() courseId?: string;

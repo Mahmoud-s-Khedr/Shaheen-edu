@@ -30,7 +30,9 @@ The material remaining work is concentrated in these areas:
 2. Refunds and the remaining post-payment commercial lifecycle.
 3. Durable parent accounts/relationships, parent commerce views, and parent
    administration.
-4. Consolidated admin reporting/exports and the referral-partner model.
+4. Consolidated admin reporting/exports, Student 360, and the remaining
+   referral-partner administration/reporting work. The financial/referral
+   attribution foundation is now implemented.
 5. A business decision on subject-level products; the current commercial model
    deliberately sells courses and chapters only.
 
@@ -48,6 +50,7 @@ choices, so a percentage would obscure the actionable backlog below.
 | AI quiz and question intelligence      | Student AI-prompt assessment generation, constrained to permitted questions; a ranked, entitlement-safe community-incorrect feed; tutor assessment creation; and student question reporting/admin moderation are implemented. See [`assessments.controller.ts`](../src/modules/assessments/assessments.controller.ts), [`question-intelligence.controller.ts`](../src/modules/assessments/question-intelligence.controller.ts), and [`assessments.service.ts`](../src/modules/assessments/assessments.service.ts). |
 | AI explanation and review support      | Admin-generated/reviewed question explanations, AI re-answer review, long-answer transcription/grading, and video-timestamp snapshots are implemented. This is not a per-student AI chat/hint service. See [`ai-question-explanations`](../src/modules/ai-question-explanations) and [`assessments.service.ts`](../src/modules/assessments/assessments.service.ts).                                                                                                                                                |
 | Parent learning/performance monitoring | A selected-child parent session can retrieve progress, assessment/practice analytics, unified performance overview, analysis, trends, and insights. See [`learning.controller.ts`](../src/modules/learning/learning.controller.ts) and [`parent-performance.controller.ts`](../src/modules/performance/parent-performance.controller.ts).                                                                                                                                                                          |
+| Partner finance and referral foundation | Additive schema/migration now provides partner allocations/settlements, fixed or percentage publisher payout data, referral programs/codes/rules, provisional order referral attribution, and frozen assessment source/publisher attribution. Fulfilment creates idempotent publisher/referral allocations from approved order items. See [`fulfilment.service.ts`](../src/modules/commerce/fulfilment.service.ts), [`commerce.service.ts`](../src/modules/commerce/commerce.service.ts), and [`schema.prisma`](../prisma/schema.prisma). |
 
 ## Remaining feature gaps
 
@@ -112,7 +115,7 @@ Evidence: [`parent-auth.controller.ts`](../src/modules/auth/controllers/parent-a
 | -------- | ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | P1       | Consolidated student 360 view             | Student administration, orders, entitlements, audit records, and performance are separate APIs.                                                                         | Add an authorized student-detail composition endpoint with explicit PII rules, summary/performance/access/orders data, pagination for large collections, and audit logging.                    |
 | P1       | Subscriber export and platform reporting  | There is no CSV/XLSX export or platform-wide revenue/payment/refund/sales/entitlement report. Publisher reporting is separate and partner-scoped.                       | Specify report dimensions and retention; add filtered export jobs, secure expiring download delivery, authorization/audit logs, and platform financial aggregates.                             |
-| P2       | Referral-partner reporting and assignment | The implemented partner model supports content publishers, agreements, and aggregate earnings only. It has no referral attribution or learner-level partner assignment. | Only if this is the intended partner business model: add attribution at registration/order time, conversion/revenue-share rules, partner-scoped aggregated reporting, and privacy constraints. |
+| P1       | Referral-partner administration/reporting | Referral program, code, versioned commission-rule, checkout attribution, self-referral prevention, and fulfilment-time commission allocation schema/logic exist. There are no admin CRUD/settlement APIs, usage-limit enforcement, partner dashboards, or aggregate referral reports yet. | Complete referral program/code/rule administration, settlement controls, limits/fraud operations, and privacy-safe aggregate reporting. |
 
 Evidence: [`students.controller.ts`](../src/modules/students/students.controller.ts), [`partner-analytics.controller.ts`](../src/modules/partner-analytics/partner-analytics.controller.ts), and [`publisher-agreements.controller.ts`](../src/modules/publisher-agreements/publisher-agreements.controller.ts).
 
@@ -135,7 +138,7 @@ the business confirms that they are required:
 | ----------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
 | Per-student AI chat, hints, or explanation generation | AI explanations are generated and reviewed by admins, then reused through normal answer reveal. |
 | Subject products                                      | The commercial model sells courses/chapters rather than a subject subscription.                 |
-| Referral network                                      | Partners are content publishers; there is no referral-attribution model.                        |
+| Referral network                                      | The attribution and commission foundation exists; administration, reporting, and operational controls remain pending. |
 | Video-outline topics as assessment scopes             | Curriculum sections are the supported topic scope; video outlines are delivery metadata.        |
 
 ## Recommended implementation order

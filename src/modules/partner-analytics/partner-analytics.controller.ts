@@ -14,9 +14,11 @@ import type { RequestUser } from '../../common/types/request-with-user.types';
 import { PartnerAnalyticsService } from './partner-analytics.service';
 import {
   PartnerContentQueryDto,
+  PartnerAllocationsQueryDto,
   PartnerEarningsQueryDto,
   PartnerPeriodQueryDto,
   PartnerStatementsQueryDto,
+  PartnerQuestionUsageQueryDto,
 } from './dto/partner-analytics.dto';
 
 @ApiTags('partners/analytics')
@@ -56,6 +58,30 @@ export class PartnerAnalyticsController {
   ) {
     return this.analytics.earnings(user.id, query);
   }
+
+  @Get('analytics/allocations')
+  @ApiOperation({ summary: 'List immutable ledger allocations for the authenticated partner' })
+  allocations(@CurrentUser() user: RequestUser, @Query() query: PartnerAllocationsQueryDto) {
+    return this.analytics.allocations(user.id, query);
+  }
+
+  @Get('analytics/ledger-dashboard')
+  @ApiOperation({ summary: 'Get aggregate-only allocation totals and trend for the authenticated partner' })
+  ledgerDashboard(@CurrentUser() user: RequestUser, @Query() query: PartnerPeriodQueryDto) {
+    return this.analytics.ledgerDashboard(user.id, query);
+  }
+
+  @Get('analytics/question-usage')
+  @ApiOperation({ summary: 'Get aggregate-only publisher question usage and correctness metrics' })
+  questionUsage(@CurrentUser() user: RequestUser, @Query() query: PartnerQuestionUsageQueryDto) { return this.analytics.questionUsage(user.id, query); }
+
+  @Get('analytics/question-usage/sources')
+  @ApiOperation({ summary: 'Get a paginated source breakdown without learner identity' })
+  questionUsageSources(@CurrentUser() user: RequestUser, @Query() query: PartnerQuestionUsageQueryDto) { return this.analytics.questionUsageSources(user.id, query); }
+
+  @Get('analytics/question-usage/questions')
+  @ApiOperation({ summary: 'Get a paginated frozen-question usage breakdown without learner identity' })
+  questionUsageQuestions(@CurrentUser() user: RequestUser, @Query() query: PartnerQuestionUsageQueryDto) { return this.analytics.questionUsageQuestions(user.id, query); }
 
   @Get('analytics/content')
   @ApiOperation({

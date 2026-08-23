@@ -111,6 +111,46 @@ enum PublisherAgreementStatus {
   ENDED
 }
 
+enum PartnerAllocationKind {
+  PUBLISHER_SALE
+  REFERRAL_COMMISSION
+}
+
+enum PartnerAllocationState {
+  PENDING
+  PAYABLE
+  PAID
+  REVERSED
+}
+
+enum ReferralProgramStatus {
+  DRAFT
+  ACTIVE
+  ENDED
+  SUSPENDED
+}
+
+enum ReferralCommissionKind {
+  PERCENTAGE
+  FIXED_PER_SALE
+  PERCENTAGE_CAPPED
+}
+
+enum AssessmentAttributionRole {
+  PRIMARY
+  CONTRIBUTOR
+  UNKNOWN_LEGACY
+}
+
+enum ReportExportStatus {
+  QUEUED
+  PROCESSING
+  COMPLETED
+  FAILED
+  CANCELLED
+  EXPIRED
+}
+
 enum AssetProvider {
   BUNNY_STORAGE
   BUNNY_STREAM
@@ -441,6 +481,7 @@ model User {
   manualPaymentSubmissionsReviewed ManualPaymentSubmission[]    @relation("ManualPaymentSubmissionReviewedBy")
   publisherAgreementsCreated       PublisherAgreement[]         @relation("PublisherAgreementCreatedBy")
   earningsStatementsCreated        PublisherEarningsStatement[] @relation("EarningsStatementCreatedBy")
+  reportExportsRequested           ReportExportJob[]            @relation("ReportExportRequestedBy")
 
   academicGradesCreated     AcademicGrade[]           @relation("AcademicGradeCreatedBy")
   academicGradesUpdated     AcademicGrade[]           @relation("AcademicGradeUpdatedBy")
@@ -511,6 +552,7 @@ model StudentProfile {
   contentStudyStates      StudentContentStudyState[]
   cart                    Cart?
   orders                  Order[]
+  referralAttributions    OrderReferralAttribution[]
   parentAccessSessions    ParentAccessSession[]
   contentProgress         StudentContentProgress[]
   questionAttempts        StudentQuestionAttempt[]
@@ -539,6 +581,9 @@ model PartnerProfile {
   updatedAt           DateTime             @updatedAt
   publisherAgreements PublisherAgreement[] @relation("AgreementPublisher")
   questionSources     QuestionSource[]     @relation("QuestionSourcePublisher")
+  referralPrograms    ReferralProgram[]    @relation("ReferralProgramPartner")
+  allocations         PartnerAllocation[]  @relation("AllocationPartner")
+  settlements         PartnerSettlement[]  @relation("SettlementPartner")
 }
 
 model AuthSession {
@@ -688,6 +733,7 @@ model Course {
   discountTargets     DiscountCampaignTarget[]     @relation("DiscountCampaignTargetCourse")
   couponTargets       CouponTarget[]               @relation("CouponTargetCourse")
   publisherAgreements PublisherAgreement[]         @relation("PublisherAgreementCourse")
+  referralPrograms    ReferralProgram[]            @relation("ReferralProgramCourse")
   earningsStatements  PublisherEarningsStatement[] @relation("EarningsCourse")
   contentPlacements   ContentPlacement[]           @relation("ContentPlacementCourse")
   coverAsset          Asset?                       @relation("CourseCover", fields: [coverAssetId], references: [id], onDelete: Restrict)
@@ -730,6 +776,7 @@ model Chapter {
   discountTargets     DiscountCampaignTarget[]     @relation("DiscountCampaignTargetChapter")
   couponTargets       CouponTarget[]               @relation("CouponTargetChapter")
   publisherAgreements PublisherAgreement[]         @relation("PublisherAgreementChapter")
+  referralPrograms    ReferralProgram[]            @relation("ReferralProgramChapter")
   earningsStatements  PublisherEarningsStatement[] @relation("EarningsChapter")
   contentPlacements   ContentPlacement[]           @relation("ContentPlacementChapter")
   questionPlacements  QuestionPlacement[]          @relation("QuestionPlacementChapter")
@@ -1705,6 +1752,7 @@ model AssessmentQuestion {
   contexts              AssessmentQuestionContext[]
   attachments           AssessmentQuestionAsset[]
   contentBlocks         AssessmentQuestionContentBlock[]
+  attributions          AssessmentQuestionAttribution[]
 
   @@unique([assessmentId, sortOrder])
   @@index([assessmentId])
@@ -2320,6 +2368,7 @@ model Order {
   paymentAttempts       PaymentAttempt[]
   couponReservation     CouponReservation?
   receipt               PaymentReceipt?
+  referralAttribution   OrderReferralAttribution?
   createdAt             DateTime                  @default(now())
   updatedAt             DateTime                  @updatedAt
   approvedAt            DateTime?
@@ -2349,6 +2398,7 @@ model OrderItem {
   currency                 String
   appliedPromotionSnapshot Json?
   entitlement              StudentEntitlement?
+  allocations              PartnerAllocation[]
   createdAt                DateTime            @default(now())
 
   @@index([orderId])
@@ -2543,31 +2593,225 @@ model CommerceIdempotencyKey {
 }
 
 model PublisherAgreement {
-  id              String                   @id @default(cuid())
-  publisherUserId String
-  publisher       PartnerProfile           @relation("AgreementPublisher", fields: [publisherUserId], references: [userId], onDelete: Restrict)
-  courseId        String?
-  course          Course?                  @relation("PublisherAgreementCourse", fields: [courseId], references: [id], onDelete: Restrict)
-  chapterId       String?
-  chapter         Chapter?                 @relation("PublisherAgreementChapter", fields: [chapterId], references: [id], onDelete: Restrict)
-  lessonId        String?
-  lesson          Lesson?                  @relation("PublisherAgreementLesson", fields: [lessonId], references: [id], onDelete: Restrict)
-  revenueShareBps Int
-  startsAt        DateTime
-  endsAt          DateTime?
-  status          PublisherAgreementStatus @default(DRAFT)
-  isPrimary       Boolean                  @default(true)
-  createdById     String
-  createdBy       User                     @relation("PublisherAgreementCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
-  createdAt       DateTime                 @default(now())
-  updatedAt       DateTime                 @updatedAt
+  id                    String                   @id @default(cuid())
+  publisherUserId       String
+  publisher             PartnerProfile           @relation("AgreementPublisher", fields: [publisherUserId], references: [userId], onDelete: Restrict)
+  courseId              String?
+  course                Course?                  @relation("PublisherAgreementCourse", fields: [courseId], references: [id], onDelete: Restrict)
+  chapterId             String?
+  chapter               Chapter?                 @relation("PublisherAgreementChapter", fields: [chapterId], references: [id], onDelete: Restrict)
+  lessonId              String?
+  lesson                Lesson?                  @relation("PublisherAgreementLesson", fields: [lessonId], references: [id], onDelete: Restrict)
+  payoutKind            ReferralCommissionKind   @default(PERCENTAGE)
+  revenueShareBps       Int?
+  fixedPayoutMinor      Int?
+  currency              String                   @default("EGP")
+  contractReference     String?
+  signedDocumentAssetId String?
+  internalNote          String?
+  version               Int                      @default(1)
+  supersedesId          String?
+  supersedes            PublisherAgreement?      @relation("PublisherAgreementVersion", fields: [supersedesId], references: [id], onDelete: Restrict)
+  replacements          PublisherAgreement[]     @relation("PublisherAgreementVersion")
+  startsAt              DateTime
+  endsAt                DateTime?
+  status                PublisherAgreementStatus @default(DRAFT)
+  isPrimary             Boolean                  @default(true)
+  createdById           String
+  createdBy             User                     @relation("PublisherAgreementCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  createdAt             DateTime                 @default(now())
+  updatedAt             DateTime                 @updatedAt
 
   earningsStatements PublisherEarningsStatement[]
+  allocations        PartnerAllocation[]          @relation("AllocationPublisherAgreement")
 
   @@index([courseId, status, isPrimary, startsAt, endsAt])
   @@index([chapterId, status, isPrimary, startsAt, endsAt])
   @@index([lessonId, status, isPrimary, startsAt, endsAt])
   @@index([publisherUserId, startsAt])
+  @@index([supersedesId])
+}
+
+model ReferralProgram {
+  id                   String                     @id @default(cuid())
+  partnerUserId        String
+  partner              PartnerProfile             @relation("ReferralProgramPartner", fields: [partnerUserId], references: [userId], onDelete: Restrict)
+  name                 String
+  status               ReferralProgramStatus      @default(DRAFT)
+  startsAt             DateTime
+  endsAt               DateTime?
+  usageLimit           Int?
+  perStudentUsageLimit Int?
+  appliesToAll         Boolean                    @default(true)
+  courseId             String?
+  course               Course?                    @relation("ReferralProgramCourse", fields: [courseId], references: [id], onDelete: Restrict)
+  chapterId            String?
+  chapter              Chapter?                   @relation("ReferralProgramChapter", fields: [chapterId], references: [id], onDelete: Restrict)
+  createdById          String
+  createdAt            DateTime                   @default(now())
+  updatedAt            DateTime                   @updatedAt
+  codes                ReferralCode[]
+  rules                ReferralCommissionRule[]
+  attributions         OrderReferralAttribution[]
+
+  @@index([partnerUserId, status, startsAt, endsAt])
+  @@index([status, startsAt, endsAt])
+}
+
+model ReferralCode {
+  id                   String                     @id @default(cuid())
+  programId            String
+  program              ReferralProgram            @relation(fields: [programId], references: [id], onDelete: Cascade)
+  code                 String                     @unique
+  isActive             Boolean                    @default(true)
+  startsAt             DateTime?
+  endsAt               DateTime?
+  usageLimit           Int?
+  perStudentUsageLimit Int?
+  createdAt            DateTime                   @default(now())
+  updatedAt            DateTime                   @updatedAt
+  attributions         OrderReferralAttribution[]
+
+  @@index([programId, isActive])
+}
+
+model ReferralCommissionRule {
+  id                        String                     @id @default(cuid())
+  programId                 String
+  program                   ReferralProgram            @relation(fields: [programId], references: [id], onDelete: Cascade)
+  version                   Int
+  kind                      ReferralCommissionKind
+  percentageBps             Int?
+  fixedCommissionMinor      Int?
+  maximumCommissionMinor    Int?
+  currency                  String                     @default("EGP")
+  startsAt                  DateTime
+  endsAt                    DateTime?
+  isActive                  Boolean                    @default(false)
+  createdAt                 DateTime                   @default(now())
+  allocations               PartnerAllocation[]        @relation("AllocationReferralRule")
+  orderReferralAttributions OrderReferralAttribution[]
+
+  @@unique([programId, version])
+  @@index([programId, isActive, startsAt, endsAt])
+}
+
+model OrderReferralAttribution {
+  id                String                 @id @default(cuid())
+  orderId           String                 @unique
+  order             Order                  @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  studentUserId     String
+  student           StudentProfile         @relation(fields: [studentUserId], references: [userId], onDelete: Restrict)
+  referralCodeId    String
+  referralCode      ReferralCode           @relation(fields: [referralCodeId], references: [id], onDelete: Restrict)
+  referralProgramId String
+  referralProgram   ReferralProgram        @relation(fields: [referralProgramId], references: [id], onDelete: Restrict)
+  ruleId            String
+  rule              ReferralCommissionRule @relation(fields: [ruleId], references: [id], onDelete: Restrict)
+  snapshot          Json
+  createdAt         DateTime               @default(now())
+
+  @@index([referralProgramId, createdAt])
+  @@index([referralCodeId, createdAt])
+  @@index([studentUserId, createdAt])
+}
+
+model PartnerAllocation {
+  id                   String                  @id @default(cuid())
+  kind                 PartnerAllocationKind
+  state                PartnerAllocationState  @default(PAYABLE)
+  partnerUserId        String
+  partner              PartnerProfile          @relation("AllocationPartner", fields: [partnerUserId], references: [userId], onDelete: Restrict)
+  orderItemId          String
+  orderItem            OrderItem               @relation(fields: [orderItemId], references: [id], onDelete: Restrict)
+  publisherAgreementId String?
+  publisherAgreement   PublisherAgreement?     @relation("AllocationPublisherAgreement", fields: [publisherAgreementId], references: [id], onDelete: Restrict)
+  referralRuleId       String?
+  referralRule         ReferralCommissionRule? @relation("AllocationReferralRule", fields: [referralRuleId], references: [id], onDelete: Restrict)
+  basisMinor           Int
+  amountMinor          Int
+  currency             String
+  snapshot             Json
+  idempotencyKey       String                  @unique
+  reversedAllocationId String?                 @unique
+  reversedAllocation   PartnerAllocation?      @relation("PartnerAllocationReversal", fields: [reversedAllocationId], references: [id], onDelete: Restrict)
+  reversalOf           PartnerAllocation?      @relation("PartnerAllocationReversal")
+  payableAt            DateTime                @default(now())
+  paidAt               DateTime?
+  reversedAt           DateTime?
+  createdAt            DateTime                @default(now())
+  settlementLines      PartnerSettlementLine[]
+
+  @@unique([orderItemId, kind])
+  @@index([partnerUserId, state, createdAt])
+  @@index([publisherAgreementId])
+  @@index([referralRuleId])
+}
+
+model PartnerSettlement {
+  id               String                  @id @default(cuid())
+  partnerUserId    String
+  partner          PartnerProfile          @relation("SettlementPartner", fields: [partnerUserId], references: [userId], onDelete: Restrict)
+  paymentReference String                  @unique
+  currency         String                  @default("EGP")
+  totalMinor       Int
+  createdById      String
+  paidAt           DateTime?
+  createdAt        DateTime                @default(now())
+  lines            PartnerSettlementLine[]
+
+  @@index([partnerUserId, createdAt])
+}
+
+model PartnerSettlementLine {
+  settlementId String
+  allocationId String
+  settlement   PartnerSettlement @relation(fields: [settlementId], references: [id], onDelete: Restrict)
+  allocation   PartnerAllocation @relation(fields: [allocationId], references: [id], onDelete: Restrict)
+
+  @@id([settlementId, allocationId])
+  @@unique([allocationId])
+}
+
+model AssessmentQuestionAttribution {
+  id                   String                    @id @default(cuid())
+  assessmentQuestionId String
+  assessmentQuestion   AssessmentQuestion        @relation(fields: [assessmentQuestionId], references: [id], onDelete: Cascade)
+  sourceId             String?
+  sourceTitle          String?
+  sourceType           QuestionSourceType?
+  publisherUserId      String?
+  publisherDisplayName String?
+  role                 AssessmentAttributionRole @default(PRIMARY)
+  weightBps            Int                       @default(10000)
+  createdAt            DateTime                  @default(now())
+
+  @@unique([assessmentQuestionId, role, sourceId, publisherUserId])
+  @@index([publisherUserId, createdAt])
+  @@index([sourceId])
+}
+
+model ReportExportJob {
+  id            String             @id @default(cuid())
+  requestedById String
+  requestedBy   User               @relation("ReportExportRequestedBy", fields: [requestedById], references: [id], onDelete: Restrict)
+  reportType    String
+  filters       Json
+  columns       Json
+  reason        String?
+  containsPii   Boolean            @default(false)
+  status        ReportExportStatus @default(QUEUED)
+  storageKey    String?
+  rowCount      Int?
+  error         String?
+  expiresAt     DateTime?
+  downloadedAt  DateTime?
+  cancelledAt   DateTime?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  @@index([requestedById, status, createdAt])
+  @@index([status, createdAt])
 }
 
 model PublisherEarningsStatement {

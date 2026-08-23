@@ -34,6 +34,7 @@ import {
 } from '../../common/dto/api-response.dto';
 import { QueryAdminStudentsDto } from './dto/query-admin-students.dto';
 import { DeleteStudentDto } from './dto/delete-student.dto';
+import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
 
 @ApiTags('students')
 @ApiBearerAuth()
@@ -86,6 +87,22 @@ export class AdminStudentsController {
   get(@CurrentUser() actor: RequestUser, @Param('id') id: string) {
     return this.studentsService.getForAdmin(actor, id);
   }
+
+  @Get(':id/360')
+  @ApiOperation({ summary: 'Get an audited Student 360 summary; national ID is limited to the stored last four digits' })
+  student360(@CurrentUser() actor: RequestUser, @Param('id') id: string, @Query('reason') reason?: string) { return this.studentsService.student360(actor, id, reason); }
+
+  @Get(':id/360/orders')
+  orders(@CurrentUser() actor: RequestUser, @Param('id') id: string, @Query() query: PaginationQueryDto, @Query('reason') reason?: string) { return this.studentsService.student360Orders(actor, id, query, reason); }
+
+  @Get(':id/360/entitlements')
+  entitlements(@CurrentUser() actor: RequestUser, @Param('id') id: string, @Query() query: PaginationQueryDto, @Query('reason') reason?: string) { return this.studentsService.student360Entitlements(actor, id, query, reason); }
+
+  @Get(':id/360/assessments')
+  assessments(@CurrentUser() actor: RequestUser, @Param('id') id: string, @Query() query: PaginationQueryDto, @Query('reason') reason?: string) { return this.studentsService.student360Assessments(actor, id, query, reason); }
+
+  @Get(':id/360/audit-events')
+  auditEvents(@CurrentUser() actor: RequestUser, @Param('id') id: string, @Query() query: PaginationQueryDto, @Query('reason') reason?: string) { return this.studentsService.student360AuditEvents(actor, id, query, reason); }
 
   @Post(':id/suspend')
   @HttpCode(HttpStatus.OK)
