@@ -35,10 +35,15 @@ function buildService() {
     asset: {
       create: jest.fn(),
       update: jest.fn(),
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       findUnique: jest.fn(),
       delete: jest.fn(),
     },
-    videoAsset: { update: jest.fn(), findUnique: jest.fn() },
+    videoAsset: {
+      update: jest.fn(),
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      findUnique: jest.fn(),
+    },
     bunnyStreamWebhookEvent: { create: jest.fn().mockResolvedValue(undefined) },
     // Supports both the array form (webhook) and the callback form (retry).
     $transaction: jest.fn().mockImplementation(async (arg: any) => {
@@ -385,19 +390,26 @@ describe('VideosService', () => {
   describe('confirmation', () => {
     it('records client completion after upload authorization', async () => {
       const { service, prisma, audit } = buildService();
-      prisma.asset.findUnique.mockResolvedValue({
+      const uploading = {
         id: 'a1',
         status: AssetStatus.UPLOADING,
-        video: { assetId: 'a1', processingStatus: VideoProcessingStatus.UPLOADING },
-      });
-      prisma.asset.update.mockResolvedValue({
+        video: {
+          assetId: 'a1',
+          processingStatus: VideoProcessingStatus.UPLOADING,
+          clientUploadCompletedAt: null,
+        },
+      };
+      const awaitingProcessing = {
         id: 'a1',
         status: AssetStatus.UPLOADED_AWAITING_PROCESSING,
         video: {
           processingStatus: VideoProcessingStatus.UPLOADING,
           clientUploadCompletedAt: new Date('2026-08-03T12:00:00.000Z'),
         },
-      });
+      };
+      prisma.asset.findUnique
+        .mockResolvedValueOnce(uploading)
+        .mockResolvedValueOnce(awaitingProcessing);
 
       const result = await service.confirmation(admin, 'a1');
 
@@ -405,13 +417,15 @@ describe('VideosService', () => {
         status: AssetStatus.UPLOADED_AWAITING_PROCESSING,
         video: { processingStatus: VideoProcessingStatus.UPLOADING },
       });
-      expect(prisma.asset.update).toHaveBeenCalledWith(
+      expect(prisma.videoAsset.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({
-            status: AssetStatus.UPLOADED_AWAITING_PROCESSING,
-          }),
+          where: { assetId: 'a1', clientUploadCompletedAt: null },
         }),
       );
+      expect(prisma.asset.updateMany).toHaveBeenCalledWith({
+        where: { id: 'a1', status: AssetStatus.UPLOADING },
+        data: { status: AssetStatus.UPLOADED_AWAITING_PROCESSING },
+      });
       expect(audit.record).toHaveBeenCalledWith(
         expect.objectContaining({ action: 'VIDEO_UPLOAD_CONFIRMED_BY_CLIENT' }),
       );
@@ -427,7 +441,7 @@ describe('VideosService', () => {
       await expect(service.confirmation(admin, 'a1')).rejects.toBeInstanceOf(
         ConflictException,
       );
-      expect(prisma.asset.update).not.toHaveBeenCalled();
+      expect(prisma.videoAsset.updateMany).not.toHaveBeenCalled();
     });
 
     it('records a delayed confirmation without regressing Bunny-driven state', async () => {
@@ -441,25 +455,20 @@ describe('VideosService', () => {
           clientUploadCompletedAt: null,
         },
       };
-      prisma.asset.findUnique.mockResolvedValue(processing);
-      prisma.asset.update.mockResolvedValue({
+      prisma.asset.findUnique
+        .mockResolvedValueOnce(processing)
+        .mockResolvedValueOnce({
         ...processing,
         video: {
           ...processing.video,
           clientUploadCompletedAt: new Date('2026-08-05T16:18:21.000Z'),
         },
-      });
+        });
       await expect(service.confirmation(admin, 'a1')).resolves.toMatchObject({
         status: AssetStatus.PROCESSING,
         video: { processingStatus: VideoProcessingStatus.PROCESSING },
       });
-      expect(prisma.asset.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: {
-            video: { update: { clientUploadCompletedAt: expect.any(Date) } },
-          },
-        }),
-      );
+      expect(prisma.asset.updateMany).not.toHaveBeenCalled();
       expect(audit.record).toHaveBeenCalledWith(
         expect.objectContaining({ action: 'VIDEO_UPLOAD_CONFIRMED_BY_CLIENT' }),
       );
@@ -479,8 +488,41 @@ describe('VideosService', () => {
       await expect(service.confirmation(admin, 'a1')).resolves.toMatchObject({
         status: AssetStatus.PROCESSING,
       });
-      expect(prisma.asset.update).not.toHaveBeenCalled();
+      expect(prisma.videoAsset.updateMany).not.toHaveBeenCalled();
       expect(audit.record).not.toHaveBeenCalled();
+    });
+
+    it('does not regress a provider state that advances during confirmation', async () => {
+      const { service, prisma } = buildService();
+      prisma.asset.findUnique
+        .mockResolvedValueOnce({
+          id: 'a1',
+          status: AssetStatus.UPLOADING,
+          video: {
+            assetId: 'a1',
+            processingStatus: VideoProcessingStatus.UPLOADING,
+            clientUploadCompletedAt: null,
+          },
+        })
+        .mockResolvedValueOnce({
+          id: 'a1',
+          status: AssetStatus.PROCESSING,
+          video: {
+            assetId: 'a1',
+            processingStatus: VideoProcessingStatus.QUEUED,
+            clientUploadCompletedAt: new Date('2026-08-05T16:18:21.000Z'),
+          },
+        });
+      prisma.asset.updateMany.mockResolvedValue({ count: 0 });
+
+      await expect(service.confirmation(admin, 'a1')).resolves.toMatchObject({
+        status: AssetStatus.PROCESSING,
+        video: { processingStatus: VideoProcessingStatus.QUEUED },
+      });
+      expect(prisma.asset.updateMany).toHaveBeenCalledWith({
+        where: { id: 'a1', status: AssetStatus.UPLOADING },
+        data: { status: AssetStatus.UPLOADED_AWAITING_PROCESSING },
+      });
     });
   });
 

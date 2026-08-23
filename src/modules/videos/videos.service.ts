@@ -129,35 +129,24 @@ export class VideosService {
     )
       throw new ConflictException('Video upload has not started');
 
-    // Bunny can deliver its first processing webhook before the client reaches
-    // this endpoint. Preserve that newer provider state, but still retain the
-    // client-completion audit signal.
-    if (asset.status !== AssetStatus.UPLOADING) {
-      if (asset.video.clientUploadCompletedAt) return this.summary(asset);
-      const updated = await this.prisma.asset.update({
-        where: { id: assetId },
-        data: {
-          video: { update: { clientUploadCompletedAt: new Date() } },
-        },
-        include: { video: true },
-      });
-      await this.audit.record({
-        actorUserId: actor.id,
-        action: 'VIDEO_UPLOAD_CONFIRMED_BY_CLIENT',
-        targetType: 'Asset',
-        targetId: assetId,
-      });
-      return this.summary(updated);
-    }
-
-    const updated = await this.prisma.asset.update({
-      where: { id: assetId },
-      data: {
-        status: AssetStatus.UPLOADED_AWAITING_PROCESSING,
-        video: { update: { clientUploadCompletedAt: new Date() } },
-      },
-      include: { video: true },
+    // Bunny can deliver its first processing webhook concurrently with this
+    // client confirmation. Mark the video first (the same lock order used by
+    // the webhook), then transition the asset only if it is still uploading.
+    // The conditional update prevents a stale confirmation from regressing a
+    // provider-driven PROCESSING or READY asset back to the upload boundary.
+    if (asset.video.clientUploadCompletedAt) return this.summary(asset);
+    const completion = await this.prisma.videoAsset.updateMany({
+      where: { assetId, clientUploadCompletedAt: null },
+      data: { clientUploadCompletedAt: new Date() },
     });
+    if (!completion.count) return this.summary(await this.getWithVideo(assetId));
+    if (asset.status === AssetStatus.UPLOADING) {
+      await this.prisma.asset.updateMany({
+        where: { id: assetId, status: AssetStatus.UPLOADING },
+        data: { status: AssetStatus.UPLOADED_AWAITING_PROCESSING },
+      });
+    }
+    const updated = await this.getWithVideo(assetId);
     await this.audit.record({
       actorUserId: actor.id,
       action: 'VIDEO_UPLOAD_CONFIRMED_BY_CLIENT',
