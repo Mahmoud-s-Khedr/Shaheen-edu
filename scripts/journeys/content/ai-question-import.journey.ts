@@ -225,8 +225,8 @@ export const aiQuestionImportJourney: JourneyDefinition = {
         }), 409);
         expectStatus(await admin.request('PATCH', `/admin/ai/question-imports/${importId}/media/MISSING`, { description: 'Not available for raw-text imports' }), 409);
         expectStatus(await admin.request('POST', `/admin/ai/question-imports/${importId}/media/MISSING/retry`), 409);
-        expectStatus(await admin.request('PATCH', `/admin/ai/question-imports/${importId}/items/missing-item/media`, { assignments: [] }), 404);
-        expectStatus(await admin.request('POST', `/admin/ai/question-imports/${importId}/items/missing-item/reject`, { reason: 'Not a review candidate' }), 404);
+        expectStatus(await admin.request('PATCH', `/admin/ai/question-imports/${importId}/items/missing-item/media`, { assignments: [] }), 409);
+        expectStatus(await admin.request('POST', `/admin/ai/question-imports/${importId}/items/missing-item/reject`, { reason: 'Not a review candidate' }), 409);
         // Keep this state-changing call last: a completed import with
         // invalid/reviewable candidates may be retried (201), while an import
         // with no retryable work is rejected (409). Both outcomes are valid.
