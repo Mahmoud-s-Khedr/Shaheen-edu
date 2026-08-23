@@ -22,7 +22,7 @@ describe('ReportsService export lifecycle', () => {
         updateMany: jest.fn(),
         findMany: jest.fn(),
       },
-      order: { findMany: jest.fn().mockResolvedValue([]) },
+      order: { findMany: jest.fn().mockResolvedValue([]), groupBy: jest.fn().mockResolvedValue([]) },
       partnerAllocation: { findMany: jest.fn().mockResolvedValue([]) },
       partnerSettlement: { findMany: jest.fn().mockResolvedValue([]) },
     };
@@ -297,5 +297,43 @@ describe('ReportsService export lifecycle', () => {
         }),
       }),
     );
+  });
+
+  it('uses half-open Cairo calendar ranges and persists normalized export filters', async () => {
+    const { prisma, queue, service } = build();
+    expect((service as any).dates({ from: '2026-08-01', to: '2026-08-01' })).toEqual({
+      gte: new Date('2026-07-31T21:00:00.000Z'),
+      lt: new Date('2026-08-01T21:00:00.000Z'),
+    });
+    prisma.reportExportJob.create.mockResolvedValue({ id: 'job-1' });
+    await service.requestExport(actor, {
+      reportType: 'PAYMENTS', columns: ['status'], reason: 'finance reconciliation',
+      from: '2026-08-01', to: '2026-08-31', couponCode: ' summer-26 ', referralCode: ' friend ',
+    });
+    expect(prisma.reportExportJob.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        filters: expect.objectContaining({ couponCode: 'SUMMER-26', referralCode: 'FRIEND' }),
+      }),
+    }));
+    expect(queue.enqueue).toHaveBeenCalledWith('job-1');
+  });
+
+  it('rejects filters which a report cannot apply instead of silently ignoring them', async () => {
+    const { service } = build();
+    await expect(service.registrations(actor, { couponCode: 'SUMMER-26' })).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('uses approved Cairo-period source records for the revenue report', async () => {
+    const { prisma, service } = build();
+    const report = await service.commerce(actor, {
+      from: '2026-08-01', to: '2026-08-01', paymentStatus: 'PAID' as any,
+    });
+    expect(report.data).toEqual([]);
+    expect(prisma.order.groupBy).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        approvedAt: { gte: new Date('2026-07-31T21:00:00.000Z'), lt: new Date('2026-08-01T21:00:00.000Z') },
+        paymentAttempts: { some: { status: 'PAID' } },
+      }),
+    }));
   });
 });

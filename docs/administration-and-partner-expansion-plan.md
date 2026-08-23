@@ -297,20 +297,27 @@ attribution or allocation.
 **Goal:** Provide the operations and finance report set on top of the Phase 1
 privacy model and Phases 2–3 ledger reporting.
 
-- [ ] Add aggregate report families for refunds, payments, registrations,
+- [x] Add aggregate report families for refunds, payments, registrations,
   active purchasers, entitlement grants/revocations/expiry, and platform
   revenue/discounts.
-- [ ] Add supported filters for Cairo date range, product hierarchy, grade,
+- [x] Add supported filters for Cairo date range, product hierarchy, grade,
   governorate/center, payment channel/status, promotion, coupon, referral
   code, and partner. Specify metric definitions, empty-result behaviour, and
   pagination/rollup boundaries for every report.
-- [ ] Make each approved report exportable through the private asynchronous
+- [x] Make each approved report exportable through the private asynchronous
   export pipeline, with normalized filters and a report-specific column
   policy. CSV remains the initial format; add XLSX only for a confirmed
   formatting requirement.
-- [ ] Publish retention and deletion runbooks: financial allocations/receipts
+- [x] Publish retention and deletion runbooks: financial allocations/receipts
   and audit events for seven years; learner and derived-report data according
   to the approved privacy policy.
+
+**Implementation status (2026-08-23):** Complete in code and documented in
+[`platform-reporting-and-retention-runbook.md`](platform-reporting-and-retention-runbook.md).
+The catalogue is aggregate-only, Cairo-calendar based, rejects filters a report
+cannot apply, and exports only approved non-PII columns through the existing
+private worker. Deploy the already-required privacy/export migration and keep
+the export rollout control disabled until the Phase 0 finance sign-off.
 
 **Exit criteria:** The approved operational report catalogue is documented,
 authorized, auditable, reproducible from its source records, and exportable

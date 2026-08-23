@@ -1667,6 +1667,63 @@
         ]
       }
     },
+    "/api/v1/admin/partners/{id}/detail": {
+      "get": {
+        "description": "Administrative aggregate history only. This response never includes learner identities or order records.",
+        "operationId": "AdminPartnersController_detail_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get administrative partner account, programme, ledger, and audit history",
+        "tags": [
+          "admin/partners"
+        ]
+      }
+    },
     "/api/v1/admin/partners/{id}/suspend": {
       "post": {
         "operationId": "AdminPartnersController_suspend_v1",
@@ -2378,6 +2435,14 @@
           },
           {
             "name": "reason",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sections",
             "required": true,
             "in": "query",
             "schema": {
@@ -19251,6 +19316,59 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "granularity",
+            "required": false,
+            "in": "query",
+            "description": "Defaults to day for ranges up to 93 days and month afterwards.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "day",
+                "month"
+              ]
+            }
+          },
+          {
+            "name": "subjectId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "courseId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "chapterId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "lessonId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sectionId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -19321,6 +19439,59 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "granularity",
+            "required": false,
+            "in": "query",
+            "description": "Defaults to day for ranges up to 93 days and month afterwards.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "day",
+                "month"
+              ]
+            }
+          },
+          {
+            "name": "subjectId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "courseId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "chapterId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "lessonId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sectionId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -19386,6 +19557,59 @@
           },
           {
             "name": "sourceId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "granularity",
+            "required": false,
+            "in": "query",
+            "description": "Defaults to day for ranges up to 93 days and month afterwards.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "day",
+                "month"
+              ]
+            }
+          },
+          {
+            "name": "subjectId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "courseId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "chapterId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "lessonId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sectionId",
             "required": false,
             "in": "query",
             "schema": {
@@ -19695,6 +19919,34 @@
         ]
       }
     },
+    "/api/v1/admin/referral-programs/{id}/resume": {
+      "post": {
+        "operationId": "ReferralsController_resume_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "admin/referral-programs"
+        ]
+      }
+    },
     "/api/v1/admin/referral-programs/{id}/end": {
       "post": {
         "operationId": "ReferralsController_end_v1",
@@ -19799,6 +20051,62 @@
         ]
       }
     },
+    "/api/v1/admin/referral-programs/codes/{id}/suspend": {
+      "post": {
+        "operationId": "ReferralsController_suspendCode_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "admin/referral-programs"
+        ]
+      }
+    },
+    "/api/v1/admin/referral-programs/codes/{id}/resume": {
+      "post": {
+        "operationId": "ReferralsController_resumeCode_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "admin/referral-programs"
+        ]
+      }
+    },
     "/api/v1/admin/referral-programs/{id}/rules": {
       "post": {
         "operationId": "ReferralsController_createRule_v1",
@@ -19870,6 +20178,474 @@
         ],
         "tags": [
           "admin/referral-programs"
+        ]
+      }
+    },
+    "/api/v1/admin/referral-programs/{id}/review-rules": {
+      "post": {
+        "operationId": "ReferralsController_createReviewRule_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateReferralReviewRuleDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "admin/referral-programs"
+        ]
+      }
+    },
+    "/api/v1/admin/referral-programs/review-rules/{id}": {
+      "patch": {
+        "operationId": "ReferralsController_updateReviewRule_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateReferralReviewRuleDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "admin/referral-programs"
+        ]
+      }
+    },
+    "/api/v1/admin/referral-programs/review-flags": {
+      "get": {
+        "operationId": "ReferralsController_reviewFlags_v1",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "One-based page number.",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Maximum records to return per page.",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "OPEN",
+                "ASSIGNED",
+                "RESOLVED",
+                "ACCEPTED"
+              ]
+            }
+          },
+          {
+            "name": "programId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "assigneeUserId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "admin/referral-programs"
+        ]
+      }
+    },
+    "/api/v1/admin/referral-programs/attributions/{id}/review-flags": {
+      "post": {
+        "operationId": "ReferralsController_createManualFlag_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateManualReferralReviewFlagDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "admin/referral-programs"
+        ]
+      }
+    },
+    "/api/v1/admin/referral-programs/review-flags/{id}/assign": {
+      "patch": {
+        "operationId": "ReferralsController_assignFlag_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignReferralReviewFlagDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "admin/referral-programs"
+        ]
+      }
+    },
+    "/api/v1/admin/referral-programs/review-flags/{id}/notes": {
+      "post": {
+        "operationId": "ReferralsController_addFlagNote_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddReferralReviewNoteDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "admin/referral-programs"
+        ]
+      }
+    },
+    "/api/v1/admin/referral-programs/review-flags/{id}/resolve": {
+      "patch": {
+        "operationId": "ReferralsController_resolveFlag_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResolveReferralReviewFlagDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "admin/referral-programs"
+        ]
+      }
+    },
+    "/api/v1/partners/referrals/report": {
+      "get": {
+        "operationId": "PartnerReferralReportingController_report_v1",
+        "parameters": [
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "Cairo calendar date.",
+            "schema": {
+              "example": "2026-08-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "Cairo calendar date.",
+            "schema": {
+              "example": "2026-08-31",
+              "type": "string"
+            }
+          },
+          {
+            "name": "granularity",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "day",
+                "month"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get privacy-safe aggregate referral conversions, sales, commissions, trends, products, and categories.",
+        "tags": [
+          "partners/referrals"
+        ]
+      }
+    },
+    "/api/v1/partners/referrals/settlements": {
+      "get": {
+        "operationId": "PartnerReferralReportingController_settlements_v1",
+        "parameters": [
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "Cairo calendar date.",
+            "schema": {
+              "example": "2026-08-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "Cairo calendar date.",
+            "schema": {
+              "example": "2026-08-31",
+              "type": "string"
+            }
+          },
+          {
+            "name": "granularity",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "day",
+                "month"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get privacy-safe aggregate referral settlement summaries without order rows.",
+        "tags": [
+          "partners/referrals"
+        ]
+      }
+    },
+    "/api/v1/admin/referral-reporting": {
+      "get": {
+        "operationId": "AdminReferralReportingController_report_v1",
+        "parameters": [
+          {
+            "name": "partnerUserId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "Cairo calendar date.",
+            "schema": {
+              "example": "2026-08-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "Cairo calendar date.",
+            "schema": {
+              "example": "2026-08-31",
+              "type": "string"
+            }
+          },
+          {
+            "name": "granularity",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "day",
+                "month"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get aggregate referral reporting for a referral partner; administrative responses are not cohort-suppressed.",
+        "tags": [
+          "admin/referral-reporting"
         ]
       }
     },
@@ -20061,6 +20837,18 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "kind",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "PUBLISHER_SALE",
+                "REFERRAL_COMMISSION"
+              ]
+            }
           }
         ],
         "responses": {
@@ -20103,6 +20891,36 @@
           }
         ],
         "summary": "Mark every allocation in a settlement paid",
+        "tags": [
+          "admin/partner-finance"
+        ]
+      }
+    },
+    "/api/v1/admin/partner-finance/usage-rollups/rebuild": {
+      "post": {
+        "operationId": "PartnerFinanceController_rebuildUsageRollups_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RebuildPublisherUsageRollupsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Rebuild derived publisher usage rollups for an audited Cairo-date range",
         "tags": [
           "admin/partner-finance"
         ]
@@ -20384,12 +21202,132 @@
             "name": "from",
             "required": false,
             "in": "query",
+            "description": "Inclusive Cairo calendar date.",
             "schema": {
               "type": "string"
             }
           },
           {
             "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "Inclusive Cairo calendar date.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "subjectId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "courseId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "chapterId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "gradeId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "governorateId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "centerId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "paymentChannel",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "MANUAL",
+                "PAYMOB"
+              ]
+            }
+          },
+          {
+            "name": "orderStatus",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "AWAITING_PAYMENT",
+                "SUBMITTED",
+                "APPROVED",
+                "REJECTED",
+                "CANCELLED",
+                "EXPIRED"
+              ]
+            }
+          },
+          {
+            "name": "paymentStatus",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "INITIATED",
+                "PENDING",
+                "PAID",
+                "DECLINED",
+                "FAILED",
+                "EXPIRED"
+              ]
+            }
+          },
+          {
+            "name": "promotionId",
+            "required": false,
+            "in": "query",
+            "description": "Discount campaign ID.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "couponCode",
+            "required": false,
+            "in": "query",
+            "description": "Coupon code, case-insensitive.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "referralCode",
             "required": false,
             "in": "query",
             "schema": {
@@ -20400,6 +21338,7 @@
             "name": "partnerUserId",
             "required": false,
             "in": "query",
+            "description": "Publisher or referral partner user ID.",
             "schema": {
               "type": "string"
             }
@@ -20421,12 +21360,30 @@
         ]
       }
     },
-    "/api/v1/admin/reports/partner-obligations": {
+    "/api/v1/admin/reports/revenue": {
       "get": {
-        "operationId": "ReportsController_obligations_v1",
+        "operationId": "ReportsController_revenue_v1",
         "parameters": [
           {
             "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "Inclusive Cairo calendar date.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "Inclusive Cairo calendar date.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "subjectId",
             "required": false,
             "in": "query",
             "schema": {
@@ -20434,7 +21391,109 @@
             }
           },
           {
-            "name": "to",
+            "name": "courseId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "chapterId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "gradeId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "governorateId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "centerId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "paymentChannel",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "MANUAL",
+                "PAYMOB"
+              ]
+            }
+          },
+          {
+            "name": "orderStatus",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "AWAITING_PAYMENT",
+                "SUBMITTED",
+                "APPROVED",
+                "REJECTED",
+                "CANCELLED",
+                "EXPIRED"
+              ]
+            }
+          },
+          {
+            "name": "paymentStatus",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "INITIATED",
+                "PENDING",
+                "PAID",
+                "DECLINED",
+                "FAILED",
+                "EXPIRED"
+              ]
+            }
+          },
+          {
+            "name": "promotionId",
+            "required": false,
+            "in": "query",
+            "description": "Discount campaign ID.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "couponCode",
+            "required": false,
+            "in": "query",
+            "description": "Coupon code, case-insensitive.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "referralCode",
             "required": false,
             "in": "query",
             "schema": {
@@ -20445,6 +21504,1003 @@
             "name": "partnerUserId",
             "required": false,
             "in": "query",
+            "description": "Publisher or referral partner user ID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get aggregate approved revenue and discount totals",
+        "tags": [
+          "admin/reports"
+        ]
+      }
+    },
+    "/api/v1/admin/reports/refunds": {
+      "get": {
+        "operationId": "ReportsController_refunds_v1",
+        "parameters": [
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "Inclusive Cairo calendar date.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "Inclusive Cairo calendar date.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "subjectId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "courseId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "chapterId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "gradeId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "governorateId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "centerId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "paymentChannel",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "MANUAL",
+                "PAYMOB"
+              ]
+            }
+          },
+          {
+            "name": "orderStatus",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "AWAITING_PAYMENT",
+                "SUBMITTED",
+                "APPROVED",
+                "REJECTED",
+                "CANCELLED",
+                "EXPIRED"
+              ]
+            }
+          },
+          {
+            "name": "paymentStatus",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "INITIATED",
+                "PENDING",
+                "PAID",
+                "DECLINED",
+                "FAILED",
+                "EXPIRED"
+              ]
+            }
+          },
+          {
+            "name": "promotionId",
+            "required": false,
+            "in": "query",
+            "description": "Discount campaign ID.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "couponCode",
+            "required": false,
+            "in": "query",
+            "description": "Coupon code, case-insensitive.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "referralCode",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "partnerUserId",
+            "required": false,
+            "in": "query",
+            "description": "Publisher or referral partner user ID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get aggregate refund request and approved reimbursement totals",
+        "tags": [
+          "admin/reports"
+        ]
+      }
+    },
+    "/api/v1/admin/reports/payments": {
+      "get": {
+        "operationId": "ReportsController_payments_v1",
+        "parameters": [
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "Inclusive Cairo calendar date.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "Inclusive Cairo calendar date.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "subjectId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "courseId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "chapterId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "gradeId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "governorateId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "centerId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "paymentChannel",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "MANUAL",
+                "PAYMOB"
+              ]
+            }
+          },
+          {
+            "name": "orderStatus",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "AWAITING_PAYMENT",
+                "SUBMITTED",
+                "APPROVED",
+                "REJECTED",
+                "CANCELLED",
+                "EXPIRED"
+              ]
+            }
+          },
+          {
+            "name": "paymentStatus",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "INITIATED",
+                "PENDING",
+                "PAID",
+                "DECLINED",
+                "FAILED",
+                "EXPIRED"
+              ]
+            }
+          },
+          {
+            "name": "promotionId",
+            "required": false,
+            "in": "query",
+            "description": "Discount campaign ID.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "couponCode",
+            "required": false,
+            "in": "query",
+            "description": "Coupon code, case-insensitive.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "referralCode",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "partnerUserId",
+            "required": false,
+            "in": "query",
+            "description": "Publisher or referral partner user ID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get aggregate payment-attempt totals",
+        "tags": [
+          "admin/reports"
+        ]
+      }
+    },
+    "/api/v1/admin/reports/registrations": {
+      "get": {
+        "operationId": "ReportsController_registrations_v1",
+        "parameters": [
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "Inclusive Cairo calendar date.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "Inclusive Cairo calendar date.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "subjectId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "courseId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "chapterId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "gradeId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "governorateId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "centerId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "paymentChannel",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "MANUAL",
+                "PAYMOB"
+              ]
+            }
+          },
+          {
+            "name": "orderStatus",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "AWAITING_PAYMENT",
+                "SUBMITTED",
+                "APPROVED",
+                "REJECTED",
+                "CANCELLED",
+                "EXPIRED"
+              ]
+            }
+          },
+          {
+            "name": "paymentStatus",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "INITIATED",
+                "PENDING",
+                "PAID",
+                "DECLINED",
+                "FAILED",
+                "EXPIRED"
+              ]
+            }
+          },
+          {
+            "name": "promotionId",
+            "required": false,
+            "in": "query",
+            "description": "Discount campaign ID.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "couponCode",
+            "required": false,
+            "in": "query",
+            "description": "Coupon code, case-insensitive.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "referralCode",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "partnerUserId",
+            "required": false,
+            "in": "query",
+            "description": "Publisher or referral partner user ID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get aggregate student registration totals",
+        "tags": [
+          "admin/reports"
+        ]
+      }
+    },
+    "/api/v1/admin/reports/active-purchasers": {
+      "get": {
+        "operationId": "ReportsController_activePurchasers_v1",
+        "parameters": [
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "Inclusive Cairo calendar date.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "Inclusive Cairo calendar date.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "subjectId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "courseId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "chapterId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "gradeId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "governorateId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "centerId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "paymentChannel",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "MANUAL",
+                "PAYMOB"
+              ]
+            }
+          },
+          {
+            "name": "orderStatus",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "AWAITING_PAYMENT",
+                "SUBMITTED",
+                "APPROVED",
+                "REJECTED",
+                "CANCELLED",
+                "EXPIRED"
+              ]
+            }
+          },
+          {
+            "name": "paymentStatus",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "INITIATED",
+                "PENDING",
+                "PAID",
+                "DECLINED",
+                "FAILED",
+                "EXPIRED"
+              ]
+            }
+          },
+          {
+            "name": "promotionId",
+            "required": false,
+            "in": "query",
+            "description": "Discount campaign ID.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "couponCode",
+            "required": false,
+            "in": "query",
+            "description": "Coupon code, case-insensitive.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "referralCode",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "partnerUserId",
+            "required": false,
+            "in": "query",
+            "description": "Publisher or referral partner user ID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get aggregate approved purchaser and current-access totals",
+        "tags": [
+          "admin/reports"
+        ]
+      }
+    },
+    "/api/v1/admin/reports/entitlements": {
+      "get": {
+        "operationId": "ReportsController_entitlements_v1",
+        "parameters": [
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "Inclusive Cairo calendar date.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "Inclusive Cairo calendar date.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "subjectId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "courseId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "chapterId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "gradeId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "governorateId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "centerId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "paymentChannel",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "MANUAL",
+                "PAYMOB"
+              ]
+            }
+          },
+          {
+            "name": "orderStatus",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "AWAITING_PAYMENT",
+                "SUBMITTED",
+                "APPROVED",
+                "REJECTED",
+                "CANCELLED",
+                "EXPIRED"
+              ]
+            }
+          },
+          {
+            "name": "paymentStatus",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "INITIATED",
+                "PENDING",
+                "PAID",
+                "DECLINED",
+                "FAILED",
+                "EXPIRED"
+              ]
+            }
+          },
+          {
+            "name": "promotionId",
+            "required": false,
+            "in": "query",
+            "description": "Discount campaign ID.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "couponCode",
+            "required": false,
+            "in": "query",
+            "description": "Coupon code, case-insensitive.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "referralCode",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "partnerUserId",
+            "required": false,
+            "in": "query",
+            "description": "Publisher or referral partner user ID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get aggregate entitlement grant, revocation, expiry, and active-access totals",
+        "tags": [
+          "admin/reports"
+        ]
+      }
+    },
+    "/api/v1/admin/reports/partner-obligations": {
+      "get": {
+        "operationId": "ReportsController_obligations_v1",
+        "parameters": [
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "Inclusive Cairo calendar date.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "Inclusive Cairo calendar date.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "subjectId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "courseId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "chapterId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "gradeId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "governorateId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "centerId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "paymentChannel",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "MANUAL",
+                "PAYMOB"
+              ]
+            }
+          },
+          {
+            "name": "orderStatus",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "AWAITING_PAYMENT",
+                "SUBMITTED",
+                "APPROVED",
+                "REJECTED",
+                "CANCELLED",
+                "EXPIRED"
+              ]
+            }
+          },
+          {
+            "name": "paymentStatus",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "INITIATED",
+                "PENDING",
+                "PAID",
+                "DECLINED",
+                "FAILED",
+                "EXPIRED"
+              ]
+            }
+          },
+          {
+            "name": "promotionId",
+            "required": false,
+            "in": "query",
+            "description": "Discount campaign ID.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "couponCode",
+            "required": false,
+            "in": "query",
+            "description": "Coupon code, case-insensitive.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "referralCode",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "partnerUserId",
+            "required": false,
+            "in": "query",
+            "description": "Publisher or referral partner user ID.",
             "schema": {
               "type": "string"
             }
@@ -28884,6 +30940,126 @@
           "startsAt"
         ]
       },
+      "CreateReferralReviewRuleDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "STUDENT_PROGRAM_APPROVED_SALES",
+              "STUDENT_CODE_APPROVED_SALES"
+            ]
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "BLOCK_CHECKOUT",
+              "QUEUE_REVIEW"
+            ]
+          },
+          "threshold": {
+            "type": "number",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "name",
+          "kind",
+          "action",
+          "threshold"
+        ]
+      },
+      "UpdateReferralReviewRuleDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "BLOCK_CHECKOUT",
+              "QUEUE_REVIEW"
+            ]
+          },
+          "threshold": {
+            "type": "number",
+            "minimum": 1
+          },
+          "isActive": {
+            "type": "boolean"
+          }
+        }
+      },
+      "CreateManualReferralReviewFlagDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "note"
+        ]
+      },
+      "AssignReferralReviewFlagDto": {
+        "type": "object",
+        "properties": {
+          "assigneeUserId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "assigneeUserId"
+        ]
+      },
+      "AddReferralReviewNoteDto": {
+        "type": "object",
+        "properties": {
+          "body": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "body"
+        ]
+      },
+      "ResolveReferralReviewFlagDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "RESOLVED",
+              "ACCEPTED"
+            ]
+          },
+          "disposition": {
+            "type": "string",
+            "enum": [
+              "CLEARED",
+              "CONFIRMED_FRAUD",
+              "NO_ACTION",
+              "ESCALATED"
+            ]
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "disposition",
+          "note"
+        ]
+      },
       "CreateSettlementDto": {
         "type": "object",
         "properties": {
@@ -28902,6 +31078,29 @@
         "required": [
           "allocationIds",
           "paymentReference"
+        ]
+      },
+      "RebuildPublisherUsageRollupsDto": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "example": "2026-08-01",
+            "description": "Inclusive Cairo calendar date."
+          },
+          "to": {
+            "type": "string",
+            "example": "2026-08-31",
+            "description": "Inclusive Cairo calendar date."
+          },
+          "publisherUserId": {
+            "type": "string",
+            "description": "Rebuild one publisher only; omit for all publishers."
+          }
+        },
+        "required": [
+          "from",
+          "to"
         ]
       },
       "CreateReconciliationRunDto": {
@@ -28962,19 +31161,90 @@
         "type": "object",
         "properties": {
           "from": {
-            "type": "string"
+            "type": "string",
+            "description": "Inclusive Cairo calendar date."
           },
           "to": {
+            "type": "string",
+            "description": "Inclusive Cairo calendar date."
+          },
+          "subjectId": {
+            "type": "string"
+          },
+          "courseId": {
+            "type": "string"
+          },
+          "chapterId": {
+            "type": "string"
+          },
+          "gradeId": {
+            "type": "string"
+          },
+          "governorateId": {
+            "type": "string"
+          },
+          "centerId": {
+            "type": "string"
+          },
+          "paymentChannel": {
+            "type": "string",
+            "enum": [
+              "MANUAL",
+              "PAYMOB"
+            ]
+          },
+          "orderStatus": {
+            "type": "string",
+            "enum": [
+              "AWAITING_PAYMENT",
+              "SUBMITTED",
+              "APPROVED",
+              "REJECTED",
+              "CANCELLED",
+              "EXPIRED"
+            ]
+          },
+          "paymentStatus": {
+            "type": "string",
+            "enum": [
+              "INITIATED",
+              "PENDING",
+              "PAID",
+              "DECLINED",
+              "FAILED",
+              "EXPIRED"
+            ]
+          },
+          "promotionId": {
+            "type": "string",
+            "description": "Discount campaign ID."
+          },
+          "couponCode": {
+            "type": "string",
+            "description": "Coupon code, case-insensitive."
+          },
+          "referralCode": {
             "type": "string"
           },
           "partnerUserId": {
-            "type": "string"
+            "type": "string",
+            "description": "Publisher or referral partner user ID."
           },
           "reportType": {
             "type": "string",
             "enum": [
               "COMMERCE",
+              "PLATFORM_REVENUE",
+              "REFUNDS",
+              "PAYMENTS",
+              "REGISTRATIONS",
+              "ACTIVE_PURCHASERS",
+              "ENTITLEMENT_LIFECYCLE",
               "PARTNER_OBLIGATIONS",
+              "PUBLISHER_ALLOCATIONS",
+              "PUBLISHER_SETTLEMENTS",
+              "REFERRAL_ALLOCATIONS",
+              "REFERRAL_SETTLEMENTS",
               "ENTITLEMENTS"
             ]
           },

@@ -12,6 +12,12 @@ import { ReportsService } from './reports.service';
 export class ReportsController {
   constructor(private readonly reports: ReportsService) {}
   @Get('commerce') @ApiOperation({ summary: 'Get aggregate platform commerce totals' }) commerce(@CurrentUser() actor: RequestUser, @Query() query: PlatformReportQueryDto) { return this.reports.commerce(actor, query); }
+  @Get('revenue') @ApiOperation({ summary: 'Get aggregate approved revenue and discount totals' }) revenue(@CurrentUser() actor: RequestUser, @Query() query: PlatformReportQueryDto) { return this.reports.commerce(actor, query); }
+  @Get('refunds') @ApiOperation({ summary: 'Get aggregate refund request and approved reimbursement totals' }) refunds(@CurrentUser() actor: RequestUser, @Query() query: PlatformReportQueryDto) { return this.reports.refunds(actor, query); }
+  @Get('payments') @ApiOperation({ summary: 'Get aggregate payment-attempt totals' }) payments(@CurrentUser() actor: RequestUser, @Query() query: PlatformReportQueryDto) { return this.reports.payments(actor, query); }
+  @Get('registrations') @ApiOperation({ summary: 'Get aggregate student registration totals' }) registrations(@CurrentUser() actor: RequestUser, @Query() query: PlatformReportQueryDto) { return this.reports.registrations(actor, query); }
+  @Get('active-purchasers') @ApiOperation({ summary: 'Get aggregate approved purchaser and current-access totals' }) activePurchasers(@CurrentUser() actor: RequestUser, @Query() query: PlatformReportQueryDto) { return this.reports.activePurchasers(actor, query); }
+  @Get('entitlements') @ApiOperation({ summary: 'Get aggregate entitlement grant, revocation, expiry, and active-access totals' }) entitlements(@CurrentUser() actor: RequestUser, @Query() query: PlatformReportQueryDto) { return this.reports.entitlementLifecycle(actor, query); }
   @Get('partner-obligations') @ApiOperation({ summary: 'Get aggregate publisher and referral obligation totals' }) obligations(@CurrentUser() actor: RequestUser, @Query() query: PlatformReportQueryDto) { return this.reports.partnerObligations(actor, query); }
   @Post('exports') @ApiOperation({ summary: 'Queue a secure CSV report export' }) createExport(@CurrentUser() actor: RequestUser, @Body() dto: CreateReportExportDto) { return this.reports.requestExport(actor, dto); }
   @Get('exports') exports(@CurrentUser() actor: RequestUser, @Query() query: ReportExportsQueryDto) { return this.reports.exports(actor, query); }
