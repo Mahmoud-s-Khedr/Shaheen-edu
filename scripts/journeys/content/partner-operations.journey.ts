@@ -354,7 +354,13 @@ export const partnerOperationsJourney: JourneyDefinition = {
       'Proving partner isolation, cohort suppression, and secure export completion',
       async () => {
         expectStatus(await admin.request('GET', `/admin/partners/${referralPartnerId}/detail`), 200);
-        expectStatus(await admin.request('GET', '/admin/referral-reporting'), 200);
+        expectStatus(
+          await admin.request(
+            'GET',
+            `/admin/referral-reporting?partnerUserId=${referralPartnerId}`,
+          ),
+          200,
+        );
         const flags = await admin.request<any>('GET', `/admin/referral-programs/review-flags?programId=${referralProgramId}&limit=100`);
         expectStatus(flags, 200);
         const flag = flags.body.data[0];

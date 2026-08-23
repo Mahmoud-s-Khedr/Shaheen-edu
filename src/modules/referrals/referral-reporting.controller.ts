@@ -5,7 +5,7 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Role } from '../../common/types/roles.enum';
 import type { RequestUser } from '../../common/types/request-with-user.types';
-import { ReferralReportingQueryDto } from './dto/referrals.dto';
+import { AdminReferralReportingQueryDto, ReferralReportingQueryDto } from './dto/referrals.dto';
 import { ReferralReportingService } from './referral-reporting.service';
 
 @ApiTags('partners/referrals') @ApiBearerAuth() @UseGuards(RolesGuard) @Roles(Role.PARTNER)
@@ -20,5 +20,5 @@ export class PartnerReferralReportingController {
 @Controller({ path: 'admin/referral-reporting', version: '1' })
 export class AdminReferralReportingController {
   constructor(private readonly reports: ReferralReportingService) {}
-  @Get() @ApiOperation({ summary: 'Get aggregate referral reporting for a referral partner; administrative responses are not cohort-suppressed.' }) report(@CurrentUser() user: RequestUser, @Query('partnerUserId') partnerUserId: string, @Query() query: ReferralReportingQueryDto) { return this.reports.adminReport(user, partnerUserId, query); }
+  @Get() @ApiOperation({ summary: 'Get aggregate referral reporting for a referral partner; administrative responses are not cohort-suppressed.' }) report(@CurrentUser() user: RequestUser, @Query() query: AdminReferralReportingQueryDto) { const { partnerUserId, ...period } = query; return this.reports.adminReport(user, partnerUserId, period); }
 }

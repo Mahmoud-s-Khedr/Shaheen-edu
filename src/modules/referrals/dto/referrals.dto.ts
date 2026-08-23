@@ -102,3 +102,7 @@ export class ReferralReportingQueryDto {
   @ApiPropertyOptional({ example: '2026-08-31', description: 'Cairo calendar date.' }) @IsOptional() @IsDateString() to?: string;
   @ApiPropertyOptional({ enum: ['day', 'month'] }) @IsOptional() @IsEnum(['day', 'month']) granularity?: 'day' | 'month';
 }
+
+export class AdminReferralReportingQueryDto extends ReferralReportingQueryDto {
+  @ApiProperty({ description: 'Referral-partner user ID to report on.' }) @IsString() partnerUserId!: string;
+}
