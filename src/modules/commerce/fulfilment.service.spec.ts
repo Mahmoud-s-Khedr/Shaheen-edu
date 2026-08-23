@@ -15,7 +15,7 @@ describe('FulfilmentService partner allocations and referral limits', () => {
       order: { findUnique: jest.fn().mockResolvedValueOnce(firstOrder).mockResolvedValueOnce(firstOrder), updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
       $executeRaw: jest.fn().mockResolvedValue(1),
       orderReferralAttribution: { count: jest.fn().mockResolvedValue(0) },
-      publisherAgreement: { findFirst: jest.fn().mockResolvedValue(null) },
+      publisherAgreement: { findMany: jest.fn().mockResolvedValue([]) },
       partnerAllocation: { createMany: jest.fn().mockResolvedValue({ count: 1 }) },
       studentEntitlement: { updateMany: jest.fn(), createMany: jest.fn() },
       paymentReceipt: { create: jest.fn() },
@@ -35,13 +35,38 @@ describe('FulfilmentService partner allocations and referral limits', () => {
 
   it('creates publisher allocations with a retry-safe idempotency key', async () => {
     const tx = client(order());
-    tx.publisherAgreement.findFirst.mockResolvedValue({ id: 'agreement-1', publisherUserId: 'publisher-1', payoutKind: 'PERCENTAGE', revenueShareBps: 2500, fixedPayoutMinor: null, version: 1, courseId: 'course-1', chapterId: null, lessonId: null });
+    tx.publisherAgreement.findMany.mockResolvedValue([{ id: 'agreement-1', publisherUserId: 'publisher-1', payoutKind: 'PERCENTAGE', revenueShareBps: 2500, fixedPayoutMinor: null, version: 1, courseId: 'course-1', chapterId: null, lessonId: null, startsAt: new Date() }]);
     const service = new FulfilmentService({ recordWithClient: jest.fn() } as any);
     await service.fulfil(tx, { orderId: 'order-1' });
 
     expect(tx.partnerAllocation.createMany).toHaveBeenCalledWith(expect.objectContaining({
       skipDuplicates: true,
       data: [expect.objectContaining({ kind: PartnerAllocationKind.PUBLISHER_SALE, amountMinor: 250, basisMinor: 1000, idempotencyKey: 'publisher-sale:item-1' })],
+    }));
+  });
+
+  it('prefers a chapter agreement over a course agreement that starts at the same time', async () => {
+    const chapterOrder = order();
+    chapterOrder.items[0] = {
+      ...chapterOrder.items[0],
+      courseId: null,
+      chapterId: 'chapter-1',
+      chapter: { courseId: 'course-1' },
+    };
+    const tx = client(chapterOrder);
+    const startsAt = new Date();
+    tx.publisherAgreement.findMany.mockResolvedValue([
+      { id: 'course-agreement', publisherUserId: 'publisher-1', payoutKind: 'PERCENTAGE', revenueShareBps: 1000, fixedPayoutMinor: null, version: 1, courseId: 'course-1', chapterId: null, lessonId: null, startsAt },
+      { id: 'chapter-agreement', publisherUserId: 'publisher-1', payoutKind: 'PERCENTAGE', revenueShareBps: 2500, fixedPayoutMinor: null, version: 1, courseId: null, chapterId: 'chapter-1', lessonId: null, startsAt },
+    ]);
+
+    await new FulfilmentService({ recordWithClient: jest.fn() } as any).fulfil(tx, { orderId: 'order-1' });
+
+    expect(tx.partnerAllocation.createMany).toHaveBeenCalledWith(expect.objectContaining({
+      data: [expect.objectContaining({
+        publisherAgreementId: 'chapter-agreement',
+        amountMinor: 250,
+      })],
     }));
   });
 });

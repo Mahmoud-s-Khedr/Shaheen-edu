@@ -14,6 +14,17 @@ import {
 } from '../../common/types/roles.enum';
 import { AuditService } from '../audit/audit.service';
 
+function agreementSpecificity(agreement: {
+  courseId: string | null;
+  chapterId: string | null;
+  lessonId: string | null;
+}) {
+  if (agreement.lessonId) return 3;
+  if (agreement.chapterId) return 2;
+  if (agreement.courseId) return 1;
+  return 0;
+}
+
 @Injectable()
 export class FulfilmentService {
   constructor(private readonly audit: AuditService) {}
@@ -57,7 +68,7 @@ export class FulfilmentService {
       const target = item.chapterId
         ? [{ chapterId: item.chapterId }, { courseId: item.chapter?.courseId }]
         : [{ courseId: item.courseId }];
-      const agreement = await tx.publisherAgreement.findFirst({
+      const agreements = await tx.publisherAgreement.findMany({
         where: {
           OR: target.filter((value) => Object.values(value)[0]),
           status: 'ACTIVE', isPrimary: true, startsAt: { lte: now },
@@ -65,6 +76,15 @@ export class FulfilmentService {
         },
         orderBy: { startsAt: 'desc' },
       });
+      // A chapter/lesson agreement always takes precedence over a broader
+      // course agreement. Ordering only by start time made same-timestamp
+      // agreements nondeterministic, which could underpay a publisher.
+      const agreement = [...agreements].sort((left, right) => {
+        const scopeDifference =
+          agreementSpecificity(right) - agreementSpecificity(left);
+        if (scopeDifference) return scopeDifference;
+        return right.startsAt.getTime() - left.startsAt.getTime();
+      })[0];
       if (agreement) {
         const amount = agreement.payoutKind === ReferralCommissionKind.PERCENTAGE
           ? Math.floor((item.priceMinor * (agreement.revenueShareBps ?? 0)) / 10_000)
