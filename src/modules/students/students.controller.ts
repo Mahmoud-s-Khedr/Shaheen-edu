@@ -34,7 +34,7 @@ import {
 } from '../../common/dto/api-response.dto';
 import { QueryAdminStudentsDto } from './dto/query-admin-students.dto';
 import { DeleteStudentDto } from './dto/delete-student.dto';
-import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
+import { Student360PaginationQueryDto } from './dto/student-360-pagination-query.dto';
 
 @ApiTags('students')
 @ApiBearerAuth()
@@ -106,24 +106,22 @@ export class AdminStudentsController {
   orders(
     @CurrentUser() actor: RequestUser,
     @Param('id') id: string,
-    @Query() query: PaginationQueryDto,
-    @Query('reason') reason?: string,
+    @Query() query: Student360PaginationQueryDto,
   ) {
-    return this.studentsService.student360Orders(actor, id, query, reason);
+    return this.studentsService.student360Orders(actor, id, query, query.reason);
   }
 
   @Get(':id/360/entitlements')
   entitlements(
     @CurrentUser() actor: RequestUser,
     @Param('id') id: string,
-    @Query() query: PaginationQueryDto,
-    @Query('reason') reason?: string,
+    @Query() query: Student360PaginationQueryDto,
   ) {
     return this.studentsService.student360Entitlements(
       actor,
       id,
       query,
-      reason,
+      query.reason,
     );
   }
 
@@ -131,20 +129,18 @@ export class AdminStudentsController {
   assessments(
     @CurrentUser() actor: RequestUser,
     @Param('id') id: string,
-    @Query() query: PaginationQueryDto,
-    @Query('reason') reason?: string,
+    @Query() query: Student360PaginationQueryDto,
   ) {
-    return this.studentsService.student360Assessments(actor, id, query, reason);
+    return this.studentsService.student360Assessments(actor, id, query, query.reason);
   }
 
   @Get(':id/360/audit-events')
   auditEvents(
     @CurrentUser() actor: RequestUser,
     @Param('id') id: string,
-    @Query() query: PaginationQueryDto,
-    @Query('reason') reason?: string,
+    @Query() query: Student360PaginationQueryDto,
   ) {
-    return this.studentsService.student360AuditEvents(actor, id, query, reason);
+    return this.studentsService.student360AuditEvents(actor, id, query, query.reason);
   }
 
   @Post(':id/suspend')
