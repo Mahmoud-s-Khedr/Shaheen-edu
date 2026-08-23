@@ -112,6 +112,21 @@ test('delivery URL fetch consumes a successful non-empty response', async () => 
   finally { globalThis.fetch = originalFetch; }
 });
 
+test('delivery URL fetch retries a transient network failure', async () => {
+  const originalFetch = globalThis.fetch;
+  let attempts = 0;
+  globalThis.fetch = (async () => {
+    attempts += 1;
+    if (attempts === 1) throw new TypeError('fetch failed');
+    return new Response('asset-bytes', { status: 200 });
+  }) as typeof fetch;
+  try {
+    resetDeliveryFetches();
+    await fetchDeliveryUrl('https://cdn.example.test/asset.pdf', 'Retried delivery');
+    assert.equal(attempts, 2);
+  } finally { globalThis.fetch = originalFetch; }
+});
+
 test('delivery URL fetch rejects failed and empty responses', async () => {
   const originalFetch = globalThis.fetch;
   try {

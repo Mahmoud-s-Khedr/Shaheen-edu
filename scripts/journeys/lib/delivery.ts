@@ -9,6 +9,11 @@ export interface DeliveryFetchRecord {
 }
 
 const deliveryFetches: DeliveryFetchRecord[] = [];
+const DELIVERY_FETCH_ATTEMPTS = 3;
+
+function pause(milliseconds: number) {
+  return new Promise<void>((resolve) => setTimeout(resolve, milliseconds));
+}
 
 /** Clears delivery evidence before a new journey runner starts. */
 export function resetDeliveryFetches(): void {
@@ -26,27 +31,40 @@ export async function fetchDeliveryUrl(url: unknown, label: string): Promise<voi
   let parsed: URL;
   try { parsed = new URL(url); } catch { throw new Error(`${label} returned an invalid URL`); }
   if (!['http:', 'https:'].includes(parsed.protocol)) throw new Error(`${label} must use HTTP(S)`);
-  let recorded = false;
-  try {
-    const response = await fetch(parsed);
-    const body = await response.arrayBuffer();
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= DELIVERY_FETCH_ATTEMPTS; attempt += 1) {
+    let response: Response;
+    let body: ArrayBuffer;
+    try {
+      response = await fetch(parsed);
+      body = await response.arrayBuffer();
+    } catch (error) {
+      lastError = error;
+      if (attempt < DELIVERY_FETCH_ATTEMPTS) {
+        await pause(250 * attempt);
+        continue;
+      }
+      break;
+    }
+    if (response.status >= 500 && attempt < DELIVERY_FETCH_ATTEMPTS) {
+      await pause(250 * attempt);
+      continue;
+    }
     deliveryFetches.push({
       label,
       url: parsed.toString(),
       status: response.status,
       fileSize: body.byteLength,
     });
-    recorded = true;
     assert(response.ok, `${label} URL must resolve (received ${response.status})`);
     assert(body.byteLength > 0, `${label} URL must return a non-empty response body`);
-  } catch (error) {
-    if (!recorded)
-      deliveryFetches.push({
-        label,
-        url: parsed.toString(),
-        fileSize: 0,
-        error: error instanceof Error ? error.message : String(error),
-      });
-    throw error;
+    return;
   }
+  deliveryFetches.push({
+    label,
+    url: parsed.toString(),
+    fileSize: 0,
+    error: lastError instanceof Error ? lastError.message : String(lastError),
+  });
+  throw lastError;
 }
