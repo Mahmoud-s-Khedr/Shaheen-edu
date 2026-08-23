@@ -408,8 +408,16 @@ export const partnerOperationsJourney: JourneyDefinition = {
           '/admin/reports/payments', '/admin/reports/registrations', '/admin/reports/active-purchasers',
           '/admin/reports/entitlements', '/admin/reports/partner-obligations',
         ]) expectStatus(await admin.request('GET', path), 200);
-        for (const suffix of ['', '/assessments', '/audit-events', '/entitlements', '/orders'])
+        for (const suffix of ['', '/assessments', '/entitlements', '/orders'])
           expectStatus(await admin.request('GET', `/admin/students/${studentUserId}/360${suffix}?reason=phase5-acceptance-coverage`), 200);
+        // Audit-event history is intentionally restricted to a Super Admin.
+        expectStatus(
+          await clients.superAdmin.request(
+            'GET',
+            `/admin/students/${studentUserId}/360/audit-events?reason=phase5-acceptance-coverage`,
+          ),
+          200,
+        );
         const referralReport = await clients.public.request<any>(
           'GET',
           '/partners/referrals/report',
