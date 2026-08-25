@@ -74,7 +74,12 @@ export class QuestionImportService {
     const image = (assignment: any) => ({
       type: QuestionContentBlockType.IMAGE,
       assetId: assignment.media.assetId,
-      altText: assignment.reason ?? undefined,
+      // `reason` records review/provenance (for example, a reviewer manually
+      // assigning a ranked crop); it is not a description of the image. Using
+      // it as alt text also leaks that internal note into Question.body's
+      // legacy content projection. The crop description is the appropriate
+      // accessibility text.
+      altText: assignment.media.description?.trim() || undefined,
     });
     const matching = assignments.filter(matches);
     const starts = matching.filter(

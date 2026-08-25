@@ -24,6 +24,32 @@ describe('QuestionImportService review summaries', () => {
     );
   }
 
+  it('uses a crop description, never a reviewer-assignment reason, as image alt text', () => {
+    const blocks = (serviceWith() as any).anchoredBlocks(
+      'Question text',
+      [
+        {
+          placementAnchor: 'START',
+          reason: 'Manually added by reviewer from ranked candidates.',
+          media: {
+            assetId: 'asset-1',
+            description: 'Microscope image of plant cells',
+          },
+        },
+      ],
+      () => true,
+    );
+
+    expect(blocks).toEqual([
+      {
+        type: 'IMAGE',
+        assetId: 'asset-1',
+        altText: 'Microscope image of plant cells',
+      },
+      { type: 'TEXT', text: 'Question text' },
+    ]);
+  });
+
   it('marks a persisted queued batch retryable when Redis enqueue fails', async () => {
     const update = jest.fn().mockResolvedValue({});
     const service = new QuestionImportService(
