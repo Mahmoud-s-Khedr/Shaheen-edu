@@ -29,6 +29,7 @@ const translations: Record<string, string> = {
   'Video is not ready for publication': 'الفيديو غير جاهز للنشر',
   'Phone number already registered': 'رقم الهاتف مسجل بالفعل', 'National ID already registered': 'الرقم القومي مسجل بالفعل',
   'Slug already in use': 'المعرّف المختصر مستخدم بالفعل', 'Record is already archived': 'السجل مؤرشف بالفعل',
+  'One or more visuals are already assigned to another candidate': 'عنصر مرئي واحد أو أكثر مرتبط بالفعل بسؤال مرشح آخر',
 };
 
 const validationTranslations: Record<string, string> = {

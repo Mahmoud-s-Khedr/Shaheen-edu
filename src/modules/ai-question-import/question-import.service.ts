@@ -594,7 +594,11 @@ export class QuestionImportService {
     dto: UpdateQuestionImportItemMediaAssignmentsDto,
   ) {
     this.admin(actor);
-    return this.prisma.$transaction(async (tx: any) => {
+    if (dto.overrideVisualSafeguards && !dto.overrideReason?.trim())
+      throw new BadRequestException(
+        'overrideReason is required when overriding visual safeguards',
+      );
+    const result = await this.prisma.$transaction(async (tx: any) => {
       const item = await tx.questionImportItem.findFirst({
         where: {
           id: itemId,
@@ -610,9 +614,11 @@ export class QuestionImportService {
           'Only unresolved visual candidates can be updated',
         );
       if (
-        !['question-import-v4', 'question-import-v5', 'question-import-v6'].includes(
-          item.batch.schemaVersion,
-        )
+        ![
+          'question-import-v4',
+          'question-import-v5',
+          'question-import-v6',
+        ].includes(item.batch.schemaVersion)
       )
         throw new ConflictException(
           'Visual ownership review is available only for PDF visual imports',
@@ -727,13 +733,65 @@ export class QuestionImportService {
                 ],
               },
             },
-            select: { mediaId: true },
+            select: {
+              mediaId: true,
+              owner: true,
+              ownerReference: true,
+              importItem: {
+                select: {
+                  id: true,
+                  batchId: true,
+                  sequence: true,
+                  sourceNumber: true,
+                  globalOrder: true,
+                  section: true,
+                  questionId: true,
+                },
+              },
+            },
           })
         : [];
-      if (conflicts.length)
-        throw new ConflictException(
-          'A question or option visual is already owned by another candidate; attach it as shared context instead',
-        );
+      const mediaKeyById = new Map(
+        media.map((entry: any) => [entry.id, entry.mediaKey]),
+      );
+      const conflictMeta = conflicts.map((conflict: any) => ({
+        mediaKey: mediaKeyById.get(conflict.mediaId) ?? conflict.mediaId,
+        existingAssignment: {
+          owner: conflict.owner,
+          ownerReference: conflict.ownerReference,
+          location:
+            conflict.owner === QuestionImportMediaAssignmentOwner.QUESTION
+              ? 'question body'
+              : `option ${Number(conflict.ownerReference?.slice(7)) + 1}`,
+        },
+        candidate: {
+          id: conflict.importItem.id,
+          batchId: conflict.importItem.batchId,
+          sequence: conflict.importItem.sequence,
+          sourceNumber: conflict.importItem.sourceNumber,
+          globalOrder: conflict.importItem.globalOrder,
+          section: conflict.importItem.section,
+          questionId: conflict.importItem.questionId,
+        },
+      }));
+      if (conflicts.length && !dto.overrideVisualSafeguards)
+        throw new ConflictException({
+          message:
+            'One or more visuals are already assigned to another candidate',
+          meta: {
+            conflictType: 'VISUAL_OWNERSHIP',
+            conflicts: conflictMeta,
+            resolution:
+              'Move the visual to shared context, or use an admin override with a documented reason.',
+          },
+        });
+      const overriddenMediaIds = new Set(
+        conflicts.map((conflict: any) => conflict.mediaId),
+      );
+      const overrideReviewNote =
+        conflicts.length && dto.overrideVisualSafeguards
+          ? `ADMIN VISUAL SAFEGUARD OVERRIDE: ${dto.overrideReason!.trim()}`
+          : null;
       await tx.questionImportMediaAssignment.createMany({
         data: dto.assignments.map((assignment) => ({
           importItemId: item.id,
@@ -742,7 +800,9 @@ export class QuestionImportService {
           exclusiveOwnershipKey:
             (assignment.owner === QuestionImportMediaAssignmentOwner.QUESTION ||
               assignment.owner === QuestionImportMediaAssignmentOwner.OPTION) &&
-            assignment.status !== QuestionImportMediaAssignmentStatus.REJECTED
+            assignment.status !==
+              QuestionImportMediaAssignmentStatus.REJECTED &&
+            !overriddenMediaIds.has(mediaByKey.get(assignment.mediaKey).id)
               ? `${rootBatchId}:${mediaByKey.get(assignment.mediaKey).id}`
               : null,
           owner: assignment.owner,
@@ -753,10 +813,17 @@ export class QuestionImportService {
           status: assignment.status,
           reviewedAt: new Date(),
           reviewedById: actor.id,
-          reviewNote: dto.note?.trim() ?? null,
+          reviewNote:
+            [dto.note?.trim(), overrideReviewNote]
+              .filter(Boolean)
+              .join('\n\n') || null,
         })),
       });
-      if (['question-import-v5', 'question-import-v6'].includes(item.batch.schemaVersion)) {
+      if (
+        ['question-import-v5', 'question-import-v6'].includes(
+          item.batch.schemaVersion,
+        )
+      ) {
         const [requirements, assigned, allMedia] = await Promise.all([
           tx.questionImportVisualRequirement.findMany({
             where: { importItemId: item.id },
@@ -806,6 +873,21 @@ export class QuestionImportService {
           },
         });
       }
+      const overriddenMediaKeys = [...mediaByKey.entries()]
+        .filter(([, media]: [string, any]) => overriddenMediaIds.has(media.id))
+        .map(([mediaKey]) => mediaKey);
+      if (overriddenMediaKeys.length)
+        await this.audit.recordWithClient(tx, {
+          actorUserId: actor.id,
+          action: 'AI_QUESTION_IMPORT_VISUAL_OWNERSHIP_OVERRIDDEN',
+          targetType: 'QuestionImportItem',
+          targetId: itemId,
+          metadata: {
+            importId: id,
+            mediaKeys: overriddenMediaKeys,
+            reason: dto.overrideReason!.trim(),
+          },
+        });
       return tx.questionImportItem.findUniqueOrThrow({
         where: { id: item.id },
         include: {
@@ -816,6 +898,7 @@ export class QuestionImportService {
         },
       });
     });
+    return result;
   }
   async acceptItem(
     actor: RequestUser,
@@ -824,6 +907,10 @@ export class QuestionImportService {
     dto: AcceptQuestionImportItemDto,
   ) {
     this.admin(actor);
+    if (dto.overrideVisualSafeguards && !dto.overrideReason?.trim())
+      throw new BadRequestException(
+        'overrideReason is required when overriding visual safeguards',
+      );
     const created = await this.prisma.$transaction(async (tx: any) => {
       const item = await tx.questionImportItem.findFirst({
         where: {
@@ -845,15 +932,19 @@ export class QuestionImportService {
         throw new ConflictException(
           'Only unresolved review candidates can be accepted',
         );
+      const unresolvedVisualRequirements = item.visualRequirements.filter(
+        (requirement: any) =>
+          requirement.resolutionState !==
+            QuestionImportVisualResolutionState.NOT_REQUIRED &&
+          requirement.resolutionState !==
+            QuestionImportVisualResolutionState.RESOLVED,
+      );
       if (
-        ['question-import-v5', 'question-import-v6'].includes(item.batch.schemaVersion) &&
-        !item.visualRequirements.every(
-          (requirement: any) =>
-            requirement.resolutionState ===
-              QuestionImportVisualResolutionState.NOT_REQUIRED ||
-            requirement.resolutionState ===
-              QuestionImportVisualResolutionState.RESOLVED,
-        )
+        ['question-import-v5', 'question-import-v6'].includes(
+          item.batch.schemaVersion,
+        ) &&
+        unresolvedVisualRequirements.length &&
+        !dto.overrideVisualSafeguards
       )
         throw new ConflictException(
           'Every visual requirement must resolve before answer content can be accepted',
@@ -997,19 +1088,44 @@ export class QuestionImportService {
           reviewerCandidate: normalized as any,
           reviewedAt: new Date(),
           reviewedById: actor.id,
-          reviewNote: dto.note?.trim() ?? null,
+          reviewNote:
+            [
+              dto.note?.trim(),
+              unresolvedVisualRequirements.length &&
+              dto.overrideVisualSafeguards
+                ? `ADMIN VISUAL SAFEGUARD OVERRIDE: ${dto.overrideReason!.trim()}`
+                : null,
+            ]
+              .filter(Boolean)
+              .join('\n\n') || null,
           errorDetail: null,
         },
       });
       await this.refreshReviewSummary(tx, item.batchId, item.batch.parentId);
+      const overriddenRequirementKeys = unresolvedVisualRequirements.map(
+        (requirement: any) => requirement.requirementKey,
+      );
+      await this.audit.recordWithClient(tx, {
+        actorUserId: actor.id,
+        action: overriddenRequirementKeys.length
+          ? 'AI_QUESTION_IMPORT_ITEM_ACCEPTED_WITH_VISUAL_OVERRIDE'
+          : 'AI_QUESTION_IMPORT_ITEM_ACCEPTED',
+        targetType: 'QuestionImportItem',
+        targetId: itemId,
+        metadata: {
+          importId: id,
+          questionId: updated.questionId,
+          ...(overriddenRequirementKeys.length
+            ? {
+                visualSafeguardOverride: {
+                  requirementKeys: overriddenRequirementKeys,
+                  reason: dto.overrideReason!.trim(),
+                },
+              }
+            : {}),
+        },
+      });
       return updated;
-    });
-    await this.audit.record({
-      actorUserId: actor.id,
-      action: 'AI_QUESTION_IMPORT_ITEM_ACCEPTED',
-      targetType: 'QuestionImportItem',
-      targetId: itemId,
-      metadata: { importId: id, questionId: created.questionId },
     });
     return created;
   }

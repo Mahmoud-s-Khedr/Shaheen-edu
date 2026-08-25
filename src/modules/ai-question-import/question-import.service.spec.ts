@@ -4,7 +4,7 @@ import {
   QuestionImportStatus,
   Role,
 } from '../../common/types/roles.enum';
-import { ServiceUnavailableException } from '@nestjs/common';
+import { ConflictException, ServiceUnavailableException } from '@nestjs/common';
 import { QuestionImportService } from './question-import.service';
 
 describe('QuestionImportService review summaries', () => {
@@ -210,6 +210,7 @@ describe('QuestionImportService review summaries', () => {
 
   function mediaReviewService() {
     const createMany = jest.fn().mockResolvedValue({ count: 1 });
+    const audit = { recordWithClient: jest.fn() };
     const tx = {
       questionImportItem: {
         findFirst: jest.fn().mockResolvedValue({
@@ -246,7 +247,7 @@ describe('QuestionImportService review summaries', () => {
     const service = new QuestionImportService(
       prisma as any,
       {} as any,
-      {} as any,
+      audit as any,
       {} as any,
       {} as any,
       {} as any,
@@ -259,7 +260,7 @@ describe('QuestionImportService review summaries', () => {
         }),
       } as any,
     );
-    return { createMany, service };
+    return { audit, createMany, service, tx };
   }
 
   it('releases exclusive ownership when a reviewer rejects an assignment', async () => {
@@ -305,5 +306,145 @@ describe('QuestionImportService review summaries', () => {
         { assignments: [assignment, assignment] },
       ),
     ).rejects.toThrow('Each visual may be assigned only once');
+  });
+
+  it('allows an admin to override visual ownership with an audit reason', async () => {
+    const { audit, createMany, service, tx } = mediaReviewService();
+    tx.questionImportMediaAssignment.findMany.mockResolvedValue([
+      {
+        mediaId: 'media-1',
+        owner: QuestionImportMediaAssignmentOwner.QUESTION,
+        ownerReference: 'QUESTION',
+        importItem: {
+          id: 'item-elsewhere',
+          batchId: 'batch-1',
+          sequence: 2,
+          sourceNumber: null,
+          globalOrder: 2,
+          section: null,
+          questionId: null,
+        },
+      },
+    ]);
+
+    await service.updateItemMedia(
+      { id: 'admin-1', role: Role.ADMIN } as any,
+      'batch-1',
+      'item-1',
+      {
+        assignments: [
+          {
+            mediaKey: 'M0001',
+            owner: QuestionImportMediaAssignmentOwner.QUESTION,
+            ownerReference: 'QUESTION',
+            status: QuestionImportMediaAssignmentStatus.APPROVED,
+          },
+        ],
+        overrideVisualSafeguards: true,
+        overrideReason:
+          'The book clearly reuses this figure for both questions.',
+      },
+    );
+
+    expect(createMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: [
+          expect.objectContaining({
+            exclusiveOwnershipKey: null,
+            reviewNote: expect.stringContaining(
+              'ADMIN VISUAL SAFEGUARD OVERRIDE',
+            ),
+          }),
+        ],
+      }),
+    );
+    expect(audit.recordWithClient).toHaveBeenCalledWith(
+      tx,
+      expect.objectContaining({
+        action: 'AI_QUESTION_IMPORT_VISUAL_OWNERSHIP_OVERRIDDEN',
+        metadata: expect.objectContaining({
+          mediaKeys: ['M0001'],
+          reason: 'The book clearly reuses this figure for both questions.',
+        }),
+      }),
+    );
+  });
+
+  it('requires a reason before allowing a visual safeguard override', async () => {
+    const { service } = mediaReviewService();
+
+    await expect(
+      service.updateItemMedia(
+        { id: 'admin-1', role: Role.ADMIN } as any,
+        'batch-1',
+        'item-1',
+        { assignments: [], overrideVisualSafeguards: true },
+      ),
+    ).rejects.toThrow('overrideReason is required');
+  });
+
+  it('identifies the crop and candidate that own a conflicting visual', async () => {
+    const { service, tx } = mediaReviewService();
+    tx.questionImportMediaAssignment.findMany.mockResolvedValue([
+      {
+        mediaId: 'media-1',
+        owner: QuestionImportMediaAssignmentOwner.OPTION,
+        ownerReference: 'OPTION:1',
+        importItem: {
+          id: 'item-elsewhere',
+          batchId: 'batch-1',
+          sequence: 4,
+          sourceNumber: '12',
+          globalOrder: 12,
+          section: 'Cell biology',
+          questionId: null,
+        },
+      },
+    ]);
+
+    let response: unknown;
+    try {
+      await service.updateItemMedia(
+        { id: 'admin-1', role: Role.ADMIN } as any,
+        'batch-1',
+        'item-1',
+        {
+          assignments: [
+            {
+              mediaKey: 'M0001',
+              owner: QuestionImportMediaAssignmentOwner.QUESTION,
+              ownerReference: 'QUESTION',
+              status: QuestionImportMediaAssignmentStatus.APPROVED,
+            },
+          ],
+        },
+      );
+    } catch (error) {
+      expect(error).toBeInstanceOf(ConflictException);
+      response = (error as ConflictException).getResponse();
+    }
+
+    expect(response).toMatchObject({
+      message: 'One or more visuals are already assigned to another candidate',
+      meta: {
+        conflictType: 'VISUAL_OWNERSHIP',
+        conflicts: [
+          {
+            mediaKey: 'M0001',
+            existingAssignment: {
+              owner: QuestionImportMediaAssignmentOwner.OPTION,
+              ownerReference: 'OPTION:1',
+              location: 'option 2',
+            },
+            candidate: {
+              id: 'item-elsewhere',
+              sourceNumber: '12',
+              globalOrder: 12,
+              section: 'Cell biology',
+            },
+          },
+        ],
+      },
+    });
   });
 });

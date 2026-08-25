@@ -632,6 +632,15 @@
 
   Accepting an item should materialize the draft question using the reviewed assignments.
 
+  Visual safeguards are the default, not an irreversible lock. The review UI
+  should expose a clearly labelled **Admin override** action for an unresolved
+  visual requirement or an exclusive-ownership conflict. It must require a
+  written reason and send `overrideVisualSafeguards: true` with
+  `overrideReason`; the backend retains the reason and writes an audit event.
+  When a visual is owned elsewhere, the conflict response identifies the crop,
+  its existing question/option location, and the owning candidate so the admin
+  can inspect it before choosing shared context or override.
+
   ———
 
   # 15. Assessment snapshots

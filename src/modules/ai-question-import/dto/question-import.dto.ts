@@ -3,6 +3,7 @@ import { Type } from 'class-transformer';
 import {
   ArrayMinSize,
   IsArray,
+  IsBoolean,
   IsEnum,
   IsInt,
   IsNumber,
@@ -13,6 +14,7 @@ import {
   MaxLength,
   Min,
   MinLength,
+  ValidateIf,
   ValidateNested,
 } from 'class-validator';
 import { SearchPaginationQueryDto } from '../../../common/dto/pagination-query.dto';
@@ -70,6 +72,25 @@ export class AcceptQuestionImportItemDto {
   @IsString()
   @MaxLength(2000)
   note?: string;
+  @ApiPropertyOptional({
+    description:
+      'Explicitly accept despite unresolved AI visual requirements. Requires overrideReason and is audit logged.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  overrideVisualSafeguards?: boolean;
+  @ApiPropertyOptional({
+    description:
+      'Required reviewer reason when overriding AI visual safeguards.',
+  })
+  @ValidateIf(
+    (dto: { overrideVisualSafeguards?: boolean }) =>
+      dto.overrideVisualSafeguards === true,
+  )
+  @IsString()
+  @MinLength(1)
+  @MaxLength(2000)
+  overrideReason?: string;
 }
 export class RejectQuestionImportItemDto {
   @ApiProperty() @IsString() @MinLength(1) @MaxLength(2000) reason!: string;
@@ -111,6 +132,25 @@ export class UpdateQuestionImportItemMediaAssignmentsDto {
   @IsString()
   @MaxLength(2000)
   note?: string;
+  @ApiPropertyOptional({
+    description:
+      'Explicitly allow a visual already owned by another candidate to be reused. Requires overrideReason and is audit logged.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  overrideVisualSafeguards?: boolean;
+  @ApiPropertyOptional({
+    description:
+      'Required reviewer reason when overriding AI visual safeguards.',
+  })
+  @ValidateIf(
+    (dto: { overrideVisualSafeguards?: boolean }) =>
+      dto.overrideVisualSafeguards === true,
+  )
+  @IsString()
+  @MinLength(1)
+  @MaxLength(2000)
+  overrideReason?: string;
 }
 
 export class QuestionImportMediaBoundsDto {
