@@ -6938,14 +6938,10 @@ Retries a failed visual crop without retranscribing the page (HTTP 201).
 ### `PATCH /api/v1/admin/ai/question-imports/{id}/items/{itemId}/media`
 
 Approves, rejects, moves, or reorders visual ownership assignments with `UpdateQuestionImportItemMediaAssignmentsDto` (HTTP 200).
-The normal exclusive-ownership check remains enforced. An admin may deliberately
-reuse a visual by sending `overrideVisualSafeguards: true` and a non-empty
-`overrideReason`; the assignment is recorded without an exclusive key and an
-audit event is written.
-On conflict, the HTTP 409 response contains `meta.conflicts`: each entry names
-the `mediaKey`, the existing question/option location, and the owning candidate
-ID, source number, global order, section, and materialized question ID (when
-available). The review UI should link directly to that candidate.
+AI ownership conflicts are advisory only. An administrator may reuse or assign
+any eligible import visual without an override flag or reason. Reuse is retained
+without an exclusive key and the conflict metadata is written to the audit log
+for traceability.
 
 ### `POST /api/v1/admin/ai/question-imports/{id}/retry`
 
@@ -6970,9 +6966,9 @@ Retries one failed import item and returns the restarted item (HTTP 201).
 ### `POST /api/v1/admin/ai/question-imports/{id}/items/{itemId}/accept`
 
 Creates a `HUMAN_REVIEWED` draft question from a corrected `AcceptQuestionImportItemDto` review candidate (HTTP 201).
-Unresolved visual requirements normally block acceptance. An admin may accept
-anyway with `overrideVisualSafeguards: true` and a non-empty `overrideReason`;
-the reason is retained in the review note and audit log.
+AI visual requirements, answer evidence, confidence, warnings, and provenance
+are advisory only. They are retained in the import record for review and audit,
+but never block an administrator from accepting a valid question draft.
 
 ### `POST /api/v1/admin/ai/question-imports/{id}/items/{itemId}/reject`
 

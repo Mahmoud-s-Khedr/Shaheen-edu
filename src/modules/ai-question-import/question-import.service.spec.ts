@@ -4,7 +4,7 @@ import {
   QuestionImportStatus,
   Role,
 } from '../../common/types/roles.enum';
-import { ConflictException, ServiceUnavailableException } from '@nestjs/common';
+import { ServiceUnavailableException } from '@nestjs/common';
 import { QuestionImportService } from './question-import.service';
 
 describe('QuestionImportService review summaries', () => {
@@ -308,7 +308,7 @@ describe('QuestionImportService review summaries', () => {
     ).rejects.toThrow('Each visual may be assigned only once');
   });
 
-  it('allows an admin to override visual ownership with an audit reason', async () => {
+  it('allows an admin to reuse a visual without an AI override flag', async () => {
     const { audit, createMany, service, tx } = mediaReviewService();
     tx.questionImportMediaAssignment.findMany.mockResolvedValue([
       {
@@ -340,9 +340,6 @@ describe('QuestionImportService review summaries', () => {
             status: QuestionImportMediaAssignmentStatus.APPROVED,
           },
         ],
-        overrideVisualSafeguards: true,
-        overrideReason:
-          'The book clearly reuses this figure for both questions.',
       },
     );
 
@@ -352,7 +349,7 @@ describe('QuestionImportService review summaries', () => {
           expect.objectContaining({
             exclusiveOwnershipKey: null,
             reviewNote: expect.stringContaining(
-              'ADMIN VISUAL SAFEGUARD OVERRIDE',
+              'ADMIN VISUAL OWNERSHIP DECISION',
             ),
           }),
         ],
@@ -364,13 +361,13 @@ describe('QuestionImportService review summaries', () => {
         action: 'AI_QUESTION_IMPORT_VISUAL_OWNERSHIP_OVERRIDDEN',
         metadata: expect.objectContaining({
           mediaKeys: ['M0001'],
-          reason: 'The book clearly reuses this figure for both questions.',
+          reason: null,
         }),
       }),
     );
   });
 
-  it('requires a reason before allowing a visual safeguard override', async () => {
+  it('does not require a reason for an administrator visual decision', async () => {
     const { service } = mediaReviewService();
 
     await expect(
@@ -378,13 +375,23 @@ describe('QuestionImportService review summaries', () => {
         { id: 'admin-1', role: Role.ADMIN } as any,
         'batch-1',
         'item-1',
-        { assignments: [], overrideVisualSafeguards: true },
+        {
+          assignments: [
+            {
+              mediaKey: 'M0001',
+              owner: QuestionImportMediaAssignmentOwner.QUESTION,
+              ownerReference: 'QUESTION',
+              status: QuestionImportMediaAssignmentStatus.APPROVED,
+            },
+          ],
+          overrideVisualSafeguards: true,
+        },
       ),
-    ).rejects.toThrow('overrideReason is required');
+    ).resolves.toEqual({ id: 'item-1' });
   });
 
-  it('identifies the crop and candidate that own a conflicting visual', async () => {
-    const { service, tx } = mediaReviewService();
+  it('records, but does not reject, a conflicting visual assignment', async () => {
+    const { audit, createMany, service, tx } = mediaReviewService();
     tx.questionImportMediaAssignment.findMany.mockResolvedValue([
       {
         mediaId: 'media-1',
@@ -402,9 +409,8 @@ describe('QuestionImportService review summaries', () => {
       },
     ]);
 
-    let response: unknown;
-    try {
-      await service.updateItemMedia(
+    await expect(
+      service.updateItemMedia(
         { id: 'admin-1', role: Role.ADMIN } as any,
         'batch-1',
         'item-1',
@@ -418,33 +424,28 @@ describe('QuestionImportService review summaries', () => {
             },
           ],
         },
-      );
-    } catch (error) {
-      expect(error).toBeInstanceOf(ConflictException);
-      response = (error as ConflictException).getResponse();
-    }
+      ),
+    ).resolves.toEqual({ id: 'item-1' });
 
-    expect(response).toMatchObject({
-      message: 'One or more visuals are already assigned to another candidate',
-      meta: {
-        conflictType: 'VISUAL_OWNERSHIP',
-        conflicts: [
-          {
-            mediaKey: 'M0001',
-            existingAssignment: {
-              owner: QuestionImportMediaAssignmentOwner.OPTION,
-              ownerReference: 'OPTION:1',
-              location: 'option 2',
-            },
-            candidate: {
-              id: 'item-elsewhere',
-              sourceNumber: '12',
-              globalOrder: 12,
-              section: 'Cell biology',
-            },
-          },
-        ],
-      },
-    });
+    expect(createMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: [expect.objectContaining({ exclusiveOwnershipKey: null })],
+      }),
+    );
+    expect(audit.recordWithClient).toHaveBeenCalledWith(
+      tx,
+      expect.objectContaining({
+        metadata: expect.objectContaining({
+          conflicts: [
+            expect.objectContaining({
+              mediaKey: 'M0001',
+              existingAssignment: expect.objectContaining({
+                location: 'option 2',
+              }),
+            }),
+          ],
+        }),
+      }),
+    );
   });
 });

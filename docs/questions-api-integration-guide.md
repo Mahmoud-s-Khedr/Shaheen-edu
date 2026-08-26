@@ -516,7 +516,9 @@ Example media assignment:
 }
 ```
 
-`OPTION:0` means the first option. Visual requirements must be resolved before the candidate can be accepted.
+`OPTION:0` means the first option. Visual requirements are AI review advisories:
+they help the admin spot missing, ambiguous, or incomplete image work, but they
+never prevent an administrator from accepting the reviewed question.
 
 ### 9.5 Retry failed import work
 
@@ -553,7 +555,11 @@ POST /admin/ai/question-imports/:importId/items/:itemId/accept
 }
 ```
 
-The `candidate` is the admin-reviewed version. The endpoint creates a normal question in `DRAFT` status and returns the import item with the created `questionId`.
+The `candidate` is the admin-reviewed version. The endpoint creates a normal
+question in `DRAFT` status, records it as `HUMAN_REVIEWED`, and returns the
+import item with the created `questionId`. Retained AI evidence, confidence,
+warnings, visual states, and ownership conflicts are review context only; they
+do not veto the administrator's decision.
 
 The frontend can then use the normal question APIs from sections 7 and 8.
 

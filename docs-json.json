@@ -2503,9 +2503,11 @@
           },
           {
             "name": "reason",
-            "required": true,
+            "required": false,
             "in": "query",
+            "description": "Support reason recorded with sensitive Student-360 access.",
             "schema": {
+              "maxLength": 500,
               "type": "string"
             }
           }
@@ -2562,9 +2564,11 @@
           },
           {
             "name": "reason",
-            "required": true,
+            "required": false,
             "in": "query",
+            "description": "Support reason recorded with sensitive Student-360 access.",
             "schema": {
+              "maxLength": 500,
               "type": "string"
             }
           }
@@ -2621,9 +2625,11 @@
           },
           {
             "name": "reason",
-            "required": true,
+            "required": false,
             "in": "query",
+            "description": "Support reason recorded with sensitive Student-360 access.",
             "schema": {
+              "maxLength": 500,
               "type": "string"
             }
           }
@@ -2680,9 +2686,11 @@
           },
           {
             "name": "reason",
-            "required": true,
+            "required": false,
             "in": "query",
+            "description": "Support reason recorded with sensitive Student-360 access.",
             "schema": {
+              "maxLength": 500,
               "type": "string"
             }
           }
@@ -20593,14 +20601,6 @@
         "operationId": "AdminReferralReportingController_report_v1",
         "parameters": [
           {
-            "name": "partnerUserId",
-            "required": true,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
             "name": "from",
             "required": false,
             "in": "query",
@@ -20630,6 +20630,15 @@
                 "day",
                 "month"
               ]
+            }
+          },
+          {
+            "name": "partnerUserId",
+            "required": true,
+            "in": "query",
+            "description": "Referral-partner user ID to report on.",
+            "schema": {
+              "type": "string"
             }
           }
         ],
@@ -31464,6 +31473,14 @@
           },
           "note": {
             "type": "string"
+          },
+          "overrideVisualSafeguards": {
+            "type": "boolean",
+            "description": "Legacy compatibility flag. Administrators may always assign a visual; AI ownership conflicts are advisory only."
+          },
+          "overrideReason": {
+            "type": "string",
+            "description": "Optional reviewer note for an AI ownership advisory."
           }
         },
         "required": [
@@ -31475,10 +31492,18 @@
         "properties": {
           "candidate": {
             "type": "object",
-            "description": "Corrected typed candidate. It must use one supported question type and batch-local evidence keys."
+            "description": "Corrected typed candidate. The administrator is the answer authority; retained AI evidence is optional review context."
           },
           "note": {
             "type": "string"
+          },
+          "overrideVisualSafeguards": {
+            "type": "boolean",
+            "description": "Legacy compatibility flag. Administrators may always accept; AI visual requirements are advisory only."
+          },
+          "overrideReason": {
+            "type": "string",
+            "description": "Optional reviewer note for an AI visual advisory."
           }
         },
         "required": [

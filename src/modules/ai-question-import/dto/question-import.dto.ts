@@ -14,7 +14,6 @@ import {
   MaxLength,
   Min,
   MinLength,
-  ValidateIf,
   ValidateNested,
 } from 'class-validator';
 import { SearchPaginationQueryDto } from '../../../common/dto/pagination-query.dto';
@@ -63,7 +62,7 @@ export class UpdateQuestionImportSourceTextDto {
 export class AcceptQuestionImportItemDto {
   @ApiProperty({
     description:
-      'Corrected typed candidate. It must use one supported question type and batch-local evidence keys.',
+      'Corrected typed candidate. The administrator is the answer authority; retained AI evidence is optional review context.',
   })
   @IsObject()
   candidate!: Record<string, unknown>;
@@ -74,21 +73,16 @@ export class AcceptQuestionImportItemDto {
   note?: string;
   @ApiPropertyOptional({
     description:
-      'Explicitly accept despite unresolved AI visual requirements. Requires overrideReason and is audit logged.',
+      'Legacy compatibility flag. Administrators may always accept; AI visual requirements are advisory only.',
   })
   @IsOptional()
   @IsBoolean()
   overrideVisualSafeguards?: boolean;
   @ApiPropertyOptional({
-    description:
-      'Required reviewer reason when overriding AI visual safeguards.',
+    description: 'Optional reviewer note for an AI visual advisory.',
   })
-  @ValidateIf(
-    (dto: { overrideVisualSafeguards?: boolean }) =>
-      dto.overrideVisualSafeguards === true,
-  )
+  @IsOptional()
   @IsString()
-  @MinLength(1)
   @MaxLength(2000)
   overrideReason?: string;
 }
@@ -134,21 +128,16 @@ export class UpdateQuestionImportItemMediaAssignmentsDto {
   note?: string;
   @ApiPropertyOptional({
     description:
-      'Explicitly allow a visual already owned by another candidate to be reused. Requires overrideReason and is audit logged.',
+      'Legacy compatibility flag. Administrators may always assign a visual; AI ownership conflicts are advisory only.',
   })
   @IsOptional()
   @IsBoolean()
   overrideVisualSafeguards?: boolean;
   @ApiPropertyOptional({
-    description:
-      'Required reviewer reason when overriding AI visual safeguards.',
+    description: 'Optional reviewer note for an AI ownership advisory.',
   })
-  @ValidateIf(
-    (dto: { overrideVisualSafeguards?: boolean }) =>
-      dto.overrideVisualSafeguards === true,
-  )
+  @IsOptional()
   @IsString()
-  @MinLength(1)
   @MaxLength(2000)
   overrideReason?: string;
 }

@@ -594,10 +594,6 @@ export class QuestionImportService {
     dto: UpdateQuestionImportItemMediaAssignmentsDto,
   ) {
     this.admin(actor);
-    if (dto.overrideVisualSafeguards && !dto.overrideReason?.trim())
-      throw new BadRequestException(
-        'overrideReason is required when overriding visual safeguards',
-      );
     const result = await this.prisma.$transaction(async (tx: any) => {
       const item = await tx.questionImportItem.findFirst({
         where: {
@@ -774,24 +770,18 @@ export class QuestionImportService {
           questionId: conflict.importItem.questionId,
         },
       }));
-      if (conflicts.length && !dto.overrideVisualSafeguards)
-        throw new ConflictException({
-          message:
-            'One or more visuals are already assigned to another candidate',
-          meta: {
-            conflictType: 'VISUAL_OWNERSHIP',
-            conflicts: conflictMeta,
-            resolution:
-              'Move the visual to shared context, or use an admin override with a documented reason.',
-          },
-        });
+      // Visual ownership is AI-derived review guidance, not an authority
+      // boundary.  An administrator has the physical source and may know that
+      // a crop is legitimately reused, so retain conflict metadata/audit data
+      // but never prevent the assignment from being saved.
       const overriddenMediaIds = new Set(
         conflicts.map((conflict: any) => conflict.mediaId),
       );
-      const overrideReviewNote =
-        conflicts.length && dto.overrideVisualSafeguards
-          ? `ADMIN VISUAL SAFEGUARD OVERRIDE: ${dto.overrideReason!.trim()}`
-          : null;
+      const overrideReviewNote = conflicts.length
+        ? `ADMIN VISUAL OWNERSHIP DECISION${
+            dto.overrideReason?.trim() ? `: ${dto.overrideReason.trim()}` : ''
+          }`
+        : null;
       await tx.questionImportMediaAssignment.createMany({
         data: dto.assignments.map((assignment) => ({
           importItemId: item.id,
@@ -885,7 +875,8 @@ export class QuestionImportService {
           metadata: {
             importId: id,
             mediaKeys: overriddenMediaKeys,
-            reason: dto.overrideReason!.trim(),
+            conflicts: conflictMeta,
+            reason: dto.overrideReason?.trim() ?? null,
           },
         });
       return tx.questionImportItem.findUniqueOrThrow({
@@ -907,10 +898,6 @@ export class QuestionImportService {
     dto: AcceptQuestionImportItemDto,
   ) {
     this.admin(actor);
-    if (dto.overrideVisualSafeguards && !dto.overrideReason?.trim())
-      throw new BadRequestException(
-        'overrideReason is required when overriding visual safeguards',
-      );
     const created = await this.prisma.$transaction(async (tx: any) => {
       const item = await tx.questionImportItem.findFirst({
         where: {
@@ -925,12 +912,9 @@ export class QuestionImportService {
         },
       });
       if (!item) throw new NotFoundException('Question import item not found');
-      if (
-        item.status !== QuestionImportItemStatus.REVIEW_REQUIRED ||
-        item.questionId
-      )
+      if (item.questionId)
         throw new ConflictException(
-          'Only unresolved review candidates can be accepted',
+          'An import item that already created a question cannot be accepted again',
         );
       const unresolvedVisualRequirements = item.visualRequirements.filter(
         (requirement: any) =>
@@ -939,16 +923,10 @@ export class QuestionImportService {
           requirement.resolutionState !==
             QuestionImportVisualResolutionState.RESOLVED,
       );
-      if (
-        ['question-import-v5', 'question-import-v6'].includes(
-          item.batch.schemaVersion,
-        ) &&
-        unresolvedVisualRequirements.length &&
-        !dto.overrideVisualSafeguards
-      )
-        throw new ConflictException(
-          'Every visual requirement must resolve before answer content can be accepted',
-        );
+      // Requirements and visual states remain visible to the reviewer, but
+      // they cannot veto an administrator's acceptance decision.  The admin
+      // is the authoritative reviewer and may have the original book or
+      // publisher confirmation unavailable to the import worker.
       const acceptedVisuals = [
         'question-import-v4',
         'question-import-v5',
@@ -969,8 +947,6 @@ export class QuestionImportService {
       );
       const normalized = this.normalizeReviewCandidate(
         dto.candidate,
-        source,
-        item.batch.answerEvidence,
         visualOptionIndexes,
       );
       const questionBlocks = acceptedVisuals.length
@@ -1091,9 +1067,12 @@ export class QuestionImportService {
           reviewNote:
             [
               dto.note?.trim(),
-              unresolvedVisualRequirements.length &&
-              dto.overrideVisualSafeguards
-                ? `ADMIN VISUAL SAFEGUARD OVERRIDE: ${dto.overrideReason!.trim()}`
+              unresolvedVisualRequirements.length
+                ? `ADMIN ACCEPTED DESPITE AI VISUAL ADVISORY${
+                    dto.overrideReason?.trim()
+                      ? `: ${dto.overrideReason.trim()}`
+                      : ''
+                  }`
                 : null,
             ]
               .filter(Boolean)
@@ -1108,7 +1087,7 @@ export class QuestionImportService {
       await this.audit.recordWithClient(tx, {
         actorUserId: actor.id,
         action: overriddenRequirementKeys.length
-          ? 'AI_QUESTION_IMPORT_ITEM_ACCEPTED_WITH_VISUAL_OVERRIDE'
+          ? 'AI_QUESTION_IMPORT_ITEM_ACCEPTED_WITH_VISUAL_ADVISORY'
           : 'AI_QUESTION_IMPORT_ITEM_ACCEPTED',
         targetType: 'QuestionImportItem',
         targetId: itemId,
@@ -1119,7 +1098,7 @@ export class QuestionImportService {
             ? {
                 visualSafeguardOverride: {
                   requirementKeys: overriddenRequirementKeys,
-                  reason: dto.overrideReason!.trim(),
+                  reason: dto.overrideReason?.trim() ?? null,
                 },
               }
             : {}),
@@ -1409,8 +1388,6 @@ export class QuestionImportService {
   }
   private normalizeReviewCandidate(
     candidate: Record<string, unknown>,
-    source: any,
-    evidence: any[],
     visualOptionIndexes = new Set<number>(),
   ) {
     const value: any = candidate;
@@ -1431,21 +1408,19 @@ export class QuestionImportService {
       throw new BadRequestException(
         'Candidate must contain a supported type, body, and explanation',
       );
-    if (!['SOURCE_MARKED', 'AI_INFERRED'].includes(value.answerOrigin))
-      throw new BadRequestException(
-        'Candidate must declare SOURCE_MARKED or AI_INFERRED answer provenance',
-      );
     if (
-      !Number.isFinite(value.confidence) ||
-      value.confidence < 0 ||
-      value.confidence > 1
+      value.confidence !== undefined &&
+      (!Number.isFinite(value.confidence) ||
+        value.confidence < 0 ||
+        value.confidence > 1)
     )
       throw new BadRequestException(
         'Candidate confidence must be between zero and one',
       );
     if (
-      !Array.isArray(value.warnings) ||
-      !value.warnings.every((warning: any) => typeof warning === 'string')
+      value.warnings !== undefined &&
+      (!Array.isArray(value.warnings) ||
+        !value.warnings.every((warning: any) => typeof warning === 'string'))
     )
       throw new BadRequestException('Candidate warnings must be strings');
     const citedEvidenceKeys = [
@@ -1455,39 +1430,48 @@ export class QuestionImportService {
     ];
     if (!citedEvidenceKeys.every((key: any) => typeof key === 'string'))
       throw new BadRequestException('Candidate evidence keys must be strings');
-    const relevant = new Set(
-      (source.answerEvidence ?? []).map((item: any) => item.evidenceKey),
-    );
-    const existing = new Set(evidence.map((item) => item.evidenceKey));
-    if (
-      citedEvidenceKeys.some(
-        (key: string) => !existing.has(key) || !relevant.has(key),
-      )
-    )
-      throw new BadRequestException(
-        'Candidate cites evidence that is not relevant to this question',
-      );
-    if (value.answerOrigin === 'SOURCE_MARKED' && !citedEvidenceKeys.length)
-      throw new BadRequestException(
-        'SOURCE_MARKED answers require retained source evidence',
-      );
     const output: any = {
       body: value.body.trim(),
       explanation: value.explanation.trim(),
       type,
-      warnings: value.warnings,
-      confidence: value.confidence,
-      answerOrigin: value.answerOrigin,
+      warnings: value.warnings ?? [],
+      confidence: value.confidence ?? 1,
+      // The reviewer's decision is authoritative.  AI provenance/evidence is
+      // kept with the import item for traceability, but it must not constrain
+      // a question whose answer was verified from the physical book or its
+      // publisher.
+      answerOrigin: QuestionAnswerProvenance.HUMAN_REVIEWED,
       citedEvidenceKeys,
       options: [],
       acceptedAnswers: [],
       gradingRubric: undefined,
     };
     if (value.structuredExplanation !== undefined) {
-      const fields = ['keywords', 'eliminationStrategy', 'whyCorrect', 'generalRule', 'whatIf', 'commonMistakes'];
-      if (!value.structuredExplanation || !fields.every((field) => typeof value.structuredExplanation[field] === 'string' && value.structuredExplanation[field].trim()))
-        throw new BadRequestException('Structured explanation must contain all six explanation sections');
-      output.structuredExplanation = Object.fromEntries(fields.map((field) => [field, value.structuredExplanation[field].trim()]));
+      const fields = [
+        'keywords',
+        'eliminationStrategy',
+        'whyCorrect',
+        'generalRule',
+        'whatIf',
+        'commonMistakes',
+      ];
+      if (
+        !value.structuredExplanation ||
+        !fields.every(
+          (field) =>
+            typeof value.structuredExplanation[field] === 'string' &&
+            value.structuredExplanation[field].trim(),
+        )
+      )
+        throw new BadRequestException(
+          'Structured explanation must contain all six explanation sections',
+        );
+      output.structuredExplanation = Object.fromEntries(
+        fields.map((field) => [
+          field,
+          value.structuredExplanation[field].trim(),
+        ]),
+      );
     }
     if (type === 'SINGLE_CHOICE' || type === 'MULTIPLE_CHOICE') {
       if (

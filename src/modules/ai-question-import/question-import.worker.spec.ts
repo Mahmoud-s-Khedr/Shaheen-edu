@@ -124,8 +124,8 @@ describe('QuestionImportWorker', () => {
     };
   }
 
-  it('replays a chunk without recreating sequences that already produced a question', async () => {
-    const { worker, prisma, tx, questions, client } = workerWith();
+  it('replays a chunk without recreating sequences that already produced a candidate', async () => {
+    const { worker, prisma, questions, client } = workerWith();
     prisma.questionImportItem.findMany.mockResolvedValue([{ sequence: 1 }]);
     client.extractQuestions.mockResolvedValue({
       items: [candidate('Existing question'), candidate('Retryable question')],
@@ -163,12 +163,7 @@ describe('QuestionImportWorker', () => {
       },
     );
 
-    expect(questions.createImportedDraftWithClient).toHaveBeenCalledTimes(1);
-    expect(questions.createImportedDraftWithClient).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({ body: 'Retryable question' }),
-      tx,
-    );
+    expect(questions.createImportedDraftWithClient).not.toHaveBeenCalled();
     expect(prisma.questionImportItem.create).toHaveBeenCalledTimes(1);
     expect(prisma.questionImportChunk.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -189,8 +184,7 @@ describe('QuestionImportWorker', () => {
     expect(prisma.questionImportItem.update).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
-          status: 'CREATED',
-          questionId: 'new-question',
+          status: 'REVIEW_REQUIRED',
         }),
       }),
     );
@@ -1311,7 +1305,7 @@ describe('QuestionImportWorker', () => {
     expect(aligned.get(2)[0].optionIndex).toBe(1);
   });
 
-  it('creates a source-marked short-answer draft only when its cited evidence is relevant', async () => {
+  it('routes a source-marked short-answer candidate to admin review', async () => {
     const { worker, questions, tx } = workerWith();
     await (worker as any).createV3Item(
       {
@@ -1343,14 +1337,11 @@ describe('QuestionImportWorker', () => {
         answerEvidence: [{ evidenceKey: 'E001' }],
       },
     );
-    expect(questions.createImportedDraftWithClient).toHaveBeenCalledWith(
-      expect.anything(),
+    expect(questions.createImportedDraftWithClient).not.toHaveBeenCalled();
+    expect(tx.questionImportItem.update).toHaveBeenCalledWith(
       expect.objectContaining({
-        type: 'SHORT_ANSWER',
-        acceptedAnswers: ['Cairo'],
-        answerOrigin: 'SOURCE_MARKED',
+        data: expect.objectContaining({ status: 'REVIEW_REQUIRED' }),
       }),
-      tx,
     );
   });
 

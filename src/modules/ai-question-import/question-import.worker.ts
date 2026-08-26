@@ -1002,13 +1002,15 @@ export class QuestionImportWorker {
   }
   private async ensureSourceBlocks(batch: any, current: any) {
     const rootBatchId = batch.parentId ?? batch.id;
-    const layoutPages: any[] =
-      ['question-import-v5', 'question-import-v6'].includes(current.schemaVersion)
-        ? await this.prisma.questionImportPage.findMany({
-            where: { batchId: rootBatchId },
-            select: { pageNumber: true, layoutEnvelopes: true },
-          })
-        : [];
+    const layoutPages: any[] = [
+      'question-import-v5',
+      'question-import-v6',
+    ].includes(current.schemaVersion)
+      ? await this.prisma.questionImportPage.findMany({
+          where: { batchId: rootBatchId },
+          select: { pageNumber: true, layoutEnvelopes: true },
+        })
+      : [];
     const parts = this.sourceBlockParts(current.normalizedText);
     const aligned = this.alignLayoutReferences(parts, layoutPages);
     return Promise.all(
@@ -2215,7 +2217,9 @@ export class QuestionImportWorker {
       const questions = Array.isArray(input) ? input : input.questions;
       const v4 =
         batch.schemaVersion === 'question-import-v4' ||
-        ['question-import-v5', 'question-import-v6'].includes(batch.schemaVersion);
+        ['question-import-v5', 'question-import-v6'].includes(
+          batch.schemaVersion,
+        );
       const v3 = batch.schemaVersion === 'question-import-v3' || v4;
       const r = await (v4
         ? this.extractV4(
@@ -2406,17 +2410,10 @@ export class QuestionImportWorker {
         options.filter((o) => o.isCorrect).length === 1) &&
       (c.type !== 'MULTIPLE_CHOICE' ||
         options.filter((o) => o.isCorrect).length >= 2);
-    const confidence = c.answer?.confidence;
-    const sourceWarnings = c.warnings ?? [];
-    const corruptionWarning =
-      /ambiguous|uncertain|garbl|corrupt|illegible|مشوش|تشوش|غير\s*واضح|محرّف|محرف|مقطوع|غير\s*مقروء/i;
-    const reviewRequired =
-      !Number.isFinite(confidence) ||
-      confidence < 0 ||
-      confidence > 1 ||
-      confidence < 0.9 ||
-      c.answer?.origin !== 'EXPLICIT' ||
-      sourceWarnings.some((warning) => corruptionWarning.test(warning));
+    // The AI may draft, but it must never decide that a question is ready.
+    // The administrator has the original book and publisher access, so every
+    // AI candidate is routed to the authoritative human review queue.
+    const reviewRequired = true;
     const plainExplanation = explanation
       ? [
           explanation.keywords,
@@ -2560,8 +2557,6 @@ export class QuestionImportWorker {
       ),
     );
     const citationValid = citations.every((key) => allowedEvidence.has(key));
-    const corruptionWarning =
-      /ambiguous|uncertain|incomplete|missing|absent|no\s+answer|garbl|corrupt|illegible|مشوش|تشوش|غير\s*واضح|محرّف|محرف|مقطوع|غير\s*مقروء/i;
     const validType = choice || written || type === 'LONG_ANSWER';
     const structuralValid =
       validType &&
@@ -2570,39 +2565,9 @@ export class QuestionImportWorker {
       typeof c?.explanation === 'string' &&
       Boolean(c.explanation.trim()) &&
       ['SOURCE_MARKED', 'AI_INFERRED'].includes(c?.answerOrigin);
-    const choiceComplete =
-      choice &&
-      options.length >= 2 &&
-      options.every((option: any) => option.body) &&
-      new Set(options.map((option: any) => option.body)).size ===
-        options.length &&
-      options.some((option: any) => option.isCorrect) &&
-      (type !== 'SINGLE_CHOICE' ||
-        options.filter((option: any) => option.isCorrect).length === 1) &&
-      (type !== 'MULTIPLE_CHOICE' ||
-        options.filter((option: any) => option.isCorrect).length >= 2);
-    const writtenComplete =
-      written &&
-      acceptedAnswers.length > 0 &&
-      acceptedAnswers.every(Boolean) &&
-      new Set(acceptedAnswers).size === acceptedAnswers.length;
-    const longComplete = type === 'LONG_ANSWER' && Boolean(gradingRubric);
-    const completeAnswer = choice
-      ? choiceComplete
-      : written
-        ? writtenComplete
-        : longComplete;
-    const reviewRequired =
-      Boolean(source.contextUnresolved) ||
-      !completeAnswer ||
-      !citationValid ||
-      !Number.isFinite(confidence) ||
-      confidence < 0 ||
-      confidence > 1 ||
-      confidence < 0.9 ||
-      c.answerOrigin !== 'SOURCE_MARKED' ||
-      !citations.length ||
-      warnings.some((warning) => corruptionWarning.test(warning));
+    // Candidate quality signals are displayed to the reviewer, not used to
+    // bypass the reviewer's decision by auto-creating a question.
+    const reviewRequired = true;
     try {
       return await this.prisma.$transaction(async (tx) => {
         const item = await tx.questionImportItem.create({
@@ -2670,7 +2635,8 @@ export class QuestionImportWorker {
             body: c.body,
             explanation: c.explanation,
             aiExplanation: c.structuredExplanation,
-            aiAnswerOrigin: c.answerOrigin === 'SOURCE_MARKED' ? 'EXPLICIT' : 'INFERRED',
+            aiAnswerOrigin:
+              c.answerOrigin === 'SOURCE_MARKED' ? 'EXPLICIT' : 'INFERRED',
             confidence: c.confidence,
             warnings: c.warnings,
             model: batch.model,
@@ -2743,7 +2709,9 @@ export class QuestionImportWorker {
     c: ImportedCandidateV4,
     source: any,
   ) {
-    const isV5 = ['question-import-v5', 'question-import-v6'].includes(batch.schemaVersion);
+    const isV5 = ['question-import-v5', 'question-import-v6'].includes(
+      batch.schemaVersion,
+    );
     const type = c?.type;
     const choice = type === 'SINGLE_CHOICE' || type === 'MULTIPLE_CHOICE';
     const written = type === 'SHORT_ANSWER' || type === 'FILL_IN_THE_BLANK';
@@ -2761,9 +2729,6 @@ export class QuestionImportWorker {
       type === 'LONG_ANSWER' ? c.gradingRubric?.trim() : undefined;
     const citations = [...new Set(c.citedEvidenceKeys ?? [])];
     const sourceCitations = [...new Set(c.citedSourceBlockKeys ?? [])];
-    const allowedEvidence = new Set(
-      (source.answerEvidence ?? []).map((item: any) => item.evidenceKey),
-    );
     // Some model responses include the supplied context key alongside the
     // page-block citations. Context keys are already scoped by segmentation,
     // so retain them as valid citations without treating arbitrary IDs as
@@ -2778,7 +2743,6 @@ export class QuestionImportWorker {
             source.lastBlock,
           ) || (source.contextIds ?? []).includes(key),
       );
-    const evidenceValid = citations.every((key) => allowedEvidence.has(key));
     const assignments = c.mediaAssignments ?? [];
     const offeredMedia = new Set(
       (source.media ?? []).map((item: any) => item.mediaKey),
@@ -2831,30 +2795,18 @@ export class QuestionImportWorker {
       ).size === assignments.length;
     const structuredExplanationValid =
       !isV5 ||
-      ['keywords', 'eliminationStrategy', 'whyCorrect', 'generalRule', 'whatIf', 'commonMistakes'].every(
+      [
+        'keywords',
+        'eliminationStrategy',
+        'whyCorrect',
+        'generalRule',
+        'whatIf',
+        'commonMistakes',
+      ].every(
         (key) =>
           typeof (c as any).structuredExplanation?.[key] === 'string' &&
           (c as any).structuredExplanation[key].trim(),
       );
-    const hasOptionVisual = (index: number) =>
-      assignments.some(
-        (item) =>
-          item.owner === 'OPTION' && item.ownerReference === `OPTION:${index}`,
-      );
-    const choiceComplete =
-      choice &&
-      options.length >= 2 &&
-      options.every((option, index) => option.body || hasOptionVisual(index)) &&
-      options.some((option) => option.isCorrect) &&
-      (type !== 'SINGLE_CHOICE' ||
-        options.filter((option) => option.isCorrect).length === 1) &&
-      (type !== 'MULTIPLE_CHOICE' ||
-        options.filter((option) => option.isCorrect).length >= 2);
-    const answerComplete = choice
-      ? choiceComplete
-      : written
-        ? acceptedAnswers.length > 0 && acceptedAnswers.every(Boolean)
-        : type === 'LONG_ANSWER' && Boolean(gradingRubric);
     const structuralValid =
       Boolean(
         [
@@ -2878,17 +2830,10 @@ export class QuestionImportWorker {
     const visualRequired = requirementSpecs.some(
       (item) => item.kind !== 'NONE',
     );
-    const reviewRequired =
-      Boolean(source.contextUnresolved) ||
-      visualRequired ||
-      !answerComplete ||
-      !evidenceValid ||
-      !citations.length ||
-      c.answerOrigin !== 'SOURCE_MARKED' ||
-      !Number.isFinite(c.confidence) ||
-      c.confidence < 0.9 ||
-      warnings.length > 0 ||
-      assignments.some((item) => item.confidence < 0.9);
+    // Visual requirements, answer evidence, confidence, and warnings are
+    // advisory information for the administrator.  The import worker must
+    // never auto-create a question before that human review.
+    const reviewRequired = true;
     try {
       const rootBatchId = batch.parentId ?? batch.id;
       const mediaRows: any[] = assignments.length
@@ -3142,7 +3087,8 @@ export class QuestionImportWorker {
             contentBlocks: questionBlocks,
             explanation: c.explanation,
             aiExplanation: c.structuredExplanation,
-            aiAnswerOrigin: c.answerOrigin === 'SOURCE_MARKED' ? 'EXPLICIT' : 'INFERRED',
+            aiAnswerOrigin:
+              c.answerOrigin === 'SOURCE_MARKED' ? 'EXPLICIT' : 'INFERRED',
             confidence: c.confidence,
             warnings: c.warnings,
             model: batch.model,
