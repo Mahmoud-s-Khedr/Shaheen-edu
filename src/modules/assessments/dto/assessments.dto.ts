@@ -292,12 +292,12 @@ export class UpdateAdminAssessmentDto {
 
 export class QueryAssessmentDto extends SearchPaginationQueryDto {
   @ApiPropertyOptional({
-    enum: ['ALL', 'SUSPENDED', 'COMPLETED'],
+    enum: ['ALL', 'NOT_STARTED', 'SUSPENDED', 'COMPLETED'],
     description: "Filters by the student's own attempt status",
   })
   @IsOptional()
-  @IsString()
-  status?: 'ALL' | 'SUSPENDED' | 'COMPLETED';
+  @IsIn(['ALL', 'NOT_STARTED', 'SUSPENDED', 'COMPLETED'])
+  status?: 'ALL' | 'NOT_STARTED' | 'SUSPENDED' | 'COMPLETED';
   @ApiPropertyOptional() @IsOptional() @IsString() search?: string;
 }
 
@@ -422,8 +422,8 @@ export class AssessmentListItemDto {
     number | null;
   @ApiProperty() questionCount!: number;
   @ApiProperty({ type: String, format: 'date-time' }) createdAt!: Date;
-  @ApiPropertyOptional({ type: String, nullable: true }) attemptStatus!:
-    string | null;
+  @ApiProperty({ enum: ['NOT_STARTED', 'SUSPENDED', 'COMPLETED'] }) attemptStatus!:
+    'NOT_STARTED' | 'SUSPENDED' | 'COMPLETED';
   @ApiPropertyOptional({ type: Number, nullable: true }) score!: number | null;
 }
 

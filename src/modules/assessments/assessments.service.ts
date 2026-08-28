@@ -1201,6 +1201,11 @@ export class AssessmentsService {
     return sourceQuestionId;
   }
 
+  /** Shared authorization boundary for student-owned question annotations. */
+  async assertAccessibleSourceQuestion(studentId: string, questionId: string) {
+    return this.accessibleSourceQuestionId(studentId, questionId);
+  }
+
   async saveQuestionNote(studentId: string, questionId: string, body: string) {
     const sourceQuestionId = await this.accessibleSourceQuestionId(
       studentId,
@@ -1453,7 +1458,7 @@ export class AssessmentsService {
       durationSeconds: assessment.durationSeconds,
       questionCount: assessment.questionCount,
       createdAt: assessment.createdAt,
-      attemptStatus: attempt?.status ?? null,
+      attemptStatus: attempt?.status ?? 'NOT_STARTED',
       score:
         attempt?.status === AssessmentAttemptStatus.COMPLETED
           ? attempt.score
@@ -1609,8 +1614,10 @@ export class AssessmentsService {
       })),
     ];
     if (query.status && query.status !== 'ALL')
-      merged = merged.filter(
-        (x) => byAssessment.get(x.assessment.id)?.status === query.status,
+      merged = merged.filter((x) =>
+        query.status === 'NOT_STARTED'
+          ? !byAssessment.has(x.assessment.id)
+          : byAssessment.get(x.assessment.id)?.status === query.status,
       );
     merged.sort(
       (a, b) =>

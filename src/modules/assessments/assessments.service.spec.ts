@@ -52,6 +52,7 @@ describe('AssessmentsService', () => {
       asset: { findUnique: jest.fn() },
       assessmentAttempt: {
         findUnique: jest.fn(),
+        findMany: jest.fn().mockResolvedValue([]),
         findUniqueOrThrow: jest.fn(),
         create: jest.fn(),
         update: jest.fn(),
@@ -106,6 +107,23 @@ describe('AssessmentsService', () => {
       videos,
     };
   }
+
+  it('renders NOT_STARTED when no assessment attempt exists', () => {
+    const { service } = build();
+    expect((service as any).listItemDto({
+      id: 'assessment-1', title: 'Assessment', generationType: 'STANDARD', mode: 'EXAM', isTimed: false,
+      durationSeconds: null, questionCount: 1, createdAt: new Date(),
+    }, 'PUBLIC')).toMatchObject({ attemptStatus: 'NOT_STARTED', score: null });
+  });
+
+  it('filters visible assessments with no attempt as NOT_STARTED', async () => {
+    const { service, prisma } = build();
+    prisma.assessment.findMany
+      .mockResolvedValueOnce([{ id: 'assessment-1', title: 'Assessment', generationType: 'STANDARD', mode: 'EXAM', isTimed: false, durationSeconds: null, questionCount: 1, createdAt: new Date(), ownerType: AssessmentOwnerType.STUDENT, studentUserId }])
+      .mockResolvedValueOnce([]);
+    await expect(service.list(studentUserId, { page: 1, limit: 20, status: 'NOT_STARTED' } as any))
+      .resolves.toMatchObject({ data: [{ id: 'assessment-1', attemptStatus: 'NOT_STARTED' }], meta: { total: 1 } });
+  });
 
   describe('scope resolution', () => {
     it('rejects a scope with zero targets', async () => {

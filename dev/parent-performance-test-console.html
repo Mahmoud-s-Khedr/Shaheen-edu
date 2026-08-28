@@ -1,0 +1,212 @@
+<!doctype html>
+<!--
+  Dev-only manual client for the selected-child parent performance APIs.
+
+  Run from the repository root:
+    npx serve dev -l 5173
+
+  Then open http://localhost:5173/parent-performance-test-console.html.
+  The default local origin is allowed by the repository CORS configuration.
+  Tokens are kept only in this page's JavaScript memory and are never shown.
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Shaheen Edu — Parent Performance API Console</title>
+  <style>
+    :root { color-scheme: light dark; }
+    * { box-sizing: border-box; }
+    body { max-width: 1180px; margin: 0 auto; padding: 24px; font: 16px/1.5 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+    h1 { margin: 0 0 4px; font-size: 1.5rem; }
+    h2 { margin: 0; font-size: 1rem; }
+    .muted { opacity: .72; }
+    fieldset, article { border: 1px solid color-mix(in srgb, currentColor 24%, transparent); border-radius: 12px; padding: 16px; }
+    legend { padding: 0 6px; font-weight: 700; }
+    .form, .results { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+    .results { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 20px; }
+    @media (max-width: 720px) { .form, .results { grid-template-columns: 1fr; } }
+    label { display: block; margin: 10px 0 4px; font-size: .85rem; font-weight: 650; }
+    input, select, button { width: 100%; padding: 9px 11px; border: 1px solid color-mix(in srgb, currentColor 32%, transparent); border-radius: 8px; background: transparent; color: inherit; font: inherit; }
+    button { width: auto; cursor: pointer; font-weight: 700; background: color-mix(in srgb, currentColor 11%, transparent); }
+    button:hover { background: color-mix(in srgb, currentColor 19%, transparent); }
+    button:disabled { opacity: .5; cursor: wait; }
+    .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+    .status { display: inline-block; padding: 3px 8px; border-radius: 999px; font-size: .8rem; background: color-mix(in srgb, currentColor 12%, transparent); }
+    .ok { color: #16803b; } .error { color: #c92a2a; } .pending { color: #9a6700; }
+    article header { display: flex; gap: 8px; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+    code { font-size: .82rem; }
+    pre { min-height: 130px; max-height: 410px; overflow: auto; margin: 0; padding: 12px; border-radius: 8px; background: color-mix(in srgb, currentColor 8%, transparent); font-size: .78rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .notice { margin: 18px 0; padding: 12px 14px; border-left: 4px solid #9a6700; background: color-mix(in srgb, #9a6700 12%, transparent); }
+  </style>
+</head>
+<body>
+  <h1>Parent Performance API Console</h1>
+  <p class="muted">Authenticate a parent, choose a linked child, then run the four selected-child performance endpoints.</p>
+
+  <p class="notice">This is a dev-only test page. It holds the entered credentials and access tokens only in memory; refreshing the page clears the session.</p>
+
+  <fieldset>
+    <legend>Parent session</legend>
+    <div class="form">
+      <div>
+        <label for="baseUrl">API base URL</label>
+        <input id="baseUrl" value="https://api-edu.mydevtest.website/api/v1" spellcheck="false" />
+      </div>
+      <div>
+        <label for="nationalId">Student national ID</label>
+        <input id="nationalId" value="30303033300333" inputmode="numeric" autocomplete="off" />
+      </div>
+      <div>
+        <label for="parentPhone">Parent phone</label>
+        <input id="parentPhone" value="01000000001" inputmode="tel" autocomplete="off" />
+      </div>
+      <div>
+        <label for="childSelect">Linked child</label>
+        <select id="childSelect" disabled><option>Log in to load children</option></select>
+      </div>
+    </div>
+    <div class="actions">
+      <button id="loginButton">1. Log in and load children</button>
+      <button id="runButton" disabled>2. Select child and run all endpoints</button>
+      <span id="sessionStatus" class="status">Not signed in</span>
+    </div>
+  </fieldset>
+
+  <section class="results" aria-live="polite">
+    <article data-path="/parent/selected-child/performance">
+      <header><h2>Overview</h2><span class="status">Not run</span></header>
+      <code>GET /parent/selected-child/performance</code>
+      <pre>—</pre>
+    </article>
+    <article data-path="/parent/selected-child/performance/analysis">
+      <header><h2>Analysis</h2><span class="status">Not run</span></header>
+      <code>GET /parent/selected-child/performance/analysis</code>
+      <pre>—</pre>
+    </article>
+    <article data-path="/parent/selected-child/performance/trends">
+      <header><h2>Trends</h2><span class="status">Not run</span></header>
+      <code>GET /parent/selected-child/performance/trends</code>
+      <pre>—</pre>
+    </article>
+    <article data-path="/parent/selected-child/performance/insights">
+      <header><h2>Insights</h2><span class="status">Not run</span></header>
+      <code>GET /parent/selected-child/performance/insights</code>
+      <pre>—</pre>
+    </article>
+  </section>
+
+  <script>
+    (() => {
+      const $ = (id) => document.getElementById(id);
+      const endpoints = [...document.querySelectorAll('article[data-path]')];
+      let parentToken = null;
+      let selectedChildToken = null;
+
+      const baseUrl = () => $('baseUrl').value.trim().replace(/\/$/, '');
+      const setStatus = (element, text, state = '') => {
+        element.textContent = text;
+        element.className = `status ${state}`;
+      };
+      const format = (value) => typeof value === 'string' ? value : JSON.stringify(value, null, 2);
+      const parse = (text) => { try { return text ? JSON.parse(text) : null; } catch { return text; } };
+
+      async function request(method, path, { token, body } = {}) {
+        const headers = { Accept: 'application/json' };
+        if (token) headers.Authorization = `Bearer ${token}`;
+        if (body !== undefined) headers['Content-Type'] = 'application/json';
+        const response = await fetch(`${baseUrl()}${path}`, {
+          method,
+          headers,
+          body: body === undefined ? undefined : JSON.stringify(body),
+        });
+        const responseBody = parse(await response.text());
+        if (!response.ok) {
+          const error = new Error(`HTTP ${response.status}`);
+          error.status = response.status;
+          error.body = responseBody;
+          throw error;
+        }
+        return { status: response.status, body: responseBody };
+      }
+
+      function showResult(card, title, content, state) {
+        setStatus(card.querySelector('.status'), title, state);
+        card.querySelector('pre').textContent = format(content);
+      }
+
+      function showError(card, error) {
+        const response = error.body ?? { message: error.message };
+        showResult(card, `HTTP ${error.status ?? 'error'}`, response, 'error');
+      }
+
+      $('loginButton').addEventListener('click', async () => {
+        const loginButton = $('loginButton');
+        loginButton.disabled = true;
+        $('runButton').disabled = true;
+        $('childSelect').disabled = true;
+        parentToken = null;
+        selectedChildToken = null;
+        setStatus($('sessionStatus'), 'Signing in…', 'pending');
+        try {
+          const login = await request('POST', '/auth/parents/login', {
+            body: { nationalId: $('nationalId').value.trim(), parentPhone: $('parentPhone').value.trim() },
+          });
+          parentToken = login.body.accessToken;
+          if (!parentToken) throw new Error('The login response did not include an access token.');
+
+          const children = await request('GET', '/auth/parents/children?page=1&limit=100', { token: parentToken });
+          const options = children.body.data ?? [];
+          if (!options.length) throw new Error('No linked children were returned for this parent.');
+
+          $('childSelect').replaceChildren(...options.map((child) => {
+            const option = document.createElement('option');
+            option.value = child.userId;
+            option.textContent = `${child.fullName} — ${child.governorate}${child.center ? ` (${child.center})` : ''}`;
+            return option;
+          }));
+          $('childSelect').disabled = false;
+          $('runButton').disabled = false;
+          setStatus($('sessionStatus'), `${options.length} linked child${options.length === 1 ? '' : 'ren'} loaded`, 'ok');
+        } catch (error) {
+          setStatus($('sessionStatus'), `Login failed: ${error.status ?? error.message}`, 'error');
+          alert(format(error.body ?? { message: error.message }));
+        } finally {
+          loginButton.disabled = false;
+        }
+      });
+
+      $('runButton').addEventListener('click', async () => {
+        const runButton = $('runButton');
+        if (!parentToken) return;
+        runButton.disabled = true;
+        endpoints.forEach((card) => showResult(card, 'Loading…', 'Request in progress', 'pending'));
+        try {
+          const selected = await request('POST', '/auth/parents/select-child', {
+            token: parentToken,
+            body: { studentUserId: $('childSelect').value },
+          });
+          selectedChildToken = selected.body.accessToken;
+          if (!selectedChildToken) throw new Error('The selected-child response did not include an access token.');
+          setStatus($('sessionStatus'), 'Child selected — loading performance data…', 'pending');
+
+          await Promise.all(endpoints.map(async (card) => {
+            try {
+              const result = await request('GET', card.dataset.path, { token: selectedChildToken });
+              showResult(card, `HTTP ${result.status}`, result.body, 'ok');
+            } catch (error) {
+              showError(card, error);
+            }
+          }));
+          setStatus($('sessionStatus'), 'All requests finished', 'ok');
+        } catch (error) {
+          endpoints.forEach((card) => showError(card, error));
+          setStatus($('sessionStatus'), `Could not select child: ${error.status ?? error.message}`, 'error');
+        } finally {
+          runButton.disabled = false;
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

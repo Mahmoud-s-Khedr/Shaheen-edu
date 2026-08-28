@@ -6,7 +6,10 @@ describe('CatalogService hierarchy hasChildren', () => {
   function buildService() {
     const prisma = {
       subject: { findMany: jest.fn(), count: jest.fn() },
-      course: { findMany: jest.fn(), count: jest.fn() },
+      course: { findMany: jest.fn(), count: jest.fn(), findFirst: jest.fn() },
+      chapter: { count: jest.fn() },
+      lesson: { count: jest.fn() },
+      section: { count: jest.fn() },
       $transaction: jest.fn(),
     };
     return { service: new CatalogService(prisma as never), prisma };
@@ -31,5 +34,15 @@ describe('CatalogService hierarchy hasChildren', () => {
       }),
     );
     expect(prisma.course.findMany).not.toHaveBeenCalled();
+  });
+
+  it('returns aggregate nested content counts on a course detail', async () => {
+    const { service, prisma } = buildService();
+    prisma.course.findFirst.mockResolvedValue({
+      id: 'course', title: 'Course', slug: 'course', description: null, sortOrder: 1, coverAssetId: null,
+      _count: { chapters: 2 }, subject: { id: 'subject', title: 'Subject', slug: 'subject', description: null, sortOrder: 1, coverAssetId: null, _count: { courses: 1 }, academicGrade: { id: 'grade', title: 'Grade', slug: 'grade', description: null, sortOrder: 1, coverAssetId: null, _count: { subjects: 1 } } },
+    });
+    prisma.$transaction.mockResolvedValue([2, 4, 7]);
+    await expect(service.course('course')).resolves.toMatchObject({ contentCounts: { chapters: 2, lessons: 4, sections: 7 } });
   });
 });

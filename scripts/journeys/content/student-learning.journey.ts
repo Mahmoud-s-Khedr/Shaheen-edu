@@ -118,6 +118,18 @@ export const studentLearningJourney: JourneyDefinition = {
         ])
           await publish(resource, id);
 
+        const publicCourse = await clients.public.request<any>(
+          'GET',
+          `/catalog/courses/${courseId}`,
+        );
+        expectStatus(publicCourse, 200);
+        assert(
+          publicCourse.body.contentCounts?.chapters === 1 &&
+            publicCourse.body.contentCounts?.lessons === 1 &&
+            publicCourse.body.contentCounts?.sections === 1,
+          'Public course detail must return accurate nested content counts',
+        );
+
         const source = await create('/admin/question-banks/sources', {
           type: 'PLATFORM',
           title: factory.localizedTitle('Learning source'),
@@ -261,19 +273,31 @@ export const studentLearningJourney: JourneyDefinition = {
         assert(
           progress.body.content?.completedItems === 1 &&
             progress.body.courses?.some(
-              (node: any) => node.id === courseId && !node.completed,
+              (node: any) =>
+                node.id === courseId &&
+                !node.completed &&
+                node.isCompleted === false,
             ),
           'A course with an incomplete direct child must not be complete',
         );
         assert(
           progress.body.chapters?.some(
-            (node: any) => node.id === chapterId && !node.completed,
+            (node: any) =>
+              node.id === chapterId &&
+              !node.completed &&
+              node.isCompleted === false,
           ) &&
             progress.body.lessons?.some(
-              (node: any) => node.id === lessonId && node.completed,
+              (node: any) =>
+                node.id === lessonId &&
+                node.completed &&
+                node.isCompleted === true,
             ) &&
             progress.body.sections?.some(
-              (node: any) => node.id === sectionId && node.completed,
+              (node: any) =>
+                node.id === sectionId &&
+                node.completed &&
+                node.isCompleted === true,
             ),
           'Only the populated completed lesson and section should roll up',
         );
@@ -295,18 +319,42 @@ export const studentLearningJourney: JourneyDefinition = {
         assert(
           progress.body.content?.completedItems === 2 &&
             progress.body.courses?.some(
-              (node: any) => node.id === courseId && node.completed,
+              (node: any) =>
+                node.id === courseId &&
+                node.completed &&
+                node.isCompleted === true,
             ) &&
             progress.body.chapters?.some(
-              (node: any) => node.id === chapterId && node.completed,
+              (node: any) =>
+                node.id === chapterId &&
+                node.completed &&
+                node.isCompleted === true,
             ) &&
             progress.body.lessons?.some(
-              (node: any) => node.id === lessonId && node.completed,
+              (node: any) =>
+                node.id === lessonId &&
+                node.completed &&
+                node.isCompleted === true,
             ) &&
             progress.body.sections?.some(
-              (node: any) => node.id === sectionId && node.completed,
+              (node: any) =>
+                node.id === sectionId &&
+                node.completed &&
+                node.isCompleted === true,
             ),
           'Completing every direct and descendant item must complete all ancestors',
+        );
+        const catalogue = await student<any>(
+          'GET',
+          `/student/catalog/courses/${courseId}/chapters`,
+        );
+        expectStatus(catalogue, 200);
+        assert(
+          catalogue.body.parent?.isCompleted === true &&
+            catalogue.body.data?.some(
+              (node: any) => node.id === chapterId && node.isCompleted === true,
+            ),
+          'Student catalogue completion flags must use the same derived rollup',
         );
         const library = await student<any>(
           'GET',

@@ -1032,7 +1032,7 @@ Response — `200 OK`:
   - Response — `200 OK`: `{ "id": "cmsksbb1600sinw01d9ikhjth", "deleted": true }`
 
 #### Start, save, submit, and review an attempt
-
+no 
 - **`POST /student/assessments/:id/attempts/start`**
   - Request: `POST /api/v1/student/assessments/cmsksbb1600sinw01d9ikhjth/attempts/start`
   - Response — `201 Created`: `{ "attemptId": "cmsksbc7200sunw01d4sidtcu", "status": "SUSPENDED", "mode": "EXAM", "totalQuestions": 2, "questions": [{ "id": "cmsksbb3o00smnw01iwqu5zux" }] }`

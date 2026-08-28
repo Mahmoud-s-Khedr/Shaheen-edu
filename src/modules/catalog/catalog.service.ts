@@ -114,10 +114,16 @@ export class CatalogService {
       },
     });
     if (!record) throw new NotFoundException('Published course not found');
+    const [chapters, lessons, sections] = await this.prisma.$transaction([
+      this.prisma.chapter.count({ where: { courseId: record.id, status: published } }),
+      this.prisma.lesson.count({ where: { chapter: { courseId: record.id, status: published }, status: published } }),
+      this.prisma.section.count({ where: { lesson: { chapter: { courseId: record.id, status: published }, status: published }, status: published } }),
+    ]);
     return {
       ...publicNode(record),
       subject: publicNode(record.subject),
       academicGrade: publicNode(record.subject.academicGrade),
+      contentCounts: { chapters, lessons, sections },
     };
   }
 

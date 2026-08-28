@@ -200,6 +200,137 @@ export const assessmentsJourney: JourneyDefinition = {
     });
 
     await step(
+      'Managing student-private highlights, notebook pages, and subject constants',
+      async () => {
+        const highlight = await student<any>(
+          student1Token,
+          'POST',
+          `/student/questions/${questionIds[0]}/highlights`,
+          {
+            selectedText: 'Assessment',
+            startOffset: 0,
+            endOffset: 10,
+            color: 'yellow',
+          },
+        );
+        expectStatus(highlight, 201);
+        assert(
+          highlight.body.questionId === questionIds[0] &&
+            highlight.body.selectedText === 'Assessment' &&
+            highlight.body.color === 'yellow',
+          'A student must be able to create a highlight with recoverable text offsets',
+        );
+        const highlights = await student<any>(
+          student1Token,
+          'GET',
+          `/student/questions/${questionIds[0]}/highlights`,
+        );
+        expectStatus(highlights, 200);
+        assert(
+          highlights.body.data?.some(
+            (item: any) => item.id === highlight.body.id,
+          ),
+          'A student must only receive their own question highlights',
+        );
+        const invalidHighlight = await student<any>(
+          student1Token,
+          'POST',
+          `/student/questions/${questionIds[0]}/highlights`,
+          { selectedText: 'wrong', startOffset: 0, endOffset: 10 },
+        );
+        expectStatus(invalidHighlight, 400);
+        const foreignDelete = await student<any>(
+          student2Token,
+          'DELETE',
+          `/student/questions/${questionIds[0]}/highlights/${highlight.body.id}`,
+        );
+        expectStatus(foreignDelete, 404);
+        expectStatus(
+          await student<any>(
+            student1Token,
+            'DELETE',
+            `/student/questions/${questionIds[0]}/highlights/${highlight.body.id}`,
+          ),
+          200,
+        );
+
+        const page = await student<any>(
+          student1Token,
+          'POST',
+          '/student/notebook/pages',
+          { title: 'Assessment revision', content: '<p>Private notes</p>' },
+        );
+        expectStatus(page, 201);
+        const foreignPage = await student<any>(
+          student2Token,
+          'GET',
+          `/student/notebook/pages/${page.body.id}`,
+        );
+        expectStatus(foreignPage, 404);
+        const updatedPage = await student<any>(
+          student1Token,
+          'PATCH',
+          `/student/notebook/pages/${page.body.id}`,
+          { content: '<p>Updated private notes</p>' },
+        );
+        expectStatus(updatedPage, 200);
+        const pages = await student<any>(
+          student1Token,
+          'GET',
+          '/student/notebook/pages',
+        );
+        expectStatus(pages, 200);
+        assert(
+          pages.body.data?.some(
+            (item: any) =>
+              item.id === page.body.id &&
+              item.content === '<p>Updated private notes</p>',
+          ),
+          'Notebook page CRUD must be strictly student-scoped',
+        );
+        expectStatus(
+          await student<any>(
+            student1Token,
+            'DELETE',
+            `/student/notebook/pages/${page.body.id}`,
+          ),
+          200,
+        );
+
+        const constant = await admin.request<any>(
+          'POST',
+          `/admin/subjects/${subjectId}/constants`,
+          { key: 'gravity', value: '9.8' },
+        );
+        expectStatus(constant, 201);
+        const publicConstants = await clients.public.request<any>(
+          'GET',
+          `/subjects/${subjectId}/constants`,
+        );
+        expectStatus(publicConstants, 200);
+        assert(
+          publicConstants.body.data?.some(
+            (item: any) => item.key === 'gravity' && item.value === '9.8',
+          ),
+          'Subject constants must be publicly readable for calculators',
+        );
+        const duplicateConstant = await admin.request<any>(
+          'POST',
+          `/admin/subjects/${subjectId}/constants`,
+          { key: 'gravity', value: '9.81' },
+        );
+        expectStatus(duplicateConstant, 409);
+        const studentWrite = await student<any>(
+          student1Token,
+          'POST',
+          `/admin/subjects/${subjectId}/constants`,
+          { key: 'student-write', value: 'nope' },
+        );
+        expectStatus(studentWrite, 403);
+      },
+    );
+
+    await step(
       'Rejecting invalid student voice uploads before transcription',
       async () => {
         const upload = await clients.public.upload<any>(
@@ -421,8 +552,24 @@ export const assessmentsJourney: JourneyDefinition = {
         );
         expectStatus(ownList, 200);
         assert(
-          ownList.body.data.some((x: any) => x.id === studentAssessmentId),
-          "The owner's list must include their own generated assessment",
+          ownList.body.data.some(
+            (x: any) =>
+              x.id === studentAssessmentId && x.attemptStatus === 'NOT_STARTED',
+          ),
+          "The owner's list must include a generated assessment as NOT_STARTED",
+        );
+        const notStarted = await student<any>(
+          student1Token,
+          'GET',
+          '/student/assessments?status=NOT_STARTED',
+        );
+        expectStatus(notStarted, 200);
+        assert(
+          notStarted.body.data?.some(
+            (x: any) =>
+              x.id === studentAssessmentId && x.attemptStatus === 'NOT_STARTED',
+          ),
+          'The NOT_STARTED filter must include assessments without an attempt record',
         );
 
         const otherList = await student<any>(
@@ -475,6 +622,20 @@ export const assessmentsJourney: JourneyDefinition = {
           start.body.status === 'SUSPENDED' &&
             start.body.questions.length === 2,
           'A fresh attempt must start suspended with every snapshot question',
+        );
+        const suspended = await student<any>(
+          student1Token,
+          'GET',
+          '/student/assessments?status=SUSPENDED',
+        );
+        expectStatus(suspended, 200);
+        assert(
+          suspended.body.data?.some(
+            (item: any) =>
+              item.id === studentAssessmentId &&
+              item.attemptStatus === 'SUSPENDED',
+          ),
+          'The suspended filter must preserve existing attempt status behavior',
         );
         const firstQuestion = start.body.questions[0];
         const noteOnSnapshot = await student<any>(
@@ -532,6 +693,20 @@ export const assessmentsJourney: JourneyDefinition = {
         assert(
           submit.body.status === 'COMPLETED',
           'Submission must finalize the attempt',
+        );
+        const completed = await student<any>(
+          student1Token,
+          'GET',
+          '/student/assessments?status=COMPLETED',
+        );
+        expectStatus(completed, 200);
+        assert(
+          completed.body.data?.some(
+            (item: any) =>
+              item.id === studentAssessmentId &&
+              item.attemptStatus === 'COMPLETED',
+          ),
+          'The completed filter must preserve existing attempt status behavior',
         );
 
         const result = await student<any>(

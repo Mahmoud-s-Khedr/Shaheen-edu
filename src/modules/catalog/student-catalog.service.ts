@@ -22,6 +22,7 @@ import { StudentCatalogSearchDto } from './dto/student-catalog-search.dto';
 import { arabicMatchText, normalizeArabic, paginateArabicSearch, searchArabicIds, searchNeedle, sqlAnd } from '../../common/search/arabic-search';
 import { publishedScope, sortOrderSql } from '../../common/search/content-scope';
 import { nodeMatches } from '../../common/search/node-match';
+import { CompletionService, type CompletionContainerType } from '../completion/completion.service';
 
 const published = ContentStatus.PUBLISHED;
 const order = [{ sortOrder: 'asc' as const }, { id: 'asc' as const }];
@@ -42,7 +43,10 @@ type Pricing = {
 
 @Injectable()
 export class StudentCatalogService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly completion: CompletionService,
+  ) {}
 
   async summary(studentUserId: string) {
     const grade = await this.gradeFor(studentUserId);
@@ -120,17 +124,19 @@ export class StudentCatalogService {
       page: query.page,
       limit: query.limit,
     });
+    const completions = await this.completion.containers(
+      studentUserId,
+      data.map((course) => ({ id: course.id, type: 'course' as const })),
+    );
     return {
       data: data.map((course) =>
-        this.withAccess(
-          this.node(course),
-          this.access(
-            grants,
-            course.id,
-            undefined,
-            [course.accessType],
-            course,
+        this.withCompletion(
+          this.withAccess(
+            this.node(course),
+            this.access(grants, course.id, undefined, [course.accessType], course),
           ),
+          'course',
+          completions,
         ),
       ),
       meta: toPaginationMeta(query.page, query.limit, total),
@@ -255,9 +261,28 @@ export class StudentCatalogService {
       const section = sectionsById.get(row.id)!;
       return this.searchNode(subject, section.lesson.chapter.course, section.lesson.chapter, section.lesson, section, grants);
     });
+    const completions = await this.completion.containers(
+      studentUserId,
+      data.flatMap((hit) => [
+        { id: hit.breadcrumb.course.id, type: 'course' as const },
+        ...(hit.breadcrumb.chapter ? [{ id: hit.breadcrumb.chapter.id, type: 'chapter' as const }] : []),
+        ...(hit.breadcrumb.lesson ? [{ id: hit.breadcrumb.lesson.id, type: 'lesson' as const }] : []),
+        ...(hit.breadcrumb.section ? [{ id: hit.breadcrumb.section.id, type: 'section' as const }] : []),
+      ]),
+    );
+    const completedData = data.map((hit) => ({
+      ...this.withCompletion(hit, hit.type.toLowerCase() as CompletionContainerType, completions),
+      breadcrumb: {
+        ...hit.breadcrumb,
+        course: this.withCompletion(hit.breadcrumb.course, 'course', completions),
+        chapter: hit.breadcrumb.chapter && this.withCompletion(hit.breadcrumb.chapter, 'chapter', completions),
+        lesson: hit.breadcrumb.lesson && this.withCompletion(hit.breadcrumb.lesson, 'lesson', completions),
+        section: hit.breadcrumb.section && this.withCompletion(hit.breadcrumb.section, 'section', completions),
+      },
+    }));
     const last = page.at(-1);
     return {
-      data,
+      data: completedData,
       pageInfo: {
         hasNextPage: rows.length > query.limit,
         nextCursor:
@@ -426,10 +451,17 @@ export class StudentCatalogService {
     });
     if (!course) throw new NotFoundException('Published course not found');
     const grants = await this.activeGrants(studentUserId);
+    const completions = await this.completion.containers(studentUserId, [
+      { id: course.id, type: 'course' },
+    ]);
     return {
-      ...this.withAccess(
-        this.node(course),
-        this.access(grants, course.id, undefined, [course.accessType], course),
+      ...this.withCompletion(
+        this.withAccess(
+          this.node(course),
+          this.access(grants, course.id, undefined, [course.accessType], course),
+        ),
+        'course',
+        completions,
       ),
       subject: this.node(course.subject),
     };
@@ -464,14 +496,18 @@ export class StudentCatalogService {
       orderBy: order,
       take: query.limit + 1,
     });
+    const completions = await this.completion.containers(studentUserId, [
+      { id: course.id, type: 'course' },
+      ...rows.map((chapter) => ({ id: chapter.id, type: 'chapter' as const })),
+    ]);
     return {
-      parent: this.withAccess(
+      parent: this.withCompletion(this.withAccess(
         this.node(course),
         this.access(grants, course.id, undefined, [course.accessType], course),
-      ),
+      ), 'course', completions),
       ...this.page(
         rows.map((chapter) =>
-          this.withAccess(
+          this.withCompletion(this.withAccess(
             this.node(chapter),
             this.access(
               grants,
@@ -480,7 +516,7 @@ export class StudentCatalogService {
               [chapter.accessType, course.accessType],
               this.chapterPricing(chapter, course),
             ),
-          ),
+          ), 'chapter', completions),
         ),
         query.limit, query.q,
       ),
@@ -531,11 +567,15 @@ export class StudentCatalogService {
         [record.accessType, chapter.accessType, chapter.course.accessType],
         this.chapterPricing(chapter, chapter.course),
       );
+    const completions = await this.completion.containers(studentUserId, [
+      { id: chapter.id, type: 'chapter' },
+      ...rows.map((lesson) => ({ id: lesson.id, type: 'lesson' as const })),
+    ]);
     return {
-      parent: this.withAccess(this.node(chapter), access(chapter)),
+      parent: this.withCompletion(this.withAccess(this.node(chapter), access(chapter)), 'chapter', completions),
       ...this.page(
         rows.map((lesson) =>
-          this.withAccess(this.node(lesson), access(lesson)),
+          this.withCompletion(this.withAccess(this.node(lesson), access(lesson)), 'lesson', completions),
         ),
         query.limit, query.q,
       ),
@@ -595,11 +635,15 @@ export class StudentCatalogService {
         ],
         this.chapterPricing(chapter, chapter.course),
       );
+    const completions = await this.completion.containers(studentUserId, [
+      { id: lesson.id, type: 'lesson' },
+      ...rows.map((section) => ({ id: section.id, type: 'section' as const })),
+    ]);
     return {
-      parent: this.withAccess(this.node(lesson), access(lesson)),
+      parent: this.withCompletion(this.withAccess(this.node(lesson), access(lesson)), 'lesson', completions),
       ...this.page(
         rows.map((section) =>
-          this.withAccess(this.node(section), access(section)),
+          this.withCompletion(this.withAccess(this.node(section), access(section)), 'section', completions),
         ),
         query.limit, query.q,
       ),
@@ -753,9 +797,22 @@ export class StudentCatalogService {
       config.accesses(parent),
       config.pricing(parent),
     );
+    const parentType = resource.slice(0, -1) as CompletionContainerType;
+    const completions = await this.completion.containers(studentUserId, [
+      { id: parent.id, type: parentType },
+    ]);
+    const completedItems = new Set(
+      (await this.prisma.studentContentProgress.findMany({
+        where: { studentUserId, contentItemId: { in: rows.map((row) => row.contentItemId) } },
+        select: { contentItemId: true },
+      })).map((row) => row.contentItemId),
+    );
     const render = (placement: any) =>
       this.withAccess(
-        this.contentItem(placement.contentItem, placement.sortOrder),
+        {
+          ...this.contentItem(placement.contentItem, placement.sortOrder),
+          isCompleted: completedItems.has(placement.contentItemId),
+        },
         this.access(
           grants,
           course.id,
@@ -765,7 +822,7 @@ export class StudentCatalogService {
         ),
       );
     return {
-      parent: this.withAccess(this.node(parent), parentAccess),
+      parent: this.withCompletion(this.withAccess(this.node(parent), parentAccess), parentType, completions),
       ...this.placementPage(rows, query.limit, render, query.q),
     };
   }
@@ -788,6 +845,13 @@ export class StudentCatalogService {
       },
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
     });
+    const completions = await this.completion.containers(studentUserId, records.flatMap((record) => {
+      const course = record.course ?? record.chapter?.course;
+      return [
+        ...(course ? [{ id: course.id, type: 'course' as const }] : []),
+        ...(record.chapter ? [{ id: record.chapter.id, type: 'chapter' as const }] : []),
+      ];
+    }));
     const data = records.flatMap((record) => {
       const course = record.course ?? record.chapter?.course;
       const grade = course?.subject.academicGrade;
@@ -801,14 +865,17 @@ export class StudentCatalogService {
       )
         return [];
       const target = record.course
-        ? this.node(record.course)
-        : this.node(record.chapter!);
+        ? this.withCompletion(this.node(record.course), 'course', completions)
+        : {
+            ...this.withCompletion(this.node(record.chapter!), 'chapter', completions),
+            courseId: course.id,
+          };
       return [
         {
           entitlementId: record.id,
           targetType: record.courseId ? 'COURSE' : 'CHAPTER',
           target,
-          course: this.node(course),
+          course: this.withCompletion(this.node(course), 'course', completions),
           subject: this.node(course.subject),
           academicGrade: this.gradeDto(grade),
           startsAt: record.startsAt,
@@ -964,8 +1031,8 @@ export class StudentCatalogService {
           id: true,
           courseId: true,
           chapterId: true,
-          course: { select: { title: true } },
-          chapter: { select: { title: true } },
+          course: { select: { id: true, title: true } },
+          chapter: { select: { title: true, courseId: true } },
           source: true,
           status: true,
           startsAt: true,
@@ -978,12 +1045,20 @@ export class StudentCatalogService {
       }),
       this.prisma.studentEntitlement.count({ where }),
     ]);
+    const progress = await Promise.all(
+      data.map((record) => this.completion.progress(studentUserId, {
+        type: record.courseId ? 'course' : 'chapter',
+        id: record.courseId ?? record.chapterId!,
+      })),
+    );
     return {
-      data: data.map((record) => ({
+      data: data.map((record, index) => ({
         ...record,
+        courseId: record.courseId ?? record.chapter?.courseId ?? null,
         targetType: record.courseId ? 'COURSE' : 'CHAPTER',
         targetId: record.courseId ?? record.chapterId,
         targetName: record.course?.title ?? record.chapter?.title ?? null,
+        progress: progress[index],
       })),
       meta: toPaginationMeta(query.page, query.limit, total),
     };
@@ -1328,5 +1403,12 @@ export class StudentCatalogService {
       access,
       isLocked: access.state === 'LOCKED' || access.state === 'PURCHASABLE',
     };
+  }
+  private withCompletion(
+    node: Record<string, unknown>,
+    type: CompletionContainerType,
+    completions: Map<string, boolean>,
+  ) {
+    return { ...node, isCompleted: completions.get(`${type}:${node.id}`) ?? false };
   }
 }

@@ -8,6 +8,7 @@ import { LearningController, ParentLearningController } from './learning.control
 import { LearningService } from './learning.service';
 import { ParentAuthGuard } from '../../common/guards/parent-auth.guard';
 import { ParentSelectedChildGuard } from '../../common/guards/parent-selected-child.guard';
+import { CompletionModule } from '../completion/completion.module';
 
-@Module({ imports: [EntitlementsModule, AssetsModule, VideosModule, QuestionBanksModule, AssessmentsModule], controllers: [LearningController, ParentLearningController], providers: [LearningService, ParentAuthGuard, ParentSelectedChildGuard], exports: [LearningService] })
+@Module({ imports: [EntitlementsModule, AssetsModule, VideosModule, QuestionBanksModule, AssessmentsModule, CompletionModule], controllers: [LearningController, ParentLearningController], providers: [LearningService, ParentAuthGuard, ParentSelectedChildGuard], exports: [LearningService] })
 export class LearningModule {}

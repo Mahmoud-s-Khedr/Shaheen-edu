@@ -1,6 +1,12 @@
 # Questions API Integration Guide
 
-This guide documents the question-related APIs in dependency order. It is intended for frontend integration.
+This guide documents the implementation-backed question APIs in dependency
+order. It is the frontend team's working contract for question authoring, AI
+assistance, student practice, assessments, and question analytics.
+
+The Nest controllers and DTOs are the source of truth. When API documentation
+is enabled, Swagger is also available at `/api/docs`; use it to inspect the
+complete generated schemas before introducing a new client type.
 
 All URLs below are relative to:
 
@@ -16,6 +22,20 @@ Content-Type: application/json
 ```
 
 Admin endpoints require `ADMIN` or `SUPER_ADMIN`. Student endpoints require `STUDENT`.
+
+### Frontend HTTP-client rules
+
+- Store the API origin in an environment variable and append `/api/v1` once.
+  Do not hard-code a development host in feature code.
+- Send `Authorization: Bearer <access-token>` for user routes. Parent analytics
+  uses the parent session and selected-child context instead.
+- The server rejects unknown JSON fields. Build request objects from the DTO
+  contract; do not pass UI-only fields through to the API.
+- Preserve and log the response `correlationId` when an error occurs. It lets
+  the backend find the matching request in logs.
+- Treat `401` as a re-authentication/refresh-token flow, `403` as a permission
+  or entitlement state, `404` as removed/inaccessible data, `409` as a stale
+  lifecycle/attempt state, and `400` as a field-level validation issue.
 
 ## 1. Integration order and dependencies
 
@@ -78,6 +98,22 @@ Paginated list endpoints return this shape:
 ```
 
 Successful create/update/action endpoints generally return the created or updated resource. Errors are returned as HTTP errors with a message and validation details where applicable.
+
+The standard error shape is:
+
+```json
+{
+  "statusCode": 400,
+  "code": "VALIDATION_ERROR",
+  "message": { "ar": "...", "en": "Validation failed" },
+  "error": { "ar": "...", "en": "Bad Request" },
+  "details": [{ "field": "body", "message": "..." }],
+  "correlationId": "..."
+}
+```
+
+`details` is optional. Display its field messages beside the relevant editor
+control; do not discard the top-level message or correlation ID.
 
 The exact IDs in examples such as `bank_123` and `question_123` are placeholders. The frontend must store IDs returned by earlier calls.
 
@@ -662,6 +698,44 @@ The backend selects only eligible published questions. Response: an assessment w
 | `PUT /student/assessments/question-notes/:questionId` | `{ "body": "Review this formula" }` | Creates or updates the student’s private note. |
 | `DELETE /student/assessments/question-notes/:questionId` | No body | Deletes the private note. |
 
+### 11.4 Community question discovery and issue reporting
+
+The community list deliberately omits answers and explanations. It is suitable
+for a "students often miss these" screen, but it must not reveal the answer in
+the card UI. A student chooses cards and creates a tutor assessment to answer
+them normally.
+
+| Method and endpoint | Request | Response/job |
+|---|---|---|
+| `GET /student/questions/community-most-incorrect` | Optional hierarchy filters: `subjectId`, `courseId`, `chapterId`, `lessonId`, `sectionId`, plus pagination | Entitled ranked question cards without answers. |
+| `POST /student/assessments/community-tutor` | `{ "questionIds": ["..."], "scopes": [{ "courseId": "..." }], "title": "..." }` | Creates a private tutor assessment from selected accessible cards. |
+| `POST /student/questions/:questionId/reports` | `{ "type": "...", "note": "optional detail" }` | Creates a report for an accessible canonical or snapshot question. |
+
+Legacy-compatible routes also exist under `/student/assessments` for the first
+and third operations: `GET /community-most-incorrect` and
+`POST /question-reports/:questionId`. New frontend code should use the
+`/student/questions` routes so the intent is clear.
+
+### 11.5 AI-prompt assessment generation
+
+```http
+POST /student/assessments/ai-prompt
+```
+
+```json
+{
+  "prompt": "Give me a timed revision quiz on cell respiration.",
+  "scopes": [{ "courseId": "course_123" }],
+  "questionCount": 10,
+  "mode": "TUTOR"
+}
+```
+
+The prompt is a selection aid, not a permission bypass: the backend only uses
+published questions the student is entitled to access within `scopes`. Show an
+empty-result state if no eligible questions match rather than retrying with a
+broader scope without the student's consent.
+
 ## 12. Admin assessment creation
 
 These APIs are used when an administrator prepares a quiz/exam for students.
@@ -897,11 +971,55 @@ POST /admin/assessments/grading/answers/:answerId
 
 The student can call the result endpoint again after manual grading to see the updated score and feedback.
 
-## 15. Question-related analytics
+## 15. AI re-answer and explanation review
+
+This is an admin-only assistive workflow. It never silently changes a question:
+the generated proposal is retained as a review run and must be explicitly
+applied or rejected by an authorized administrator.
+
+| Method and endpoint | Request | Response/job |
+|---|---|---|
+| `POST /admin/questions/:questionId/ai/re-answer` | `mode`, optional `suppliedAnswer`, optional `additionalContext` | Starts one answer/explanation review run. |
+| `GET /admin/questions/:questionId/ai/re-answer` | No body | Lists retained runs for the question. |
+| `GET /admin/questions/:questionId/ai/re-answer/:runId` | No body | Returns one proposal and its review state. |
+| `POST /admin/questions/:questionId/ai/re-answer/:runId/apply` | `{ "applyAnswer": true, "applyExplanation": true, "note": "optional" }` | Applies only the selected reviewed fields. |
+| `POST /admin/questions/:questionId/ai/re-answer/:runId/reject` | `{ "note": "Reason for rejecting the proposal" }` | Marks the proposal rejected without changing the question. |
+
+For a choice question, `suppliedAnswer.selectedOptionIndexes` uses zero-based
+option indexes. For written questions use `acceptedAnswers`; for long-answer
+questions use `gradingRubric`. After applying a proposal, reload the canonical
+question and show that response rather than assuming the local draft is current.
+
+## 16. Report moderation and voice transcription
+
+### 16.1 Admin question-report queue
+
+| Method and endpoint | Request | Response/job |
+|---|---|---|
+| `GET /admin/question-reports` | Pagination and optional `status` | Moderation queue of student-reported questions. |
+| `POST /admin/question-reports/:reportId/review` | `{ "status": "...", "note": "optional" }` | Assigns/transitions a report and adds a moderation note. |
+
+The same APIs are available under `/admin/assessments/question-reports` for
+backward compatibility. Use `/admin/question-reports` in new moderation UI.
+
+### 16.2 Voice-to-text for written answers
+
+```http
+POST /student/voice/transcriptions?language=ar
+Content-Type: multipart/form-data
+```
+
+Send one `file` part. The backend transcribes the recording without retaining
+the audio. Put the returned transcript into the normal answer autosave payload
+as `responseText`; include its language, provider, and confidence only when
+those values were returned by the transcription flow. Audio is not an answer
+attachment and must not be treated as durable student content.
+
+## 17. Question-related analytics
 
 These read-only endpoints depend on practice attempts or completed assessment attempts. They are placed after the attempt and grading sections because they summarize data produced by those workflows.
 
-### 15.1 Student direct-practice performance
+### 17.1 Student direct-practice performance
 
 ```http
 GET /student/performance
@@ -909,7 +1027,7 @@ GET /student/performance
 
 No body is required. The response contains the current student’s direct-practice totals, accuracy, and related performance summary.
 
-### 15.2 Student assessment analytics
+### 17.2 Student assessment analytics
 
 ```http
 GET /student/assessments/analytics/summary?subjectId=subject_123&chapterId=chapter_123&page=1&limit=20
@@ -917,18 +1035,28 @@ GET /student/assessments/analytics/summary?subjectId=subject_123&chapterId=chapt
 
 All query parameters are optional. The response contains paginated performance rollups at the requested hierarchy level and, when `chapterId` is supplied, completed attempts for that chapter.
 
-### 15.3 Parent view of a selected child
+### 17.3 Parent view of a selected child
 
 These endpoints use the parent session and selected-child context. They do not create or modify questions.
 
 | Method and endpoint | Request | Response/job |
 |---|---|---|
-| `GET /parent/selected-child/performance` | Parent session; no body | Selected child’s learning summary. |
 | `GET /parent/selected-child/analytics/scopes` | Query: optional `subjectId`, `orderItemId`, `page`, `limit` | Approved/purchased scopes available for analytics. |
 | `GET /parent/selected-child/analytics/assessments` | Same scope query | Selected child’s assessment performance for the approved scope. |
 | `GET /parent/selected-child/analytics/practice` | Same scope query | Selected child’s direct-practice performance for the approved scope. |
 
-## 16. Recommended frontend implementation
+### 17.4 Partner question-usage analytics
+
+These `PARTNER`-only routes expose aggregate usage only; they intentionally do
+not return student identity or answer text.
+
+| Method and endpoint | Request | Response/job |
+|---|---|---|
+| `GET /partners/analytics/question-usage` | Optional date, hierarchy, source, pagination, and `granularity=day\|month` filters | Aggregate usage and correctness metrics. |
+| `GET /partners/analytics/question-usage/sources` | Same filters | Usage grouped by source. |
+| `GET /partners/analytics/question-usage/questions` | Same filters | Paginated frozen-question usage breakdown. |
+
+## 18. Recommended frontend implementation
 
 ### Admin question editor
 
@@ -966,7 +1094,7 @@ These endpoints use the parent session and selected-child context. They do not c
 7. Show the result endpoint response according to the assessment mode.
 8. Refresh results later if long answers were manually graded.
 
-## 17. Main source files
+## 19. Main source files
 
 - [Question banks and questions controller](../src/modules/question-banks/question-banks.controller.ts)
 - [Question banks and questions DTOs](../src/modules/question-banks/dto/question-banks.dto.ts)
@@ -975,4 +1103,7 @@ These endpoints use the parent session and selected-child context. They do not c
 - [Learning/practice controller](../src/modules/learning/learning.controller.ts)
 - [AI question import controller](../src/modules/ai-question-import/question-import.controller.ts)
 - [AI question import DTOs](../src/modules/ai-question-import/dto/question-import.dto.ts)
+- [AI question explanation controller](../src/modules/ai-question-explanations/question-ai-explanations.controller.ts)
+- [Question intelligence/report controller](../src/modules/assessments/question-intelligence.controller.ts)
+- [Partner analytics controller](../src/modules/partner-analytics/partner-analytics.controller.ts)
 - [Detailed API reference](./api-reference-detailed.md)

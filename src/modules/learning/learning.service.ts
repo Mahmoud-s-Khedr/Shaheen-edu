@@ -20,6 +20,7 @@ import { AssetsService } from '../assets/assets.service';
 import { VideosService } from '../videos/videos.service';
 import { QuestionCommunityStatsService } from '../question-banks/question-community-stats.service';
 import { AssessmentsService } from '../assessments/assessments.service';
+import { CompletionService, type CompletionContainerType } from '../completion/completion.service';
 import type {
   PracticeScopeQueryDto,
   ParentAnalyticsScopeQueryDto,
@@ -37,6 +38,7 @@ export class LearningService {
     private readonly videos: VideosService,
     private readonly communityStats: QuestionCommunityStatsService,
     private readonly assessments: AssessmentsService,
+    private readonly completion: CompletionService = {} as CompletionService,
   ) {}
 
   async completeContent(studentId: string, contentItemId: string) {
@@ -308,6 +310,14 @@ export class LearningService {
         )
           continue;
         const path = this.itemPath(item);
+        const completions = await this.completion.containers(studentId, [
+          { id: path.course.id, type: 'course' },
+          ...(path.chapter ? [{ id: path.chapter.id, type: 'chapter' as const }] : []),
+          ...(path.lesson ? [{ id: path.lesson.id, type: 'lesson' as const }] : []),
+          ...(path.section ? [{ id: path.section.id, type: 'section' as const }] : []),
+        ]);
+        const completedNode = (node: any, type: CompletionContainerType) =>
+          node ? { ...this.node(node), isCompleted: completions.get(`${type}:${node.id}`) ?? false } : null;
         const progress = await this.contentProgress(studentId, item.id);
         const subjectItems = (
           await this.eligibleItems(studentId, false, path.course.subjectId)
@@ -331,10 +341,10 @@ export class LearningService {
               playbackPositionSeconds: state.playbackPositionSeconds,
             },
             subject: this.node(path.course.subject),
-            course: this.node(path.course),
-            chapter: this.node(path.chapter),
-            lesson: this.node(path.lesson),
-            section: this.node(path.section),
+            course: completedNode(path.course, 'course'),
+            chapter: completedNode(path.chapter, 'chapter'),
+            lesson: completedNode(path.lesson, 'lesson'),
+            section: completedNode(path.section, 'section'),
             subjectProgress: await this.subjectProgress(
               studentId,
               path.course.subjectId,
@@ -378,17 +388,24 @@ export class LearningService {
           nodes.set(existing.id, existing);
         }
     }
-    return [...nodes.values()].map((node) => ({
-      ...node,
-      completionPercent: node.totalContentItems
-        ? Math.round(
-            (node.completedContentItems / node.totalContentItems) * 100,
-          )
-        : 0,
-      completed:
-        node.totalContentItems > 0 &&
-        node.completedContentItems === node.totalContentItems,
-    }));
+    const derived = [...nodes.values()];
+    const shared = this.completion.containers
+      ? await this.completion.containers(
+          studentId,
+          derived.map((node) => ({ id: node.id, type: node.kind as CompletionContainerType })),
+        )
+      : new Map<string, boolean>();
+    return derived.map((node) => {
+      const isCompleted = node.totalContentItems > 0 && node.completedContentItems === node.totalContentItems;
+      return {
+        ...node,
+        completionPercent: node.totalContentItems
+          ? Math.round((node.completedContentItems / node.totalContentItems) * 100)
+          : 0,
+        completed: isCompleted,
+        isCompleted: shared.get(`${node.kind}:${node.id}`) ?? isCompleted,
+      };
+    });
   }
 
   async progress(studentId: string) {

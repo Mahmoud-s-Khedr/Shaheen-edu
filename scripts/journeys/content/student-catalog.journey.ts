@@ -308,10 +308,21 @@ export const studentCatalogJourney: JourneyDefinition = {
           ),
           'The library must include the active chapter entitlement and hierarchy',
         );
-        assert(library.body.meta?.page === 1 && library.body.meta?.total >= 1, 'Student library must return pagination metadata');
-        const searchedLibrary = await studentRequest<any>('GET', `/student/library?q=${encodeURIComponent('Entitled')}`);
+        assert(
+          library.body.meta?.page === 1 && library.body.meta?.total >= 1,
+          'Student library must return pagination metadata',
+        );
+        const searchedLibrary = await studentRequest<any>(
+          'GET',
+          `/student/library?q=${encodeURIComponent('Entitled')}`,
+        );
         expectStatus(searchedLibrary, 200);
-        assert(searchedLibrary.body.data?.some((item: any) => item.target?.id === entitledChapterId), 'Student library q search must match owned hierarchy content');
+        assert(
+          searchedLibrary.body.data?.some(
+            (item: any) => item.target?.id === entitledChapterId,
+          ),
+          'Student library q search must match owned hierarchy content',
+        );
 
         const entitlements = await studentRequest<any>(
           'GET',
@@ -322,8 +333,10 @@ export const studentCatalogJourney: JourneyDefinition = {
           entitlements.body.meta?.total === 1 &&
             entitlements.body.data?.[0]?.targetType === 'CHAPTER' &&
             entitlements.body.data[0]?.targetId === entitledChapterId &&
-            typeof entitlements.body.data[0]?.targetName === 'string',
-          'Student entitlements must be paginated, scoped to the authenticated student, and return the target name',
+            typeof entitlements.body.data[0]?.targetName === 'string' &&
+            entitlements.body.data[0]?.courseId === courseId &&
+            entitlements.body.data[0]?.progress === 0,
+          'Student entitlements must be paginated, scoped to the authenticated student, and return target, course, and progress data',
         );
 
         const changeGrade = await studentRequest<any>('PATCH', '/students/me', {

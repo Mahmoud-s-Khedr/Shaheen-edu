@@ -69,6 +69,15 @@ export class CatalogNodeDto {
 
   @ApiPropertyOptional({ description: 'Resolved access for the requesting student.' })
   access?: Record<string, unknown>;
+
+  @ApiPropertyOptional({ description: 'Whether every published descendant content item is complete for this student.' })
+  isCompleted?: boolean;
+}
+
+export class CourseContentCountsDto {
+  @ApiProperty() chapters!: number;
+  @ApiProperty() lessons!: number;
+  @ApiProperty() sections!: number;
 }
 
 export class AcademicGradeNodeDto {
@@ -153,6 +162,9 @@ export class CatalogContentItemDto {
 
   @ApiProperty()
   sortOrder!: number;
+
+  @ApiPropertyOptional({ description: 'Whether this content item is complete for this student.' })
+  isCompleted?: boolean;
 }
 
 export class CursorCatalogContentItemResponseDto {
@@ -250,6 +262,12 @@ export class StudentEntitlementDto {
 
   @ApiProperty({ type: String, nullable: true })
   targetName!: string | null;
+
+  @ApiProperty({ type: String, nullable: true, description: 'Owning course for either a course or chapter entitlement.' })
+  courseId!: string | null;
+
+  @ApiProperty({ minimum: 0, maximum: 100, description: 'Completion percentage across descendant content items.' })
+  progress!: number;
 
   @ApiProperty({ example: 'ACTIVE' })
   status!: string;

@@ -610,6 +610,8 @@ model StudentProfile {
   archivedAccessSnapshots ArchivedAccessSnapshot[]
   questionMarks           StudentQuestionMark[]
   questionNotes           StudentQuestionNote[]
+  questionHighlights      StudentQuestionHighlight[]
+  notebookPages           StudentNotebookPage[]
   couponReservations      CouponReservation[]
   questionReports         QuestionReport[]
   aiQuizRuns              AiQuizGenerationRun[]
@@ -774,7 +776,8 @@ model Subject {
 
   courses       Course[]
   questionBanks QuestionBank[]
-  coverAsset    Asset?         @relation("SubjectCover", fields: [coverAssetId], references: [id], onDelete: Restrict)
+  constants     SubjectConstant[]
+  coverAsset    Asset?            @relation("SubjectCover", fields: [coverAssetId], references: [id], onDelete: Restrict)
   coverAssetId  String?
 
   @@unique([academicGradeId, slug])
@@ -1163,6 +1166,7 @@ model Question {
   studentAttempts       StudentQuestionAttempt[]
   marks                 StudentQuestionMark[]
   notes                 StudentQuestionNote[]
+  highlights            StudentQuestionHighlight[]
   communityStats        QuestionCommunityStat?
   importItem            QuestionImportItem?
   contexts              QuestionContextQuestion[]
@@ -2290,6 +2294,54 @@ model StudentContentProgress {
   @@unique([studentUserId, contentItemId])
   @@index([studentUserId, completedAt])
   @@index([contentItemId])
+}
+
+/// A private text-range annotation on an authored question. Highlights are
+/// intentionally immutable after creation so clients can safely reconstruct
+/// the original selection from its persisted offsets and text.
+model StudentQuestionHighlight {
+  id            String         @id @default(cuid())
+  studentUserId String
+  questionId    String
+  selectedText  String
+  startOffset   Int
+  endOffset     Int
+  color         String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  student       StudentProfile @relation(fields: [studentUserId], references: [userId], onDelete: Cascade)
+  question      Question       @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@index([studentUserId, questionId, createdAt, id])
+  @@index([questionId])
+}
+
+/// A global private notebook page. It deliberately has no content hierarchy
+/// foreign key: pages follow the student across questions, subjects and courses.
+model StudentNotebookPage {
+  id            String         @id @default(cuid())
+  studentUserId String
+  title         String
+  content       String
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  student       StudentProfile @relation(fields: [studentUserId], references: [userId], onDelete: Cascade)
+
+  @@index([studentUserId, updatedAt, id])
+}
+
+/// Key/value data used by subject-specific public tools such as calculators.
+model SubjectConstant {
+  id        String   @id @default(cuid())
+  subjectId String
+  key       String
+  value     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  subject   Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+  @@unique([subjectId, key])
+  @@index([subjectId, createdAt, id])
 }
 
 /// Private learner activity state. Completion remains intentionally separate
