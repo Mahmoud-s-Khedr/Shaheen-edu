@@ -9,71 +9,164 @@ following recently added operations are listed here to keep this reference's
 operation inventory aligned with that document.
 
 ### `GET /api/v1/admin/partner-finance/allocations`
+
 ### `GET /api/v1/admin/partner-finance/reconciliation-runs`
+
 ### `GET /api/v1/admin/partner-finance/reconciliation-runs/{id}`
+
 ### `GET /api/v1/admin/partner-finance/reconciliation-runs/{id}/discrepancies`
+
 ### `GET /api/v1/admin/partner-finance/settlements`
+
 ### `GET /api/v1/admin/partners/{id}/detail`
+
 ### `GET /api/v1/admin/referral-programs`
+
 ### `GET /api/v1/admin/referral-programs/review-flags`
+
 ### `GET /api/v1/admin/referral-programs/{id}`
+
 ### `GET /api/v1/admin/referral-reporting`
+
 ### `GET /api/v1/admin/refunds`
+
 ### `GET /api/v1/admin/refunds/policy`
+
 ### `GET /api/v1/admin/reports/commerce`
+
 ### `GET /api/v1/admin/reports/revenue`
+
 ### `GET /api/v1/admin/reports/refunds`
+
 ### `GET /api/v1/admin/reports/payments`
+
 ### `GET /api/v1/admin/reports/registrations`
+
 ### `GET /api/v1/admin/reports/active-purchasers`
+
 ### `GET /api/v1/admin/reports/entitlements`
+
 ### `GET /api/v1/admin/reports/exports`
+
 ### `GET /api/v1/admin/reports/exports/{id}/download`
+
 ### `GET /api/v1/admin/reports/partner-obligations`
+
 ### `GET /api/v1/admin/students/{id}/360`
+
 ### `GET /api/v1/admin/students/{id}/360/assessments`
+
 ### `GET /api/v1/admin/students/{id}/360/audit-events`
+
 ### `GET /api/v1/admin/students/{id}/360/entitlements`
+
 ### `GET /api/v1/admin/students/{id}/360/orders`
+
 ### `GET /api/v1/partners/analytics/allocations`
+
 ### `GET /api/v1/partners/analytics/question-usage`
+
 ### `GET /api/v1/partners/analytics/question-usage/questions`
+
 ### `GET /api/v1/partners/analytics/question-usage/sources`
+
 ### `GET /api/v1/partners/referrals/report`
+
 ### `GET /api/v1/partners/referrals/settlements`
+
 ### `GET /api/v1/student/refund-requests`
+
 ### `PATCH /api/v1/admin/partner-finance/reconciliation-discrepancies/{id}/assign`
+
 ### `PATCH /api/v1/admin/partner-finance/reconciliation-discrepancies/{id}/resolve`
+
 ### `PATCH /api/v1/admin/referral-programs/codes/{id}`
+
 ### `PATCH /api/v1/admin/referral-programs/review-flags/{id}/assign`
+
 ### `PATCH /api/v1/admin/referral-programs/review-flags/{id}/resolve`
+
 ### `PATCH /api/v1/admin/referral-programs/review-rules/{id}`
+
 ### `PATCH /api/v1/admin/referral-programs/{id}`
+
 ### `PATCH /api/v1/admin/refunds/policy`
+
 ### `POST /api/v1/admin/partner-finance/reconciliation-runs`
+
 ### `POST /api/v1/admin/partner-finance/reconciliation-runs/{id}/run`
+
 ### `POST /api/v1/admin/partner-finance/settlements`
+
 ### `POST /api/v1/admin/partner-finance/settlements/{id}/mark-paid`
+
 ### `POST /api/v1/admin/partner-finance/usage-rollups/rebuild`
+
 ### `POST /api/v1/admin/publisher-agreements/{id}/replace`
+
 ### `POST /api/v1/admin/referral-programs`
+
 ### `POST /api/v1/admin/referral-programs/{id}/activate`
+
 ### `POST /api/v1/admin/referral-programs/{id}/codes`
+
 ### `POST /api/v1/admin/referral-programs/codes/{id}/resume`
+
 ### `POST /api/v1/admin/referral-programs/codes/{id}/suspend`
+
 ### `POST /api/v1/admin/referral-programs/attributions/{id}/review-flags`
+
 ### `POST /api/v1/admin/referral-programs/{id}/end`
+
 ### `POST /api/v1/admin/referral-programs/{id}/rules`
+
 ### `POST /api/v1/admin/referral-programs/{id}/rules/{ruleId}/activate`
+
 ### `POST /api/v1/admin/referral-programs/{id}/resume`
+
 ### `POST /api/v1/admin/referral-programs/{id}/review-rules`
+
 ### `POST /api/v1/admin/referral-programs/review-flags/{id}/notes`
+
 ### `POST /api/v1/admin/referral-programs/{id}/suspend`
+
 ### `POST /api/v1/admin/refunds/{id}/approve`
+
 ### `POST /api/v1/admin/refunds/{id}/reject`
+
 ### `POST /api/v1/admin/reports/exports`
+
 ### `POST /api/v1/admin/reports/exports/{id}/cancel`
+
 ### `POST /api/v1/student/orders/{orderId}/refund-requests`
+
+### `DELETE /api/v1/admin/subjects/{subjectId}/constants/{id}`
+
+### `DELETE /api/v1/student/notebook/pages/{pageId}`
+
+### `DELETE /api/v1/student/questions/{questionId}/highlights/{highlightId}`
+
+### `GET /api/v1/admin/subjects/{subjectId}/constants`
+
+### `GET /api/v1/admin/subjects/{subjectId}/constants/{id}`
+
+### `GET /api/v1/student/notebook/pages`
+
+### `GET /api/v1/student/notebook/pages/{pageId}`
+
+### `GET /api/v1/student/questions/{questionId}/highlights`
+
+### `GET /api/v1/subjects/{subjectId}/constants`
+
+### `PATCH /api/v1/admin/subjects/{subjectId}/constants/{id}`
+
+### `PATCH /api/v1/student/notebook/pages/{pageId}`
+
+### `POST /api/v1/admin/subjects/{subjectId}/constants`
+
+### `POST /api/v1/student/notebook/pages`
+
+### `POST /api/v1/student/questions/{questionId}/highlights`
 
 ## Health
 

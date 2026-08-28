@@ -7,8 +7,17 @@ export class CreateSubjectConstantDto {
 }
 
 export class UpdateSubjectConstantDto {
-  @ApiPropertyOptional() @IsOptional() @IsString() @MinLength(1) @MaxLength(120) key?: string;
-  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(10000) value?: string;
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(120)
+  key?: string;
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(10000)
+  value?: string;
 }
 
 export class SubjectConstantDto {
@@ -18,4 +27,9 @@ export class SubjectConstantDto {
   @ApiProperty() value!: string;
   @ApiProperty() createdAt!: Date;
   @ApiProperty() updatedAt!: Date;
+}
+
+export class SubjectConstantsResponseDto {
+  @ApiProperty({ type: [SubjectConstantDto] })
+  data!: SubjectConstantDto[];
 }

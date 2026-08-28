@@ -4542,6 +4542,248 @@
         ]
       }
     },
+    "/api/v1/subjects/{subjectId}/constants": {
+      "get": {
+        "operationId": "PublicSubjectConstantsController_list_v1",
+        "parameters": [
+          {
+            "name": "subjectId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubjectConstantsResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "List public calculator constants for a subject",
+        "tags": [
+          "subjects/constants"
+        ]
+      }
+    },
+    "/api/v1/admin/subjects/{subjectId}/constants": {
+      "get": {
+        "operationId": "AdminSubjectConstantsController_list_v1",
+        "parameters": [
+          {
+            "name": "subjectId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubjectConstantsResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List constants for a subject",
+        "tags": [
+          "admin/subjects/constants"
+        ]
+      },
+      "post": {
+        "operationId": "AdminSubjectConstantsController_create_v1",
+        "parameters": [
+          {
+            "name": "subjectId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSubjectConstantDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubjectConstantDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create a subject constant",
+        "tags": [
+          "admin/subjects/constants"
+        ]
+      }
+    },
+    "/api/v1/admin/subjects/{subjectId}/constants/{id}": {
+      "get": {
+        "operationId": "AdminSubjectConstantsController_get_v1",
+        "parameters": [
+          {
+            "name": "subjectId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubjectConstantDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get a subject constant",
+        "tags": [
+          "admin/subjects/constants"
+        ]
+      },
+      "patch": {
+        "operationId": "AdminSubjectConstantsController_update_v1",
+        "parameters": [
+          {
+            "name": "subjectId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSubjectConstantDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubjectConstantDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update a subject constant",
+        "tags": [
+          "admin/subjects/constants"
+        ]
+      },
+      "delete": {
+        "operationId": "AdminSubjectConstantsController_remove_v1",
+        "parameters": [
+          {
+            "name": "subjectId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Delete a subject constant",
+        "tags": [
+          "admin/subjects/constants"
+        ]
+      }
+    },
     "/api/v1/admin/courses": {
       "post": {
         "operationId": "CoursesController_create_v1",
@@ -16112,6 +16354,7 @@
               "type": "string",
               "enum": [
                 "ALL",
+                "NOT_STARTED",
                 "SUSPENDED",
                 "COMPLETED"
               ]
@@ -23601,6 +23844,278 @@
           "admin/questions/ai"
         ]
       }
+    },
+    "/api/v1/student/questions/{questionId}/highlights": {
+      "get": {
+        "operationId": "StudentQuestionHighlightsController_list_v1",
+        "parameters": [
+          {
+            "name": "questionId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuestionHighlightsResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the student’s private highlights for an accessible question",
+        "tags": [
+          "student/questions"
+        ]
+      },
+      "post": {
+        "operationId": "StudentQuestionHighlightsController_create_v1",
+        "parameters": [
+          {
+            "name": "questionId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateQuestionHighlightDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuestionHighlightDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create a private question-text highlight",
+        "tags": [
+          "student/questions"
+        ]
+      }
+    },
+    "/api/v1/student/questions/{questionId}/highlights/{highlightId}": {
+      "delete": {
+        "operationId": "StudentQuestionHighlightsController_remove_v1",
+        "parameters": [
+          {
+            "name": "questionId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "highlightId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Delete the student’s own question highlight",
+        "tags": [
+          "student/questions"
+        ]
+      }
+    },
+    "/api/v1/student/notebook/pages": {
+      "get": {
+        "operationId": "StudentNotebookController_list_v1",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotebookPagesResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the student’s global notebook pages",
+        "tags": [
+          "student/notebook"
+        ]
+      },
+      "post": {
+        "operationId": "StudentNotebookController_create_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateNotebookPageDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotebookPageDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create a global notebook page",
+        "tags": [
+          "student/notebook"
+        ]
+      }
+    },
+    "/api/v1/student/notebook/pages/{pageId}": {
+      "get": {
+        "operationId": "StudentNotebookController_get_v1",
+        "parameters": [
+          {
+            "name": "pageId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get the student’s notebook page",
+        "tags": [
+          "student/notebook"
+        ]
+      },
+      "patch": {
+        "operationId": "StudentNotebookController_update_v1",
+        "parameters": [
+          {
+            "name": "pageId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateNotebookPageDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update the student’s notebook page",
+        "tags": [
+          "student/notebook"
+        ]
+      },
+      "delete": {
+        "operationId": "StudentNotebookController_remove_v1",
+        "parameters": [
+          {
+            "name": "pageId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Delete the student’s notebook page",
+        "tags": [
+          "student/notebook"
+        ]
+      }
     }
   },
   "info": {
@@ -24995,6 +25510,79 @@
         "required": [
           "newAcademicGradeId"
         ]
+      },
+      "SubjectConstantDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "subjectId": {
+            "type": "string"
+          },
+          "key": {
+            "type": "string"
+          },
+          "value": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "subjectId",
+          "key",
+          "value",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "SubjectConstantsResponseDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SubjectConstantDto"
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "CreateSubjectConstantDto": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "value": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "value"
+        ]
+      },
+      "UpdateSubjectConstantDto": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "value": {
+            "type": "string"
+          }
+        }
       },
       "CreateCourseDto": {
         "type": "object",
@@ -27072,6 +27660,10 @@
           "access": {
             "type": "object",
             "description": "Resolved access for the requesting student."
+          },
+          "isCompleted": {
+            "type": "boolean",
+            "description": "Whether every published descendant content item is complete for this student."
           }
         },
         "required": [
@@ -27220,6 +27812,10 @@
           },
           "sortOrder": {
             "type": "number"
+          },
+          "isCompleted": {
+            "type": "boolean",
+            "description": "Whether this content item is complete for this student."
           }
         },
         "required": [
@@ -27388,6 +27984,17 @@
             "type": "string",
             "nullable": true
           },
+          "courseId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Owning course for either a course or chapter entitlement."
+          },
+          "progress": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100,
+            "description": "Completion percentage across descendant content items."
+          },
           "status": {
             "type": "string",
             "example": "ACTIVE"
@@ -27407,6 +28014,8 @@
           "targetType",
           "targetId",
           "targetName",
+          "courseId",
+          "progress",
           "status",
           "startsAt",
           "expiresAt"
@@ -29680,7 +30289,11 @@
           },
           "attemptStatus": {
             "type": "string",
-            "nullable": true
+            "enum": [
+              "NOT_STARTED",
+              "SUSPENDED",
+              "COMPLETED"
+            ]
           },
           "score": {
             "type": "number",
@@ -29726,6 +30339,7 @@
           "isTimed",
           "questionCount",
           "createdAt",
+          "attemptStatus",
           "questionBankIds",
           "questionBanks",
           "scopes"
@@ -29892,7 +30506,11 @@
           },
           "attemptStatus": {
             "type": "string",
-            "nullable": true
+            "enum": [
+              "NOT_STARTED",
+              "SUSPENDED",
+              "COMPLETED"
+            ]
           },
           "score": {
             "type": "number",
@@ -29907,7 +30525,8 @@
           "mode",
           "isTimed",
           "questionCount",
-          "createdAt"
+          "createdAt",
+          "attemptStatus"
         ]
       },
       "PaginatedAssessmentsResponseDto": {
@@ -31590,6 +32209,154 @@
         "required": [
           "note"
         ]
+      },
+      "QuestionHighlightDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "questionId": {
+            "type": "string"
+          },
+          "selectedText": {
+            "type": "string"
+          },
+          "startOffset": {
+            "type": "number"
+          },
+          "endOffset": {
+            "type": "number"
+          },
+          "color": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "questionId",
+          "selectedText",
+          "startOffset",
+          "endOffset",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "QuestionHighlightsResponseDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QuestionHighlightDto"
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "CreateQuestionHighlightDto": {
+        "type": "object",
+        "properties": {
+          "selectedText": {
+            "type": "string"
+          },
+          "startOffset": {
+            "type": "number",
+            "minimum": 0
+          },
+          "endOffset": {
+            "type": "number",
+            "minimum": 1
+          },
+          "color": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "selectedText",
+          "startOffset",
+          "endOffset"
+        ]
+      },
+      "NotebookPageDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "content",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "NotebookPagesResponseDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NotebookPageDto"
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "CreateNotebookPageDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "content"
+        ]
+      },
+      "UpdateNotebookPageDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          }
+        }
       }
     }
   }

@@ -303,6 +303,34 @@ export const assessmentsJourney: JourneyDefinition = {
           { key: 'gravity', value: '9.8' },
         );
         expectStatus(constant, 201);
+        const adminConstants = await admin.request<any>(
+          'GET',
+          `/admin/subjects/${subjectId}/constants`,
+        );
+        expectStatus(adminConstants, 200);
+        assert(
+          adminConstants.body.data?.some(
+            (item: any) =>
+              item.id === constant.body.id && item.key === 'gravity',
+          ),
+          'Administrators must be able to list constants for their subject',
+        );
+        const adminConstant = await admin.request<any>(
+          'GET',
+          `/admin/subjects/${subjectId}/constants/${constant.body.id}`,
+        );
+        expectStatus(adminConstant, 200);
+        const updatedConstant = await admin.request<any>(
+          'PATCH',
+          `/admin/subjects/${subjectId}/constants/${constant.body.id}`,
+          { value: '9.81' },
+        );
+        expectStatus(updatedConstant, 200);
+        assert(
+          updatedConstant.body.id === constant.body.id &&
+            updatedConstant.body.value === '9.81',
+          'Administrators must be able to update a subject constant',
+        );
         const publicConstants = await clients.public.request<any>(
           'GET',
           `/subjects/${subjectId}/constants`,
@@ -310,7 +338,7 @@ export const assessmentsJourney: JourneyDefinition = {
         expectStatus(publicConstants, 200);
         assert(
           publicConstants.body.data?.some(
-            (item: any) => item.key === 'gravity' && item.value === '9.8',
+            (item: any) => item.key === 'gravity' && item.value === '9.81',
           ),
           'Subject constants must be publicly readable for calculators',
         );
@@ -327,6 +355,13 @@ export const assessmentsJourney: JourneyDefinition = {
           { key: 'student-write', value: 'nope' },
         );
         expectStatus(studentWrite, 403);
+        expectStatus(
+          await admin.request<any>(
+            'DELETE',
+            `/admin/subjects/${subjectId}/constants/${constant.body.id}`,
+          ),
+          200,
+        );
       },
     );
 
