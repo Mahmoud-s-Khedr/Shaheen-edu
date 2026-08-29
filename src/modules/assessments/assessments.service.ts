@@ -58,7 +58,6 @@ import type {
   CreateQuestionReportDto,
   QueryQuestionReportDto,
   ReviewQuestionReportDto,
-  GradeLongAnswerDto,
   QueryAdminAssessmentDto,
   QueryAssessmentDto,
   RenameAssessmentDto,
@@ -415,6 +414,11 @@ export class AssessmentsService {
     });
     const eligible: any[] = [];
     for (const question of questions) {
+      if (
+        question.type === QuestionType.LONG_ANSWER &&
+        !question.gradingRubric?.trim()
+      )
+        continue;
       const matching = question.placements
         .filter(
           (p: any) =>
@@ -2078,10 +2082,8 @@ export class AssessmentsService {
           : Boolean(answer?.selectedOptionIds.length);
         const outcome = !hasResponse
           ? AssessmentQuestionOutcome.OMITTED
-          : question.type === QuestionType.LONG_ANSWER
-            ? question.gradingRubric?.trim()
-              ? AssessmentQuestionOutcome.PENDING_AI_GRADING
-              : AssessmentQuestionOutcome.PENDING_GRADING
+          : written
+            ? AssessmentQuestionOutcome.PENDING_AI_GRADING
             : answer?.isCorrect
               ? AssessmentQuestionOutcome.CORRECT
               : AssessmentQuestionOutcome.INCORRECT;
@@ -2095,7 +2097,6 @@ export class AssessmentsService {
             data: {
               outcome,
               awardedPoints:
-                outcome === AssessmentQuestionOutcome.PENDING_GRADING ||
                 outcome === AssessmentQuestionOutcome.PENDING_AI_GRADING
                   ? null
                   : awardedPoints,
@@ -2213,23 +2214,61 @@ export class AssessmentsService {
         : AssessmentQuestionOutcome.PARTIALLY_CORRECT;
   }
 
-  private async gradePendingAiAnswers(attemptId: string) {
+  private writtenQuestion(type: QuestionType) {
+    return (
+      type === QuestionType.SHORT_ANSWER ||
+      type === QuestionType.FILL_IN_THE_BLANK ||
+      type === QuestionType.LONG_ANSWER
+    );
+  }
+
+  private aiGradingEligible(question: any, responseText?: string | null) {
+    if (
+      !question ||
+      !this.writtenQuestion(question.type) ||
+      !responseText?.trim()
+    )
+      return false;
+    return (
+      question.type !== QuestionType.LONG_ANSWER ||
+      Boolean(question.gradingRubric?.trim())
+    );
+  }
+
+  private async gradePendingAiAnswers(
+    attemptId: string,
+    onlyAnswerId?: string,
+  ) {
     const answers = await this.prisma.assessmentAttemptAnswer.findMany({
       where: {
         attemptId,
         outcome: AssessmentQuestionOutcome.PENDING_AI_GRADING,
+        ...(onlyAnswerId ? { id: onlyAnswerId } : {}),
       },
-      include: { assessmentQuestion: true },
+      include: {
+        assessmentQuestion: {
+          include: {
+            contexts: {
+              include: { assessmentContext: true },
+              orderBy: { sortOrder: 'asc' },
+            },
+          },
+        },
+      },
     });
     let attempted = false;
     for (const answer of answers) {
       if (
-        !answer.responseText?.trim() ||
-        !answer.assessmentQuestion.gradingRubric?.trim()
+        !this.aiGradingEligible(answer.assessmentQuestion, answer.responseText)
       )
         continue;
+      const responseText = answer.responseText!;
       const running = await this.prisma.assessmentAnswerAiGradingRun.findFirst({
-        where: { attemptAnswerId: answer.id, status: AiRunStatus.PENDING },
+        where: {
+          attemptAnswerId: answer.id,
+          responseVersion: answer.responseVersion,
+          status: AiRunStatus.PENDING,
+        },
       });
       if (running) continue;
       attempted = true;
@@ -2237,17 +2276,30 @@ export class AssessmentsService {
         answer.responseLanguageCode === 'en' ||
         answer.responseLanguageCode === 'ar'
           ? answer.responseLanguageCode
-          : this.responseLanguage(answer.responseText);
+          : this.responseLanguage(responseText);
       const run = await this.prisma.assessmentAnswerAiGradingRun.create({
         data: {
           attemptAnswerId: answer.id,
           questionSnapshot: {
             id: answer.assessmentQuestion.id,
             body: answer.assessmentQuestion.body,
-            rubric: answer.assessmentQuestion.gradingRubric,
             maxPoints: answer.assessmentQuestion.maxPoints,
+            context: answer.assessmentQuestion.contexts.map((link: any) => ({
+              title: link.assessmentContext.title,
+              body: link.assessmentContext.body,
+              languageCode: link.assessmentContext.languageCode,
+            })),
+            acceptedAnswers:
+              answer.assessmentQuestion.type === QuestionType.LONG_ANSWER
+                ? undefined
+                : (answer.assessmentQuestion.acceptedAnswers ?? []),
+            gradingRubric:
+              answer.assessmentQuestion.type === QuestionType.LONG_ANSWER
+                ? answer.assessmentQuestion.gradingRubric
+                : undefined,
           },
-          responseSnapshot: answer.responseText,
+          responseSnapshot: responseText,
+          responseVersion: answer.responseVersion,
           responseLanguageCode: languageCode,
           promptVersion: 'assessment-answer-grade-v1',
         },
@@ -2255,25 +2307,47 @@ export class AssessmentsService {
       try {
         const response = await this.ai.gradeAnswer({
           question: answer.assessmentQuestion.body,
-          rubric: answer.assessmentQuestion.gradingRubric,
+          context: answer.assessmentQuestion.contexts.map((link: any) => ({
+            title: link.assessmentContext.title,
+            body: link.assessmentContext.body,
+            languageCode: link.assessmentContext.languageCode,
+          })),
+          acceptedAnswers:
+            answer.assessmentQuestion.type === QuestionType.LONG_ANSWER
+              ? undefined
+              : ((answer.assessmentQuestion.acceptedAnswers ?? []) as string[]),
+          gradingRubric:
+            answer.assessmentQuestion.type === QuestionType.LONG_ANSWER
+              ? answer.assessmentQuestion.gradingRubric!
+              : undefined,
           maxPoints: answer.assessmentQuestion.maxPoints,
-          response: answer.responseText,
+          response: responseText,
           languageCode,
         });
         const grade = this.validateAiGrade(
           response.result,
           answer.assessmentQuestion.maxPoints,
-          answer.responseText,
+          responseText,
         );
         const outcome = this.aiOutcome(
           grade.awardedPoints,
           answer.assessmentQuestion.maxPoints,
         );
         await this.prisma.$transaction(async (tx) => {
+          // Separate answer runs can complete concurrently. Serialize the
+          // aggregate/score update on the parent attempt exactly as manual
+          // grading does, so one completion cannot erase another's points.
+          await tx.$queryRaw`
+            SELECT "id"
+            FROM "AssessmentAttempt"
+            WHERE "id" = ${attemptId}
+            FOR UPDATE
+          `;
           const updated = await tx.assessmentAttemptAnswer.updateMany({
             where: {
               id: answer.id,
               outcome: AssessmentQuestionOutcome.PENDING_AI_GRADING,
+              responseVersion: answer.responseVersion,
             },
             data: {
               awardedPoints: grade.awardedPoints,
@@ -2283,7 +2357,6 @@ export class AssessmentsService {
               graderFeedback: grade.feedback,
             },
           });
-          if (!updated.count) return;
           await tx.assessmentAnswerAiGradingRun.update({
             where: { id: run.id },
             data: {
@@ -2298,6 +2371,9 @@ export class AssessmentsService {
               completedAt: new Date(),
             },
           });
+          // A newer autosave leaves this run in the audit trail, but its
+          // result is never allowed to replace the newer response's grade.
+          if (!updated.count) return;
           await this.communityStats.recordResponse(
             tx,
             answer.assessmentQuestion.sourceQuestionId,
@@ -2342,6 +2418,7 @@ export class AssessmentsService {
     );
     const answers = await this.prisma.assessmentAttemptAnswer.findMany({
       where: { attemptId: current.id },
+      include: { aiGradingRuns: { orderBy: { createdAt: 'desc' } } },
     });
     const byQuestion = new Map(answers.map((a) => [a.assessmentQuestionId, a]));
     const revealAnswers = current.status === AssessmentAttemptStatus.COMPLETED;
@@ -2400,15 +2477,43 @@ export class AssessmentsService {
           selectedOptionIds: answer?.selectedOptionIds ?? [],
           responseText: answer?.responseText ?? null,
           maxPoints: q.maxPoints,
-          awardedPoints: revealAnswers ? (answer?.awardedPoints ?? null) : null,
+          awardedPoints:
+            revealAnswers || assessment.mode === AssessmentMode.TUTOR
+              ? (answer?.awardedPoints ?? null)
+              : null,
           answered: Boolean(
             answer &&
             (answer.selectedOptionIds.length || answer.responseText?.trim()),
           ),
           isCorrect: showAnswer ? (answer?.isCorrect ?? false) : null,
-          outcome: revealAnswers
-            ? (answer?.outcome ?? AssessmentQuestionOutcome.OMITTED)
-            : null,
+          outcome:
+            revealAnswers || assessment.mode === AssessmentMode.TUTOR
+              ? (answer?.outcome ?? AssessmentQuestionOutcome.OMITTED)
+              : null,
+          graderFeedback:
+            revealAnswers || assessment.mode === AssessmentMode.TUTOR
+              ? (answer?.graderFeedback ?? null)
+              : null,
+          aiGrading:
+            revealAnswers || assessment.mode === AssessmentMode.TUTOR
+              ? (() => {
+                  const run = answer?.aiGradingRuns?.find(
+                    (item: any) =>
+                      item.responseVersion === answer.responseVersion,
+                  );
+                  return run
+                    ? {
+                        status: run.status,
+                        feedback: run.feedback,
+                        highlights: run.highlights,
+                        error:
+                          run.status === AiRunStatus.FAILED
+                            ? 'PENDING_RETRY'
+                            : null,
+                      }
+                    : null;
+                })()
+              : null,
           correctOptionIds: showAnswer
             ? q.options.filter((o) => o.isCorrect).map((o) => o.id)
             : null,
@@ -2479,27 +2584,16 @@ export class AssessmentsService {
       .map((o) => o.id)
       .sort();
     const selected = [...selectedOptionIds].sort();
-    const normalize = (value: string) =>
-      value
-        .normalize('NFKC')
-        .toLocaleLowerCase('ar')
-        .replace(/[\u064B-\u065F\u0670]/g, '')
-        .replace(/[إأآ]/g, 'ا')
-        .replace(/ى/g, 'ي')
-        .replace(/\s+/g, ' ')
-        .trim();
     const isCorrect = written
-      ? question.type === QuestionType.LONG_ANSWER
-        ? null
-        : Boolean(responseText) &&
-          Array.isArray(question.acceptedAnswers) &&
-          question.acceptedAnswers.some(
-            (answer: any) =>
-              normalize(String(answer)) === normalize(responseText),
-          )
+      ? null
       : selected.length > 0 &&
         correct.length === selected.length &&
         correct.every((id, index) => id === selected[index]);
+    const writtenOutcome = !responseText
+      ? AssessmentQuestionOutcome.OMITTED
+      : AssessmentQuestionOutcome.PENDING_AI_GRADING;
+    let savedAnswer: any;
+    let changed = false;
     await this.prisma.$transaction(async (tx) => {
       const gate = await tx.assessmentAttempt.updateMany({
         where: { id: attempt.id, status: AssessmentAttemptStatus.SUSPENDED },
@@ -2522,6 +2616,7 @@ export class AssessmentsService {
           selected.includes(optionId),
         ) &&
         (existing.responseText ?? '') === responseText;
+      changed = !existing || !sameSelection;
       const answer = await tx.assessmentAttemptAnswer.upsert({
         where: {
           attemptId_assessmentQuestionId: {
@@ -2549,6 +2644,11 @@ export class AssessmentsService {
               ? (dto.transcriptionConfidence ?? null)
               : null,
           isCorrect,
+          outcome: written ? writtenOutcome : undefined,
+          awardedPoints: written ? null : undefined,
+          graderFeedback: written ? null : undefined,
+          gradedAt: written ? null : undefined,
+          responseVersion: written ? 1 : 0,
         },
         update: {
           selectedOptionIds: selected,
@@ -2568,8 +2668,15 @@ export class AssessmentsService {
               ? (dto.transcriptionConfidence ?? null)
               : null,
           isCorrect,
+          outcome: written && !sameSelection ? writtenOutcome : undefined,
+          awardedPoints: written && !sameSelection ? null : undefined,
+          graderFeedback: written && !sameSelection ? null : undefined,
+          gradedAt: written && !sameSelection ? null : undefined,
+          responseVersion:
+            written && !sameSelection ? { increment: 1 } : undefined,
         },
       });
+      savedAnswer = answer;
       if (existing && !sameSelection) {
         const outcome = (optionIds: string[], correctAnswer: boolean | null) =>
           optionIds.length === 0
@@ -2600,14 +2707,52 @@ export class AssessmentsService {
         });
       }
     });
+    if (
+      written &&
+      changed &&
+      assessment.mode === AssessmentMode.TUTOR &&
+      this.aiGradingEligible(question, responseText)
+    )
+      await this.gradePendingAiAnswers(attempt.id, savedAnswer.id);
+    const currentAnswer = written
+      ? await this.prisma.assessmentAttemptAnswer.findUnique({
+          where: { id: savedAnswer.id },
+          include: { aiGradingRuns: { orderBy: { createdAt: 'desc' } } },
+        })
+      : null;
+    const currentAiRun = currentAnswer?.aiGradingRuns?.find(
+      (run: any) => run.responseVersion === currentAnswer.responseVersion,
+    );
     return {
       assessmentQuestionId,
       selectedOptionIds,
       responseText: written ? responseText : null,
       isCorrect:
-        assessment.mode === AssessmentMode.TUTOR &&
-        question.type !== QuestionType.LONG_ANSWER
-          ? isCorrect
+        assessment.mode === AssessmentMode.TUTOR
+          ? (currentAnswer?.isCorrect ?? isCorrect)
+          : null,
+      outcome: written ? (currentAnswer?.outcome ?? writtenOutcome) : null,
+      awardedPoints: written ? (currentAnswer?.awardedPoints ?? null) : null,
+      aiGradingStatus:
+        written &&
+        currentAnswer?.outcome === AssessmentQuestionOutcome.PENDING_AI_GRADING
+          ? 'PENDING'
+          : null,
+      graderFeedback:
+        assessment.mode === AssessmentMode.TUTOR
+          ? (currentAnswer?.graderFeedback ?? null)
+          : null,
+      aiGrading:
+        assessment.mode === AssessmentMode.TUTOR && currentAiRun
+          ? {
+              status: currentAiRun.status,
+              feedback: currentAiRun.feedback,
+              highlights: currentAiRun.highlights,
+              error:
+                currentAiRun.status === AiRunStatus.FAILED
+                  ? 'PENDING_RETRY'
+                  : null,
+            }
           : null,
       correctOptionIds:
         assessment.mode === AssessmentMode.TUTOR ? correct : null,
@@ -2616,10 +2761,10 @@ export class AssessmentsService {
     };
   }
 
-  async pendingGrades(actor: RequestUser) {
+  async pendingAiGrades(actor: RequestUser) {
     this.assertAdmin(actor);
     return this.prisma.assessmentAttemptAnswer.findMany({
-      where: { outcome: AssessmentQuestionOutcome.PENDING_GRADING },
+      where: { outcome: AssessmentQuestionOutcome.PENDING_AI_GRADING },
       include: {
         attempt: {
           include: {
@@ -2628,106 +2773,35 @@ export class AssessmentsService {
           },
         },
         assessmentQuestion: true,
+        aiGradingRuns: { orderBy: { createdAt: 'desc' }, take: 1 },
       },
       orderBy: { answeredAt: 'asc' },
     });
   }
 
-  async gradeLongAnswer(
-    actor: RequestUser,
-    answerId: string,
-    dto: GradeLongAnswerDto,
-  ) {
+  /** Retry a failed/awaiting AI proposal for one written answer. Failed run
+   * records remain immutable audit evidence; this creates a fresh run. */
+  async retryAiGrade(actor: RequestUser, answerId: string) {
     this.assertAdmin(actor);
     const answer = await this.prisma.assessmentAttemptAnswer.findUnique({
       where: { id: answerId },
-      include: { attempt: true, assessmentQuestion: true },
+      include: { assessmentQuestion: true },
     });
+    if (!answer) throw new NotFoundException('Assessment answer not found');
     if (
-      !answer ||
-      answer.assessmentQuestion.type !== QuestionType.LONG_ANSWER ||
-      !(
-        [
-          AssessmentQuestionOutcome.PENDING_GRADING,
-          AssessmentQuestionOutcome.PENDING_AI_GRADING,
-          AssessmentQuestionOutcome.CORRECT,
-          AssessmentQuestionOutcome.PARTIALLY_CORRECT,
-          AssessmentQuestionOutcome.INCORRECT,
-        ] as AssessmentQuestionOutcome[]
-      ).includes(answer.outcome as AssessmentQuestionOutcome)
+      answer.outcome !== AssessmentQuestionOutcome.PENDING_AI_GRADING ||
+      !this.aiGradingEligible(answer.assessmentQuestion, answer.responseText)
     )
-      throw new ConflictException('Long answer is not awaiting grading');
-    if (dto.awardedPoints > answer.assessmentQuestion.maxPoints)
-      throw new BadRequestException('awardedPoints cannot exceed maxPoints');
-    const outcome =
-      dto.awardedPoints === answer.assessmentQuestion.maxPoints
-        ? AssessmentQuestionOutcome.CORRECT
-        : dto.awardedPoints === 0
-          ? AssessmentQuestionOutcome.INCORRECT
-          : AssessmentQuestionOutcome.PARTIALLY_CORRECT;
-    await this.prisma.$transaction(async (tx) => {
-      // Different long answers from the same attempt may be graded in
-      // parallel. Serialize score recomputation on the attempt row so the
-      // second aggregate observes the first committed grade.
-      await tx.$queryRaw`
-        SELECT "id"
-        FROM "AssessmentAttempt"
-        WHERE "id" = ${answer.attemptId}
-        FOR UPDATE
-      `;
-      const graded = await tx.assessmentAttemptAnswer.updateMany({
-        where: {
-          id: answerId,
-          outcome:
-            answer.outcome === AssessmentQuestionOutcome.PENDING_GRADING
-              ? AssessmentQuestionOutcome.PENDING_GRADING
-              : {
-                  in: [
-                    AssessmentQuestionOutcome.PENDING_AI_GRADING,
-                    AssessmentQuestionOutcome.CORRECT,
-                    AssessmentQuestionOutcome.PARTIALLY_CORRECT,
-                    AssessmentQuestionOutcome.INCORRECT,
-                  ],
-                },
-        },
-        data: {
-          awardedPoints: dto.awardedPoints,
-          outcome,
-          isCorrect: outcome === AssessmentQuestionOutcome.CORRECT,
-          gradedAt: new Date(),
-          gradedById: actor.id,
-          graderFeedback: dto.feedback?.trim() ?? null,
-        },
-      });
-      if (!graded.count)
-        throw new ConflictException('Long answer is not awaiting grading');
-      if (
-        answer.outcome === AssessmentQuestionOutcome.PENDING_GRADING ||
-        answer.outcome === AssessmentQuestionOutcome.PENDING_AI_GRADING
-      )
-        await this.communityStats.recordResponse(
-          tx,
-          answer.assessmentQuestion.sourceQuestionId,
-          outcome === AssessmentQuestionOutcome.CORRECT,
-        );
-      const totals = await tx.assessmentAttemptAnswer.aggregate({
-        where: { attemptId: answer.attemptId },
-        _sum: { awardedPoints: true },
-      });
-      await tx.assessmentAttempt.update({
-        where: { id: answer.attemptId },
-        data: { score: totals._sum.awardedPoints ?? 0 },
-      });
-    });
+      throw new ConflictException('Answer is not awaiting AI grading');
+    await this.gradePendingAiAnswers(answer.attemptId, answer.id);
     await this.audit.record({
       actorUserId: actor.id,
-      action: 'ASSESSMENT_LONG_ANSWER_GRADED_OR_OVERRIDDEN',
+      action: 'ASSESSMENT_ANSWER_AI_GRADING_RETRIED',
       targetType: 'AssessmentAttemptAnswer',
-      targetId: answerId,
-      metadata: { awardedPoints: dto.awardedPoints },
+      targetId: answer.id,
     });
     return this.prisma.assessmentAttemptAnswer.findUniqueOrThrow({
-      where: { id: answerId },
+      where: { id: answer.id },
     });
   }
 
@@ -2992,7 +3066,7 @@ export class AssessmentsService {
     );
     const answers = await this.prisma.assessmentAttemptAnswer.findMany({
       where: { attemptId: attempt.id },
-      include: { aiGradingRuns: { orderBy: { createdAt: 'desc' }, take: 1 } },
+      include: { aiGradingRuns: { orderBy: { createdAt: 'desc' } } },
     });
     const byQuestion = new Map(answers.map((a) => [a.assessmentQuestionId, a]));
     const outcomes = answers.map((answer) => answer.outcome);
@@ -3010,6 +3084,9 @@ export class AssessmentsService {
     ).length;
     const pendingAiGradingCount = outcomes.filter(
       (outcome) => outcome === AssessmentQuestionOutcome.PENDING_AI_GRADING,
+    ).length;
+    const answeredCount = outcomes.filter(
+      (outcome) => outcome !== AssessmentQuestionOutcome.OMITTED,
     ).length;
     const percentage = this.round(
       ((currentAttempt.score ?? 0) / currentAttempt.totalPoints) * 100,
@@ -3040,11 +3117,14 @@ export class AssessmentsService {
       omittedCount,
       pendingGradingCount,
       pendingAiGradingCount,
-      answeredCount: correctCount + incorrectCount,
+      answeredCount,
       submittedAt: attempt.submittedAt,
       questions: questions.map((q) => {
         const answer = byQuestion.get(q.id);
         const stat = statsByQuestion.get(q.sourceQuestionId);
+        const currentAiRun = answer?.aiGradingRuns?.find(
+          (run: any) => run.responseVersion === answer.responseVersion,
+        );
         return {
           id: q.id,
           sourceQuestionId: q.sourceQuestionId,
@@ -3086,13 +3166,13 @@ export class AssessmentsService {
           inputMethod: answer?.inputMethod ?? null,
           responseLanguageCode: answer?.responseLanguageCode ?? null,
           graderFeedback: answer?.graderFeedback ?? null,
-          aiGrading: answer?.aiGradingRuns?.[0]
+          aiGrading: currentAiRun
             ? {
-                status: answer.aiGradingRuns[0].status,
-                feedback: answer.aiGradingRuns[0].feedback,
-                highlights: answer.aiGradingRuns[0].highlights,
+                status: currentAiRun.status,
+                feedback: currentAiRun.feedback,
+                highlights: currentAiRun.highlights,
                 error:
-                  answer.aiGradingRuns[0].status === AiRunStatus.FAILED
+                  currentAiRun.status === AiRunStatus.FAILED
                     ? 'PENDING_RETRY'
                     : null,
               }
@@ -3373,6 +3453,15 @@ export class AssessmentsService {
     if (ordered.some((q) => !q))
       throw new BadRequestException(
         'One or more questionIds are invalid or not published',
+      );
+    if (
+      ordered.some(
+        (q) =>
+          q!.type === QuestionType.LONG_ANSWER && !q!.gradingRubric?.trim(),
+      )
+    )
+      throw new BadRequestException(
+        'Long-answer questions require a grading rubric for AI grading',
       );
     if (
       ordered.some(

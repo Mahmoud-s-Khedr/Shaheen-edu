@@ -52,7 +52,8 @@ the API copies its questions, options, explanations, and answer keys into an
 immutable snapshot. Later edits or archival of the authoring question do not
 change an already-created assessment or its result.
 
-`TUTOR` and `EXAM` are modes of the same assessment API:
+`TUTOR` and `EXAM` are modes of the same assessment API. Tutor feedback never
+includes written answer keys, rubrics, raw AI prompts, or provider payloads:
 
 | Mode    | Frontend behavior                                                           |
 | ------- | --------------------------------------------------------------------------- |
@@ -89,12 +90,21 @@ provider, model }`, and does not retain the recording. Put the student-edited
 returned text in `responseText` when autosaving, with
 `inputMethod: "VOICE_TRANSCRIPT"`, optional `responseLanguageCode`,
 `transcriptionProvider: "openrouter"`, and optional
-`transcriptionConfidence`. Rubric-backed long answers create AI feedback after
-submission. Result question entries expose `graderFeedback` and `aiGrading`
-with exact text-offset highlights (`CORRECT`, `LANGUAGE`, `FACTUAL_ERROR`).
-Keep those offsets against the returned immutable `responseText`; do not apply
-them to edited text. Failed AI runs stay `PENDING_AI_GRADING` and retry when
-the result is read. Admin grading can override an AI score.
+`transcriptionConfidence`.
+
+All non-empty `SHORT_ANSWER`, `FILL_IN_THE_BLANK`, and `LONG_ANSWER`
+responses use one safe per-answer AI grading run. Long-answer questions require
+a rubric before they can be published; AI uses that rubric as its criterion. In `TUTOR`
+mode, grading runs after each saved written response and the student receives
+that question's safe feedback immediately. In `EXAM` mode, autosave makes no
+AI call; each eligible written response is graded separately after submission.
+Empty written responses are `OMITTED` and never call AI. Result question entries expose
+`graderFeedback` and `aiGrading` with exact text-offset highlights (`CORRECT`,
+`LANGUAGE`, `FACTUAL_ERROR`). Keep offsets against the returned immutable
+`responseText`; do not apply them to edited text. Failed AI runs stay
+`PENDING_AI_GRADING`; an administrator can retry them at
+`POST /admin/assessments/grading/answers/:answerId/retry-ai`. Accepted answers, rubrics, internal prompts, and raw
+provider data are never returned to students.
 
 ## 1. Admin question banks and authoring
 
@@ -412,20 +422,20 @@ the candidate set; duplicate targets are rejected.
 
 ### Student assessment endpoints
 
-| Method and path                                                                     | Request body or query                                                                    | Frontend use                                                                                      |
-| ----------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| Method and path                                                                     | Request body or query                                                                                              | Frontend use                                                                                      |
+| ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------- |
 | `POST /student/assessments`                                                         | `scopes`, `questionCount` (1–50), optional `mode`, `isTimed`, `durationSeconds`, `title` | Create a private random assessment.                                                               |
-| `GET /student/assessments`                                                          | `page`, `limit`, `search`, `status` (`ALL`, `SUSPENDED`, `COMPLETED`)                    | List own and visible public assessments.                                                          |
-| `GET /student/assessments/:id`                                                      | —                                                                                        | Read metadata and scopes.                                                                         |
-| `PATCH /student/assessments/:id`                                                    | `{ "title": "…" }`                                                                       | Rename an owned assessment.                                                                       |
-| `DELETE /student/assessments/:id`                                                   | —                                                                                        | Delete an owned assessment.                                                                       |
-| `POST /student/assessments/:id/attempts/start`                                      | —                                                                                        | Start or resume the only attempt.                                                                 |
-| `GET /student/assessments/:id/attempts/current`                                     | —                                                                                        | Restore a saved attempt.                                                                          |
-| `POST /student/assessments/:id/attempts/current/answers/:questionId`                | `selectedOptionIds`                                                                      | Autosave one answer.                                                                              |
-| `POST /student/assessments/:id/attempts/current/submit`                             | —                                                                                        | Finalize and score.                                                                               |
-| `GET /student/assessments/:id/attempts/current/result`                              | optional `includeComparison` (default `true`)                                            | Retrieve completed review data and weighted chapter peer comparisons.                             |
-| `PATCH /student/assessments/:id/attempts/current/questions/:questionId/active-time` | `{ "activeSeconds": number }`                                                            | Persist the monotonic active-time total while an attempt is resumable.                            |
-| `GET /student/assessments/analytics/summary`                                        | optional `subjectId`, `chapterId`, `q`, `page`, `limit`                                  | Retrieve paginated completed-result subject/chapter/topic rollups and chapter attempt drill-down. |
+| `GET /student/assessments`                                                          | `page`, `limit`, `search`, `status` (`ALL`, `SUSPENDED`, `COMPLETED`)                                              | List own and visible public assessments.                                                          |
+| `GET /student/assessments/:id`                                                      | —                                                                                                                  | Read metadata and scopes.                                                                         |
+| `PATCH /student/assessments/:id`                                                    | `{ "title": "…" }`                                                                                                 | Rename an owned assessment.                                                                       |
+| `DELETE /student/assessments/:id`                                                   | —                                                                                                                  | Delete an owned assessment.                                                                       |
+| `POST /student/assessments/:id/attempts/start`                                      | —                                                                                                                  | Start or resume the only attempt.                                                                 |
+| `GET /student/assessments/:id/attempts/current`                                     | —                                                                                                                  | Restore a saved attempt.                                                                          |
+| `POST /student/assessments/:id/attempts/current/answers/:questionId`                | `selectedOptionIds` or written `responseText`                                                                      | Autosave one answer; may return safe AI grading state for save-time assessments.                  |
+| `POST /student/assessments/:id/attempts/current/submit`                             | —                                                                                                                  | Finalize and score.                                                                               |
+| `GET /student/assessments/:id/attempts/current/result`                              | optional `includeComparison` (default `true`)                                                                      | Retrieve completed review data and weighted chapter peer comparisons.                             |
+| `PATCH /student/assessments/:id/attempts/current/questions/:questionId/active-time` | `{ "activeSeconds": number }`                                                                                      | Persist the monotonic active-time total while an attempt is resumable.                            |
+| `GET /student/assessments/analytics/summary`                                        | optional `subjectId`, `chapterId`, `q`, `page`, `limit`                                                            | Retrieve paginated completed-result subject/chapter/topic rollups and chapter attempt drill-down. |
 
 `GET /student/assessments` combines the student's non-archived private
 assessments with accessible published admin assessments. Its `status` query is
@@ -1032,7 +1042,9 @@ Response — `200 OK`:
   - Response — `200 OK`: `{ "id": "cmsksbb1600sinw01d9ikhjth", "deleted": true }`
 
 #### Start, save, submit, and review an attempt
-no 
+
+no
+
 - **`POST /student/assessments/:id/attempts/start`**
   - Request: `POST /api/v1/student/assessments/cmsksbb1600sinw01d9ikhjth/attempts/start`
   - Response — `201 Created`: `{ "attemptId": "cmsksbc7200sunw01d4sidtcu", "status": "SUSPENDED", "mode": "EXAM", "totalQuestions": 2, "questions": [{ "id": "cmsksbb3o00smnw01iwqu5zux" }] }`

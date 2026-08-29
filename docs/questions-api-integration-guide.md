@@ -888,7 +888,7 @@ Response: a protected short-lived access URL for an image, PDF, or other assessm
 POST /student/assessments/:assessmentId/attempts/current/submit
 ```
 
-No body is required. The attempt changes from `SUSPENDED` to `COMPLETED` and the server finalizes every question as correct, incorrect, omitted, or pending manual grading.
+No body is required. The attempt changes from `SUSPENDED` to `COMPLETED` and the server finalizes every question as correct, incorrect, omitted, or pending AI grading.
 
 Response:
 
@@ -942,34 +942,18 @@ The following are graded by the server:
 
 A correct answer receives the question’s `maxPoints`. Incorrect and omitted answers receive zero points.
 
-### Manually graded long answers
+### AI-graded written answers
 
-Long answers become `PENDING_GRADING` after submission.
+Every `LONG_ANSWER` question must include a rubric before publication. The rubric is used only by the server-side AI grader and is never returned to students.
 
-List pending answers:
+Written answers become `PENDING_AI_GRADING` until the AI response is available. Administrators can inspect pending answers and retry a failed run:
 
 ```http
 GET /admin/assessments/grading/pending
+POST /admin/assessments/grading/answers/:answerId/retry-ai
 ```
 
-Response: submitted long-answer responses with the student, assessment, question, answer text, and answer ID.
-
-Grade one long answer:
-
-```http
-POST /admin/assessments/grading/answers/:answerId
-```
-
-```json
-{
-  "awardedPoints": 3,
-  "feedback": "Good answer, but the final step is missing."
-}
-```
-
-`awardedPoints` cannot exceed the question’s `maxPoints`. The answer becomes `CORRECT`, `PARTIALLY_CORRECT`, or `INCORRECT`, and the assessment score is updated.
-
-The student can call the result endpoint again after manual grading to see the updated score and feedback.
+There is no manual assessment-grading endpoint. The student can retrieve the result again after AI grading to see the updated score and feedback.
 
 ## 15. AI re-answer and explanation review
 

@@ -351,18 +351,6 @@ export class AutosaveAnswerDto {
   transcriptionConfidence?: number;
 }
 
-export class GradeLongAnswerDto {
-  @ApiProperty({ minimum: 0 })
-  @Type(() => Number)
-  @IsInt()
-  @Min(0)
-  awardedPoints!: number;
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsString()
-  @MaxLength(10000)
-  feedback?: string;
-}
 export class ReportActiveTimeDto {
   @ApiProperty({
     minimum: 0,
@@ -422,8 +410,8 @@ export class AssessmentListItemDto {
     number | null;
   @ApiProperty() questionCount!: number;
   @ApiProperty({ type: String, format: 'date-time' }) createdAt!: Date;
-  @ApiProperty({ enum: ['NOT_STARTED', 'SUSPENDED', 'COMPLETED'] }) attemptStatus!:
-    'NOT_STARTED' | 'SUSPENDED' | 'COMPLETED';
+  @ApiProperty({ enum: ['NOT_STARTED', 'SUSPENDED', 'COMPLETED'] })
+  attemptStatus!: 'NOT_STARTED' | 'SUSPENDED' | 'COMPLETED';
   @ApiPropertyOptional({ type: Number, nullable: true }) score!: number | null;
 }
 
@@ -546,6 +534,10 @@ export class AssessmentAttemptQuestionDto {
   structuredExplanation!: object | null;
   @ApiPropertyOptional({ type: String, nullable: true }) outcome!:
     string | null;
+  @ApiPropertyOptional({ type: String, nullable: true }) graderFeedback!:
+    string | null;
+  @ApiPropertyOptional({ type: Object, nullable: true }) aiGrading!:
+    object | null;
 }
 
 export class AssessmentAttemptStateDto {

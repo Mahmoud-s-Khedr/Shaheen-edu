@@ -66,6 +66,11 @@ describe('AssessmentsService', () => {
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
         aggregate: jest.fn().mockResolvedValue({ _sum: { awardedPoints: 0 } }),
       },
+      assessmentAnswerAiGradingRun: {
+        findFirst: jest.fn().mockResolvedValue(null),
+        create: jest.fn().mockResolvedValue({ id: 'ai-run-1' }),
+        update: jest.fn().mockResolvedValue({}),
+      },
       studentQuestionMark: {
         findMany: jest.fn().mockResolvedValue([]),
       },
@@ -105,24 +110,57 @@ describe('AssessmentsService', () => {
       communityStats,
       assets,
       videos,
+      ai,
     };
   }
 
   it('renders NOT_STARTED when no assessment attempt exists', () => {
     const { service } = build();
-    expect((service as any).listItemDto({
-      id: 'assessment-1', title: 'Assessment', generationType: 'STANDARD', mode: 'EXAM', isTimed: false,
-      durationSeconds: null, questionCount: 1, createdAt: new Date(),
-    }, 'PUBLIC')).toMatchObject({ attemptStatus: 'NOT_STARTED', score: null });
+    expect(
+      (service as any).listItemDto(
+        {
+          id: 'assessment-1',
+          title: 'Assessment',
+          generationType: 'STANDARD',
+          mode: 'EXAM',
+          isTimed: false,
+          durationSeconds: null,
+          questionCount: 1,
+          createdAt: new Date(),
+        },
+        'PUBLIC',
+      ),
+    ).toMatchObject({ attemptStatus: 'NOT_STARTED', score: null });
   });
 
   it('filters visible assessments with no attempt as NOT_STARTED', async () => {
     const { service, prisma } = build();
     prisma.assessment.findMany
-      .mockResolvedValueOnce([{ id: 'assessment-1', title: 'Assessment', generationType: 'STANDARD', mode: 'EXAM', isTimed: false, durationSeconds: null, questionCount: 1, createdAt: new Date(), ownerType: AssessmentOwnerType.STUDENT, studentUserId }])
+      .mockResolvedValueOnce([
+        {
+          id: 'assessment-1',
+          title: 'Assessment',
+          generationType: 'STANDARD',
+          mode: 'EXAM',
+          isTimed: false,
+          durationSeconds: null,
+          questionCount: 1,
+          createdAt: new Date(),
+          ownerType: AssessmentOwnerType.STUDENT,
+          studentUserId,
+        },
+      ])
       .mockResolvedValueOnce([]);
-    await expect(service.list(studentUserId, { page: 1, limit: 20, status: 'NOT_STARTED' } as any))
-      .resolves.toMatchObject({ data: [{ id: 'assessment-1', attemptStatus: 'NOT_STARTED' }], meta: { total: 1 } });
+    await expect(
+      service.list(studentUserId, {
+        page: 1,
+        limit: 20,
+        status: 'NOT_STARTED',
+      } as any),
+    ).resolves.toMatchObject({
+      data: [{ id: 'assessment-1', attemptStatus: 'NOT_STARTED' }],
+      meta: { total: 1 },
+    });
   });
 
   describe('scope resolution', () => {
@@ -636,126 +674,263 @@ describe('AssessmentsService', () => {
   });
 
   describe('attempt lifecycle', () => {
-    it('records a fully credited long answer as correct and includes it in community stats', async () => {
-      const { service, prisma, communityStats } = build();
-      const pendingAnswer = {
-        id: 'answer-1',
-        attemptId: 'attempt-1',
-        outcome: 'PENDING_GRADING',
-        assessmentQuestion: {
-          type: QuestionType.LONG_ANSWER,
-          maxPoints: 5,
-          sourceQuestionId: 'source-question-1',
-        },
-      };
-      prisma.assessmentAttemptAnswer.findUnique.mockResolvedValueOnce(
-        pendingAnswer,
-      );
-      prisma.assessmentAttemptAnswer.findUniqueOrThrow.mockResolvedValue({
-        ...pendingAnswer,
-        isCorrect: true,
-        outcome: 'CORRECT',
-        awardedPoints: 5,
-      });
-      prisma.assessmentAttemptAnswer.aggregate.mockResolvedValue({
-        _sum: { awardedPoints: 8 },
-      });
+    it.each([
+      [QuestionType.SHORT_ANSWER, ['Cairo'], undefined],
+      [QuestionType.FILL_IN_THE_BLANK, ['Cairo'], undefined],
+      [QuestionType.LONG_ANSWER, undefined, 'Award for identifying Cairo.'],
+    ])(
+      'AI-grades a %s response with its frozen criterion',
+      async (type, acceptedAnswers, gradingRubric) => {
+        const { service, prisma, communityStats, ai } = build();
+        prisma.assessmentAttemptAnswer.findMany.mockResolvedValue([
+          {
+            id: 'answer-1',
+            attemptId: 'attempt-1',
+            responseText: 'Cairo',
+            responseVersion: 3,
+            responseLanguageCode: 'en',
+            assessmentQuestion: {
+              id: 'snapshot-question-1',
+              type,
+              body: 'What is the capital of Egypt?',
+              maxPoints: 2,
+              sourceQuestionId: 'source-question-1',
+              acceptedAnswers,
+              gradingRubric,
+              contexts: [],
+            },
+          },
+        ]);
+        ai.gradeAnswer.mockResolvedValue({
+          result: {
+            awardedPoints: 2,
+            feedback: 'Correct.',
+            highlights: [
+              { start: 0, end: 5, category: 'CORRECT', note: 'Correct city' },
+            ],
+          },
+          model: 'test-model',
+          raw: { safe: true },
+          usage: { total_tokens: 1 },
+        });
 
-      const result = await service.gradeLongAnswer(
-        { id: 'admin-1', role: Role.ADMIN } as any,
-        'answer-1',
-        { awardedPoints: 5, feedback: 'Complete answer' },
-      );
+        await (service as any).gradePendingAiAnswers('attempt-1');
 
-      expect(prisma.assessmentAttemptAnswer.updateMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { id: 'answer-1', outcome: 'PENDING_GRADING' },
-          data: expect.objectContaining({
-            awardedPoints: 5,
-            outcome: 'CORRECT',
-            isCorrect: true,
+        expect(ai.gradeAnswer).toHaveBeenCalledWith(
+          expect.objectContaining({
+            acceptedAnswers:
+              type === QuestionType.LONG_ANSWER ? undefined : ['Cairo'],
+            gradingRubric:
+              type === QuestionType.LONG_ANSWER
+                ? 'Award for identifying Cairo.'
+                : undefined,
           }),
-        }),
-      );
-      expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
-      expect(communityStats.recordResponse).toHaveBeenCalledWith(
-        prisma,
-        'source-question-1',
-        true,
-      );
-      expect(prisma.assessmentAttempt.update).toHaveBeenCalledWith({
-        where: { id: 'attempt-1' },
-        data: { score: 8 },
-      });
-      expect(result).toMatchObject({ isCorrect: true, outcome: 'CORRECT' });
+        );
+        expect(prisma.assessmentAnswerAiGradingRun.create).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({ responseVersion: 3 }),
+          }),
+        );
+        expect(prisma.assessmentAttemptAnswer.updateMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: expect.objectContaining({
+              responseVersion: 3,
+              outcome: 'PENDING_AI_GRADING',
+            }),
+            data: expect.objectContaining({
+              awardedPoints: 2,
+              outcome: 'CORRECT',
+            }),
+          }),
+        );
+        expect(communityStats.recordResponse).toHaveBeenCalledWith(
+          prisma,
+          'source-question-1',
+          true,
+        );
+      },
+    );
+
+    it('does not call AI for empty responses or rubric-less long answers', async () => {
+      const { service, prisma, ai } = build();
+      prisma.assessmentAttemptAnswer.findMany.mockResolvedValue([
+        {
+          id: 'empty',
+          attemptId: 'attempt-1',
+          responseText: '',
+          responseVersion: 1,
+          assessmentQuestion: { type: QuestionType.SHORT_ANSWER },
+        },
+        {
+          id: 'manual',
+          attemptId: 'attempt-1',
+          responseText: 'Essay',
+          responseVersion: 1,
+          assessmentQuestion: {
+            type: QuestionType.LONG_ANSWER,
+            gradingRubric: null,
+          },
+        },
+      ]);
+      await (service as any).gradePendingAiAnswers('attempt-1');
+      expect(ai.gradeAnswer).not.toHaveBeenCalled();
+      expect(prisma.assessmentAnswerAiGradingRun.create).not.toHaveBeenCalled();
     });
 
-    it('records partial-credit long answers as incorrect in binary community stats', async () => {
-      const { service, prisma, communityStats } = build();
-      const pendingAnswer = {
-        id: 'answer-1',
-        attemptId: 'attempt-1',
-        outcome: 'PENDING_GRADING',
-        assessmentQuestion: {
-          type: QuestionType.LONG_ANSWER,
-          maxPoints: 5,
-          sourceQuestionId: 'source-question-1',
-        },
-      };
-      prisma.assessmentAttemptAnswer.findUnique.mockResolvedValueOnce(
-        pendingAnswer,
-      );
-      prisma.assessmentAttemptAnswer.findUniqueOrThrow.mockResolvedValue({
-        ...pendingAnswer,
-        isCorrect: false,
-        outcome: 'PARTIALLY_CORRECT',
-        awardedPoints: 3,
-      });
-
-      await service.gradeLongAnswer(
-        { id: 'admin-1', role: Role.ADMIN } as any,
-        'answer-1',
-        { awardedPoints: 3 },
-      );
-
-      expect(prisma.assessmentAttemptAnswer.updateMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({
-            outcome: 'PARTIALLY_CORRECT',
-            isCorrect: false,
-          }),
-        }),
-      );
-      expect(communityStats.recordResponse).toHaveBeenCalledWith(
-        prisma,
-        'source-question-1',
-        false,
-      );
-    });
-
-    it('does not record community stats when another grader has already graded the answer', async () => {
-      const { service, prisma, communityStats } = build();
-      prisma.assessmentAttemptAnswer.findUnique.mockResolvedValue({
-        id: 'answer-1',
-        attemptId: 'attempt-1',
-        outcome: 'PENDING_GRADING',
-        assessmentQuestion: {
-          type: QuestionType.LONG_ANSWER,
-          maxPoints: 5,
-          sourceQuestionId: 'source-question-1',
-        },
-      });
-      prisma.assessmentAttemptAnswer.updateMany.mockResolvedValue({ count: 0 });
+    it('returns not found when an AI retry targets a missing answer', async () => {
+      const { service } = build();
 
       await expect(
-        service.gradeLongAnswer(
+        service.retryAiGrade(
           { id: 'admin-1', role: Role.ADMIN } as any,
-          'answer-1',
-          { awardedPoints: 5 },
+          'missing-answer',
         ),
-      ).rejects.toBeInstanceOf(ConflictException);
+      ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('retains a failed run and leaves its answer pending for retry', async () => {
+      const { service, prisma, ai } = build();
+      prisma.assessmentAttemptAnswer.findMany.mockResolvedValue([
+        {
+          id: 'answer-1',
+          attemptId: 'attempt-1',
+          responseText: 'Cairo',
+          responseVersion: 1,
+          assessmentQuestion: {
+            id: 'q1',
+            type: QuestionType.SHORT_ANSWER,
+            body: 'Capital?',
+            maxPoints: 1,
+            acceptedAnswers: ['Cairo'],
+            sourceQuestionId: 'source-1',
+            contexts: [],
+          },
+        },
+      ]);
+      ai.gradeAnswer.mockRejectedValue(new Error('provider unavailable'));
+      await (service as any).gradePendingAiAnswers('attempt-1');
+      expect(prisma.assessmentAttemptAnswer.updateMany).not.toHaveBeenCalled();
+      expect(prisma.assessmentAnswerAiGradingRun.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ status: 'FAILED' }),
+        }),
+      );
+    });
+
+    it('does not let a stale grading run overwrite a re-answered response', async () => {
+      const { service, prisma, communityStats, ai } = build();
+      prisma.assessmentAttemptAnswer.findMany.mockResolvedValue([
+        {
+          id: 'answer-1',
+          attemptId: 'attempt-1',
+          responseText: 'new response',
+          responseVersion: 2,
+          assessmentQuestion: {
+            id: 'q1',
+            type: QuestionType.FILL_IN_THE_BLANK,
+            body: 'Fill',
+            maxPoints: 1,
+            acceptedAnswers: ['new response'],
+            sourceQuestionId: 'source-1',
+            contexts: [],
+          },
+        },
+      ]);
+      prisma.assessmentAttemptAnswer.updateMany.mockResolvedValue({ count: 0 });
+      ai.gradeAnswer.mockResolvedValue({
+        result: { awardedPoints: 1, feedback: 'Correct.', highlights: [] },
+        model: 'test',
+        raw: {},
+        usage: {},
+      });
+      await (service as any).gradePendingAiAnswers('attempt-1');
+      expect(prisma.assessmentAnswerAiGradingRun.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ status: 'COMPLETED' }),
+        }),
+      );
       expect(communityStats.recordResponse).not.toHaveBeenCalled();
-      expect(prisma.assessmentAttempt.update).not.toHaveBeenCalled();
+    });
+
+    it('does not call AI during submit-time written autosave', async () => {
+      const { service, prisma, ai } = build();
+      prisma.assessment.findUnique.mockResolvedValue({
+        id: 'assessment-1',
+        mode: AssessmentMode.EXAM,
+      });
+      prisma.assessmentAttempt.findUnique.mockResolvedValue({
+        id: 'attempt-1',
+        status: 'SUSPENDED',
+        expiresAt: null,
+      });
+      prisma.assessmentQuestion.findFirst.mockResolvedValue({
+        id: 'q1',
+        type: QuestionType.SHORT_ANSWER,
+        acceptedAnswers: ['Cairo'],
+        gradingRubric: null,
+        options: [],
+      });
+      await service.autosaveAnswer(studentUserId, 'assessment-1', 'q1', {
+        responseText: 'Cairo',
+      });
+      expect(ai.gradeAnswer).not.toHaveBeenCalled();
+      expect(prisma.assessmentAttemptAnswer.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          create: expect.objectContaining({ outcome: 'PENDING_AI_GRADING' }),
+        }),
+      );
+    });
+
+    it('AI-grades a short answer immediately in tutor mode', async () => {
+      const { service, prisma, ai } = build();
+      prisma.assessment.findUnique.mockResolvedValue({
+        id: 'assessment-1',
+        mode: AssessmentMode.TUTOR,
+      });
+      prisma.assessmentAttempt.findUnique.mockResolvedValue({
+        id: 'attempt-1',
+        status: 'SUSPENDED',
+        expiresAt: null,
+      });
+      prisma.assessmentQuestion.findFirst.mockResolvedValue({
+        id: 'q1',
+        type: QuestionType.SHORT_ANSWER,
+        body: 'Capital?',
+        acceptedAnswers: ['Cairo'],
+        gradingRubric: null,
+        maxPoints: 1,
+        sourceQuestionId: 'source-1',
+        options: [],
+      });
+      prisma.assessmentAttemptAnswer.findMany.mockResolvedValue([
+        {
+          id: 'answer-1',
+          attemptId: 'attempt-1',
+          responseText: 'Cairo',
+          responseVersion: 1,
+          responseLanguageCode: 'en',
+          assessmentQuestion: {
+            id: 'q1',
+            type: QuestionType.SHORT_ANSWER,
+            body: 'Capital?',
+            acceptedAnswers: ['Cairo'],
+            maxPoints: 1,
+            sourceQuestionId: 'source-1',
+            contexts: [],
+          },
+        },
+      ]);
+      ai.gradeAnswer.mockResolvedValue({
+        result: { awardedPoints: 1, feedback: 'Correct.', highlights: [] },
+        model: 'test',
+        raw: {},
+        usage: {},
+      });
+      await service.autosaveAnswer(studentUserId, 'assessment-1', 'q1', {
+        responseText: 'Cairo',
+        responseLanguageCode: 'en',
+      });
+      expect(ai.gradeAnswer).toHaveBeenCalledTimes(1);
     });
 
     it('authorizes a video retained by the student-owned assessment snapshot', async () => {

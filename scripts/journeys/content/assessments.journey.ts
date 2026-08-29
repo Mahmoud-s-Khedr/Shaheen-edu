@@ -22,6 +22,7 @@ export const assessmentsJourney: JourneyDefinition = {
     let studentAssessmentId = '';
     let adminAssessmentId = '';
     let writtenAssessmentId = '';
+    let writtenShortQuestionId = '';
     const create = async (path: string, body: unknown) => {
       const response = await admin.request<any>('POST', path, body);
       expectStatus(response, 201);
@@ -896,7 +897,7 @@ export const assessmentsJourney: JourneyDefinition = {
     );
 
     await step(
-      'Delivering written responses through autosave, submission, and manual grading',
+      'Delivering written responses through autosave, submission, and AI grading',
       async () => {
         const short = await create('/admin/questions', {
           bankId: questionBankId,
@@ -923,7 +924,19 @@ export const assessmentsJourney: JourneyDefinition = {
           answerOrigin: 'HUMAN_REVIEWED',
           maxPoints: 2,
         });
-        for (const question of [short, long]) {
+        const fill = await create('/admin/questions', {
+          bankId: questionBankId,
+          sourceId: questionSourceId,
+          courseId,
+          placements: [{ chapterId }],
+          type: 'FILL_IN_THE_BLANK',
+          body: 'Complete the keyword: synt_____.',
+          explanation: 'The accepted answer is synthetic.',
+          acceptedAnswers: ['synthetic'],
+          answerOrigin: 'HUMAN_REVIEWED',
+          maxPoints: 2,
+        });
+        for (const question of [short, fill, long]) {
           expectStatus(
             await admin.request<any>(
               'POST',
@@ -940,11 +953,12 @@ export const assessmentsJourney: JourneyDefinition = {
           );
           context.created.questions.push(question.id);
         }
+        writtenShortQuestionId = short.id;
         const assessment = await admin.request<any>(
           'POST',
           '/admin/assessments/custom',
           {
-            questionIds: [short.id, long.id],
+            questionIds: [short.id, fill.id, long.id],
             scopes: [{ courseId }],
             mode: 'EXAM',
             title: factory.title('Written response assessment'),
@@ -973,21 +987,37 @@ export const assessmentsJourney: JourneyDefinition = {
         const longSnapshot = started.body.questions.find(
           (question: any) => question.type === 'LONG_ANSWER',
         );
+        const fillSnapshot = started.body.questions.find(
+          (question: any) => question.type === 'FILL_IN_THE_BLANK',
+        );
         assert(
           shortSnapshot &&
+            fillSnapshot &&
             longSnapshot &&
             shortSnapshot.acceptedAnswers === undefined &&
+            fillSnapshot.acceptedAnswers === undefined &&
             longSnapshot.gradingRubric === undefined,
           'Student assessment delivery must not expose written answer keys or rubrics',
         );
-        expectStatus(
-          await student<any>(
-            student1Token,
-            'POST',
-            `/student/assessments/${writtenAssessmentId}/attempts/current/answers/${shortSnapshot.id}`,
-            { responseText: ' SYNTHETIC ' },
-          ),
-          201,
+        const shortSaved = await student<any>(
+          student1Token,
+          'POST',
+          `/student/assessments/${writtenAssessmentId}/attempts/current/answers/${shortSnapshot.id}`,
+          { responseText: ' SYNTHETIC ' },
+        );
+        expectStatus(shortSaved, 201);
+        const fillSaved = await student<any>(
+          student1Token,
+          'POST',
+          `/student/assessments/${writtenAssessmentId}/attempts/current/answers/${fillSnapshot.id}`,
+          { responseText: 'synthetic' },
+        );
+        expectStatus(fillSaved, 201);
+        assert(
+          shortSaved.body.outcome === 'PENDING_AI_GRADING' &&
+            fillSaved.body.outcome === 'PENDING_AI_GRADING' &&
+            shortSaved.body.isCorrect === null,
+          'Submit-time written autosaves must not invoke AI or reveal a grade',
         );
         expectStatus(
           await student<any>(
@@ -1033,15 +1063,47 @@ export const assessmentsJourney: JourneyDefinition = {
         const longResult = result.body.questions.find(
           (question: any) => question.id === longSnapshot.id,
         );
+        const shortResult = result.body.questions.find(
+          (question: any) => question.id === shortSnapshot.id,
+        );
+        const fillResult = result.body.questions.find(
+          (question: any) => question.id === fillSnapshot.id,
+        );
         assert(
-          result.body.score === 2 &&
-            result.body.totalPoints === 4 &&
-            longResult?.inputMethod === 'VOICE_TRANSCRIPT',
-          'Written result delivery must retain the voice-transcript provenance',
+          result.body.totalPoints === 6 &&
+            longResult?.inputMethod === 'VOICE_TRANSCRIPT' &&
+            [shortResult, fillResult, longResult].every((item) =>
+              [
+                'CORRECT',
+                'PARTIALLY_CORRECT',
+                'INCORRECT',
+                'PENDING_AI_GRADING',
+              ].includes(item?.outcome),
+            ),
+          'All written types must be separately AI graded after submission and retain transcript provenance',
+        );
+        assert(
+          [shortResult, fillResult, longResult].every((item) => {
+            const run = item?.aiGrading;
+            if (run?.status === 'COMPLETED')
+              return (
+                ['CORRECT', 'PARTIALLY_CORRECT', 'INCORRECT'].includes(
+                  item.outcome,
+                ) &&
+                typeof item.awardedPoints === 'number' &&
+                typeof item.graderFeedback === 'string'
+              );
+            return (
+              item?.outcome === 'PENDING_AI_GRADING' &&
+              run?.status === 'FAILED' &&
+              run?.error === 'PENDING_RETRY'
+            );
+          }),
+          'Every submitted written response must retain a completed grade or a retryable failed AI run',
         );
         if (longResult?.outcome === 'PENDING_AI_GRADING') {
           assert(
-            result.body.pendingAiGradingCount === 1,
+            result.body.pendingAiGradingCount >= 1,
             'Failed AI grading must remain retryable',
           );
           const pending = await admin.request<any>(
@@ -1055,30 +1117,14 @@ export const assessmentsJourney: JourneyDefinition = {
           assert(
             pendingAnswer?.gradingRubric === undefined &&
               pendingAnswer?.assessmentQuestion?.gradingRubric,
-            'Graders must receive the frozen rubric only through the grading queue',
+            'The AI retry queue must retain the frozen rubric without returning it to students',
           );
-          const graded = await admin.request<any>(
-            'POST',
-            `/admin/assessments/grading/answers/${pendingAnswer.id}`,
-            {
-              awardedPoints: 1,
-              feedback: 'Concept is present; expand the explanation.',
-            },
-          );
-          expectStatus(graded, 201);
-          const gradedResult = await student<any>(
-            student1Token,
-            'GET',
-            `/student/assessments/${writtenAssessmentId}/attempts/current/result`,
-          );
-          expectStatus(gradedResult, 200);
-          assert(
-            gradedResult.body.score === 3 &&
-              gradedResult.body.pendingGradingCount === 0 &&
-              gradedResult.body.questions.find(
-                (question: any) => question.id === longSnapshot.id,
-              )?.outcome === 'PARTIALLY_CORRECT',
-            'Manual grading must apply partial credit and remove the pending state',
+          expectStatus(
+            await admin.request<any>(
+              'POST',
+              `/admin/assessments/grading/answers/${pendingAnswer.id}/retry-ai`,
+            ),
+            201,
           );
         } else {
           assert(
@@ -1093,15 +1139,15 @@ export const assessmentsJourney: JourneyDefinition = {
       },
     );
 
-    await step('Manually grading an essay without an AI rubric', async () => {
+    await step('Rejecting an essay without an AI rubric', async () => {
       const manualQuestion = await create('/admin/questions', {
         bankId: questionBankId,
         sourceId: questionSourceId,
         courseId,
         placements: [{ chapterId }],
         type: 'LONG_ANSWER',
-        body: 'Describe the synthetic concept for a manual grader.',
-        explanation: 'This response intentionally has no AI rubric.',
+        body: 'Describe the synthetic concept without a rubric.',
+        explanation: 'Long-answer questions require an AI grading rubric.',
         answerOrigin: 'HUMAN_REVIEWED',
         maxPoints: 2,
       });
@@ -1110,82 +1156,7 @@ export const assessmentsJourney: JourneyDefinition = {
           'POST',
           `/admin/questions/${manualQuestion.id}/submit`,
         ),
-        201,
-      );
-      expectStatus(
-        await admin.request<any>(
-          'POST',
-          `/admin/questions/${manualQuestion.id}/publish`,
-        ),
-        201,
-      );
-      context.created.questions.push(manualQuestion.id);
-      const assessment = await admin.request<any>(
-        'POST',
-        '/admin/assessments/custom',
-        {
-          questionIds: [manualQuestion.id],
-          scopes: [{ courseId }],
-          mode: 'EXAM',
-          title: factory.title('Manual essay assessment'),
-        },
-      );
-      expectStatus(assessment, 201);
-      context.created.assessments.push(assessment.body.id);
-      expectStatus(
-        await admin.request<any>(
-          'POST',
-          `/admin/assessments/${assessment.body.id}/publish`,
-        ),
-        201,
-      );
-      const started = await student<any>(
-        student1Token,
-        'POST',
-        `/student/assessments/${assessment.body.id}/attempts/start`,
-      );
-      expectStatus(started, 201);
-      const snapshot = started.body.questions[0];
-      expectStatus(
-        await student<any>(
-          student1Token,
-          'POST',
-          `/student/assessments/${assessment.body.id}/attempts/current/answers/${snapshot.id}`,
-          { responseText: 'A manually reviewed synthetic explanation.' },
-        ),
-        201,
-      );
-      expectStatus(
-        await student<any>(
-          student1Token,
-          'POST',
-          `/student/assessments/${assessment.body.id}/attempts/current/submit`,
-        ),
-        201,
-      );
-      const pending = await admin.request<any>(
-        'GET',
-        '/admin/assessments/grading/pending',
-      );
-      expectStatus(pending, 200);
-      const pendingAnswer = pending.body.find(
-        (answer: any) =>
-          answer.assessmentQuestion?.sourceQuestionId === manualQuestion.id,
-      );
-      assert(
-        typeof pendingAnswer?.id === 'string',
-        'An essay without an AI rubric must enter the manual grading queue',
-      );
-      expectStatus(
-        await admin.request<any>(
-          'POST',
-          `/admin/assessments/grading/answers/${pendingAnswer.id}`,
-          {
-            awardedPoints: 1,
-            feedback: 'The concept is present; add more detail.',
-          },
-        ),
-        201,
+        409,
       );
     });
 
@@ -1239,7 +1210,7 @@ export const assessmentsJourney: JourneyDefinition = {
           'POST',
           '/admin/assessments/custom',
           {
-            questionIds: [questionIds[0], questionIds[1]],
+            questionIds: [questionIds[0], writtenShortQuestionId],
             scopes: [{ courseId }],
             mode: 'TUTOR',
           },
@@ -1295,17 +1266,45 @@ export const assessmentsJourney: JourneyDefinition = {
           `/student/assessments/${adminAssessmentId}/attempts/start`,
         );
         expectStatus(start, 201);
-        const question = start.body.questions[0];
+        const choiceQuestion = start.body.questions.find(
+          (question: any) => question.type === 'SINGLE_CHOICE',
+        );
+        const writtenQuestion = start.body.questions.find(
+          (question: any) => question.type === 'SHORT_ANSWER',
+        );
+        assert(
+          choiceQuestion && writtenQuestion,
+          'The tutor assessment must include both choice and written snapshots',
+        );
         const autosave = await student<any>(
           student2Token,
           'POST',
-          `/student/assessments/${adminAssessmentId}/attempts/current/answers/${question.id}`,
-          { selectedOptionIds: [question.options[0].id] },
+          `/student/assessments/${adminAssessmentId}/attempts/current/answers/${choiceQuestion.id}`,
+          { selectedOptionIds: [choiceQuestion.options[0].id] },
         );
         expectStatus(autosave, 201);
         assert(
           autosave.body.isCorrect !== null,
           'TUTOR mode must reveal correctness immediately after an answer is saved',
+        );
+        const writtenAutosave = await student<any>(
+          student2Token,
+          'POST',
+          `/student/assessments/${adminAssessmentId}/attempts/current/answers/${writtenQuestion.id}`,
+          { responseText: 'synthetic' },
+        );
+        expectStatus(writtenAutosave, 201);
+        assert(
+          (writtenAutosave.body.aiGrading?.status === 'COMPLETED' &&
+            ['CORRECT', 'PARTIALLY_CORRECT', 'INCORRECT'].includes(
+              writtenAutosave.body.outcome,
+            ) &&
+            typeof writtenAutosave.body.awardedPoints === 'number' &&
+            typeof writtenAutosave.body.graderFeedback === 'string') ||
+            (writtenAutosave.body.aiGrading?.status === 'FAILED' &&
+              writtenAutosave.body.outcome === 'PENDING_AI_GRADING' &&
+              writtenAutosave.body.aiGrading.error === 'PENDING_RETRY'),
+          'A tutor written autosave must return immediate safe AI feedback or a retryable failure state',
         );
         expectStatus(
           await student<any>(

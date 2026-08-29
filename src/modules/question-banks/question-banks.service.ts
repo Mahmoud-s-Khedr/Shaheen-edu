@@ -1415,6 +1415,13 @@ export class QuestionBanksService {
       throw new ConflictException(
         'Short and fill-in questions require accepted answers',
       );
+    if (
+      question.type === QuestionType.LONG_ANSWER &&
+      !question.gradingRubric?.trim()
+    )
+      throw new ConflictException(
+        'Long-answer questions require a grading rubric for AI grading',
+      );
     if (question.answerOrigin === QuestionAnswerProvenance.AI_INFERRED)
       throw new ConflictException(
         'AI-inferred answers must be human-reviewed before publication',

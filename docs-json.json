@@ -17867,7 +17867,76 @@
             "bearer": []
           }
         ],
-        "summary": "List submitted long answers awaiting manual grading",
+        "summary": "List submitted written answers awaiting AI grading",
+        "tags": [
+          "admin/assessments"
+        ]
+      }
+    },
+    "/api/v1/admin/assessments/grading/answers/{answerId}/retry-ai": {
+      "post": {
+        "operationId": "AdminAssessmentsController_retryAiGrade_v1",
+        "parameters": [
+          {
+            "name": "answerId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Retry AI grading for one pending written answer",
         "tags": [
           "admin/assessments"
         ]
@@ -17976,45 +18045,6 @@
           }
         ],
         "summary": "Assign and transition a student question report",
-        "tags": [
-          "admin/assessments"
-        ]
-      }
-    },
-    "/api/v1/admin/assessments/grading/answers/{answerId}": {
-      "post": {
-        "operationId": "AdminAssessmentsController_grade_v1",
-        "parameters": [
-          {
-            "name": "answerId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/GradeLongAnswerDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Award points to a submitted long answer",
         "tags": [
           "admin/assessments"
         ]
@@ -28596,7 +28626,7 @@
           },
           "gradingRubric": {
             "type": "string",
-            "description": "Optional long-answer rubric. When present, submitted essays receive AI grading; without one they enter the manual grading queue."
+            "description": "Required for long-answer questions. It is the criterion used for AI grading."
           },
           "answerOrigin": {
             "type": "string",
@@ -30863,6 +30893,14 @@
           "outcome": {
             "type": "string",
             "nullable": true
+          },
+          "graderFeedback": {
+            "type": "string",
+            "nullable": true
+          },
+          "aiGrading": {
+            "type": "object",
+            "nullable": true
           }
         },
         "required": [
@@ -31060,21 +31098,6 @@
         },
         "required": [
           "status"
-        ]
-      },
-      "GradeLongAnswerDto": {
-        "type": "object",
-        "properties": {
-          "awardedPoints": {
-            "type": "number",
-            "minimum": 0
-          },
-          "feedback": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "awardedPoints"
         ]
       },
       "GenerateAdminStandardAssessmentDto": {

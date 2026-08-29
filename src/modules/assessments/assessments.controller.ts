@@ -35,7 +35,6 @@ import {
   AutosaveAnswerDto,
   ReportActiveTimeDto,
   CreateCustomAssessmentDto,
-  GradeLongAnswerDto,
   GenerateAdminStandardAssessmentDto,
   GenerateStudentAssessmentDto,
   GenerateAiPromptAssessmentDto,
@@ -345,10 +344,23 @@ export class AdminAssessmentsController {
 
   @Get('grading/pending')
   @ApiOperation({
-    summary: 'List submitted long answers awaiting manual grading',
+    summary: 'List submitted written answers awaiting AI grading',
   })
   pendingGrades(@CurrentUser() user: RequestUser) {
-    return this.assessments.pendingGrades(user);
+    return this.assessments.pendingAiGrades(user);
+  }
+
+  @Post('grading/answers/:answerId/retry-ai')
+  @ApiOperation({
+    summary: 'Retry AI grading for one pending written answer',
+  })
+  @ApiCreatedResponse()
+  @ApiStandardErrors(401, 403, 404, 409)
+  retryAiGrade(
+    @CurrentUser() user: RequestUser,
+    @Param('answerId') answerId: string,
+  ) {
+    return this.assessments.retryAiGrade(user, answerId);
   }
 
   @Get('question-reports')
@@ -368,16 +380,6 @@ export class AdminAssessmentsController {
     @Body() dto: ReviewQuestionReportDto,
   ) {
     return this.assessments.reviewQuestionReport(user, reportId, dto);
-  }
-
-  @Post('grading/answers/:answerId')
-  @ApiOperation({ summary: 'Award points to a submitted long answer' })
-  grade(
-    @CurrentUser() user: RequestUser,
-    @Param('answerId') answerId: string,
-    @Body() dto: GradeLongAnswerDto,
-  ) {
-    return this.assessments.gradeLongAnswer(user, answerId, dto);
   }
 
   @Post('standard')

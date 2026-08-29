@@ -2022,6 +2022,7 @@ model AssessmentAttemptAnswer {
   assessmentQuestion      AssessmentQuestion             @relation(fields: [assessmentQuestionId], references: [id], onDelete: Cascade)
   selectedOptionIds       String[]
   responseText            String?
+  responseVersion         Int                            @default(0)
   inputMethod             AnswerInputMethod              @default(TEXT)
   responseLanguageCode    String?
   transcriptionProvider   String?
@@ -2054,6 +2055,7 @@ model AssessmentAnswerAiGradingRun {
   status               AiRunStatus                @default(PENDING)
   questionSnapshot     Json
   responseSnapshot     String
+  responseVersion      Int                        @default(0)
   responseLanguageCode String
   proposedPoints       Int?
   proposedOutcome      AssessmentQuestionOutcome?

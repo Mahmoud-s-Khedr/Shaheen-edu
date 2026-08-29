@@ -1,0 +1,638 @@
+<!doctype html>
+<!--
+  Manual test page for the student assessment and written-answer AI grading flow.
+
+  Run with:
+    npx serve dev -l 5173
+
+  Then open http://localhost:5173/ai-grading-test.html. This page deliberately
+  keeps tokens in memory only. Submitting an assessment is irreversible.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Written Answer AI Grading Test</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        max-width: 1060px;
+        margin: 0 auto;
+        padding: 28px 18px 56px;
+        line-height: 1.5;
+      }
+      h1 {
+        margin: 0;
+        font-size: 1.65rem;
+      }
+      h2 {
+        margin: 0 0 12px;
+        font-size: 1.12rem;
+      }
+      p {
+        margin: 8px 0;
+      }
+      .muted {
+        opacity: 0.72;
+        font-size: 0.9rem;
+      }
+      .panel,
+      .question {
+        border: 1px solid color-mix(in srgb, currentColor 22%, transparent);
+        border-radius: 12px;
+        padding: 16px;
+        margin-top: 18px;
+      }
+      .question {
+        margin-top: 12px;
+      }
+      .question header {
+        display: flex;
+        gap: 10px;
+        justify-content: space-between;
+        align-items: start;
+      }
+      .question h3 {
+        margin: 0;
+        font-size: 1rem;
+      }
+      .question-body {
+        white-space: pre-wrap;
+        margin: 10px 0;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: 2fr 1fr auto;
+        gap: 10px;
+        align-items: end;
+      }
+      @media (max-width: 700px) {
+        .grid {
+          grid-template-columns: 1fr;
+        }
+      }
+      label {
+        display: block;
+        font-size: 0.82rem;
+        margin-bottom: 4px;
+        opacity: 0.8;
+      }
+      input,
+      select,
+      textarea,
+      button {
+        font: inherit;
+        color: inherit;
+        border: 1px solid color-mix(in srgb, currentColor 30%, transparent);
+        border-radius: 8px;
+        background: transparent;
+      }
+      input,
+      select,
+      textarea {
+        width: 100%;
+        padding: 9px 10px;
+      }
+      textarea {
+        min-height: 130px;
+        resize: vertical;
+      }
+      button {
+        cursor: pointer;
+        padding: 9px 12px;
+        background: color-mix(in srgb, currentColor 10%, transparent);
+        font-weight: 600;
+      }
+      button:hover {
+        background: color-mix(in srgb, currentColor 18%, transparent);
+      }
+      button:disabled {
+        opacity: 0.55;
+        cursor: not-allowed;
+      }
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 9px;
+        margin-top: 14px;
+      }
+      .notice {
+        border-left: 4px solid #d29922;
+        padding: 9px 12px;
+        background: color-mix(in srgb, #d29922 11%, transparent);
+        margin-top: 16px;
+      }
+      .status {
+        border-radius: 999px;
+        padding: 3px 8px;
+        font-size: 0.78rem;
+        background: color-mix(in srgb, currentColor 11%, transparent);
+        white-space: nowrap;
+      }
+      .ok {
+        color: #1a7f37;
+      }
+      .error {
+        color: #cf222e;
+      }
+      .pending {
+        color: #bf8700;
+      }
+      .choice {
+        display: block;
+        padding: 8px 10px;
+        margin: 6px 0;
+        border: 1px solid color-mix(in srgb, currentColor 18%, transparent);
+        border-radius: 8px;
+      }
+      .choice input {
+        width: auto;
+        margin-right: 7px;
+      }
+      .result {
+        margin-top: 12px;
+        padding: 11px;
+        border-radius: 8px;
+        background: color-mix(in srgb, currentColor 7%, transparent);
+      }
+      .feedback {
+        white-space: pre-wrap;
+      }
+      mark {
+        border-radius: 3px;
+        padding: 1px 0;
+      }
+      mark.correct {
+        background: color-mix(in srgb, #2da44e 35%, transparent);
+      }
+      mark.language {
+        background: color-mix(in srgb, #bf8700 35%, transparent);
+      }
+      mark.factual {
+        background: color-mix(in srgb, #cf222e 35%, transparent);
+      }
+      .highlight-note {
+        font-size: 0.82rem;
+        margin: 3px 0 8px;
+        opacity: 0.83;
+      }
+      details {
+        margin-top: 15px;
+      }
+      pre {
+        overflow: auto;
+        max-height: 320px;
+        padding: 12px;
+        border-radius: 8px;
+        background: color-mix(in srgb, currentColor 8%, transparent);
+        font-size: 0.78rem;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Written Answer AI Grading Test</h1>
+    <p class="muted">
+      Live student flow: login → select a tutor or exam assessment → save
+      written answers → submit when required → inspect AI grading.
+    </p>
+
+    <section class="panel">
+      <h2>1. Student session</h2>
+      <div class="grid">
+        <div>
+          <label for="baseUrl">API base URL</label
+          ><input
+            id="baseUrl"
+            value="https://api-edu.mydevtest.website/api/v1"
+          />
+        </div>
+        <div>
+          <label for="phone">Student phone</label
+          ><input
+            id="phone"
+            inputmode="numeric"
+            autocomplete="username"
+            placeholder="01000000000"
+          />
+        </div>
+        <div>
+          <label for="password">Password</label
+          ><input
+            id="password"
+            type="password"
+            autocomplete="current-password"
+            placeholder="Password"
+          />
+        </div>
+      </div>
+      <div class="actions">
+        <button id="login">Log in and load assessments</button
+        ><button id="logoutAll" hidden>Sign out everywhere</button
+        ><span id="sessionStatus" class="status">signed out</span>
+      </div>
+    </section>
+
+    <section class="panel" id="assessmentPanel" hidden>
+      <h2>2. Choose an assessment</h2>
+      <p class="muted">
+        Choose a <code>NOT_STARTED</code> or <code>SUSPENDED</code> assessment.
+        Starting or submitting changes its live data.
+      </p>
+      <div class="grid">
+        <div>
+          <label for="assessment">Assessment</label
+          ><select id="assessment"></select>
+        </div>
+        <div>
+          <label>&nbsp;</label
+          ><button id="load">Start / resume selected assessment</button>
+        </div>
+        <div>
+          <label>&nbsp;</label><button id="refresh">Refresh list</button>
+        </div>
+      </div>
+      <p id="assessmentStatus" class="muted"></p>
+    </section>
+
+    <section id="questionsPanel" hidden>
+      <div class="notice">
+        <strong>Important:</strong>
+        <span id="timingNotice"
+          >Tutor assessments grade written answers when saved; exam assessments grade them after submission.</span
+        >
+      </div>
+      <div id="questions"></div>
+      <div class="panel">
+        <h2>3. Submit and inspect grading</h2>
+        <p class="muted">
+          Save each answer first. The timer measures the live submit request,
+          including AI grading for every rubric-backed long answer.
+        </p>
+        <div class="actions">
+          <button id="submit">Submit assessment and run AI grading</button
+          ><span id="submitStatus" class="status">not submitted</span
+          ><button id="getResult">Refresh result</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="resultsPanel" class="panel" hidden>
+      <h2>Result</h2>
+      <p id="resultSummary"></p>
+      <div id="results"></div>
+    </section>
+
+    <details>
+      <summary>Request log</summary>
+      <pre id="log">No requests yet.</pre>
+    </details>
+
+    <script>
+      (() => {
+        const $ = (id) => document.getElementById(id);
+        let token = null;
+        let currentAssessment = null;
+        let currentAttempt = null;
+
+        const base = () => $('baseUrl').value.trim().replace(/\/$/, '');
+        const setStatus = (id, text, kind = '') => {
+          const node = $(id);
+          node.textContent = text;
+          node.className = `status ${kind}`;
+        };
+        const redactForLog = (value) => {
+          if (Array.isArray(value)) return value.map(redactForLog);
+          if (!value || typeof value !== 'object') return value;
+          return Object.fromEntries(
+            Object.entries(value).map(([key, nestedValue]) => [
+              key,
+              /^(accessToken|refreshToken|password|authorization|cookie|set-cookie)$/i.test(
+                key,
+              )
+                ? '[redacted]'
+                : redactForLog(nestedValue),
+            ]),
+          );
+        };
+        const log = (label, value) => {
+          $('log').textContent =
+            `${new Date().toLocaleTimeString()} ${label}\n${JSON.stringify(redactForLog(value), null, 2)}\n\n${$('log').textContent}`;
+        };
+        const errorText = (error) =>
+          error.body?.message?.en ||
+          error.body?.message ||
+          error.message ||
+          'Request failed';
+        const escape = (value) =>
+          String(value ?? '').replace(
+            /[&<>"']/g,
+            (c) =>
+              ({
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#39;',
+              })[c],
+          );
+
+        async function api(method, path, options = {}) {
+          const headers = { ...(options.headers || {}) };
+          if (token) headers.authorization = `Bearer ${token}`;
+          if (options.json !== undefined)
+            headers['content-type'] = 'application/json';
+          const response = await fetch(base() + path, {
+            method,
+            headers,
+            body:
+              options.json === undefined
+                ? undefined
+                : JSON.stringify(options.json),
+          });
+          const text = await response.text();
+          let body;
+          try {
+            body = text ? JSON.parse(text) : null;
+          } catch {
+            body = text;
+          }
+          log(`${method} ${path} → ${response.status}`, body);
+          if (!response.ok) {
+            const error = new Error(`HTTP ${response.status}`);
+            error.body = body;
+            throw error;
+          }
+          return body;
+        }
+
+        async function loadAssessments() {
+          const list = await api(
+            'GET',
+            '/student/assessments?page=1&limit=100',
+          );
+          const selectable = (list.data || []).filter(
+            (item) => item.attemptStatus !== 'COMPLETED',
+          );
+          $('assessment').innerHTML = selectable.length
+            ? selectable
+                .map(
+                  (item) =>
+                    `<option value="${escape(item.id)}">${escape(item.title)} — ${escape(item.attemptStatus)} — ${item.questionCount} questions</option>`,
+                )
+                .join('')
+            : '<option>No incomplete assessments available</option>';
+          $('assessmentStatus').textContent =
+            `${selectable.length} incomplete assessment(s) available.`;
+        }
+
+        $('login').onclick = async () => {
+          try {
+            setStatus('sessionStatus', 'signing in…', 'pending');
+            const result = await api('POST', '/auth/students/login', {
+              json: {
+                phone: $('phone').value.trim(),
+                password: $('password').value,
+              },
+            });
+            token = result.accessToken;
+            $('password').value = '';
+            setStatus(
+              'sessionStatus',
+              `signed in as ${result.user.loginIdentifier}`,
+              'ok',
+            );
+            $('logoutAll').hidden = false;
+            $('assessmentPanel').hidden = false;
+            await loadAssessments();
+          } catch (error) {
+            token = null;
+            $('logoutAll').hidden = true;
+            setStatus('sessionStatus', errorText(error), 'error');
+          }
+        };
+
+        $('logoutAll').onclick = async () => {
+          if (!token || !confirm('Sign out of every session for this student?'))
+            return;
+          try {
+            await api('POST', '/auth/logout-all', { json: {} });
+            token = null;
+            currentAssessment = null;
+            currentAttempt = null;
+            $('logoutAll').hidden = true;
+            $('assessmentPanel').hidden = true;
+            $('questionsPanel').hidden = true;
+            $('resultsPanel').hidden = true;
+            setStatus('sessionStatus', 'signed out everywhere', 'ok');
+          } catch (error) {
+            setStatus('sessionStatus', errorText(error), 'error');
+          }
+        };
+
+        $('refresh').onclick = () =>
+          loadAssessments().catch((error) => {
+            $('assessmentStatus').textContent = errorText(error);
+          });
+
+        $('load').onclick = async () => {
+          const id = $('assessment').value;
+          if (!id || !token) return;
+          try {
+            $('assessmentStatus').textContent = 'Loading attempt…';
+            currentAssessment = id;
+            currentAttempt = await api(
+              'POST',
+              `/student/assessments/${encodeURIComponent(id)}/attempts/start`,
+              { json: {} },
+            );
+            $('assessmentStatus').textContent =
+              `Attempt ${currentAttempt.attemptId} is ${currentAttempt.status} (${currentAttempt.mode}).`;
+            $('timingNotice').textContent =
+              currentAttempt.mode === 'TUTOR'
+                ? 'Tutor mode AI-grades written answers when saved. Editing an answer creates a new grade attempt.'
+                : 'Exam mode stores written answers on save and AI-grades them after final submission.';
+            renderQuestions(currentAttempt.questions || []);
+            $('questionsPanel').hidden = false;
+            $('resultsPanel').hidden = true;
+          } catch (error) {
+            $('assessmentStatus').textContent = errorText(error);
+          }
+        };
+
+        function renderQuestions(questions) {
+          $('questions').innerHTML = questions
+            .map((question, index) => {
+              const written = [
+                'SHORT_ANSWER',
+                'FILL_IN_THE_BLANK',
+                'LONG_ANSWER',
+              ].includes(question.type);
+              const options = (question.options || [])
+                .map(
+                  (option) =>
+                    `<label class="choice"><input type="${question.type === 'MULTIPLE_CHOICE' ? 'checkbox' : 'radio'}" name="question-${escape(question.id)}" value="${escape(option.id)}" ${question.selectedOptionIds?.includes(option.id) ? 'checked' : ''} />${escape(option.body)}</label>`,
+                )
+                .join('');
+              return `<article class="question" data-question-id="${escape(question.id)}" data-question-type="${escape(question.type)}">
+        <header><h3>${index + 1}. ${escape(question.type.replaceAll('_', ' '))}</h3><span class="status">${question.maxPoints} point${question.maxPoints === 1 ? '' : 's'}</span></header>
+        <div class="question-body">${escape(question.body)}</div>
+        ${written ? `<label for="answer-${escape(question.id)}">Your answer</label><textarea id="answer-${escape(question.id)}" placeholder="Type your answer here…">${escape(question.responseText || '')}</textarea>` : options}
+        <div class="actions"><button class="save" data-question-id="${escape(question.id)}">Save answer</button><span id="save-${escape(question.id)}" class="status">not saved</span></div>
+      </article>`;
+            })
+            .join('');
+          document
+            .querySelectorAll('.save')
+            .forEach(
+              (button) =>
+                (button.onclick = () => saveAnswer(button.dataset.questionId)),
+            );
+        }
+
+        async function saveAnswer(questionId) {
+          const card = document.querySelector(
+            `[data-question-id="${CSS.escape(questionId)}"]`,
+          );
+          const type = card.dataset.questionType;
+          const written = [
+            'SHORT_ANSWER',
+            'FILL_IN_THE_BLANK',
+            'LONG_ANSWER',
+          ].includes(type);
+          const json = written
+            ? { responseText: $(`answer-${questionId}`).value }
+            : {
+                selectedOptionIds: [
+                  ...card.querySelectorAll('input:checked'),
+                ].map((input) => input.value),
+              };
+          const status = `save-${questionId}`;
+          try {
+            setStatus(status, 'saving…', 'pending');
+            const result = await api(
+              'POST',
+              `/student/assessments/${encodeURIComponent(currentAssessment)}/attempts/current/answers/${encodeURIComponent(questionId)}`,
+              { json },
+            );
+            const outcome = written
+              ? result.outcome === 'PENDING_AI_GRADING'
+                ? 'saved; AI grading pending'
+                : result.outcome
+                  ? `saved; ${result.outcome}`
+                  : 'saved'
+              : result.isCorrect === null
+                ? 'saved'
+                : result.isCorrect
+                  ? 'saved; correct'
+                  : 'saved; incorrect';
+            setStatus(status, outcome, result.isCorrect ? 'ok' : '');
+          } catch (error) {
+            setStatus(status, errorText(error), 'error');
+          }
+        }
+
+        $('submit').onclick = async () => {
+          if (
+            !currentAssessment ||
+            !confirm(
+              'Submit this assessment? This completes it and starts any remaining written-answer AI grading.',
+            )
+          )
+            return;
+          try {
+            $('submit').disabled = true;
+            setStatus('submitStatus', 'submitting and grading…', 'pending');
+            const startedAt = performance.now();
+            // An explicit JSON body prevents Fastify from rejecting an empty JSON request.
+            const submitted = await api(
+              'POST',
+              `/student/assessments/${encodeURIComponent(currentAssessment)}/attempts/current/submit`,
+              { json: {} },
+            );
+            const elapsedMs = Math.round(performance.now() - startedAt);
+            setStatus(
+              'submitStatus',
+              `completed in ${(elapsedMs / 1000).toFixed(2)}s`,
+              'ok',
+            );
+            await showResult(submitted, elapsedMs);
+            $('submit').disabled = true;
+          } catch (error) {
+            setStatus('submitStatus', errorText(error), 'error');
+            $('submit').disabled = false;
+          }
+        };
+
+        $('getResult').onclick = async () => {
+          if (!currentAssessment) return;
+          try {
+            await showResult();
+          } catch (error) {
+            setStatus('submitStatus', errorText(error), 'error');
+          }
+        };
+
+        async function showResult(submitted, elapsedMs) {
+          const result = await api(
+            'GET',
+            `/student/assessments/${encodeURIComponent(currentAssessment)}/attempts/current/result`,
+          );
+          $('resultsPanel').hidden = false;
+          const pending = result.pendingAiGradingCount || 0;
+          $('resultSummary').textContent =
+            `Score: ${result.score}/${result.totalPoints}. Pending AI grading: ${pending}.${elapsedMs !== undefined ? ` Submit request: ${(elapsedMs / 1000).toFixed(2)} seconds.` : ''}`;
+          $('results').innerHTML = (result.questions || [])
+            .map((question, index) => renderResult(question, index))
+            .join('');
+          $('resultsPanel').scrollIntoView({
+            behavior: 'smooth',
+            block: 'start',
+          });
+          return { submitted, result };
+        }
+
+        function highlightedText(text, highlights) {
+          if (!highlights?.length)
+            return `<div class="question-body">${escape(text)}</div>`;
+          let output = '',
+            cursor = 0;
+          for (const item of [...highlights].sort(
+            (a, b) => a.start - b.start,
+          )) {
+            output += escape(text.slice(cursor, item.start));
+            const kind =
+              item.category === 'CORRECT'
+                ? 'correct'
+                : item.category === 'LANGUAGE'
+                  ? 'language'
+                  : 'factual';
+            output += `<mark class="${kind}">${escape(text.slice(item.start, item.end))}</mark>`;
+            cursor = item.end;
+          }
+          output += escape(text.slice(cursor));
+          return `<div class="question-body">${output}</div>`;
+        }
+
+        function renderResult(question, index) {
+          const ai = question.aiGrading;
+          const feedback = ai?.feedback || question.graderFeedback;
+          const highlights = ai?.highlights || [];
+          return `<article class="question"><header><h3>${index + 1}. ${escape(question.type.replaceAll('_', ' '))}</h3><span class="status ${question.outcome === 'CORRECT' ? 'ok' : question.outcome?.includes('PENDING') ? 'pending' : ''}">${escape(question.outcome || 'OMITTED')} · ${question.awardedPoints ?? 0}/${question.maxPoints}</span></header>
+      <div class="question-body">${escape(question.body)}</div>
+      ${question.responseText ? `<strong>Student response</strong>${highlightedText(question.responseText, highlights)}` : '<p class="muted">No written response.</p>'}
+      ${feedback ? `<div class="result"><strong>${ai ? 'AI feedback' : 'Grader feedback'}</strong><div class="feedback">${escape(feedback)}</div></div>` : ''}
+      ${highlights.map((item) => `<p class="highlight-note"><strong>${escape(item.category)}</strong>: ${escape(item.note)}</p>`).join('')}
+      ${ai?.error ? `<p class="error">AI error: ${escape(ai.error)}</p>` : ''}
+    </article>`;
+        }
+      })();
+    </script>
+  </body>
+</html>

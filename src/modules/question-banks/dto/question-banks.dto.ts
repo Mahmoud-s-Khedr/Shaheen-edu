@@ -290,7 +290,7 @@ export class CreateQuestionDto {
   acceptedAnswers?: string[];
   @ApiPropertyOptional({
     description:
-      'Optional long-answer rubric. When present, submitted essays receive AI grading; without one they enter the manual grading queue.',
+      'Required for long-answer questions. It is the criterion used for AI grading.',
   })
   @IsOptional()
   @IsString()

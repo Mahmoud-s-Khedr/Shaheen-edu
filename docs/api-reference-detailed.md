@@ -856,13 +856,13 @@ No response body.
 
 **Authorization:** Bearer token; role must be `ADMIN` or `SUPER_ADMIN`
 
-Lists submitted long-answer responses that require manual grading (HTTP 200).
+Lists submitted written responses awaiting AI grading or retry (HTTP 200).
 
-### `POST /api/v1/admin/assessments/grading/answers/{answerId}`
+### `POST /api/v1/admin/assessments/grading/answers/{answerId}/retry-ai`
 
 **Authorization:** Bearer token; role must be `ADMIN` or `SUPER_ADMIN`
 
-Awards points to one submitted long-answer response using `GradeLongAnswerDto` (HTTP 201).
+Retries AI grading for one pending written-answer response (HTTP 201).
 
 ### `POST /api/v1/admin/assessments/standard`
 
