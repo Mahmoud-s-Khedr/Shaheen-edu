@@ -1467,7 +1467,20 @@ export class AssessmentsService {
         attempt?.status === AssessmentAttemptStatus.COMPLETED
           ? attempt.score
           : null,
+      percentage:
+        attempt?.status === AssessmentAttemptStatus.COMPLETED
+          ? this.scorePercentage(attempt.score, attempt.totalPoints)
+          : null,
     };
+  }
+
+  /** Keep every assessment summary consistent with the submitted result. */
+  private scorePercentage(
+    score: number | null | undefined,
+    totalPoints: number | null | undefined,
+  ) {
+    if (score === null || score === undefined || !totalPoints) return null;
+    return this.round((score / totalPoints) * 100);
   }
 
   private scopeNodes(scope: any): any[] {
@@ -2432,6 +2445,10 @@ export class AssessmentsService {
         current.status === AssessmentAttemptStatus.COMPLETED
           ? current.score
           : null,
+      percentage:
+        current.status === AssessmentAttemptStatus.COMPLETED
+          ? this.scorePercentage(current.score, current.totalPoints)
+          : null,
       totalQuestions: current.totalQuestions,
       totalPoints: current.totalPoints,
       mode: assessment.mode,
@@ -2858,6 +2875,7 @@ export class AssessmentsService {
       attemptId: final.id,
       status: final.status,
       score: final.score,
+      percentage: this.scorePercentage(final.score, final.totalPoints),
       totalQuestions: final.totalQuestions,
       submittedAt: final.submittedAt,
     };
@@ -3088,9 +3106,9 @@ export class AssessmentsService {
     const answeredCount = outcomes.filter(
       (outcome) => outcome !== AssessmentQuestionOutcome.OMITTED,
     ).length;
-    const percentage = this.round(
-      ((currentAttempt.score ?? 0) / currentAttempt.totalPoints) * 100,
-    );
+    const percentage =
+      this.scorePercentage(currentAttempt.score, currentAttempt.totalPoints) ??
+      0;
     const stats = await this.prisma.questionCommunityStat.findMany({
       where: {
         questionId: {
@@ -3321,6 +3339,7 @@ export class AssessmentsService {
             id: true,
             assessmentId: true,
             score: true,
+            totalPoints: true,
             totalQuestions: true,
             submittedAt: true,
             assessment: { select: { title: true, mode: true } },
@@ -3333,7 +3352,12 @@ export class AssessmentsService {
         !normalizedSearch ||
         normalizeArabic(attempt.assessment.title).includes(normalizedSearch),
     );
-    const attempts = matchingAttempts.slice((page - 1) * limit, page * limit);
+    const attempts = matchingAttempts
+      .slice((page - 1) * limit, page * limit)
+      .map((attempt) => ({
+        ...attempt,
+        percentage: this.scorePercentage(attempt.score, attempt.totalPoints),
+      }));
     return {
       level,
       data,

@@ -509,7 +509,19 @@ export class StudentsService {
         ...(policyReason ? { reason: policyReason } : {}),
       },
     });
-    return { data, meta: toPaginationMeta(query.page, query.limit, total) };
+    return {
+      data: data.map((attempt) => ({
+        ...attempt,
+        percentage:
+          attempt.score === null || !attempt.totalPoints
+            ? null
+            : Math.round(
+                ((attempt.score / attempt.totalPoints) * 100 + Number.EPSILON) *
+                  10,
+              ) / 10,
+      })),
+      meta: toPaginationMeta(query.page, query.limit, total),
+    };
   }
 
   async student360AuditEvents(

@@ -32,6 +32,7 @@ import {
   AssessmentResultQueryDto,
   AssessmentDetailDto,
   AssessmentResultDto,
+  AssessmentSubmissionDto,
   AutosaveAnswerDto,
   ReportActiveTimeDto,
   CreateCustomAssessmentDto,
@@ -315,7 +316,7 @@ export class AssessmentsController {
 
   @Post(':id/attempts/current/submit')
   @ApiOperation({ summary: 'Submit and score the attempt' })
-  @ApiCreatedResponse()
+  @ApiCreatedResponse({ type: AssessmentSubmissionDto })
   @ApiStandardErrors(401, 403, 404)
   submit(@CurrentUser() user: RequestUser, @Param('id') id: string) {
     return this.assessments.submitAttempt(user.id, id);

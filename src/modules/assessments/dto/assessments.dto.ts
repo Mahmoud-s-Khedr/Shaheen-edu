@@ -413,6 +413,8 @@ export class AssessmentListItemDto {
   @ApiProperty({ enum: ['NOT_STARTED', 'SUSPENDED', 'COMPLETED'] })
   attemptStatus!: 'NOT_STARTED' | 'SUSPENDED' | 'COMPLETED';
   @ApiPropertyOptional({ type: Number, nullable: true }) score!: number | null;
+  @ApiPropertyOptional({ type: Number, nullable: true }) percentage!:
+    number | null;
 }
 
 export class PaginatedAssessmentsResponseDto {
@@ -549,6 +551,8 @@ export class AssessmentAttemptStateDto {
   @ApiPropertyOptional({ type: String, format: 'date-time', nullable: true })
   submittedAt!: Date | null;
   @ApiPropertyOptional({ type: Number, nullable: true }) score!: number | null;
+  @ApiPropertyOptional({ type: Number, nullable: true }) percentage!:
+    number | null;
   @ApiProperty() totalQuestions!: number;
   @ApiProperty() totalPoints!: number;
   @ApiProperty() mode!: string;
@@ -560,6 +564,7 @@ export class AssessmentResultDto {
   @ApiProperty() attemptId!: string;
   @ApiProperty() score!: number;
   @ApiProperty() totalQuestions!: number;
+  @ApiProperty() totalPoints!: number;
   @ApiProperty() percentage!: number;
   @ApiProperty() correctCount!: number;
   @ApiProperty() incorrectCount!: number;
@@ -570,6 +575,17 @@ export class AssessmentResultDto {
   @ApiPropertyOptional({ type: String, format: 'date-time', nullable: true })
   submittedAt!: Date | null;
   @ApiProperty({ type: [Object] }) questions!: object[];
+}
+
+export class AssessmentSubmissionDto {
+  @ApiProperty() attemptId!: string;
+  @ApiProperty() status!: string;
+  @ApiProperty() score!: number;
+  @ApiPropertyOptional({ type: Number, nullable: true }) percentage!:
+    number | null;
+  @ApiProperty() totalQuestions!: number;
+  @ApiPropertyOptional({ type: String, format: 'date-time', nullable: true })
+  submittedAt!: Date | null;
 }
 
 export class AdminAssessmentListItemDto {

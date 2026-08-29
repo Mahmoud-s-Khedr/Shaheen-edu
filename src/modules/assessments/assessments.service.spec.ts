@@ -130,7 +130,35 @@ describe('AssessmentsService', () => {
         },
         'PUBLIC',
       ),
-    ).toMatchObject({ attemptStatus: 'NOT_STARTED', score: null });
+    ).toMatchObject({
+      attemptStatus: 'NOT_STARTED',
+      score: null,
+      percentage: null,
+    });
+  });
+
+  it('renders a completed assessment score with its percentage', () => {
+    const { service } = build();
+    expect(
+      (service as any).listItemDto(
+        {
+          id: 'assessment-1',
+          title: 'Assessment',
+          generationType: 'STANDARD',
+          mode: 'EXAM',
+          isTimed: false,
+          durationSeconds: null,
+          questionCount: 1,
+          createdAt: new Date(),
+        },
+        'MINE',
+        {
+          status: AssessmentAttemptStatus.COMPLETED,
+          score: 3,
+          totalPoints: 4,
+        },
+      ),
+    ).toMatchObject({ score: 3, percentage: 75 });
   });
 
   it('filters visible assessments with no attempt as NOT_STARTED', async () => {
@@ -1307,11 +1335,17 @@ describe('AssessmentsService', () => {
         id: 'attempt-1',
         status: AssessmentAttemptStatus.COMPLETED,
         score: 3,
+        totalPoints: 4,
         totalQuestions: 3,
         submittedAt: new Date(),
       });
 
-      await service.submitAttempt(studentUserId, 'a1');
+      await expect(
+        service.submitAttempt(studentUserId, 'a1'),
+      ).resolves.toMatchObject({
+        score: 3,
+        percentage: 75,
+      });
 
       expect(prisma.assessmentAttempt.update).not.toHaveBeenCalled();
     });

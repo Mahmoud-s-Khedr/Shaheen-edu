@@ -17720,7 +17720,14 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssessmentSubmissionDto"
+                }
+              }
+            }
           },
           "401": {
             "description": "",
@@ -30406,6 +30413,10 @@
             "type": "number",
             "nullable": true
           },
+          "percentage": {
+            "type": "number",
+            "nullable": true
+          },
           "questionBankId": {
             "type": "string",
             "nullable": true
@@ -30620,6 +30631,10 @@
             ]
           },
           "score": {
+            "type": "number",
+            "nullable": true
+          },
+          "percentage": {
             "type": "number",
             "nullable": true
           }
@@ -31022,6 +31037,10 @@
             "type": "number",
             "nullable": true
           },
+          "percentage": {
+            "type": "number",
+            "nullable": true
+          },
           "totalQuestions": {
             "type": "number"
           },
@@ -31097,6 +31116,38 @@
           "activeSeconds"
         ]
       },
+      "AssessmentSubmissionDto": {
+        "type": "object",
+        "properties": {
+          "attemptId": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "score": {
+            "type": "number"
+          },
+          "percentage": {
+            "type": "number",
+            "nullable": true
+          },
+          "totalQuestions": {
+            "type": "number"
+          },
+          "submittedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": [
+          "attemptId",
+          "status",
+          "score",
+          "totalQuestions"
+        ]
+      },
       "AssessmentResultDto": {
         "type": "object",
         "properties": {
@@ -31107,6 +31158,9 @@
             "type": "number"
           },
           "totalQuestions": {
+            "type": "number"
+          },
+          "totalPoints": {
             "type": "number"
           },
           "percentage": {
@@ -31146,6 +31200,7 @@
           "attemptId",
           "score",
           "totalQuestions",
+          "totalPoints",
           "percentage",
           "correctCount",
           "incorrectCount",
