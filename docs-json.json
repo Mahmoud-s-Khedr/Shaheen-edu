@@ -10566,7 +10566,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/CatalogNodeDto"
+                  "$ref": "#/components/schemas/StudentCatalogCourseDetailResponseDto"
                 }
               }
             }
@@ -27787,6 +27787,83 @@
         "required": [
           "data",
           "pageInfo"
+        ]
+      },
+      "CourseContentCountsDto": {
+        "type": "object",
+        "properties": {
+          "chapters": {
+            "type": "number"
+          },
+          "lessons": {
+            "type": "number"
+          },
+          "sections": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "chapters",
+          "lessons",
+          "sections"
+        ]
+      },
+      "StudentCatalogCourseDetailResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "sortOrder": {
+            "type": "number"
+          },
+          "coverAssetId": {
+            "type": "string",
+            "nullable": true
+          },
+          "coverAssetName": {
+            "type": "string",
+            "nullable": true
+          },
+          "hasChildren": {
+            "type": "boolean",
+            "description": "Present when child counts were requested."
+          },
+          "access": {
+            "type": "object",
+            "description": "Resolved access for the requesting student."
+          },
+          "isCompleted": {
+            "type": "boolean",
+            "description": "Whether every published descendant content item is complete for this student."
+          },
+          "subject": {
+            "$ref": "#/components/schemas/CatalogNodeDto"
+          },
+          "contentCounts": {
+            "$ref": "#/components/schemas/CourseContentCountsDto"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "slug",
+          "description",
+          "sortOrder",
+          "coverAssetId",
+          "coverAssetName",
+          "subject",
+          "contentCounts"
         ]
       },
       "CursorCatalogNodeResponseDto": {

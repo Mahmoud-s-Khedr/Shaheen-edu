@@ -80,6 +80,14 @@ export class CourseContentCountsDto {
   @ApiProperty() sections!: number;
 }
 
+export class StudentCatalogCourseDetailResponseDto extends CatalogNodeDto {
+  @ApiProperty({ type: CatalogNodeDto })
+  subject!: CatalogNodeDto;
+
+  @ApiProperty({ type: CourseContentCountsDto })
+  contentCounts!: CourseContentCountsDto;
+}
+
 export class AcademicGradeNodeDto {
   @ApiProperty()
   id!: string;

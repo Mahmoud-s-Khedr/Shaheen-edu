@@ -633,6 +633,17 @@ describe('Entitlements and student delivery (e2e)', () => {
       });
       expect(otherGradeCourses.statusCode).toBe(404);
 
+      const courseDetail = await app.inject({
+        method: 'GET',
+        url: `/api/v1/student/catalog/courses/${paidCourseId}`,
+        headers,
+      });
+      expect(courseDetail.statusCode).toBe(200);
+      expect(json(courseDetail)).toMatchObject({
+        id: paidCourseId,
+        contentCounts: { chapters: 3, lessons: 2, sections: 2 },
+      });
+
       expect(
         (await grant({ studentUserId: student.user.id, chapterId: chapterAId }))
           .statusCode,

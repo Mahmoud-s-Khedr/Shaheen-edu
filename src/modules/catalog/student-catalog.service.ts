@@ -450,9 +450,19 @@ export class StudentCatalogService {
       },
     });
     if (!course) throw new NotFoundException('Published course not found');
-    const grants = await this.activeGrants(studentUserId);
-    const completions = await this.completion.containers(studentUserId, [
-      { id: course.id, type: 'course' },
+    const [grants, completions, chapters, lessons, sections] = await Promise.all([
+      this.activeGrants(studentUserId),
+      this.completion.containers(studentUserId, [{ id: course.id, type: 'course' }]),
+      this.prisma.chapter.count({ where: { courseId: course.id, status: published } }),
+      this.prisma.lesson.count({
+        where: { status: published, chapter: { courseId: course.id, status: published } },
+      }),
+      this.prisma.section.count({
+        where: {
+          status: published,
+          lesson: { status: published, chapter: { courseId: course.id, status: published } },
+        },
+      }),
     ]);
     return {
       ...this.withCompletion(
@@ -464,6 +474,7 @@ export class StudentCatalogService {
         completions,
       ),
       subject: this.node(course.subject),
+      contentCounts: { chapters, lessons, sections },
     };
   }
 

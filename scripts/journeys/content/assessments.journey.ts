@@ -1101,18 +1101,21 @@ export const assessmentsJourney: JourneyDefinition = {
           }),
           'Every submitted written response must retain a completed grade or a retryable failed AI run',
         );
+        // Always exercise the moderation queue. AI success is nondeterministic
+        // on a live environment, so keeping this request inside the retry-only
+        // branch leaves both admin grading operations uncovered on healthy runs.
+        const pending = await admin.request<any>(
+          'GET',
+          '/admin/assessments/grading/pending',
+        );
+        expectStatus(pending, 200);
+        const pendingAnswer = pending.body.find(
+          (answer: any) => answer.assessmentQuestionId === longSnapshot.id,
+        );
         if (longResult?.outcome === 'PENDING_AI_GRADING') {
           assert(
             result.body.pendingAiGradingCount >= 1,
             'Failed AI grading must remain retryable',
-          );
-          const pending = await admin.request<any>(
-            'GET',
-            '/admin/assessments/grading/pending',
-          );
-          expectStatus(pending, 200);
-          const pendingAnswer = pending.body.find(
-            (answer: any) => answer.assessmentQuestionId === longSnapshot.id,
           );
           assert(
             pendingAnswer?.gradingRubric === undefined &&
@@ -1134,6 +1137,16 @@ export const assessmentsJourney: JourneyDefinition = {
               longResult?.aiGrading?.status === 'COMPLETED' &&
               typeof longResult?.graderFeedback === 'string',
             'Configured AI grading must return a scored long answer with feedback',
+          );
+          // There is no completed-answer admin list, but this assessment
+          // question ID cannot be an answer ID. Verify the retry route's
+          // documented not-found behavior when no retryable answer exists.
+          expectStatus(
+            await admin.request<any>(
+              'POST',
+              `/admin/assessments/grading/answers/${longSnapshot.id}/retry-ai`,
+            ),
+            404,
           );
         }
       },

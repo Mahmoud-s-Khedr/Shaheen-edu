@@ -1,13 +1,13 @@
 import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
-  CatalogNodeDto,
   CursorCatalogContentItemResponseDto,
   CursorCatalogNodeResponseDto,
   PaginatedCatalogNodeResponseDto,
   PaginatedMySubjectsResponseDto,
   PaginatedStudentEntitlementResponseDto,
   PaginatedStudentLibraryResponseDto,
+  StudentCatalogCourseDetailResponseDto,
   StudentCatalogSearchResponseDto,
   StudentCatalogSummaryResponseDto,
 } from './dto/student-catalog-response.dto';
@@ -72,7 +72,7 @@ export class StudentCatalogController {
 
   @Get('catalog/courses/:courseId')
   @ApiOperation({ summary: 'Get a grade-scoped course' })
-  @ApiOkResponse({ type: CatalogNodeDto })
+  @ApiOkResponse({ type: StudentCatalogCourseDetailResponseDto })
   course(
     @CurrentUser() user: RequestUser,
     @Param('courseId') courseId: string,
