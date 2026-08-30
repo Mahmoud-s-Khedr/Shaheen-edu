@@ -161,7 +161,9 @@ describe('Assessments (e2e)', () => {
 
     const current = await app.inject({ method: 'GET', url: `/api/v1/student/assessments/${studentAssessmentId}/attempts/current`, headers: { authorization: `Bearer ${student1.accessToken}` } });
     expect(current.statusCode).toBe(200);
-    expect(JSON.parse(current.body).questions.find((q: any) => q.id === firstQuestion.id).answered).toBe(true);
+    const currentState = JSON.parse(current.body);
+    expect(currentState.subjectId).toBe(subjectId);
+    expect(currentState.questions.find((q: any) => q.id === firstQuestion.id).answered).toBe(true);
 
     const activeTime = await app.inject({
       method: 'PATCH',

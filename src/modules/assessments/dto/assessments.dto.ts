@@ -544,6 +544,7 @@ export class AssessmentAttemptQuestionDto {
 
 export class AssessmentAttemptStateDto {
   @ApiProperty() attemptId!: string;
+  @ApiProperty() subjectId!: string;
   @ApiProperty() status!: string;
   @ApiProperty({ type: String, format: 'date-time' }) startedAt!: Date;
   @ApiPropertyOptional({ type: String, format: 'date-time', nullable: true })

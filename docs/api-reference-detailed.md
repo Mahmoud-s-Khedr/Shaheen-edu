@@ -704,6 +704,7 @@ No path, query, or header input beyond `id`.
 ```json
 {
   "attemptId": "string",
+  "subjectId": "string",
   "status": "string",
   "startedAt": "ISO-8601 date-time",
   "expiresAt?": "ISO-8601 date-time | null",
@@ -747,6 +748,7 @@ No path, query, or header input beyond `id`.
 ```json
 {
   "attemptId": "string",
+  "subjectId": "string",
   "status": "string",
   "startedAt": "ISO-8601 date-time",
   "expiresAt?": "ISO-8601 date-time | null",

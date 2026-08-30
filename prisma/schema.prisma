@@ -776,6 +776,7 @@ model Subject {
 
   courses       Course[]
   questionBanks QuestionBank[]
+  assessments   Assessment[]
   constants     SubjectConstant[]
   coverAsset    Asset?            @relation("SubjectCover", fields: [coverAssetId], references: [id], onDelete: Restrict)
   coverAssetId  String?
@@ -1740,6 +1741,8 @@ model QuestionPlacement {
 /// of its AssessmentScope targets.
 model Assessment {
   id               String              @id @default(cuid())
+  subjectId        String
+  subject          Subject             @relation(fields: [subjectId], references: [id], onDelete: Restrict)
   ownerType        AssessmentOwnerType
   studentUserId    String?
   student          StudentProfile?     @relation(fields: [studentUserId], references: [userId], onDelete: Cascade)
@@ -1771,6 +1774,7 @@ model Assessment {
 
   @@index([ownerType, studentUserId, status, createdAt, id])
   @@index([ownerType, createdByAdminId, status, createdAt, id])
+  @@index([subjectId, status, createdAt, id])
   @@index([status, createdAt, id])
   @@index([questionBankId])
 }

@@ -488,6 +488,33 @@ describe('AssessmentsService', () => {
       };
     }
 
+    it('rejects an assessment whose selected questions span subjects', async () => {
+      const { service, prisma } = build();
+      prisma.course.findUnique.mockResolvedValue({ subjectId: 'subject-1' });
+
+      await expect(
+        (service as any).inferAssessmentSubjectId(
+          [{ courseId: 'course-1' }],
+          [
+            { course: { subject: { id: 'subject-1' } } },
+            { course: { subject: { id: 'subject-2' } } },
+          ],
+        ),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('rejects an assessment scope outside the selected questions subject', async () => {
+      const { service, prisma } = build();
+      prisma.course.findUnique.mockResolvedValue({ subjectId: 'subject-2' });
+
+      await expect(
+        (service as any).inferAssessmentSubjectId(
+          [{ courseId: 'course-2' }],
+          [{ course: { subject: { id: 'subject-1' } } }],
+        ),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
     it('rejects generation when fewer eligible questions exist than requested', async () => {
       const { service, prisma } = build();
       prisma.course.findUnique.mockResolvedValue({
@@ -588,6 +615,7 @@ describe('AssessmentsService', () => {
       prisma.course.findUnique.mockResolvedValue({
         id: 'c1',
         status: ContentStatus.PUBLISHED,
+        subjectId: 'subject-1',
       });
       prisma.question.findMany.mockResolvedValue([
         question('q1'),

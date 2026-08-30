@@ -31016,6 +31016,9 @@
           "attemptId": {
             "type": "string"
           },
+          "subjectId": {
+            "type": "string"
+          },
           "status": {
             "type": "string"
           },
@@ -31059,6 +31062,7 @@
         },
         "required": [
           "attemptId",
+          "subjectId",
           "status",
           "startedAt",
           "totalQuestions",

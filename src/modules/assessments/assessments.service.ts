@@ -517,6 +517,72 @@ export class AssessmentsService {
     return `${label} - ${new Date().toISOString().slice(0, 16).replace('T', ' ')}`;
   }
 
+  private async scopeSubjectId(scope: ScopeRow) {
+    const node: any = scope.courseId
+      ? await this.prisma.course.findUnique({
+          where: { id: scope.courseId },
+          select: { subjectId: true },
+        })
+      : scope.chapterId
+        ? await this.prisma.chapter.findUnique({
+            where: { id: scope.chapterId },
+            select: { course: { select: { subjectId: true } } },
+          })
+        : scope.lessonId
+          ? await this.prisma.lesson.findUnique({
+              where: { id: scope.lessonId },
+              select: {
+                chapter: {
+                  select: { course: { select: { subjectId: true } } },
+                },
+              },
+            })
+          : await this.prisma.section.findUnique({
+              where: { id: scope.sectionId! },
+              select: {
+                lesson: {
+                  select: {
+                    chapter: {
+                      select: { course: { select: { subjectId: true } } },
+                    },
+                  },
+                },
+              },
+            });
+    const subjectId =
+      node?.subjectId ??
+      node?.course?.subjectId ??
+      node?.chapter?.course?.subjectId ??
+      node?.lesson?.chapter?.course?.subjectId;
+    if (!subjectId)
+      throw new BadRequestException('Scope subject cannot be resolved');
+    return subjectId;
+  }
+
+  private async inferAssessmentSubjectId(scopes: ScopeRow[], questions: any[]) {
+    const questionSubjectIds = new Set(
+      questions
+        .map(
+          (question) =>
+            question.course?.subject?.id ?? question.course?.subjectId,
+        )
+        .filter(Boolean),
+    );
+    if (questionSubjectIds.size !== 1)
+      throw new BadRequestException(
+        'All assessment questions must belong to the same subject',
+      );
+    const subjectId = [...questionSubjectIds][0] as string;
+    const scopeSubjectIds = await Promise.all(
+      scopes.map((scope) => this.scopeSubjectId(scope)),
+    );
+    if (scopeSubjectIds.some((scopeSubjectId) => scopeSubjectId !== subjectId))
+      throw new BadRequestException(
+        'All assessment scopes must belong to the assessment subject',
+      );
+    return subjectId;
+  }
+
   private async freezeSnapshot(
     tx: any,
     params: {
@@ -536,8 +602,13 @@ export class AssessmentsService {
       generationFilters?: object;
     },
   ) {
+    const subjectId = await this.inferAssessmentSubjectId(
+      params.scopes,
+      params.questions,
+    );
     const assessment = await tx.assessment.create({
       data: {
+        subjectId,
         ownerType: params.ownerType,
         studentUserId: params.studentUserId,
         createdByAdminId: params.createdByAdminId,
@@ -2437,6 +2508,7 @@ export class AssessmentsService {
     const revealAnswers = current.status === AssessmentAttemptStatus.COMPLETED;
     return {
       attemptId: current.id,
+      subjectId: assessment.subjectId,
       status: current.status,
       startedAt: current.startedAt,
       expiresAt: current.expiresAt,
