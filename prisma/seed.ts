@@ -4,6 +4,54 @@ import * as argon2 from 'argon2';
 
 const prisma = new PrismaClient();
 
+interface RefundPolicySeed {
+  eligibilityWindowDays: number;
+  maximumConsumptionBps: number;
+}
+
+function requiredProductionInteger(
+  name: string,
+  minimum: number,
+  maximum: number,
+): number {
+  const raw = process.env[name];
+  if (!raw || !/^\d+$/.test(raw)) {
+    throw new Error(
+      `FATAL: ${name} must be an integer between ${minimum} and ${maximum} for production bootstrap.`,
+    );
+  }
+  const value = Number(raw);
+  if (value < minimum || value > maximum) {
+    throw new Error(
+      `FATAL: ${name} must be an integer between ${minimum} and ${maximum} for production bootstrap.`,
+    );
+  }
+  return value;
+}
+
+function refundPolicySeed(): RefundPolicySeed {
+  if (process.env.NODE_ENV !== 'production') {
+    return { eligibilityWindowDays: 7, maximumConsumptionBps: 1_000 };
+  }
+  if (process.env.ALLOW_PRODUCTION_BOOTSTRAP !== 'true') {
+    throw new Error(
+      'FATAL: refusing to seed production. Set ALLOW_PRODUCTION_BOOTSTRAP=true for the one-off bootstrap job.',
+    );
+  }
+  return {
+    eligibilityWindowDays: requiredProductionInteger(
+      'INITIAL_REFUND_ELIGIBILITY_WINDOW_DAYS',
+      1,
+      365,
+    ),
+    maximumConsumptionBps: requiredProductionInteger(
+      'INITIAL_REFUND_MAXIMUM_CONSUMPTION_BPS',
+      1,
+      10_000,
+    ),
+  };
+}
+
 async function main() {
   const rawEmail = process.env.SUPER_ADMIN_EMAIL;
   const rawPassword = process.env.SUPER_ADMIN_PASSWORD;
@@ -21,6 +69,7 @@ async function main() {
     process.exit(1);
   }
 
+  const policySeed = refundPolicySeed();
   const loginIdentifier = rawEmail.trim().toLowerCase();
 
   const existing = await prisma.user.findUnique({ where: { loginIdentifier } });
@@ -32,9 +81,17 @@ async function main() {
       );
       process.exit(1);
     }
-    const policy = await prisma.refundPolicy.findFirst({ where: { isActive: true } });
-    if (!policy) await prisma.refundPolicy.create({ data: { version: 1, eligibilityWindowDays: 7, maximumConsumptionBps: 1_000, updatedById: existing.id } });
-    console.log('Super admin already exists; ensured development refund policy.');
+    const policy = await prisma.refundPolicy.findFirst({
+      where: { isActive: true },
+    });
+    if (!policy) {
+      await prisma.refundPolicy.create({
+        data: { version: 1, ...policySeed, updatedById: existing.id },
+      });
+    }
+    console.log(
+      'Super admin already exists; ensured the configured refund policy.',
+    );
     return;
   }
 
@@ -54,7 +111,9 @@ async function main() {
         passwordHash,
       },
     });
-    await tx.refundPolicy.create({ data: { version: 1, eligibilityWindowDays: 7, maximumConsumptionBps: 1_000, updatedById: created.id } });
+    await tx.refundPolicy.create({
+      data: { version: 1, ...policySeed, updatedById: created.id },
+    });
     await tx.adminAuditLog.create({
       data: {
         actorUserId: created.id,

@@ -9,6 +9,8 @@ import { LoggerModule } from './common/logging/logger.module';
 import { DatabaseModule } from './database/database.module';
 import { SearchModule } from './common/search/search.module';
 import { RedisModule } from './redis/redis.module';
+import { RedisService } from './redis/redis.service';
+import { RedisThrottlerStorage } from './common/throttling/redis-throttler.storage';
 import { HealthModule } from './health/health.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
@@ -61,11 +63,15 @@ import { normalizeCorrelationId } from './common/logging/correlation-id';
       },
     }),
     ThrottlerModule.forRootAsync({
-      imports: [ConfigModule],
-      inject: [ConfigService],
-      useFactory: (configService: ConfigService<AppConfig, true>) => {
+      imports: [ConfigModule, RedisModule],
+      inject: [ConfigService, RedisService],
+      useFactory: (
+        configService: ConfigService<AppConfig, true>,
+        redis: RedisService,
+      ) => {
         const rateLimit = configService.get('rateLimit', { infer: true });
         return {
+          storage: new RedisThrottlerStorage(redis.client),
           throttlers: [
             {
               ttl: rateLimit.global.windowSeconds * 1000,
@@ -116,8 +122,7 @@ import { normalizeCorrelationId } from './common/logging/correlation-id';
   providers: [
     // Global deny-by-default auth guard - @Public() opts a route out.
     { provide: APP_GUARD, useClass: UserAuthGuard },
-    // Generic per-route in-memory rate limiting (separate from the
-    // Redis-backed AuthRateLimitService used for login lockout/backoff).
+    // Generic per-route rate limiting shares Redis state across API replicas.
     { provide: APP_GUARD, useClass: ThrottlerGuard },
   ],
 })

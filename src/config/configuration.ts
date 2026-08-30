@@ -2,6 +2,7 @@ export interface AppConfig {
   nodeEnv: string;
   port: number;
   host: string;
+  workerHealthPort: number;
   trustProxyHops: number;
   corsOrigins: string[];
   cookieSecure: boolean;
@@ -113,6 +114,7 @@ export default (): AppConfig => ({
   nodeEnv: process.env.NODE_ENV ?? 'development',
   port: parseInt(process.env.PORT ?? '3000', 10),
   host: process.env.HOST ?? '0.0.0.0',
+  workerHealthPort: parseInt(process.env.WORKER_HEALTH_PORT ?? '3001', 10),
   trustProxyHops: envInteger('TRUST_PROXY_HOPS', 0),
   corsOrigins: (process.env.CORS_ORIGINS ?? '')
     .split(',')
@@ -264,7 +266,10 @@ export default (): AppConfig => ({
       .split(',')
       .map((value) => value.trim())
       .filter(Boolean),
-    referralPartnerMinimumCohort: envInteger('REFERRAL_PARTNER_MINIMUM_COHORT', 5),
+    referralPartnerMinimumCohort: envInteger(
+      'REFERRAL_PARTNER_MINIMUM_COHORT',
+      5,
+    ),
   },
   commerce: {
     paymobBaseUrl: process.env.PAYMOB_BASE_URL ?? 'https://accept.paymob.com',

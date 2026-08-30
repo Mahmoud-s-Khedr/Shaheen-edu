@@ -18,6 +18,16 @@ ENV NODE_ENV=development
 EXPOSE 3000
 CMD ["sh", "-c", "pnpm prisma migrate deploy && pnpm prisma:seed && node dist/main"]
 
+# One-shot production migration/bootstrap jobs need the Prisma CLI, but the
+# long-running API and worker images must retain production dependencies only.
+FROM build AS migration
+ENV NODE_ENV=production
+USER node
+# Cache the package-manager version pinned in package.json for the same
+# non-root user that executes migrations and the production bootstrap job.
+RUN corepack install
+CMD ["pnpm", "prisma", "migrate", "deploy"]
+
 FROM node:24-alpine AS runtime
 WORKDIR /app
 ENV NODE_ENV=production

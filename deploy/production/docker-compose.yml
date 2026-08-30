@@ -1,7 +1,7 @@
-name: shaheen-edu-test
+name: shaheen-edu-production
 
-# Shared frontend-integration environment. Only nginx publishes host ports;
-# PostgreSQL, Redis, and the API stay on this Compose network.
+# Single-host production baseline. Keep PostgreSQL, Redis, the API, and the
+# worker private to this Compose network; only nginx publishes 80/443.
 services:
   postgres:
     image: postgres:16-alpine
@@ -22,11 +22,22 @@ services:
   redis:
     image: redis:7-alpine
     restart: unless-stopped
-    command: ['redis-server', '--appendonly', 'yes']
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?set REDIS_PASSWORD in .env}
+    command:
+      [
+        'sh',
+        '-c',
+        'redis-server --appendonly yes --requirepass "$${REDIS_PASSWORD}"',
+      ]
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ['CMD', 'redis-cli', 'ping']
+      test:
+        [
+          'CMD-SHELL',
+          'redis-cli --no-auth-warning -a "$${REDIS_PASSWORD}" ping',
+        ]
       interval: 5s
       timeout: 5s
       retries: 20
@@ -34,16 +45,33 @@ services:
   migrate:
     build:
       context: ../..
-      target: development
+      target: migration
     env_file: .env
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
-      REDIS_URL: redis://redis:6379/0
-    command: ['sh', '-c', 'pnpm prisma migrate deploy && pnpm prisma:seed']
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
     restart: 'no'
     depends_on:
       postgres:
         condition: service_healthy
+
+  # This profile is deliberately separate from migrations. Run it only once
+  # for a new database after setting the explicit bootstrap acknowledgement and
+  # approved initial refund policy in the environment.
+  bootstrap:
+    profiles: ['bootstrap']
+    build:
+      context: ../..
+      target: migration
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+    command: ['pnpm', 'prisma:seed']
+    restart: 'no'
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
 
   api:
     build:
@@ -53,11 +81,8 @@ services:
     env_file: .env
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
-      REDIS_URL: redis://redis:6379/0
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
       TRUST_PROXY_HOPS: 1
-      # Bootstrap credentials belong only to the one-shot migrate/seed job.
-      SUPER_ADMIN_EMAIL: ''
-      SUPER_ADMIN_PASSWORD: ''
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -68,11 +93,12 @@ services:
         - CMD-SHELL
         - >-
           node -e "fetch('http://127.0.0.1:3000/health/ready').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
-      interval: 5s
+      interval: 10s
       timeout: 5s
-      retries: 20
+      retries: 6
+      start_period: 20s
 
-  ai-question-import-worker:
+  worker:
     build:
       context: ../..
       target: runtime
@@ -80,9 +106,7 @@ services:
     env_file: .env
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
-      REDIS_URL: redis://redis:6379/0
-      SUPER_ADMIN_EMAIL: ''
-      SUPER_ADMIN_PASSWORD: ''
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
     command: ['node', 'dist/worker']
     depends_on:
       migrate:
@@ -97,6 +121,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 6
+      start_period: 30s
 
   nginx:
     image: nginx:1.27-alpine

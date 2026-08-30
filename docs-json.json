@@ -2522,6 +2522,7 @@
             "bearer": []
           }
         ],
+        "summary": "List audited Student 360 order records",
         "tags": [
           "admin/students"
         ]
@@ -2583,6 +2584,7 @@
             "bearer": []
           }
         ],
+        "summary": "List audited Student 360 entitlement records",
         "tags": [
           "admin/students"
         ]
@@ -2644,6 +2646,7 @@
             "bearer": []
           }
         ],
+        "summary": "List audited Student 360 assessment records",
         "tags": [
           "admin/students"
         ]
@@ -2705,6 +2708,7 @@
             "bearer": []
           }
         ],
+        "summary": "List audited Student 360 administrative events",
         "tags": [
           "admin/students"
         ]
@@ -20174,6 +20178,7 @@
             "bearer": []
           }
         ],
+        "summary": "Activate a referral program",
         "tags": [
           "admin/referral-programs"
         ]
@@ -20202,6 +20207,7 @@
             "bearer": []
           }
         ],
+        "summary": "Suspend a referral program",
         "tags": [
           "admin/referral-programs"
         ]
@@ -20230,6 +20236,7 @@
             "bearer": []
           }
         ],
+        "summary": "Resume a referral program",
         "tags": [
           "admin/referral-programs"
         ]
@@ -20258,6 +20265,7 @@
             "bearer": []
           }
         ],
+        "summary": "End a referral program",
         "tags": [
           "admin/referral-programs"
         ]
@@ -20296,6 +20304,7 @@
             "bearer": []
           }
         ],
+        "summary": "Create a referral code",
         "tags": [
           "admin/referral-programs"
         ]
@@ -20334,6 +20343,7 @@
             "bearer": []
           }
         ],
+        "summary": "Update a referral code",
         "tags": [
           "admin/referral-programs"
         ]
@@ -20362,6 +20372,7 @@
             "bearer": []
           }
         ],
+        "summary": "Suspend a referral code",
         "tags": [
           "admin/referral-programs"
         ]
@@ -20390,6 +20401,7 @@
             "bearer": []
           }
         ],
+        "summary": "Resume a referral code",
         "tags": [
           "admin/referral-programs"
         ]
@@ -20428,6 +20440,7 @@
             "bearer": []
           }
         ],
+        "summary": "Create a referral commission rule",
         "tags": [
           "admin/referral-programs"
         ]
@@ -20464,6 +20477,7 @@
             "bearer": []
           }
         ],
+        "summary": "Activate a referral commission rule",
         "tags": [
           "admin/referral-programs"
         ]
@@ -20502,6 +20516,7 @@
             "bearer": []
           }
         ],
+        "summary": "Create a referral review rule",
         "tags": [
           "admin/referral-programs"
         ]
@@ -20540,6 +20555,7 @@
             "bearer": []
           }
         ],
+        "summary": "Update a referral review rule",
         "tags": [
           "admin/referral-programs"
         ]
@@ -20613,6 +20629,7 @@
             "bearer": []
           }
         ],
+        "summary": "List referral review flags",
         "tags": [
           "admin/referral-programs"
         ]
@@ -20651,6 +20668,7 @@
             "bearer": []
           }
         ],
+        "summary": "Create a manual referral review flag",
         "tags": [
           "admin/referral-programs"
         ]
@@ -20689,6 +20707,7 @@
             "bearer": []
           }
         ],
+        "summary": "Assign a referral review flag",
         "tags": [
           "admin/referral-programs"
         ]
@@ -20727,6 +20746,7 @@
             "bearer": []
           }
         ],
+        "summary": "Add a referral review note",
         "tags": [
           "admin/referral-programs"
         ]
@@ -20765,6 +20785,7 @@
             "bearer": []
           }
         ],
+        "summary": "Resolve a referral review flag",
         "tags": [
           "admin/referral-programs"
         ]
@@ -22877,6 +22898,7 @@
             "bearer": []
           }
         ],
+        "summary": "List secure report export jobs",
         "tags": [
           "admin/reports"
         ]
@@ -22905,6 +22927,7 @@
             "bearer": []
           }
         ],
+        "summary": "Get a secure report export download URL",
         "tags": [
           "admin/reports"
         ]
@@ -22933,6 +22956,7 @@
             "bearer": []
           }
         ],
+        "summary": "Cancel a queued or running report export",
         "tags": [
           "admin/reports"
         ]

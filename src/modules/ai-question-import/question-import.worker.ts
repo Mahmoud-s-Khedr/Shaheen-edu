@@ -44,6 +44,7 @@ import {
 export class QuestionImportWorker {
   private readonly logger = new Logger(QuestionImportWorker.name);
   private workers: Worker[] = [];
+  private ready = false;
   private readonly config: AppConfig['ai'];
   private readonly redisUrl: string;
   private readonly processingLeaseMs: number;
@@ -72,7 +73,7 @@ export class QuestionImportWorker {
         this.config.pdfTranscriptionTimeoutMs * 3,
       ) + 60_000;
   }
-  start() {
+  async start(): Promise<void> {
     if (!this.config.openRouterApiKey || !this.config.questionImportModel)
       throw new Error(
         'AI question import worker requires OPENROUTER_API_KEY and AI_QUESTION_IMPORT_MODEL',
@@ -109,17 +110,25 @@ export class QuestionImportWorker {
       ),
     ];
     for (const worker of this.workers) {
-      worker.on('error', (error) =>
-        this.logger.error(
-          `BullMQ worker ${worker.name} error: ${error.message}`,
-          error.stack,
-        ),
-      );
+      worker.on('error', (error) => this.markUnhealthy(worker.name, error));
     }
+    await Promise.all(this.workers.map((worker) => worker.waitUntilReady()));
+    this.ready = true;
+  }
+  isHealthy(): boolean {
+    return this.ready;
   }
   async stop() {
+    this.ready = false;
     await Promise.all(this.workers.map((worker) => worker.close()));
     this.workers = [];
+  }
+  private markUnhealthy(workerName: string, error: Error) {
+    this.ready = false;
+    this.logger.error(
+      `BullMQ worker ${workerName} error: ${error.message}`,
+      error.stack,
+    );
   }
   private async process(batchId: string) {
     const batch: any = await this.prisma.questionImportBatch.findUnique({

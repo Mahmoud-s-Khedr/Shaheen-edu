@@ -6,6 +6,7 @@ export const envValidationSchema = Joi.object({
     .default('development'),
   PORT: Joi.number().port().default(3000),
   HOST: Joi.string().default('0.0.0.0'),
+  WORKER_HEALTH_PORT: Joi.number().port().default(3001),
   TRUST_PROXY_HOPS: Joi.number().integer().min(0).max(10).default(0),
 
   DATABASE_URL: Joi.string().uri().required(),
@@ -130,7 +131,11 @@ export const envValidationSchema = Joi.object({
   PRIVACY_REQUIRE_SENSITIVE_360_REASON: Joi.boolean().default(true),
   PRIVACY_REQUIRE_PRIVILEGED_EXPORT_REASON: Joi.boolean().default(true),
   PRIVACY_SUPPORT_REASON_ALLOWLIST: Joi.string().allow('').default(''),
-  REFERRAL_PARTNER_MINIMUM_COHORT: Joi.number().integer().min(2).max(100).default(5),
+  REFERRAL_PARTNER_MINIMUM_COHORT: Joi.number()
+    .integer()
+    .min(2)
+    .max(100)
+    .default(5),
   PAYMOB_BASE_URL: Joi.string().uri().default('https://accept.paymob.com'),
   PAYMOB_SECRET_KEY: Joi.string().allow('').optional(),
   PAYMOB_PUBLIC_KEY: Joi.string().allow('').optional(),

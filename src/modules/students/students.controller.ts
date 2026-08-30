@@ -103,15 +103,22 @@ export class AdminStudentsController {
   }
 
   @Get(':id/360/orders')
+  @ApiOperation({ summary: 'List audited Student 360 order records' })
   orders(
     @CurrentUser() actor: RequestUser,
     @Param('id') id: string,
     @Query() query: Student360PaginationQueryDto,
   ) {
-    return this.studentsService.student360Orders(actor, id, query, query.reason);
+    return this.studentsService.student360Orders(
+      actor,
+      id,
+      query,
+      query.reason,
+    );
   }
 
   @Get(':id/360/entitlements')
+  @ApiOperation({ summary: 'List audited Student 360 entitlement records' })
   entitlements(
     @CurrentUser() actor: RequestUser,
     @Param('id') id: string,
@@ -126,21 +133,33 @@ export class AdminStudentsController {
   }
 
   @Get(':id/360/assessments')
+  @ApiOperation({ summary: 'List audited Student 360 assessment records' })
   assessments(
     @CurrentUser() actor: RequestUser,
     @Param('id') id: string,
     @Query() query: Student360PaginationQueryDto,
   ) {
-    return this.studentsService.student360Assessments(actor, id, query, query.reason);
+    return this.studentsService.student360Assessments(
+      actor,
+      id,
+      query,
+      query.reason,
+    );
   }
 
   @Get(':id/360/audit-events')
+  @ApiOperation({ summary: 'List audited Student 360 administrative events' })
   auditEvents(
     @CurrentUser() actor: RequestUser,
     @Param('id') id: string,
     @Query() query: Student360PaginationQueryDto,
   ) {
-    return this.studentsService.student360AuditEvents(actor, id, query, query.reason);
+    return this.studentsService.student360AuditEvents(
+      actor,
+      id,
+      query,
+      query.reason,
+    );
   }
 
   @Post(':id/suspend')

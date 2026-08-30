@@ -54,6 +54,9 @@ function testEnvironment(
     BUNNY_STREAM_PLAYER_TOKEN_KEY: 'test-player-token-key',
     OPENROUTER_API_KEY: 'test-openrouter-key',
     AI_QUESTION_IMPORT_MODEL: '~google/gemini-flash-latest',
+    // The partner-analytics suite exercises the controlled ledger rollout.
+    FEATURE_PARTNER_LEDGER_ENABLED: 'true',
+    FEATURE_PARTNER_LEDGER_ALLOWED_USER_IDS: '*',
   };
 }
 
