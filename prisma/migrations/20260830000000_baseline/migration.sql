@@ -3895,3 +3895,88 @@ ALTER TABLE "ReportExportJob" ADD CONSTRAINT "ReportExportJob_requestedById_fkey
 
 -- AddForeignKey
 ALTER TABLE "Center" ADD CONSTRAINT "Center_governorateId_fkey" FOREIGN KEY ("governorateId") REFERENCES "Governorate"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- Arabic-aware search. This is intentionally part of the compacted baseline:
+-- application startup and the public/admin list endpoints rely on this SQL
+-- function and the trigram extension. Keep it in sync with
+-- src/common/search/arabic-search.ts.
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+
+CREATE OR REPLACE FUNCTION arabic_normalize(input text)
+RETURNS text
+LANGUAGE sql
+IMMUTABLE
+PARALLEL SAFE
+AS $$
+  SELECT trim(regexp_replace(
+    regexp_replace(
+      translate(lower(normalize(coalesce(input, ''), NFKC)),
+        'أإآىیک٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹ـ',
+        'اااييك01234567890123456789'),
+      '[ً-ٰٟۖ-ۭ]', '', 'g'),
+    '[^[:alnum:]]+', ' ', 'g'));
+$$;
+
+-- Abort migration on a database that cannot correctly normalize Arabic text.
+-- A C/POSIX LC_CTYPE would otherwise produce empty search expressions.
+DO $$
+BEGIN
+  IF arabic_normalize('  إِلـى  یَوم ۱۲٣! ') <> 'الي يوم 123' THEN
+    RAISE EXCEPTION 'arabic_normalize() is misbehaving on this database (got %). Check that the server was initialised with a UTF-8 LC_CTYPE, not C/POSIX.',
+      arabic_normalize('  إِلـى  یَوم ۱۲٣! ');
+  END IF;
+  IF arabic_normalize('ﻣﺪﺭﺳﺔ') <> 'مدرسة' THEN
+    RAISE EXCEPTION 'arabic_normalize() is not applying NFKC (got %).', arabic_normalize('ﻣﺪﺭﺳﺔ');
+  END IF;
+END $$;
+
+-- Trigram indexes support partial/typo search; FTS indexes support token
+-- search. They are created after all baseline tables and constraints exist.
+CREATE INDEX "Subject_search_trgm_idx" ON "Subject" USING gin
+  (arabic_normalize(coalesce(title, '') || ' ' || coalesce(slug, '') || ' ' || coalesce(description, '')) gin_trgm_ops);
+CREATE INDEX "Subject_search_fts_idx" ON "Subject" USING gin
+  (to_tsvector('simple', arabic_normalize(coalesce(title, '') || ' ' || coalesce(slug, '') || ' ' || coalesce(description, ''))));
+CREATE INDEX "AcademicGrade_search_trgm_idx" ON "AcademicGrade" USING gin
+  (arabic_normalize(coalesce("titleAr", '') || ' ' || coalesce("titleEn", '') || ' ' || coalesce(slug, '') || ' ' || coalesce("descriptionAr", '') || ' ' || coalesce("descriptionEn", '')) gin_trgm_ops);
+CREATE INDEX "Course_search_trgm_idx" ON "Course" USING gin
+  (arabic_normalize(coalesce(title, '') || ' ' || coalesce(slug, '') || ' ' || coalesce(description, '')) gin_trgm_ops);
+CREATE INDEX "Course_search_fts_idx" ON "Course" USING gin
+  (to_tsvector('simple', arabic_normalize(coalesce(title, '') || ' ' || coalesce(slug, '') || ' ' || coalesce(description, ''))));
+CREATE INDEX "Chapter_search_trgm_idx" ON "Chapter" USING gin
+  (arabic_normalize(coalesce(title, '') || ' ' || coalesce(slug, '') || ' ' || coalesce(description, '')) gin_trgm_ops);
+CREATE INDEX "Chapter_search_fts_idx" ON "Chapter" USING gin
+  (to_tsvector('simple', arabic_normalize(coalesce(title, '') || ' ' || coalesce(slug, '') || ' ' || coalesce(description, ''))));
+CREATE INDEX "Lesson_search_trgm_idx" ON "Lesson" USING gin
+  (arabic_normalize(coalesce(title, '') || ' ' || coalesce(slug, '') || ' ' || coalesce(description, '')) gin_trgm_ops);
+CREATE INDEX "Lesson_search_fts_idx" ON "Lesson" USING gin
+  (to_tsvector('simple', arabic_normalize(coalesce(title, '') || ' ' || coalesce(slug, '') || ' ' || coalesce(description, ''))));
+CREATE INDEX "Section_search_trgm_idx" ON "Section" USING gin
+  (arabic_normalize(coalesce(title, '') || ' ' || coalesce(slug, '') || ' ' || coalesce(description, '')) gin_trgm_ops);
+CREATE INDEX "Section_search_fts_idx" ON "Section" USING gin
+  (to_tsvector('simple', arabic_normalize(coalesce(title, '') || ' ' || coalesce(slug, '') || ' ' || coalesce(description, ''))));
+CREATE INDEX "ContentItem_search_trgm_idx" ON "ContentItem" USING gin
+  (arabic_normalize(coalesce(title, '') || ' ' || coalesce(description, '') || ' ' || coalesce("textBody", '')) gin_trgm_ops);
+CREATE INDEX "ContentItem_search_fts_idx" ON "ContentItem" USING gin
+  (to_tsvector('simple', arabic_normalize(coalesce(title, '') || ' ' || coalesce(description, '') || ' ' || coalesce("textBody", ''))));
+CREATE INDEX "Question_search_trgm_idx" ON "Question" USING gin
+  (arabic_normalize(coalesce(body, '') || ' ' || coalesce(explanation, '')) gin_trgm_ops);
+CREATE INDEX "Question_search_fts_idx" ON "Question" USING gin
+  (to_tsvector('simple', arabic_normalize(coalesce(body, '') || ' ' || coalesce(explanation, ''))));
+CREATE INDEX "QuestionBank_search_trgm_idx" ON "QuestionBank" USING gin
+  (arabic_normalize(coalesce(title, '') || ' ' || coalesce(description, '')) gin_trgm_ops);
+CREATE INDEX "QuestionSource_search_trgm_idx" ON "QuestionSource" USING gin
+  (arabic_normalize(coalesce("titleAr", '') || ' ' || coalesce("titleEn", '') || ' ' || coalesce("noteAr", '') || ' ' || coalesce("noteEn", '')) gin_trgm_ops);
+CREATE INDEX "Assessment_search_trgm_idx" ON "Assessment" USING gin
+  (arabic_normalize(coalesce(title, '')) gin_trgm_ops);
+CREATE INDEX "User_loginIdentifier_search_trgm_idx" ON "User" USING gin
+  (arabic_normalize(coalesce("loginIdentifier", '')) gin_trgm_ops);
+CREATE INDEX "ManualPaymentMethod_search_trgm_idx" ON "ManualPaymentMethod" USING gin
+  (arabic_normalize(coalesce("titleAr", '') || ' ' || coalesce("titleEn", '') || ' ' || coalesce("instructionsAr", '') || ' ' || coalesce("instructionsEn", '')) gin_trgm_ops);
+CREATE INDEX "Governorate_search_trgm_idx" ON "Governorate" USING gin
+  (arabic_normalize(coalesce("nameAr", '') || ' ' || coalesce("nameEn", '')) gin_trgm_ops);
+CREATE INDEX "Center_search_trgm_idx" ON "Center" USING gin
+  (arabic_normalize(coalesce("nameAr", '') || ' ' || coalesce("nameEn", '')) gin_trgm_ops);
+CREATE INDEX "StudentProfile_search_trgm_idx" ON "StudentProfile" USING gin
+  (arabic_normalize(coalesce("fullName", '')) gin_trgm_ops);
+CREATE INDEX "PartnerProfile_search_trgm_idx" ON "PartnerProfile" USING gin
+  (arabic_normalize(coalesce("displayName", '') || ' ' || coalesce("legalName", '')) gin_trgm_ops);

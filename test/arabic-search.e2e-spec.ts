@@ -107,6 +107,13 @@ describe('Arabic search normalizer (e2e)', () => {
     expect(row.out).toBe('مدرسة');
   });
 
+  it('installs pg_trgm for the catalog fuzzy-search queries', async () => {
+    const [row] = await prisma.$queryRaw<Array<{ score: number }>>`
+      SELECT similarity('اسلاميات', 'اسلامية') AS score
+    `;
+    expect(row.score).toBeGreaterThan(0);
+  });
+
   it('creates every expression index the search helpers rely on', async () => {
     const rows = await prisma.$queryRaw<Array<{ indexname: string }>>`
       SELECT indexname FROM pg_indexes WHERE indexname LIKE '%_search_%_idx'

@@ -5,8 +5,10 @@ This is the supported single-host production baseline. It is separate from
 
 ## Before first launch
 
-1. Store a completed `deploy/production/.env` in the production secret manager,
-   set its filesystem mode to `0600`, and never commit it.
+1. Copy [`deploy/production/.env.example`](../deploy/production/.env.example)
+   to a completed `deploy/production/.env` in the production secret manager,
+   set its filesystem mode to `0600`, and never commit it. Use fresh random
+   values for every secret; the template is deliberately not usable as-is.
    Set `RELEASE_REVISION` to the immutable commit or image revision being
    deployed, and set `REDIS_MAXMEMORY` to a reviewed value below the VM memory
    budget (for the 4-GB baseline, start at `768mb` and tune from metrics).
@@ -88,6 +90,11 @@ Local log investigation is documented in
 [production-observability-and-backup-plan.md](production-observability-and-backup-plan.md).
 This launch baseline does not include dashboards, automatic alerting, or
 external uptime monitoring.
+
+Before the first real deployment, complete the same steps against a disposable
+VPS and dedicated staging provider credentials using the
+[test-VPS production rehearsal](test-vps-production-rehearsal.md). Do not
+promote the test database, secrets, certificates, or backups afterward.
 
 ## Bunny PostgreSQL backup installation
 

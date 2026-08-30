@@ -4,7 +4,7 @@ import {
   NestFastifyApplication,
 } from '@nestjs/platform-fastify';
 import { ConfigService } from '@nestjs/config';
-import { Logger as PinoLogger } from 'nestjs-pino';
+import { Logger as PinoNestLogger, PinoLogger } from 'nestjs-pino';
 import {
   BadRequestException,
   RequestMethod,
@@ -62,7 +62,7 @@ export async function createApp(
   const configService = app.get(ConfigService<AppConfig, true>);
 
   if (options.enableLogging !== false) {
-    app.useLogger(app.get(PinoLogger));
+    app.useLogger(app.get(PinoNestLogger));
   }
 
   const cookieSecret: string = configService.get('cookieSecret', {
@@ -101,7 +101,12 @@ export async function createApp(
         }),
     }),
   );
-  app.useGlobalFilters(new GlobalExceptionFilter(app.get(PinoLogger)));
+  // PinoLogger is transient-scoped, so resolving it is required. The Nest
+  // Logger wrapper used by app.useLogger() exposes `log`, not `info`; passing
+  // it to this filter turned ordinary 4xx responses into 500s while logging.
+  app.useGlobalFilters(
+    new GlobalExceptionFilter(await app.resolve(PinoLogger)),
+  );
   app.enableCors({
     origin: configService.get('corsOrigins', { infer: true }),
     credentials: true,
