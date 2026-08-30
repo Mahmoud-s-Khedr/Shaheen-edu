@@ -39,7 +39,9 @@ This is the supported single-host production baseline. It is separate from
    set `ALLOW_PRODUCTION_BOOTSTRAP=true` and the two approved
    `INITIAL_REFUND_*` values, then run
    `docker compose --profile bootstrap run --rm bootstrap`. Reset the
-   acknowledgement to `false` immediately afterwards.
+   acknowledgement to `false` immediately afterwards. This creates the super
+   admin, initial refund policy, and the 27 Egyptian governorates with their
+   396 city records.
    Normal releases run migrations only and never seed financial data.
 5. Verify `https://<API_DOMAIN>/health/ready`, the worker health status, signed
    Bunny upload/playback webhook flow, Paymob callback HMAC flow, and the full

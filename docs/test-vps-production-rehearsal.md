@@ -66,8 +66,9 @@ docker compose build migrate api worker
 docker compose --profile migration run --rm migrate
 ```
 
-For this new, empty database only, bootstrap the test administrator and refund
-policy. Temporarily set `ALLOW_PRODUCTION_BOOTSTRAP=true` in `.env`, run the
+For this new, empty database only, bootstrap the test administrator, refund
+policy, and Egyptian governorates/cities. Temporarily set
+`ALLOW_PRODUCTION_BOOTSTRAP=true` in `.env`, run the
 profile once, then change it back to `false` before continuing.
 
 ```sh

@@ -1,12 +1,44 @@
-/* eslint-disable no-console */
 import { PrismaClient, Role, AccountStatus } from '@prisma/client';
 import * as argon2 from 'argon2';
+import { EGYPT_GOVERNORATES } from './egypt-geography';
 
 const prisma = new PrismaClient();
 
 interface RefundPolicySeed {
   eligibilityWindowDays: number;
   maximumConsumptionBps: number;
+}
+
+type GeographyClient = Pick<PrismaClient, 'governorate' | 'center'>;
+
+async function seedEgyptGeography(client: GeographyClient): Promise<void> {
+  await client.governorate.createMany({
+    data: EGYPT_GOVERNORATES.map(({ nameAr, nameEn }) => ({ nameAr, nameEn })),
+    skipDuplicates: true,
+  });
+
+  const governorates = await client.governorate.findMany({
+    where: { nameAr: { in: EGYPT_GOVERNORATES.map(({ nameAr }) => nameAr) } },
+    select: { id: true, nameAr: true },
+  });
+  const governorateIdsByName = new Map(
+    governorates.map((governorate) => [governorate.nameAr, governorate.id]),
+  );
+
+  if (governorateIdsByName.size !== EGYPT_GOVERNORATES.length) {
+    throw new Error('Failed to ensure every Egyptian governorate was seeded.');
+  }
+
+  await client.center.createMany({
+    data: EGYPT_GOVERNORATES.flatMap((governorate) => {
+      const governorateId = governorateIdsByName.get(governorate.nameAr);
+      if (!governorateId) {
+        throw new Error(`Missing seeded governorate: ${governorate.nameAr}`);
+      }
+      return governorate.cities.map((city) => ({ ...city, governorateId }));
+    }),
+    skipDuplicates: true,
+  });
 }
 
 function requiredProductionInteger(
@@ -89,8 +121,9 @@ async function main() {
         data: { version: 1, ...policySeed, updatedById: existing.id },
       });
     }
+    await seedEgyptGeography(prisma);
     console.log(
-      'Super admin already exists; ensured the configured refund policy.',
+      'Super admin already exists; ensured the configured refund policy and Egyptian geography.',
     );
     return;
   }
@@ -123,9 +156,12 @@ async function main() {
         metadata: { source: 'seed' },
       },
     });
+    await seedEgyptGeography(tx);
   });
 
-  console.log(`Super admin seeded successfully for "${loginIdentifier}".`);
+  console.log(
+    `Super admin and Egyptian geography seeded successfully for "${loginIdentifier}".`,
+  );
 }
 
 main()
