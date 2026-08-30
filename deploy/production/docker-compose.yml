@@ -1,32 +1,9 @@
 name: shaheen-edu-production
 
-# Single-host production baseline. Keep PostgreSQL, Redis, the API, and the
-# worker private to this Compose network; only nginx publishes 80/443.
+# Production Docker responsibilities are limited to the application, worker,
+# Redis, and explicit one-off jobs. Nginx, TLS, and PostgreSQL are deliberately
+# host-managed and are not Compose services.
 services:
-  postgres:
-    image: postgres:16-alpine
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER in .env}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
-      POSTGRES_DB: ${POSTGRES_DB:?set POSTGRES_DB in .env}
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    labels:
-      com.shaheen.edu.service: postgres
-      com.shaheen.edu.release: ${RELEASE_REVISION:-unknown}
-    logging: &bounded_logging
-      driver: local
-      options:
-        max-size: '10m'
-        max-file: '3'
-    healthcheck:
-      test:
-        ['CMD-SHELL', 'pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
-      interval: 5s
-      timeout: 5s
-      retries: 20
-
   redis:
     image: redis:7-alpine
     restart: unless-stopped
@@ -46,7 +23,11 @@ services:
     labels:
       com.shaheen.edu.service: redis
       com.shaheen.edu.release: ${RELEASE_REVISION:-unknown}
-    logging: *bounded_logging
+    logging: &bounded_logging
+      driver: local
+      options:
+        max-size: '10m'
+        max-file: '3'
     healthcheck:
       test:
         [
@@ -58,29 +39,29 @@ services:
       retries: 20
 
   migrate:
-    # Migrations must be invoked explicitly through release-with-backup.sh.
-    # Keeping this out of the default profile prevents `docker compose up`
-    # from applying schema changes without a remote-confirmed backup.
+    # Invoke only through release-with-backup.sh after the host PostgreSQL
+    # backup automation has reported a successful, restorable backup.
     profiles: ['migration']
     build:
       context: ../..
       target: migration
     env_file: .env
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
+      DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL in .env}
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+    extra_hosts: &host_postgres
+      - 'host.docker.internal:host-gateway'
     restart: 'no'
     labels:
       com.shaheen.edu.service: migrate
       com.shaheen.edu.release: ${RELEASE_REVISION:-unknown}
     logging: *bounded_logging
     depends_on:
-      postgres:
+      redis:
         condition: service_healthy
 
-  # This profile is deliberately separate from migrations. Run it only once
-  # for a new database after setting the explicit bootstrap acknowledgement and
-  # approved initial refund policy in the environment.
+  # Run this profile exactly once for a new database, with the explicit
+  # acknowledgement and approved refund-policy values in the environment.
   bootstrap:
     profiles: ['bootstrap']
     build:
@@ -88,14 +69,19 @@ services:
       target: migration
     env_file: .env
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
+      DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL in .env}
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+    extra_hosts: *host_postgres
     command: ['pnpm', 'prisma:seed']
     restart: 'no'
     labels:
       com.shaheen.edu.service: bootstrap
       com.shaheen.edu.release: ${RELEASE_REVISION:-unknown}
     logging: *bounded_logging
+    depends_on:
+      redis:
+        condition: service_healthy
+
   api:
     build:
       context: ../..
@@ -103,10 +89,15 @@ services:
     restart: unless-stopped
     env_file: .env
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
+      DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL in .env}
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
       TRUST_PROXY_HOPS: 1
       RELEASE_REVISION: ${RELEASE_REVISION:-unknown}
+    extra_hosts: *host_postgres
+    # Host Nginx is the sole public entry point. This port is intentionally
+    # reachable only from the host loopback interface.
+    ports:
+      - '127.0.0.1:${API_HOST_PORT:-13000}:3000'
     labels:
       com.shaheen.edu.service: api
       com.shaheen.edu.release: ${RELEASE_REVISION:-unknown}
@@ -131,9 +122,10 @@ services:
     restart: unless-stopped
     env_file: .env
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
+      DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL in .env}
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
       RELEASE_REVISION: ${RELEASE_REVISION:-unknown}
+    extra_hosts: *host_postgres
     command: ['node', 'dist/worker']
     labels:
       com.shaheen.edu.service: worker
@@ -152,39 +144,5 @@ services:
       retries: 6
       start_period: 30s
 
-  nginx:
-    image: nginx:1.27-alpine
-    restart: unless-stopped
-    environment:
-      API_DOMAIN: ${API_DOMAIN:?set API_DOMAIN in .env}
-    ports:
-      - '80:80'
-      - '443:443'
-    volumes:
-      - ./nginx/default.conf.template:/etc/nginx/templates/default.conf.template:ro
-      - certbot_www:/var/www/certbot:ro
-      - certbot_conf:/etc/letsencrypt:ro
-    depends_on:
-      api:
-        condition: service_healthy
-    labels:
-      com.shaheen.edu.service: nginx
-      com.shaheen.edu.release: ${RELEASE_REVISION:-unknown}
-    logging: *bounded_logging
-
-  certbot:
-    image: certbot/certbot:v2.11.0
-    profiles: ['ops']
-    volumes:
-      - certbot_www:/var/www/certbot
-      - certbot_conf:/etc/letsencrypt
-    labels:
-      com.shaheen.edu.service: certbot
-      com.shaheen.edu.release: ${RELEASE_REVISION:-unknown}
-    logging: *bounded_logging
-
 volumes:
-  postgres_data:
   redis_data:
-  certbot_www:
-  certbot_conf:

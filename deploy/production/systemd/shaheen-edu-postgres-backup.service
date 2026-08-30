@@ -1,7 +1,8 @@
 [Unit]
-Description=Shaheen Edu encrypted PostgreSQL backup to Bunny Storage
-Wants=docker.service
-After=docker.service network-online.target
+Description=Shaheen Edu encrypted host PostgreSQL backup to Bunny Storage
+Wants=network-online.target
+After=network-online.target
+ConditionPathExists=/etc/shaheen-edu/backup.env
 
 [Service]
 Type=oneshot
@@ -10,7 +11,6 @@ Group=root
 WorkingDirectory=/opt/shaheen-edu/deploy/production
 Environment=PROJECT_DIR=/opt/shaheen-edu/deploy/production
 Environment=BACKUP_ENV_FILE=/etc/shaheen-edu/backup.env
-EnvironmentFile=/etc/shaheen-edu/backup.env
 ExecStart=/opt/shaheen-edu/deploy/production/scripts/postgres-backup.sh --scheduled
 TimeoutStartSec=2h
 Nice=10

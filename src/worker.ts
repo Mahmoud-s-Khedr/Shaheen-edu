@@ -10,7 +10,9 @@ import { safeErrorRecord } from './common/logging/error-record';
 
 async function bootstrap() {
   const app = await NestFactory.createApplicationContext(AppModule);
-  const logger = app.get(PinoLogger);
+  // PinoLogger is transient-scoped; application contexts must resolve scoped
+  // providers rather than retrieve them with app.get().
+  const logger = await app.resolve(PinoLogger);
   // Application contexts do not install the configured logger automatically.
   // Set it before resolving workers so their Nest Logger instances emit the
   // same structured Pino records as the HTTP application.

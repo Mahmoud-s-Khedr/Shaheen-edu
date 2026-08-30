@@ -37,32 +37,20 @@ done
 mkdir -p "${bundle_dir}"
 cd "${project_dir}"
 
-# Nginx access logs are disabled in production. The listed services are the
-# approved local investigation set; do not add arbitrary containers casually.
+# Host Nginx and host PostgreSQL logs are owned by the operator and are not
+# available through Compose. The listed services are the approved local
+# investigation set; do not add arbitrary containers casually.
 docker compose -f "${compose_file}" logs \
   --no-color --timestamps --since "${since}" \
-  api worker nginx postgres redis migrate >"${bundle_dir}/compose.log"
-
-if command -v journalctl >/dev/null; then
-  journalctl \
-    -u shaheen-edu-postgres-backup.service \
-    --since "${since}" \
-    --no-pager --output=short-iso >"${bundle_dir}/backup-journal.log" || true
-fi
+  api worker redis >"${bundle_dir}/compose.log"
 
 readonly compose_sha256="$(sha256sum "${bundle_dir}/compose.log" | awk '{print $1}')"
-if [[ -f "${bundle_dir}/backup-journal.log" ]]; then
-  readonly backup_journal_sha256="$(sha256sum "${bundle_dir}/backup-journal.log" | awk '{print $1}')"
-else
-  readonly backup_journal_sha256='unavailable'
-fi
-
 cat >"${bundle_dir}/manifest.txt" <<EOF
 bundle_created_at=$(date --utc +%Y-%m-%dT%H:%M:%SZ)
 window=${since}
 release_revision=${RELEASE_REVISION:-unknown}
 compose_log_sha256=${compose_sha256}
-backup_journal_sha256=${backup_journal_sha256}
+host_postgres_backup_logs=operator-managed; not collected by this repository
 handling=restricted; copy only to an encrypted, access-controlled machine; delete after incident closure
 EOF
 

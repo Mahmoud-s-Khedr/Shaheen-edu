@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Run migrations only after a successful, remote-confirmed PostgreSQL backup.
+# Run migrations only after an encrypted host-PostgreSQL backup succeeds.
 set -euo pipefail
 
 readonly project_dir="${PROJECT_DIR:-/opt/shaheen-edu/deploy/production}"

@@ -1,5 +1,5 @@
 [Unit]
-Description=Run Shaheen Edu PostgreSQL backup every four hours
+Description=Run Shaheen Edu host PostgreSQL backup every four hours
 
 [Timer]
 OnCalendar=*-*-* 00,04,08,12,16,20:15:00

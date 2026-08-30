@@ -1,41 +1,28 @@
+# Example host-Nginx virtual host. It is not mounted or run by Docker Compose.
+# Existing host automation owns domains, certificates, renewal, and the TLS
+# directives, which are intentionally omitted here. Replace <api-domain> and
+# 13000 with the approved domain and API_HOST_PORT.
 access_log off;
-error_log /dev/stderr warn;
 
 server {
-    listen 80;
-    listen [::]:80;
-    server_name ${API_DOMAIN};
+    listen 3000 ssl;
+    listen [::]:3000 ssl;
+    server_name <api-domain>;
 
-    location ^~ /.well-known/acme-challenge/ {
-        root /var/www/certbot;
-    }
-
-    location / {
-        return 301 https://$host$request_uri;
-    }
-}
-
-server {
-    listen 443 ssl;
-    listen [::]:443 ssl;
-    server_name ${API_DOMAIN};
-
-    ssl_certificate /etc/letsencrypt/live/${API_DOMAIN}/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/${API_DOMAIN}/privkey.pem;
-    ssl_protocols TLSv1.2 TLSv1.3;
-
+    # Certificate and renewal directives are managed by existing host scripts.
     client_max_body_size 110m;
     proxy_connect_timeout 10s;
     proxy_read_timeout 120s;
     proxy_send_timeout 120s;
 
     location / {
-        proxy_pass http://api:3000;
+        proxy_pass http://127.0.0.1:13000;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Forwarded-Port $server_port;
         proxy_request_buffering off;
     }
 }
