@@ -12,6 +12,14 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:?set POSTGRES_DB in .env}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    labels:
+      com.shaheen.edu.service: postgres
+      com.shaheen.edu.release: ${RELEASE_REVISION:-unknown}
+    logging: &bounded_logging
+      driver: local
+      options:
+        max-size: '10m'
+        max-file: '3'
     healthcheck:
       test:
         ['CMD-SHELL', 'pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
@@ -24,14 +32,21 @@ services:
     restart: unless-stopped
     environment:
       REDIS_PASSWORD: ${REDIS_PASSWORD:?set REDIS_PASSWORD in .env}
+      REDIS_MAXMEMORY: ${REDIS_MAXMEMORY:?set REDIS_MAXMEMORY in .env}
     command:
-      [
-        'sh',
-        '-c',
-        'redis-server --appendonly yes --requirepass "$${REDIS_PASSWORD}"',
-      ]
+      - sh
+      - -c
+      - >-
+        redis-server --appendonly yes --appendfsync everysec
+        --save 900 1 --save 300 10 --save 60 10000
+        --maxmemory "$${REDIS_MAXMEMORY}" --maxmemory-policy noeviction
+        --requirepass "$${REDIS_PASSWORD}"
     volumes:
       - redis_data:/data
+    labels:
+      com.shaheen.edu.service: redis
+      com.shaheen.edu.release: ${RELEASE_REVISION:-unknown}
+    logging: *bounded_logging
     healthcheck:
       test:
         [
@@ -43,6 +58,10 @@ services:
       retries: 20
 
   migrate:
+    # Migrations must be invoked explicitly through release-with-backup.sh.
+    # Keeping this out of the default profile prevents `docker compose up`
+    # from applying schema changes without a remote-confirmed backup.
+    profiles: ['migration']
     build:
       context: ../..
       target: migration
@@ -51,6 +70,10 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
     restart: 'no'
+    labels:
+      com.shaheen.edu.service: migrate
+      com.shaheen.edu.release: ${RELEASE_REVISION:-unknown}
+    logging: *bounded_logging
     depends_on:
       postgres:
         condition: service_healthy
@@ -69,10 +92,10 @@ services:
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
     command: ['pnpm', 'prisma:seed']
     restart: 'no'
-    depends_on:
-      migrate:
-        condition: service_completed_successfully
-
+    labels:
+      com.shaheen.edu.service: bootstrap
+      com.shaheen.edu.release: ${RELEASE_REVISION:-unknown}
+    logging: *bounded_logging
   api:
     build:
       context: ../..
@@ -83,9 +106,12 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
       TRUST_PROXY_HOPS: 1
+      RELEASE_REVISION: ${RELEASE_REVISION:-unknown}
+    labels:
+      com.shaheen.edu.service: api
+      com.shaheen.edu.release: ${RELEASE_REVISION:-unknown}
+    logging: *bounded_logging
     depends_on:
-      migrate:
-        condition: service_completed_successfully
       redis:
         condition: service_healthy
     healthcheck:
@@ -107,10 +133,13 @@ services:
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      RELEASE_REVISION: ${RELEASE_REVISION:-unknown}
     command: ['node', 'dist/worker']
+    labels:
+      com.shaheen.edu.service: worker
+      com.shaheen.edu.release: ${RELEASE_REVISION:-unknown}
+    logging: *bounded_logging
     depends_on:
-      migrate:
-        condition: service_completed_successfully
       redis:
         condition: service_healthy
     healthcheck:
@@ -138,6 +167,10 @@ services:
     depends_on:
       api:
         condition: service_healthy
+    labels:
+      com.shaheen.edu.service: nginx
+      com.shaheen.edu.release: ${RELEASE_REVISION:-unknown}
+    logging: *bounded_logging
 
   certbot:
     image: certbot/certbot:v2.11.0
@@ -145,6 +178,10 @@ services:
     volumes:
       - certbot_www:/var/www/certbot
       - certbot_conf:/etc/letsencrypt
+    labels:
+      com.shaheen.edu.service: certbot
+      com.shaheen.edu.release: ${RELEASE_REVISION:-unknown}
+    logging: *bounded_logging
 
 volumes:
   postgres_data:

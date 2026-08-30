@@ -1,13 +1,20 @@
 import { NestFactory } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
 import { createServer, type Server } from 'node:http';
+import { Logger as PinoNestLogger, PinoLogger } from 'nestjs-pino';
 import { AppModule } from './app.module';
 import { QuestionImportWorker } from './modules/ai-question-import/question-import.worker';
 import { ReportExportWorker } from './modules/reports/report-export.worker';
 import type { AppConfig } from './config/configuration';
+import { safeErrorRecord } from './common/logging/error-record';
 
 async function bootstrap() {
   const app = await NestFactory.createApplicationContext(AppModule);
+  const logger = app.get(PinoLogger);
+  // Application contexts do not install the configured logger automatically.
+  // Set it before resolving workers so their Nest Logger instances emit the
+  // same structured Pino records as the HTTP application.
+  app.useLogger(app.get(PinoNestLogger));
   app.enableShutdownHooks();
   const questionImportWorker = app.get(QuestionImportWorker);
   const reportExportWorker = app.get(ReportExportWorker);
@@ -26,6 +33,21 @@ async function bootstrap() {
       resolve,
     );
   });
+  logger.info(
+    {
+      event: 'worker_started',
+      context: 'WorkerBootstrap',
+      service: 'worker',
+      queues: [
+        'question-import',
+        'question-import-page',
+        'question-import-chunk',
+        'report-export',
+      ],
+      release: process.env.RELEASE_REVISION ?? 'unknown',
+    },
+    'Worker started',
+  );
   let closing = false;
   let healthMonitor: NodeJS.Timeout | undefined;
   const close = async () => {
@@ -39,15 +61,33 @@ async function bootstrap() {
   healthMonitor = setInterval(() => {
     if (questionImportWorker.isHealthy() && reportExportWorker.isHealthy())
       return;
-    console.error('Worker lost queue readiness; restarting process');
+    logger.error(
+      {
+        event: 'worker_queue_readiness_lost',
+        context: 'WorkerBootstrap',
+        service: 'worker',
+        release: process.env.RELEASE_REVISION ?? 'unknown',
+      },
+      'Worker lost queue readiness; restarting process',
+    );
     void close().finally(() => process.exit(1));
   }, 30_000);
   healthMonitor.unref();
   process.once('SIGINT', close);
   process.once('SIGTERM', close);
 }
-bootstrap().catch((error) => {
-  console.error('Failed to start AI question import worker', error);
+bootstrap().catch((error: unknown) => {
+  // Bootstrap may fail before Nest's Pino logger is available. Preserve a
+  // structured record and omit the raw exception message for the same privacy
+  // policy used by the running services.
+  console.error(
+    JSON.stringify({
+      event: 'worker_bootstrap_failed',
+      service: 'worker',
+      ...safeErrorRecord(error),
+      release: process.env.RELEASE_REVISION ?? 'unknown',
+    }),
+  );
   process.exit(1);
 });
 

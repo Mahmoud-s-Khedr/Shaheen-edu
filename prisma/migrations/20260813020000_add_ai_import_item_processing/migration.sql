@@ -1,1 +1,0 @@
-ALTER TYPE "QuestionImportItemStatus" ADD VALUE IF NOT EXISTS 'PROCESSING';

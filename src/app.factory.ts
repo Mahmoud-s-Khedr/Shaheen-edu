@@ -101,7 +101,7 @@ export async function createApp(
         }),
     }),
   );
-  app.useGlobalFilters(new GlobalExceptionFilter());
+  app.useGlobalFilters(new GlobalExceptionFilter(app.get(PinoLogger)));
   app.enableCors({
     origin: configService.get('corsOrigins', { infer: true }),
     credentials: true,

@@ -1,3 +1,6 @@
+access_log off;
+error_log /dev/stderr warn;
+
 server {
     listen 80;
     listen [::]:80;

@@ -1,0 +1,21 @@
+[Unit]
+Description=Shaheen Edu incident-log export to private Bunny Storage
+Wants=docker.service
+After=docker.service network-online.target
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+WorkingDirectory=/opt/shaheen-edu/deploy/production
+Environment=PROJECT_DIR=/opt/shaheen-edu/deploy/production
+Environment=BUNNY_STORAGE_ENV_FILE=/opt/shaheen-edu/deploy/production/.env
+Environment=OPERATIONS_PREFIX=operations
+ExecStart=/opt/shaheen-edu/deploy/production/scripts/export-incident-logs.sh 4h
+TimeoutStartSec=30m
+Nice=10
+IOSchedulingClass=best-effort
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ReadWritePaths=/var/lib/shaheen-edu-incident-logs

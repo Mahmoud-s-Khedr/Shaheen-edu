@@ -1,0 +1,21 @@
+[Unit]
+Description=Shaheen Edu encrypted PostgreSQL backup to Bunny Storage
+Wants=docker.service
+After=docker.service network-online.target
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+WorkingDirectory=/opt/shaheen-edu/deploy/production
+Environment=PROJECT_DIR=/opt/shaheen-edu/deploy/production
+Environment=BACKUP_ENV_FILE=/etc/shaheen-edu/backup.env
+EnvironmentFile=/etc/shaheen-edu/backup.env
+ExecStart=/opt/shaheen-edu/deploy/production/scripts/postgres-backup.sh --scheduled
+TimeoutStartSec=2h
+Nice=10
+IOSchedulingClass=best-effort
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ReadWritePaths=/var/lib/shaheen-edu-backups /var/cache/shaheen-edu-restic /run/lock

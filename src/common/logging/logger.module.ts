@@ -22,6 +22,7 @@ import { normalizeCorrelationId } from './correlation-id';
               paths: [
                 'req.headers.authorization',
                 'req.headers.cookie',
+                'req.headers["x-api-key"]',
                 'res.headers["set-cookie"]',
                 'req.body.password',
                 'req.body.oldPassword',
@@ -30,6 +31,33 @@ import { normalizeCorrelationId } from './correlation-id';
                 'req.body.refreshToken',
               ],
               censor: '[REDACTED]',
+            },
+            // Keep request logs useful without exporting query values, IDs, or
+            // request bodies. Structured exception records add Fastify route
+            // templates after route matching, never literal request URLs.
+            serializers: {
+              req: (request: { method?: string }) => ({
+                method: request.method ?? 'unknown',
+              }),
+              res: (response: { statusCode?: number }) => ({
+                statusCode: response.statusCode ?? 0,
+              }),
+            },
+            customProps: (_request, response: { statusCode?: number }) => ({
+              event: 'http_request_completed',
+              statusCode: response.statusCode ?? 0,
+              release: process.env.RELEASE_REVISION ?? 'unknown',
+            }),
+            customLogLevel: (_request, response, error) => {
+              if (error || response.statusCode >= 500) return 'error';
+              if (response.statusCode >= 400) return 'warn';
+              // Successful access logs are intentionally not written. They
+              // add little diagnostic value and may expose literal URLs.
+              return 'silent';
+            },
+            autoLogging: {
+              ignore: (request) =>
+                request.url === '/health' || request.url === '/health/ready',
             },
             genReqId: (req: { headers: Record<string, unknown> }) =>
               normalizeCorrelationId(req.headers['x-correlation-id']),

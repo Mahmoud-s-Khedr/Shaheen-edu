@@ -3,6 +3,7 @@ import { Worker } from 'bullmq';
 import { ConfigService } from '@nestjs/config';
 import { Prisma } from '@prisma/client';
 import { createHash } from 'node:crypto';
+import { safeErrorRecord } from '../../common/logging/error-record';
 import type { AppConfig } from '../../config/configuration';
 import {
   QuestionImportChunkStatus,
@@ -111,6 +112,26 @@ export class QuestionImportWorker {
     ];
     for (const worker of this.workers) {
       worker.on('error', (error) => this.markUnhealthy(worker.name, error));
+      // Page and chunk completions can be extremely frequent for one import.
+      // The control queue provides one bounded import-level completion summary.
+      if (worker.name === QUESTION_IMPORT_QUEUE) {
+        worker.on('completed', (job) =>
+          this.logger.log({
+            event: 'queue_job_completed',
+            queue: worker.name,
+            jobCategory: 'question_import',
+            attemptsMade: job.attemptsMade,
+          }),
+        );
+      }
+      worker.on('failed', (job, error) =>
+        this.logJobFailure(
+          worker.name,
+          job?.attemptsMade,
+          job?.opts.attempts,
+          error,
+        ),
+      );
     }
     await Promise.all(this.workers.map((worker) => worker.waitUntilReady()));
     this.ready = true;
@@ -125,10 +146,32 @@ export class QuestionImportWorker {
   }
   private markUnhealthy(workerName: string, error: Error) {
     this.ready = false;
-    this.logger.error(
-      `BullMQ worker ${workerName} error: ${error.message}`,
-      error.stack,
-    );
+    this.logger.error({
+      event: 'queue_connection_lost',
+      queue: workerName,
+      jobCategory: 'question_import',
+      ...safeErrorRecord(error),
+    });
+  }
+
+  private logJobFailure(
+    queue: string,
+    attemptsMade: number | undefined,
+    maxAttempts: number | undefined,
+    error: Error,
+  ) {
+    const exhausted =
+      attemptsMade !== undefined &&
+      maxAttempts !== undefined &&
+      attemptsMade >= maxAttempts;
+    this.logger.error({
+      event: exhausted ? 'queue_retry_exhausted' : 'queue_job_failed',
+      queue,
+      jobCategory: 'question_import',
+      attemptsMade,
+      maxAttempts,
+      ...safeErrorRecord(error),
+    });
   }
   private async process(batchId: string) {
     const batch: any = await this.prisma.questionImportBatch.findUnique({
@@ -222,7 +265,7 @@ export class QuestionImportWorker {
           where: { id: batchId },
           data: { status: QuestionImportStatus.SEGMENTING },
         });
-        const scope = current.pageScope as any;
+        const scope = current.pageScope;
         const rootBatchId = batch.parentId ?? batch.id;
         const segmentationMedia: any[] = v4
           ? await this.prisma.questionImportMedia.findMany({
@@ -620,9 +663,9 @@ export class QuestionImportWorker {
       const finalPage = verified?.page ?? initial.page;
       const canonicalText = this.canonicalPageText(finalPage.content);
       const priorAttemptTrace = Array.isArray(
-        (stored.rawProviderResponse as any)?.attempts,
+        stored.rawProviderResponse?.attempts,
       )
-        ? (stored.rawProviderResponse as any).attempts
+        ? stored.rawProviderResponse.attempts
         : stored.rawProviderResponse
           ? [{ mode: 'PREVIOUS_ATTEMPT', raw: stored.rawProviderResponse }]
           : [];
@@ -660,9 +703,9 @@ export class QuestionImportWorker {
           aiText: finalPage.content,
           canonicalText,
           confidence: finalPage.confidence,
-          uncertainSpans: finalPage.uncertainSpans as any,
+          uncertainSpans: finalPage.uncertainSpans,
           warnings: warnings as any,
-          layoutEnvelopes: (finalPage.layoutEnvelopes ?? []) as any,
+          layoutEnvelopes: finalPage.layoutEnvelopes ?? [],
           rawProviderResponse: {
             attempts: [...priorAttemptTrace, ...recovered.attempts],
             verification:
@@ -677,8 +720,8 @@ export class QuestionImportWorker {
           initialCanonicalText,
           initialProviderResponse: initial.raw as any,
           initialUsage: initial.usage as any,
-          verificationProviderResponse: verified?.raw as any,
-          verificationUsage: verified?.usage as any,
+          verificationProviderResponse: verified?.raw,
+          verificationUsage: verified?.usage,
           verifiedAt: verified ? new Date() : null,
           errorDetail: review
             ? 'Visual OCR transcription requires admin review'
@@ -764,9 +807,9 @@ export class QuestionImportWorker {
         const finalPage = verified?.page ?? initial.page;
         const canonicalText = this.canonicalPageText(finalPage.content);
         const priorAttemptTrace = Array.isArray(
-          (stored.rawProviderResponse as any)?.attempts,
+          stored.rawProviderResponse?.attempts,
         )
-          ? (stored.rawProviderResponse as any).attempts
+          ? stored.rawProviderResponse.attempts
           : stored.rawProviderResponse
             ? [{ mode: 'PREVIOUS_ATTEMPT', raw: stored.rawProviderResponse }]
             : [];
@@ -812,9 +855,9 @@ export class QuestionImportWorker {
             aiText: finalPage.content,
             canonicalText,
             confidence: finalPage.confidence,
-            uncertainSpans: finalPage.uncertainSpans as any,
+            uncertainSpans: finalPage.uncertainSpans,
             warnings: warnings as any,
-            layoutEnvelopes: (finalPage.layoutEnvelopes ?? []) as any,
+            layoutEnvelopes: finalPage.layoutEnvelopes ?? [],
             rawProviderResponse: {
               attempts: [...priorAttemptTrace, ...recovered.attempts],
               verification:
@@ -831,8 +874,8 @@ export class QuestionImportWorker {
             initialCanonicalText,
             initialProviderResponse: initial.raw as any,
             initialUsage: initial.usage as any,
-            verificationProviderResponse: verified?.raw as any,
-            verificationUsage: verified?.usage as any,
+            verificationProviderResponse: verified?.raw,
+            verificationUsage: verified?.usage,
             verifiedAt: verified ? new Date() : null,
             errorDetail: review
               ? 'Visual OCR transcription requires admin review'
@@ -1069,7 +1112,7 @@ export class QuestionImportWorker {
     if (matches.length < 2) return null;
     const pages = matches.map((match, index) => ({
       page: Number(match[1]),
-      text: text.slice(match.index!, matches[index + 1]?.index).trim(),
+      text: text.slice(match.index, matches[index + 1]?.index).trim(),
       tokens: 0,
     }));
     if (
@@ -2607,7 +2650,7 @@ export class QuestionImportWorker {
               sequence,
             section: source.section,
             detectedType: type,
-            answerOrigin: c.answerOrigin as QuestionAnswerProvenance,
+            answerOrigin: c.answerOrigin,
           },
         });
         if (!structuralValid)
@@ -2970,7 +3013,7 @@ export class QuestionImportWorker {
                       ? null
                       : `${rootBatchId}:${mediaByKey.get(assignment.mediaKey).id}`
                     : null,
-                owner: assignment.owner as QuestionImportMediaAssignmentOwner,
+                owner: assignment.owner,
                 ownerReference: assignment.ownerReference,
                 placementAnchor: assignment.placementAnchor,
                 confidence: assignment.confidence,

@@ -4,10 +4,10 @@ import {
   ExceptionFilter,
   HttpException,
   HttpStatus,
-  Logger,
 } from '@nestjs/common';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { Prisma } from '@prisma/client';
+import { PinoLogger } from 'nestjs-pino';
 import { RateLimitException } from '../exceptions/rate-limit.exception';
 import {
   errorCode,
@@ -17,6 +17,7 @@ import {
   type ValidationDetail,
 } from '../i18n/api-messages';
 import { normalizeCorrelationId } from '../logging/correlation-id';
+import { safeErrorRecord } from '../logging/error-record';
 
 interface ErrorResponseShape {
   statusCode: number;
@@ -30,7 +31,7 @@ interface ErrorResponseShape {
 
 @Catch()
 export class GlobalExceptionFilter implements ExceptionFilter {
-  private readonly logger = new Logger(GlobalExceptionFilter.name);
+  constructor(private readonly logger: PinoLogger) {}
 
   catch(exception: unknown, host: ArgumentsHost): void {
     const ctx = host.switchToHttp();
@@ -52,8 +53,6 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       statusCode = mapped.statusCode;
       message = mapped.message;
       explicitCode = mapped.code;
-      if (statusCode >= HttpStatus.INTERNAL_SERVER_ERROR)
-        this.logger.error(exception.message, exception.stack);
     } else if (exception instanceof HttpException) {
       statusCode = exception.getStatus();
       const body = exception.getResponse();
@@ -72,8 +71,6 @@ export class GlobalExceptionFilter implements ExceptionFilter {
         explicitCode = String((exception as { code?: unknown }).code ?? '');
       if ('meta' in exception)
         meta = (exception as { meta?: Record<string, unknown> }).meta;
-    } else if (exception instanceof Error) {
-      this.logger.error(exception.message, exception.stack);
     }
 
     const isProduction = process.env.NODE_ENV === 'production';
@@ -90,6 +87,36 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       ...(meta ? { meta } : {}),
       correlationId,
     };
+
+    const route = request.routeOptions?.url ?? 'unmatched';
+    const code = payload.code;
+    if (statusCode >= HttpStatus.INTERNAL_SERVER_ERROR) {
+      this.logger.error(
+        {
+          event: 'unhandled_exception',
+          context: GlobalExceptionFilter.name,
+          ...safeErrorRecord(exception),
+          route,
+          statusCode,
+          correlationId,
+          release: process.env.RELEASE_REVISION ?? 'unknown',
+        },
+        'Unhandled API exception',
+      );
+    } else {
+      this.logger.info(
+        {
+          event: 'http_client_error',
+          context: GlobalExceptionFilter.name,
+          route,
+          statusCode,
+          code,
+          correlationId,
+          release: process.env.RELEASE_REVISION ?? 'unknown',
+        },
+        'Expected API client error',
+      );
+    }
 
     if (exception instanceof RateLimitException) {
       void response.header('Retry-After', String(exception.retryAfterSeconds));
