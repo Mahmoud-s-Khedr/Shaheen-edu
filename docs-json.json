@@ -1462,6 +1462,19 @@
               "maxLength": 120,
               "type": "string"
             }
+          },
+          {
+            "name": "partnerType",
+            "required": false,
+            "in": "query",
+            "description": "Restricts results to a partner type.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "CONTENT_PUBLISHER",
+                "REFERRAL_PARTNER"
+              ]
+            }
           }
         ],
         "responses": {

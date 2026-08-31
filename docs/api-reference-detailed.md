@@ -1612,6 +1612,8 @@ No path, query, or header input.
 
 - query `page` (optional)
 - query `limit` (optional)
+- query `q` (optional case-insensitive text search)
+- query `partnerType` (optional: `CONTENT_PUBLISHER` or `REFERRAL_PARTNER`)
 
 **Success response — HTTP 200 (PaginatedPartnerResponseDto)**
 

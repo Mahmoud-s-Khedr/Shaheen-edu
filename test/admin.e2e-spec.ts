@@ -125,11 +125,42 @@ describe('Admin (e2e)', () => {
     });
     expect(list.statusCode).toBe(200);
     expect(JSON.parse(list.body)).toMatchObject({
-      data: [expect.objectContaining({
-        id: JSON.parse(response.body).id,
-        displayName: 'Test Partner',
-      })],
+      data: [
+        expect.objectContaining({
+          id: JSON.parse(response.body).id,
+          displayName: 'Test Partner',
+        }),
+      ],
       meta: { total: 1 },
     });
+  });
+
+  it('filters partners by partner type', async () => {
+    const createPartner = async (partnerType: string, email: string) =>
+      app.inject({
+        method: 'POST',
+        url: '/api/v1/admin/partners',
+        headers: { authorization: `Bearer ${adminToken}` },
+        payload: {
+          email,
+          password: 'PartnerP@ss1!',
+          partnerType,
+          displayName: `${partnerType} partner`,
+        },
+      });
+    await createPartner('CONTENT_PUBLISHER', 'publisher-filter@example.com');
+    await createPartner('REFERRAL_PARTNER', 'referral-filter@example.com');
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/v1/admin/partners?partnerType=REFERRAL_PARTNER&q=REFERRAL_PARTNER',
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(JSON.parse(response.body)).toMatchObject({
+      data: [expect.objectContaining({ partnerType: 'REFERRAL_PARTNER' })],
+    });
+    expect(JSON.parse(response.body).data).toHaveLength(1);
   });
 });

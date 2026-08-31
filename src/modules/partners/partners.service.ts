@@ -22,10 +22,8 @@ import {
 import type { CreatePartnerDto } from './dto/create-partner.dto';
 import type { UpdatePartnerDto } from './dto/update-partner.dto';
 import type { RequestUser } from '../../common/types/request-with-user.types';
-import {
-  toPaginationMeta,
-  type SearchPaginationQueryDto,
-} from '../../common/dto/pagination-query.dto';
+import { toPaginationMeta } from '../../common/dto/pagination-query.dto';
+import type { QueryAdminPartnersDto } from './dto/query-admin-partners.dto';
 
 /**
  * Admin-side methods here are reached only via routes guarded by
@@ -85,15 +83,31 @@ export class PartnersService {
     return this.getById(user.id);
   }
 
-  async list(pagination: SearchPaginationQueryDto) {
-    const where = { role: Role.PARTNER };
+  async list(pagination: QueryAdminPartnersDto) {
+    const where = {
+      role: Role.PARTNER,
+      ...(pagination.partnerType
+        ? { partnerProfile: { is: { partnerType: pagination.partnerType } } }
+        : {}),
+    };
     const { data: partners, total } = await paginateArabicSearch({
       prisma: this.prisma,
       delegate: this.prisma.user,
       target: 'user',
       q: pagination.q,
       scope: {
-        where: Prisma.sql`t.role = ${Role.PARTNER}::"Role"`,
+        where: Prisma.sql`
+          t.role = ${Role.PARTNER}::"Role"
+          ${
+            pagination.partnerType
+              ? Prisma.sql`AND EXISTS (
+                SELECT 1 FROM "PartnerProfile" profile
+                WHERE profile."userId" = t.id
+                  AND profile."partnerType" = ${pagination.partnerType}::"PartnerType"
+              )`
+              : Prisma.empty
+          }
+        `,
         // The display and legal names live on the profile, so a hit there is
         // OR-ed with the login-identifier match on the user row itself.
         alsoMatches: Prisma.sql`EXISTS (

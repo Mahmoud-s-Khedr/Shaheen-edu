@@ -23,7 +23,7 @@ import { PartnersService } from '../partners.service';
 import { CreatePartnerDto } from '../dto/create-partner.dto';
 import { UpdatePartnerDto } from '../dto/update-partner.dto';
 import type { RequestUser } from '../../../common/types/request-with-user.types';
-import { SearchPaginationQueryDto } from '../../../common/dto/pagination-query.dto';
+import { QueryAdminPartnersDto } from '../dto/query-admin-partners.dto';
 import { ApiStandardErrors } from '../../../common/decorators/api-standard-errors.decorator';
 import {
   PaginatedPartnerResponseDto,
@@ -53,7 +53,7 @@ export class AdminPartnersController {
   })
   @ApiOkResponse({ type: PaginatedPartnerResponseDto })
   @ApiStandardErrors(400, 401, 403)
-  list(@Query() pagination: SearchPaginationQueryDto) {
+  list(@Query() pagination: QueryAdminPartnersDto) {
     return this.partnersService.list(pagination);
   }
 
