@@ -5,13 +5,15 @@ and existing host automation:
 
 | Owner | Responsibilities |
 | --- | --- |
-| This repository / Docker Compose | `api`, `worker`, private Docker Redis, and explicit `migrate`/`bootstrap` jobs. |
+| This repository / Docker Compose | Private `api` replicas behind an internal gateway, `worker`, Redis, and explicit `migrate`/`bootstrap` jobs. |
 | Host operations | Nginx domains, TLS certificates and renewal, public listener, reverse proxy, PostgreSQL, backup credential custody, restore-target creation, and host firewall. |
 | Test VPS only | A dedicated database, database role, domain, Bunny credentials, backup destination, and all other test credentials. Never promote any of these to production. |
 
-Docker Compose does **not** run Nginx, Certbot, or PostgreSQL in production.
-The API is published only as `127.0.0.1:${API_HOST_PORT:-13000}:3000`; Redis
-has no published port.
+Docker Compose does **not** run the public Nginx, Certbot, or PostgreSQL in
+production. It runs a private Nginx gateway solely to distribute traffic over
+scaled API containers. That gateway is published only as
+`127.0.0.1:${API_HOST_PORT:-13000}:8080`; API containers and Redis have no
+published port.
 
 ## Host prerequisites
 
@@ -81,7 +83,9 @@ services:
 editor .env
 docker compose --profile bootstrap run --rm bootstrap
 editor .env
-docker compose up -d --wait
+# Choose the API replica count for this host. Workers stay at one replica
+# unless their concurrency and idempotency have been separately reviewed.
+docker compose up -d --wait --scale api=3
 ```
 
 Install the host-Nginx virtual host through the existing host automation. The
@@ -89,7 +93,8 @@ repository's [example](../deploy/production/nginx/default.conf.template) is a
 reference only; it deliberately contains no certificate path or TLS-renewal
 configuration. Its required proxy headers are `Host`, `X-Real-IP`,
 `X-Forwarded-For`, `X-Forwarded-Proto https`, and, when needed,
-`X-Forwarded-Port`. Keep `TRUST_PROXY_HOPS=1`.
+`X-Forwarded-Port`. The internal Compose gateway adds one controlled proxy
+hop, so keep `TRUST_PROXY_HOPS=2`.
 
 ```nginx
 server {
@@ -111,6 +116,7 @@ Verify the public path and private worker path:
 
 ```sh
 curl --fail-with-body "https://<api-domain>:3000/health/ready"
+docker compose ps
 docker compose exec worker node -e "fetch('http://127.0.0.1:3001/health/ready').then(r => process.exit(r.ok ? 0 : 1))"
 ```
 
@@ -121,15 +127,20 @@ Deploy immutable reviewed revisions only. Before every schema migration,
 backup. Restore drills and backup retention remain host-operator
 responsibilities; the repository provides no PostgreSQL provisioning or
 automatic backup schedule.
+The Compose gateway and Redis images are pinned by digest; update those
+digests only as part of a reviewed release and rerun the rehearsal afterwards.
 
 ### Host PostgreSQL backup and restore scripts
 
 Create root-only `/etc/shaheen-edu/backup.env` from
-[`backup.env.example`](../deploy/production/backup.env.example), with mode
-`0600`. It names the local host database, a least-privileged dump/restore role,
-a root-only `PGPASSFILE`, the Restic password file, and the local staging
-directory. The completed application `.env` supplies only Bunny S3 settings.
-No password belongs in a command line or committed file.
+[`backup.env.example`](../deploy/production/backup.env.example), and
+`/etc/shaheen-edu/backup-storage.env` from
+[`backup-storage.env.example`](../deploy/production/backup-storage.env.example),
+both with mode `0600`. They name the local host database, a least-privileged
+dump/restore role, a root-only `PGPASSFILE`, the Restic password file, a
+dedicated private backup destination, and the local staging directory. Do not
+reuse the application asset credentials for backups. No password belongs in a
+command line or committed file.
 
 Run a manual encrypted backup with:
 
@@ -137,10 +148,11 @@ Run a manual encrypted backup with:
 sudo ./scripts/postgres-backup.sh --manual
 ```
 
-`postgres-restore.sh` restores a Restic snapshot only to an empty database
-named explicitly in `RESTORE_ALLOWED_DATABASES`; it refuses the configured
-source/production database and has no overwrite mode. Create that disposable
-restore database through host automation, then run:
+`postgres-restore.sh` validates the dump checksum recorded in the snapshot,
+then restores only to an empty database named explicitly in
+`RESTORE_ALLOWED_DATABASES`; it refuses the configured source/production
+database and has no overwrite mode. Create that disposable restore database
+through host automation, then run:
 
 ```sh
 sudo ./scripts/postgres-restore.sh \
@@ -149,14 +161,44 @@ sudo ./scripts/postgres-restore.sh \
   --confirm-target <same-database>
 ```
 
-After one successful manual backup and isolated restore proof, operators may
-install the included `shaheen-edu-postgres-backup.service` and four-hour timer
-through their normal host-systemd change process. The unit invokes host client
-tools only; it has no Docker or PostgreSQL-service dependency.
+Every successful backup also applies the configured 14-daily, 8-weekly, and
+12-monthly Restic retention policy (override those values only through the
+root-only backup environment). After one successful manual backup and isolated
+restore proof, operators may install the included four-hour backup unit/timer
+and weekly `shaheen-edu-postgres-backup-verify` unit/timer through their normal
+host-systemd change process. The weekly unit reads a sample of encrypted remote
+pack data; it complements, but does not replace, a restore drill.
 
-The repository retains the incident-log export service/timer for Docker API,
-worker, and Redis logs only. Host Nginx and PostgreSQL logs are collected by
-the operator's established process. See
+### What is and is not restored
+
+PostgreSQL is the system of record and the only database restored from this
+runbook. The Compose Redis volume uses AOF/RDB persistence to survive normal
+container restarts, but Redis includes leases, rate-limit counters, and BullMQ
+queue state; restoring an old Redis snapshot can revive stale work. For a
+host-loss recovery, create a fresh Redis volume and, before API/worker traffic
+resumes, run the explicit recovery profile below. It refuses a non-empty Redis
+database, moves interrupted durable work back to `QUEUED` in PostgreSQL, and
+repopulates the two BullMQ queues. If the recovery process is interrupted, its
+private marker makes the same command safe to repeat before API/worker traffic
+is resumed. Do not treat Redis as the authoritative backup source.
+
+```sh
+# API and worker must be stopped; Redis must be a new, empty volume.
+docker compose stop api worker
+docker compose --profile queue-recovery run --rm queue-recovery
+docker compose up -d --wait --scale api=3
+```
+
+Assets and video objects live in Bunny, outside PostgreSQL and Redis. Their
+recovery policy must be configured separately in Bunny: use a distinct private
+backup Storage Zone for Restic, prevent lifecycle deletion of the operations
+prefix, and retain or replicate production asset/video objects according to the
+business retention policy. A successful database backup alone does not protect
+those objects.
+
+The repository retains the incident-log export service/timer for Docker API
+gateway, API replica, worker, and Redis logs only. Host Nginx and PostgreSQL
+logs are collected by the operator's established process. See
 [production observability and backup plan](production-observability-and-backup-plan.md)
 and complete the [test-VPS rehearsal](test-vps-production-rehearsal.md) before
 production launch.

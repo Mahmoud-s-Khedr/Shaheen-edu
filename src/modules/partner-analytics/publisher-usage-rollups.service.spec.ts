@@ -3,6 +3,7 @@ import { PublisherUsageRollupsService } from './publisher-usage-rollups.service'
 describe('PublisherUsageRollupsService', () => {
   function build() {
     const tx = {
+      $executeRaw: jest.fn(),
       publisherUsageDailySolver: {
         deleteMany: jest.fn(),
         createMany: jest.fn(),

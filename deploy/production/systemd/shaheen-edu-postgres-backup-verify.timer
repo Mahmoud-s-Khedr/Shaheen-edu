@@ -1,0 +1,11 @@
+[Unit]
+Description=Verify Shaheen Edu PostgreSQL backup repository every Sunday
+
+[Timer]
+OnCalendar=Sun *-*-* 03:30:00
+Persistent=true
+RandomizedDelaySec=10m
+Unit=shaheen-edu-postgres-backup-verify.service
+
+[Install]
+WantedBy=timers.target

@@ -110,6 +110,7 @@ export async function createApp(
   app.enableCors({
     origin: configService.get('corsOrigins', { infer: true }),
     credentials: true,
+    methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   });
 
   if (options.enableSwagger) {

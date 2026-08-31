@@ -42,7 +42,8 @@ docker compose --env-file .env config --quiet
 Use a test-only `DATABASE_URL` with `host.docker.internal` as its host. The
 production Compose file adds the explicit Linux `host-gateway` mapping. Set
 `API_HOST_PORT=13000` (or another unused loopback port), `API_DOMAIN`, CORS,
-release revision, and separate test Bunny credentials. Keep
+release revision, `REDIS_MAXMEMORY`, and a larger `REDIS_MEMORY_LIMIT`; use
+separate test Bunny credentials. Keep
 `ALLOW_PRODUCTION_BOOTSTRAP=false` initially.
 
 ## 2. Start a clean production-shaped deployment
@@ -65,7 +66,7 @@ approved test bootstrap values. Run bootstrap once, then return the setting to
 editor .env
 docker compose --profile bootstrap run --rm bootstrap
 editor .env
-docker compose up -d --wait
+docker compose up -d --wait --scale api=3
 ```
 
 Verify that the API cannot be reached publicly except through host Nginx, then
@@ -77,9 +78,10 @@ docker compose exec worker node -e "fetch('http://127.0.0.1:3001/health/ready').
 docker compose ps
 ```
 
-The API binding must show `127.0.0.1:<API_HOST_PORT>`, and Redis must show no
-published port. `TRUST_PROXY_HOPS` remains `1` because host Nginx is the one
-trusted proxy hop.
+Only `api-gateway` may show `127.0.0.1:<API_HOST_PORT>`; API replicas and
+Redis must show no published port. Confirm three healthy API containers are
+running. `TRUST_PROXY_HOPS` is `2` because the controlled internal gateway is
+the second proxy hop after host Nginx.
 
 ## 3. Prove host PostgreSQL backup and restore
 
@@ -128,8 +130,8 @@ The rehearsal passes only when the following are recorded:
 - The new dedicated host database migrated; bootstrap ran once; and
   `ALLOW_PRODUCTION_BOOTSTRAP=false` afterwards.
 - API and worker are healthy; the API is reachable through
-  `https://<test-domain>:3000/health/ready`; its Docker port is loopback-only;
-  and Redis has no host port.
+  `https://<test-domain>:3000/health/ready`; only the Docker gateway port is
+  loopback-only; API replicas and Redis have no host port.
 - The test host-Nginx headers and TLS behavior are verified.
 - The repository backup script produced a Restic snapshot reference and the
   restore script successfully restored it to an isolated test target.

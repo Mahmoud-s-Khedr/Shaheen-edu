@@ -30,18 +30,18 @@ fi
 
 # shellcheck source=/dev/null
 source "${backup_env_file}"
-for required_value in PGHOST PGPORT PGDATABASE PGUSER PGPASSFILE RESTIC_PASSWORD_FILE BUNNY_STORAGE_ENV_FILE BACKUP_STAGING_DIR RESTIC_CACHE_DIR RESTORE_ALLOWED_DATABASES; do
+for required_value in PGHOST PGPORT PGDATABASE PGUSER PGPASSFILE RESTIC_PASSWORD_FILE BACKUP_STORAGE_ENV_FILE BACKUP_STAGING_DIR RESTIC_CACHE_DIR RESTORE_ALLOWED_DATABASES; do
   if [[ -z "${!required_value:-}" ]]; then
     echo "Restore environment is missing ${required_value}." >&2
     exit 78
   fi
 done
-if [[ ! -r "${PGPASSFILE}" || ! -r "${RESTIC_PASSWORD_FILE}" || ! -r "${BUNNY_STORAGE_ENV_FILE}" ]]; then
+if [[ ! -r "${PGPASSFILE}" || ! -r "${RESTIC_PASSWORD_FILE}" || ! -r "${BACKUP_STORAGE_ENV_FILE}" ]]; then
   echo 'Required restore secret file is unavailable.' >&2
   exit 78
 fi
-if ! command -v psql >/dev/null || ! command -v pg_restore >/dev/null || ! command -v restic >/dev/null; then
-  echo 'psql, pg_restore, and restic are required.' >&2
+if ! command -v psql >/dev/null || ! command -v pg_restore >/dev/null || ! command -v restic >/dev/null || ! command -v sha256sum >/dev/null; then
+  echo 'psql, pg_restore, restic, and sha256sum are required.' >&2
   exit 69
 fi
 if [[ "${target_database}" == "${PGDATABASE}" ]]; then
@@ -55,7 +55,7 @@ case ",${RESTORE_ALLOWED_DATABASES}," in
 esac
 
 # shellcheck source=/dev/null
-source "${BUNNY_STORAGE_ENV_FILE}"
+source "${BACKUP_STORAGE_ENV_FILE}"
 for required_value in BUNNY_STORAGE_S3_ENDPOINT BUNNY_STORAGE_BUCKET BUNNY_STORAGE_ACCESS_KEY_ID BUNNY_STORAGE_SECRET_ACCESS_KEY; do
   if [[ -z "${!required_value:-}" ]]; then
     echo "Restore environment is missing ${required_value}." >&2
@@ -77,8 +77,24 @@ trap cleanup EXIT
 
 restic restore "${snapshot}" --target "${restore_dir}"
 readonly dump_file="$(find "${restore_dir}" -type f -name database.dump -print -quit)"
+readonly manifest_file="$(find "${restore_dir}" -type f -name manifest.txt -print -quit)"
 if [[ -z "${dump_file}" ]]; then
   echo 'Restic snapshot does not contain database.dump.' >&2
+  exit 66
+fi
+if [[ -z "${manifest_file}" ]]; then
+  echo 'Restic snapshot does not contain manifest.txt.' >&2
+  exit 66
+fi
+
+expected_checksum="$(awk -F= '$1 == "dump_sha256" { print $2; exit }' "${manifest_file}")"
+if [[ ! "${expected_checksum}" =~ ^[a-fA-F0-9]{64}$ ]]; then
+  echo 'Restore manifest has no valid dump checksum.' >&2
+  exit 66
+fi
+actual_checksum="$(sha256sum "${dump_file}" | awk '{print $1}')"
+if [[ "${actual_checksum}" != "${expected_checksum}" ]]; then
+  echo 'Restored database dump checksum does not match its manifest.' >&2
   exit 66
 fi
 

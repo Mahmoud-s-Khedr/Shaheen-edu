@@ -7,6 +7,10 @@ example-questions
 .github
 .env
 .env.*
+keys.txt
+*.pem
+*.key
+*.crt
 !.env.example
 .testcontainers-env.json
 *.log

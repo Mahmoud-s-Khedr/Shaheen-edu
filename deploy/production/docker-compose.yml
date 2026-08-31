@@ -1,11 +1,44 @@
 name: shaheen-edu-production
 
 # Production Docker responsibilities are limited to the application, worker,
-# Redis, and explicit one-off jobs. Nginx, TLS, and PostgreSQL are deliberately
-# host-managed and are not Compose services.
+# Redis, a private API gateway, and explicit one-off jobs. Public Nginx, TLS,
+# and PostgreSQL are deliberately host-managed and are not Compose services.
 services:
+  # The host Nginx remains the public TLS edge. This private gateway is needed
+  # only because a fixed host port cannot be published by multiple API
+  # replicas. It resolves the Compose `api` service through Docker DNS and
+  # balances requests across `docker compose up --scale api=<n>` replicas.
+  api-gateway:
+    # Pin the reviewed multi-platform image digest; update it intentionally in
+    # a release rather than accepting a changed mutable tag at deploy time.
+    image: nginx@sha256:5616878291a2eed594aee8db4dade5878cf7edcb475e59193904b198d9b830de
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:${API_HOST_PORT:-13000}:8080'
+    volumes:
+      - ./nginx/api-gateway.conf:/etc/nginx/conf.d/default.conf:ro
+    labels:
+      com.shaheen.edu.service: api-gateway
+      com.shaheen.edu.release: ${RELEASE_REVISION:-unknown}
+    logging: &bounded_logging
+      driver: local
+      options:
+        max-size: '10m'
+        max-file: '3'
+    stop_grace_period: 15s
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          'wget -q -O /dev/null http://127.0.0.1:8080/health || exit 1',
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+
   redis:
-    image: redis:7-alpine
+    # See the gateway note above: this is a reviewed immutable image digest.
+    image: redis@sha256:ee64a64eaab618d88051c3ade8f6352d11531fcf79d9a4818b9b183d8c1d18ba
     restart: unless-stopped
     environment:
       REDIS_PASSWORD: ${REDIS_PASSWORD:?set REDIS_PASSWORD in .env}
@@ -23,11 +56,11 @@ services:
     labels:
       com.shaheen.edu.service: redis
       com.shaheen.edu.release: ${RELEASE_REVISION:-unknown}
-    logging: &bounded_logging
-      driver: local
-      options:
-        max-size: '10m'
-        max-file: '3'
+    logging: *bounded_logging
+    # Leave headroom for AOF rewrite and the Redis allocator. This must be
+    # larger than REDIS_MAXMEMORY; tune both to the host's available RAM.
+    mem_limit: ${REDIS_MEMORY_LIMIT:?set REDIS_MEMORY_LIMIT in .env}
+    stop_grace_period: 30s
     healthcheck:
       test:
         [
@@ -82,6 +115,35 @@ services:
       redis:
         condition: service_healthy
 
+  # Use only after a confirmed fresh Redis recovery. The command refuses a
+  # non-empty Redis DB, resets durable interrupted work in PostgreSQL to
+  # queued, then repopulates BullMQ before API/worker traffic resumes.
+  queue-recovery:
+    profiles: ['queue-recovery']
+    build:
+      context: ../..
+      target: migration
+    env_file: .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL in .env}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+    extra_hosts: *host_postgres
+    command:
+      [
+        'pnpm',
+        'tsx',
+        'scripts/recover-redis-queues.ts',
+        '--confirm-empty-redis',
+      ]
+    restart: 'no'
+    labels:
+      com.shaheen.edu.service: queue-recovery
+      com.shaheen.edu.release: ${RELEASE_REVISION:-unknown}
+    logging: *bounded_logging
+    depends_on:
+      redis:
+        condition: service_healthy
+
   api:
     build:
       context: ../..
@@ -91,17 +153,14 @@ services:
     environment:
       DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL in .env}
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
-      TRUST_PROXY_HOPS: 1
+      TRUST_PROXY_HOPS: ${TRUST_PROXY_HOPS:-2}
       RELEASE_REVISION: ${RELEASE_REVISION:-unknown}
     extra_hosts: *host_postgres
-    # Host Nginx is the sole public entry point. This port is intentionally
-    # reachable only from the host loopback interface.
-    ports:
-      - '127.0.0.1:${API_HOST_PORT:-13000}:3000'
     labels:
       com.shaheen.edu.service: api
       com.shaheen.edu.release: ${RELEASE_REVISION:-unknown}
     logging: *bounded_logging
+    stop_grace_period: 45s
     depends_on:
       redis:
         condition: service_healthy
@@ -131,6 +190,9 @@ services:
       com.shaheen.edu.service: worker
       com.shaheen.edu.release: ${RELEASE_REVISION:-unknown}
     logging: *bounded_logging
+    # Active AI jobs may legitimately outlive a normal HTTP shutdown. BullMQ
+    # closes workers gracefully before Docker sends SIGKILL.
+    stop_grace_period: 5m
     depends_on:
       redis:
         condition: service_healthy

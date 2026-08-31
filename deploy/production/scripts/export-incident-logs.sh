@@ -42,7 +42,7 @@ cd "${project_dir}"
 # investigation set; do not add arbitrary containers casually.
 docker compose -f "${compose_file}" logs \
   --no-color --timestamps --since "${since}" \
-  api worker redis >"${bundle_dir}/compose.log"
+  api-gateway api worker redis >"${bundle_dir}/compose.log"
 
 readonly compose_sha256="$(sha256sum "${bundle_dir}/compose.log" | awk '{print $1}')"
 cat >"${bundle_dir}/manifest.txt" <<EOF

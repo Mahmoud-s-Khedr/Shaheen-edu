@@ -1,5 +1,5 @@
 [Unit]
-Description=Shaheen Edu encrypted host PostgreSQL backup to Bunny Storage
+Description=Verify Shaheen Edu encrypted host PostgreSQL backups
 Wants=network-online.target
 After=network-online.target
 ConditionPathExists=/etc/shaheen-edu/backup.env
@@ -9,14 +9,13 @@ Type=oneshot
 User=root
 Group=root
 WorkingDirectory=/opt/shaheen-edu/deploy/production
-Environment=PROJECT_DIR=/opt/shaheen-edu/deploy/production
 Environment=BACKUP_ENV_FILE=/etc/shaheen-edu/backup.env
-ExecStart=/opt/shaheen-edu/deploy/production/scripts/postgres-backup.sh --scheduled
-TimeoutStartSec=2h
+ExecStart=/opt/shaheen-edu/deploy/production/scripts/postgres-backup-verify.sh
+TimeoutStartSec=4h
 Nice=10
 IOSchedulingClass=best-effort
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectHome=true
 ProtectSystem=strict
-ReadWritePaths=/var/lib/shaheen-edu-backups /var/cache/shaheen-edu-restic /run/lock
+ReadWritePaths=/var/cache/shaheen-edu-restic /run/lock

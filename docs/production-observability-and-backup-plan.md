@@ -8,7 +8,7 @@ worker, and Redis; host operations run Nginx and PostgreSQL.
 
 | Area | Owner | Repository behavior |
 | --- | --- | --- |
-| API, worker, Redis logs | Repository-managed Docker services | Uses bounded Docker logs and can export an incident bundle. |
+| API gateway, API replicas, worker, Redis logs | Repository-managed Docker services | Uses bounded Docker logs and can export an incident bundle. |
 | Nginx access/error logs | Host operations | Not collected by Compose or the incident-bundle script. |
 | PostgreSQL service, backup scheduling, restore-target creation, retention | Host operations | PostgreSQL remains host-managed; operator controls credentials and schedules. |
 | PostgreSQL backup and isolated restore | Repository scripts run on host | Uses host client tools and Restic; never provisions or operates the PostgreSQL service. |
@@ -26,11 +26,11 @@ no Docker or PostgreSQL-service dependency.
 
 ## Incident logs
 
-The incident-log export script collects only the Docker `api`, `worker`, and
-`redis` logs, then uploads the restricted bundle to the configured private
-Bunny destination. It deliberately cannot include host Nginx or PostgreSQL
-logs. The host operator must use its established access-controlled process for
-those logs.
+The incident-log export script collects only the Docker `api-gateway`, `api`,
+`worker`, and `redis` logs, then uploads the restricted bundle to the configured
+private Bunny destination. It deliberately cannot include host Nginx or
+PostgreSQL logs. The host operator must use its established access-controlled
+process for those logs.
 
 ```sh
 cd /opt/shaheen-edu/deploy/production

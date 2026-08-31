@@ -23,19 +23,19 @@ fi
 # shellcheck source=/dev/null
 source "${backup_env_file}"
 
-for required_value in PGHOST PGPORT PGDATABASE PGUSER PGPASSFILE RESTIC_PASSWORD_FILE BUNNY_STORAGE_ENV_FILE BACKUP_STAGING_DIR RESTIC_CACHE_DIR; do
+for required_value in PGHOST PGPORT PGDATABASE PGUSER PGPASSFILE RESTIC_PASSWORD_FILE BACKUP_STORAGE_ENV_FILE BACKUP_STAGING_DIR RESTIC_CACHE_DIR; do
   if [[ -z "${!required_value:-}" ]]; then
     echo "{\"event\":\"backup_failed\",\"reason\":\"missing_${required_value}\"}" >&2
     exit 78
   fi
 done
 
-if [[ ! -r "${PGPASSFILE}" || ! -r "${RESTIC_PASSWORD_FILE}" || ! -r "${BUNNY_STORAGE_ENV_FILE}" ]]; then
+if [[ ! -r "${PGPASSFILE}" || ! -r "${RESTIC_PASSWORD_FILE}" || ! -r "${BACKUP_STORAGE_ENV_FILE}" ]]; then
   echo '{"event":"backup_failed","reason":"required_secret_file_unavailable"}' >&2
   exit 78
 fi
 
-if ! command -v pg_dump >/dev/null || ! command -v psql >/dev/null || ! command -v restic >/dev/null || ! command -v sha256sum >/dev/null; then
+if ! command -v pg_dump >/dev/null || ! command -v psql >/dev/null || ! command -v restic >/dev/null || ! command -v sha256sum >/dev/null || ! command -v flock >/dev/null; then
   echo '{"event":"backup_failed","reason":"required_command_unavailable"}' >&2
   exit 69
 fi
@@ -43,9 +43,16 @@ fi
 readonly run_started_at="$(date --utc +%Y-%m-%dT%H:%M:%SZ)"
 readonly run_id="$(date --utc +%Y%m%dT%H%M%SZ)-$(hostname -s)"
 readonly operations_prefix="${OPERATIONS_PREFIX:-operations}"
-readonly working_dir="${BACKUP_STAGING_DIR}/${run_id}"
-readonly dump_file="${working_dir}/database.dump"
-readonly manifest_file="${working_dir}/manifest.txt"
+readonly keep_daily="${RESTIC_KEEP_DAILY:-14}"
+readonly keep_weekly="${RESTIC_KEEP_WEEKLY:-8}"
+readonly keep_monthly="${RESTIC_KEEP_MONTHLY:-12}"
+
+for retention_value in "${keep_daily}" "${keep_weekly}" "${keep_monthly}"; do
+  if [[ ! "${retention_value}" =~ ^[1-9][0-9]*$ ]]; then
+    echo '{"event":"backup_failed","reason":"invalid_retention_policy"}' >&2
+    exit 78
+  fi
+done
 
 if [[ ! -d "${BACKUP_STAGING_DIR}" || ! -w "${BACKUP_STAGING_DIR}" ]]; then
   echo '{"event":"backup_failed","reason":"backup_staging_directory_unavailable"}' >&2
@@ -54,19 +61,6 @@ fi
 
 mkdir -p "${RESTIC_CACHE_DIR}"
 mkdir -p "$(dirname "${lock_file}")"
-mkdir "${working_dir}"
-
-cleanup() {
-  local result=$?
-  rm -rf -- "${working_dir}"
-  if (( result != 0 )); then
-    printf '{"event":"backup_failed","mode":"%s","startedAt":"%s"}\n' \
-      "${backup_mode#--}" "${run_started_at}" >&2
-  fi
-  exit "${result}"
-}
-trap cleanup EXIT
-
 exec 9>"${lock_file}"
 if ! flock -w 300 9; then
   echo '{"event":"backup_failed","reason":"backup_lock_timeout"}' >&2
@@ -74,7 +68,7 @@ if ! flock -w 300 9; then
 fi
 
 # shellcheck source=/dev/null
-source "${BUNNY_STORAGE_ENV_FILE}"
+source "${BACKUP_STORAGE_ENV_FILE}"
 for required_value in BUNNY_STORAGE_S3_ENDPOINT BUNNY_STORAGE_BUCKET BUNNY_STORAGE_ACCESS_KEY_ID BUNNY_STORAGE_SECRET_ACCESS_KEY; do
   if [[ -z "${!required_value:-}" ]]; then
     echo "{\"event\":\"backup_failed\",\"reason\":\"missing_${required_value}\"}" >&2
@@ -92,6 +86,23 @@ export RESTIC_REPOSITORY RESTIC_CACHE_DIR="${RESTIC_CACHE_DIR}"
 # Do not create a plaintext dump if the encrypted remote repository is not
 # available. Repository initialisation is an explicit operator action.
 restic cat config >/dev/null
+
+# Use a random suffix even when a scheduled and manually-triggered run start
+# in the same second. The lock is held before the directory is created.
+readonly working_dir="$(mktemp -d "${BACKUP_STAGING_DIR}/${run_id}.XXXXXX")"
+readonly dump_file="${working_dir}/database.dump"
+readonly manifest_file="${working_dir}/manifest.txt"
+
+cleanup() {
+  local result=$?
+  rm -rf -- "${working_dir}"
+  if (( result != 0 )); then
+    printf '{"event":"backup_failed","mode":"%s","startedAt":"%s"}\n' \
+      "${backup_mode#--}" "${run_started_at}" >&2
+  fi
+  exit "${result}"
+}
+trap cleanup EXIT
 
 schema_migration="$(psql --host="${PGHOST}" --port="${PGPORT}" --username="${PGUSER}" --dbname="${PGDATABASE}" --tuples-only --no-align \
   --command 'SELECT migration_name FROM "_prisma_migrations" WHERE finished_at IS NOT NULL ORDER BY finished_at DESC LIMIT 1' 2>/dev/null || true)"
@@ -120,6 +131,15 @@ if [[ -z "${snapshot_id}" ]]; then
   exit 70
 fi
 restic snapshots "${snapshot_id}" >/dev/null
+
+# Retention applies only to database snapshots. Keeping it in the same locked
+# operation prevents an indefinitely growing repository while never touching
+# incident-log or other operations data stored under the same prefix.
+restic forget --tag 'service:postgres' \
+  --keep-daily "${keep_daily}" \
+  --keep-weekly "${keep_weekly}" \
+  --keep-monthly "${keep_monthly}" \
+  --prune >/dev/null
 
 readonly run_completed_at="$(date --utc +%Y-%m-%dT%H:%M:%SZ)"
 printf '{"event":"backup_completed","service":"postgres","mode":"%s","backupId":"%s","startedAt":"%s","completedAt":"%s","dumpBytes":%s,"dumpSha256":"%s"}\n' \

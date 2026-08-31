@@ -217,6 +217,10 @@ export class PublisherUsageRollupsService {
     }
 
     await this.prisma.$transaction(async (tx) => {
+      // Every API replica runs Nest's cron decorators. Serialize the derived
+      // rollup replacement so a manual rebuild and any scaled replica cannot
+      // interleave delete/create operations for the same reporting tables.
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(73122403)`;
       const rangeWhere = {
         usageDate: {
           gte: this.dateValue(period.first),

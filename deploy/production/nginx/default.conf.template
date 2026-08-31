@@ -2,7 +2,9 @@
 # Existing host automation owns domains, certificates, renewal, and the TLS
 # directives, which are intentionally omitted here. Replace <api-domain> and
 # 13000 with the approved domain and API_HOST_PORT.
-access_log off;
+# Keep host access and error logs enabled through the existing host logging
+# policy. They are essential for incident investigation and remain outside the
+# Compose incident-log bundle.
 
 server {
     listen 3000 ssl;
