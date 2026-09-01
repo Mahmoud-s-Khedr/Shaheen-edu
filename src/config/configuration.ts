@@ -268,7 +268,7 @@ export default (): AppConfig => ({
       .filter(Boolean),
     referralPartnerMinimumCohort: envInteger(
       'REFERRAL_PARTNER_MINIMUM_COHORT',
-      5,
+      1,
     ),
   },
   commerce: {

@@ -5,5 +5,9 @@ import { QuestionAiExplanationsController } from './question-ai-explanations.con
 import { QuestionAiExplanationClient } from './question-ai-explanation.client';
 import { QuestionAiExplanationsService } from './question-ai-explanations.service';
 
-@Module({ imports: [AuditModule, AssetsModule], controllers: [QuestionAiExplanationsController], providers: [QuestionAiExplanationsService, QuestionAiExplanationClient] })
+@Module({
+  imports: [AuditModule, AssetsModule],
+  controllers: [QuestionAiExplanationsController],
+  providers: [QuestionAiExplanationsService, QuestionAiExplanationClient],
+})
 export class QuestionAiExplanationsModule {}

@@ -48,5 +48,7 @@ export function nodeMatches(node: unknown, q?: string): boolean {
   if (!q) return true;
   const needle = normalizeArabic(q);
   if (!needle) return true;
-  return searchableStrings(node).some((value) => normalizeArabic(value).includes(needle));
+  return searchableStrings(node).some((value) =>
+    normalizeArabic(value).includes(needle),
+  );
 }

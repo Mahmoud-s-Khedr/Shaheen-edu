@@ -49,8 +49,8 @@ export class QuestionImportMediaService {
         region,
         checked: this.validate(
           region.bounds,
-          metadata.width!,
-          metadata.height!,
+          metadata.width,
+          metadata.height,
           region.warnings,
         ),
       }))
@@ -178,8 +178,14 @@ export class QuestionImportMediaService {
             description: region.description,
             warnings: region.warnings,
             validationFlags: checked.flags,
-            cropCompleteness: this.completenessFor(checked.flags, region.warnings),
-            cropVerification: this.cropVerification(checked.flags, region.warnings),
+            cropCompleteness: this.completenessFor(
+              checked.flags,
+              region.warnings,
+            ),
+            cropVerification: this.cropVerification(
+              checked.flags,
+              region.warnings,
+            ),
             checksum,
             assetId: asset.id,
             status: this.statusFor(region, checked.flags),
@@ -268,8 +274,14 @@ export class QuestionImportMediaService {
             description: region.description.trim(),
             warnings: region.warnings,
             validationFlags: checked.flags,
-            cropCompleteness: this.completenessFor(checked.flags, region.warnings),
-            cropVerification: this.cropVerification(checked.flags, region.warnings),
+            cropCompleteness: this.completenessFor(
+              checked.flags,
+              region.warnings,
+            ),
+            cropVerification: this.cropVerification(
+              checked.flags,
+              region.warnings,
+            ),
             checksum,
             assetId: asset.id,
             status: this.statusFor(region, checked.flags),
@@ -316,13 +328,15 @@ export class QuestionImportMediaService {
       // Prisma's JSON equality filter is not portable across generated client
       // versions. Use the same in-memory overlap matching as successful crop
       // materialization, scoped to failed proposals on this page.
-      const failedMedia: any[] = await this.prisma.questionImportMedia.findMany({
-        where: {
-          batchId: batch.id,
-          pageNumber,
-          status: QuestionImportMediaStatus.FAILED,
+      const failedMedia: any[] = await this.prisma.questionImportMedia.findMany(
+        {
+          where: {
+            batchId: batch.id,
+            pageNumber,
+            status: QuestionImportMediaStatus.FAILED,
+          },
         },
-      });
+      );
       const existing = failedMedia.find(
         (media) =>
           media.normalizedBounds &&
@@ -352,8 +366,14 @@ export class QuestionImportMediaService {
             description: region.description.trim(),
             warnings: region.warnings,
             validationFlags: checked.flags,
-            cropCompleteness: this.completenessFor(checked.flags, region.warnings),
-            cropVerification: this.cropVerification(checked.flags, region.warnings),
+            cropCompleteness: this.completenessFor(
+              checked.flags,
+              region.warnings,
+            ),
+            cropVerification: this.cropVerification(
+              checked.flags,
+              region.warnings,
+            ),
             status: QuestionImportMediaStatus.FAILED,
             errorDetail: error.message.slice(0, 2000),
           },
@@ -375,9 +395,10 @@ export class QuestionImportMediaService {
         return media;
       });
     } catch (recoveryError: any) {
-      const recoveryMessage = recoveryError instanceof Error
-        ? recoveryError.message
-        : String(recoveryError);
+      const recoveryMessage =
+        recoveryError instanceof Error
+          ? recoveryError.message
+          : String(recoveryError);
       const combined = new Error(
         `Visual crop materialization failed: ${error.message}; failure persistence also failed: ${recoveryMessage}`,
       );

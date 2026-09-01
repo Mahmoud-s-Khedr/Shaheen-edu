@@ -84,7 +84,11 @@ export class SectionsController {
 
   @Patch(':id/access')
   @ApiOperation({ summary: 'Set the section access type' })
-  updateAccess(@CurrentUser() actor: RequestUser, @Param('id') id: string, @Body() dto: UpdateAccessTypeDto) {
+  updateAccess(
+    @CurrentUser() actor: RequestUser,
+    @Param('id') id: string,
+    @Body() dto: UpdateAccessTypeDto,
+  ) {
     return this.sectionsService.updateAccess(actor, id, dto.accessType);
   }
 
@@ -111,9 +115,7 @@ export class SectionsController {
   @ApiOperation({ summary: 'Publish a section' })
   @ApiOkResponse({ type: SectionSummaryDto })
   @ApiStandardErrors(401, 403, 404, 409)
-  publish(
-    @CurrentUser() actor: RequestUser,
-    @Param('id') id: string,  ) {
+  publish(@CurrentUser() actor: RequestUser, @Param('id') id: string) {
     return this.sectionsService.publish(actor, id);
   }
 
@@ -121,9 +123,7 @@ export class SectionsController {
   @ApiOperation({ summary: 'Archive a section' })
   @ApiOkResponse({ type: SectionSummaryDto })
   @ApiStandardErrors(401, 403, 404, 409)
-  archive(
-    @CurrentUser() actor: RequestUser,
-    @Param('id') id: string,  ) {
+  archive(@CurrentUser() actor: RequestUser, @Param('id') id: string) {
     return this.sectionsService.archive(actor, id);
   }
 
@@ -131,18 +131,14 @@ export class SectionsController {
   @ApiOperation({ summary: 'Restore an archived section' })
   @ApiOkResponse({ type: SectionSummaryDto })
   @ApiStandardErrors(401, 403, 404, 409)
-  restore(
-    @CurrentUser() actor: RequestUser,
-    @Param('id') id: string,  ) {
+  restore(@CurrentUser() actor: RequestUser, @Param('id') id: string) {
     return this.sectionsService.restore(actor, id);
   }
 
   @Delete(':id')
   @ApiOperation({ summary: 'Delete an eligible draft section' })
   @ApiStandardErrors(401, 403, 404, 409)
-  delete(
-    @CurrentUser() actor: RequestUser,
-    @Param('id') id: string,  ) {
+  delete(@CurrentUser() actor: RequestUser, @Param('id') id: string) {
     return this.sectionsService.delete(actor, id);
   }
 }

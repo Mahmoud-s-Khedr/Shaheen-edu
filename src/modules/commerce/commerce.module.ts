@@ -11,7 +11,10 @@ import { PricingService } from './pricing.service';
 import { PaymobService } from './paymob.service';
 import { FulfilmentService } from './fulfilment.service';
 import { CommerceExpiryService } from './commerce-expiry.service';
-import { AdminRefundsController, StudentRefundsController } from './refunds.controller';
+import {
+  AdminRefundsController,
+  StudentRefundsController,
+} from './refunds.controller';
 import { RefundsService } from './refunds.service';
 
 @Module({

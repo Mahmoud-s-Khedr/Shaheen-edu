@@ -285,7 +285,7 @@ orders and reversal rows.
 **Implementation status (2026-08-23):** Complete in code, pending migration
 deployment and operational rollout. Partner reporting is aggregate-only and
 suppresses the entire period below `REFERRAL_PARTNER_MINIMUM_COHORT` (default
-5), then omits any smaller product, category, or trend breakdown. Admins can
+1), then omits any smaller product, category, or trend breakdown. Admins can
 filter the existing immutable ledger/settlement views to referral commissions
 and request `REFERRAL_ALLOCATIONS` or `REFERRAL_SETTLEMENTS` through the
 existing audited private-export workflow. Automated review rules are scoped to

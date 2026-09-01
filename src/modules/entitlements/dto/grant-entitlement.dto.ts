@@ -1,6 +1,12 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsDate, IsEnum, IsOptional, IsString, ValidateIf } from 'class-validator';
+import {
+  IsDate,
+  IsEnum,
+  IsOptional,
+  IsString,
+  ValidateIf,
+} from 'class-validator';
 import { EntitlementSource } from '../../../common/types/roles.enum';
 import { PaginationQueryDto } from '../../../common/dto/pagination-query.dto';
 import { PaginationMetaDto } from '../../../common/dto/api-response.dto';
@@ -27,7 +33,10 @@ export class GrantEntitlementDto {
   @IsString()
   chapterId?: string;
 
-  @ApiPropertyOptional({ enum: EntitlementSource, default: EntitlementSource.ADMIN })
+  @ApiPropertyOptional({
+    enum: EntitlementSource,
+    default: EntitlementSource.ADMIN,
+  })
   @IsOptional()
   @IsEnum(EntitlementSource)
   source?: EntitlementSource;
@@ -58,12 +67,14 @@ export class AdminEntitlementDto {
   @ApiProperty({ enum: EntitlementSource }) source!: EntitlementSource;
   @ApiProperty() status!: string;
   @ApiProperty({ type: String, format: 'date-time' }) startsAt!: Date;
-  @ApiProperty({ type: String, format: 'date-time', nullable: true }) expiresAt!: Date | null;
+  @ApiProperty({ type: String, format: 'date-time', nullable: true })
+  expiresAt!: Date | null;
   @ApiProperty({ type: String, nullable: true }) grantedById!: string | null;
   @ApiProperty({ type: String, nullable: true }) grantedByName!: string | null;
   @ApiProperty({ type: String, nullable: true }) revokedById!: string | null;
   @ApiProperty({ type: String, nullable: true }) revokedByName!: string | null;
-  @ApiProperty({ type: String, format: 'date-time', nullable: true }) revokedAt!: Date | null;
+  @ApiProperty({ type: String, format: 'date-time', nullable: true })
+  revokedAt!: Date | null;
   @ApiProperty({ type: String, format: 'date-time' }) createdAt!: Date;
   @ApiProperty({ type: String, format: 'date-time' }) updatedAt!: Date;
 }

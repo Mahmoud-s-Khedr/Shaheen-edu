@@ -1,7 +1,11 @@
 import { nodeMatches, searchableStrings } from './node-match';
 
 describe('nodeMatches', () => {
-  const prismaRecord = { titleAr: 'إسلاميات', titleEn: 'Islamic Studies', slug: 'islamic' };
+  const prismaRecord = {
+    titleAr: 'إسلاميات',
+    titleEn: 'Islamic Studies',
+    slug: 'islamic',
+  };
   // What gradeDto() emits: localized objects, and no flat titleAr/titleEn.
   const gradeDto = {
     id: 'g1',

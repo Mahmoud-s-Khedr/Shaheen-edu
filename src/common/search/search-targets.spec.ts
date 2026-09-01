@@ -6,7 +6,8 @@ function sourceFiles(dir: string, acc: string[] = []): string[] {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     const path = join(dir, entry.name);
     if (entry.isDirectory()) sourceFiles(path, acc);
-    else if (entry.name.endsWith('.ts') && !entry.name.endsWith('.spec.ts')) acc.push(path);
+    else if (entry.name.endsWith('.ts') && !entry.name.endsWith('.spec.ts'))
+      acc.push(path);
   }
   return acc;
 }
@@ -24,11 +25,16 @@ describe('Arabic search targets', () => {
    * a service that quietly stopped using Arabic-aware search, or an index that
    * should be dropped -- both worth failing over.
    */
-  it.each(ARABIC_SEARCH_TARGETS)('target %s is used by at least one service', (target) => {
-    expect(CALL_SITES).toContain(`'${target}'`);
-  });
+  it.each(ARABIC_SEARCH_TARGETS)(
+    'target %s is used by at least one service',
+    (target) => {
+      expect(CALL_SITES).toContain(`'${target}'`);
+    },
+  );
 
   it('has no service left doing a raw contains search on a q parameter', () => {
-    expect(CALL_SITES).not.toMatch(/contains:\s*(q\.q|query\.q|pagination\.q|search|searchQuery)\b/);
+    expect(CALL_SITES).not.toMatch(
+      /contains:\s*(q\.q|query\.q|pagination\.q|search|searchQuery)\b/,
+    );
   });
 });

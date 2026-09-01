@@ -27,5 +27,4 @@ export class UpdateSubjectDto {
   @IsString()
   @MaxLength(2000)
   description?: string;
-
 }

@@ -13,5 +13,4 @@ export class MoveSectionDto {
   @IsInt()
   @Min(1)
   sortOrder?: number;
-
 }

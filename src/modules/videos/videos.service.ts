@@ -139,7 +139,8 @@ export class VideosService {
       where: { assetId, clientUploadCompletedAt: null },
       data: { clientUploadCompletedAt: new Date() },
     });
-    if (!completion.count) return this.summary(await this.getWithVideo(assetId));
+    if (!completion.count)
+      return this.summary(await this.getWithVideo(assetId));
     if (asset.status === AssetStatus.UPLOADING) {
       await this.prisma.asset.updateMany({
         where: { id: assetId, status: AssetStatus.UPLOADING },
@@ -321,7 +322,7 @@ export class VideosService {
             eventKey,
             bunnyVideoId: payload.VideoGuid!,
             status: payload.Status!,
-            payload: payload as object,
+            payload: payload,
           },
         });
         const video = await tx.videoAsset.findUnique({
@@ -363,7 +364,11 @@ export class VideosService {
           where: { id: video.assetId },
           data:
             next === VideoProcessingStatus.READY
-              ? { status: AssetStatus.READY, readyAt: new Date(), failedAt: null }
+              ? {
+                  status: AssetStatus.READY,
+                  readyAt: new Date(),
+                  failedAt: null,
+                }
               : next === VideoProcessingStatus.FAILED
                 ? { status: AssetStatus.FAILED, failedAt: new Date() }
                 : { status: AssetStatus.PROCESSING },

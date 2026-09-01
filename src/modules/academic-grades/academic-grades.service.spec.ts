@@ -43,7 +43,10 @@ describe('AcademicGradesService', () => {
     prisma.academicGrade.findUnique.mockResolvedValue({ id: 'existing' });
 
     await expect(
-      service.create(actor, { title: { ar: 'الصف العاشر', en: 'Grade 10' }, slug: 'grade-10' }),
+      service.create(actor, {
+        title: { ar: 'الصف العاشر', en: 'Grade 10' },
+        slug: 'grade-10',
+      }),
     ).rejects.toBeInstanceOf(ConflictException);
   });
 
@@ -52,10 +55,20 @@ describe('AcademicGradesService', () => {
     prisma.academicGrade.findUnique
       .mockResolvedValueOnce(null)
       .mockResolvedValueOnce({
-        id: 'g1', titleAr: 'الصف العاشر', titleEn: 'Grade 10', slug: 'grade-10',
-        descriptionAr: null, descriptionEn: null, sortOrder: 5, status: 'DRAFT',
-        createdAt: new Date(), updatedAt: new Date(), publishedAt: null, archivedAt: null,
-        coverAsset: null, _count: { subjects: 0 },
+        id: 'g1',
+        titleAr: 'الصف العاشر',
+        titleEn: 'Grade 10',
+        slug: 'grade-10',
+        descriptionAr: null,
+        descriptionEn: null,
+        sortOrder: 5,
+        status: 'DRAFT',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        publishedAt: null,
+        archivedAt: null,
+        coverAsset: null,
+        _count: { subjects: 0 },
       });
     prisma.academicGrade.aggregate.mockResolvedValue({
       _max: { sortOrder: 4 },
@@ -75,7 +88,9 @@ describe('AcademicGradesService', () => {
       archivedAt: null,
     });
 
-    const result = await service.create(actor, { title: { ar: 'الصف العاشر', en: 'Grade 10' } });
+    const result = await service.create(actor, {
+      title: { ar: 'الصف العاشر', en: 'Grade 10' },
+    });
 
     expect(prisma.academicGrade.create).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -102,7 +117,9 @@ describe('AcademicGradesService', () => {
     prisma.academicGrade.findUnique
       .mockResolvedValueOnce(record)
       .mockResolvedValueOnce(record);
-    await service.update(actor, 'g1', { title: { ar: 'الصف العاشر', en: 'Grade 10' } });
+    await service.update(actor, 'g1', {
+      title: { ar: 'الصف العاشر', en: 'Grade 10' },
+    });
     expect(prisma.academicGrade.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({ where: { id: 'g1' } }),
     );
@@ -111,9 +128,18 @@ describe('AcademicGradesService', () => {
   it('maps the non-archived subject relation count without extra child queries', async () => {
     const { service, prisma } = buildService();
     const grade = {
-      id: 'g1', titleAr: 'الصف العاشر', titleEn: 'Grade 10', slug: 'grade-10',
-      descriptionAr: null, descriptionEn: null, sortOrder: 1, status: 'DRAFT',
-      createdAt: new Date(), updatedAt: new Date(), publishedAt: null, archivedAt: null,
+      id: 'g1',
+      titleAr: 'الصف العاشر',
+      titleEn: 'Grade 10',
+      slug: 'grade-10',
+      descriptionAr: null,
+      descriptionEn: null,
+      sortOrder: 1,
+      status: 'DRAFT',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      publishedAt: null,
+      archivedAt: null,
       coverAssetId: null,
     };
     prisma.academicGrade.findMany.mockResolvedValueOnce([
@@ -128,7 +154,9 @@ describe('AcademicGradesService', () => {
     expect(prisma.academicGrade.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         include: expect.objectContaining({
-          _count: { select: { subjects: { where: { status: { not: 'ARCHIVED' } } } } },
+          _count: {
+            select: { subjects: { where: { status: { not: 'ARCHIVED' } } } },
+          },
         }),
       }),
     );

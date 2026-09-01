@@ -32,9 +32,21 @@ import {
 const CAIRO = 'Africa/Cairo';
 const MAX_EXPORT_ROWS = 100_000;
 const FILTER_KEYS = [
-  'from', 'to', 'subjectId', 'courseId', 'chapterId', 'gradeId',
-  'governorateId', 'centerId', 'paymentChannel', 'orderStatus',
-  'paymentStatus', 'promotionId', 'couponCode', 'referralCode', 'partnerUserId',
+  'from',
+  'to',
+  'subjectId',
+  'courseId',
+  'chapterId',
+  'gradeId',
+  'governorateId',
+  'centerId',
+  'paymentChannel',
+  'orderStatus',
+  'paymentStatus',
+  'promotionId',
+  'couponCode',
+  'referralCode',
+  'partnerUserId',
 ] as const;
 
 interface ReportExportPolicy {
@@ -66,39 +78,66 @@ export const REPORT_EXPORT_POLICIES: Record<ReportType, ReportExportPolicy> = {
   },
   PLATFORM_REVENUE: {
     classification: ReportDataClassification.NON_PII,
-    columns: ['approvedAt', 'status', 'paymentChannel', 'subtotalMinor', 'discountMinor', 'totalMinor', 'currency'],
-    roles: [Role.ADMIN, Role.SUPER_ADMIN], privileged: true,
-    retentionMs: 24 * 60 * 60 * 1000, signedUrlMs: 15 * 60 * 1000,
+    columns: [
+      'approvedAt',
+      'status',
+      'paymentChannel',
+      'subtotalMinor',
+      'discountMinor',
+      'totalMinor',
+      'currency',
+    ],
+    roles: [Role.ADMIN, Role.SUPER_ADMIN],
+    privileged: true,
+    retentionMs: 24 * 60 * 60 * 1000,
+    signedUrlMs: 15 * 60 * 1000,
   },
   REFUNDS: {
     classification: ReportDataClassification.NON_PII,
     columns: ['requestedAt', 'reviewedAt', 'status', 'amountMinor', 'currency'],
-    roles: [Role.ADMIN, Role.SUPER_ADMIN], privileged: true,
-    retentionMs: 24 * 60 * 60 * 1000, signedUrlMs: 15 * 60 * 1000,
+    roles: [Role.ADMIN, Role.SUPER_ADMIN],
+    privileged: true,
+    retentionMs: 24 * 60 * 60 * 1000,
+    signedUrlMs: 15 * 60 * 1000,
   },
   PAYMENTS: {
     classification: ReportDataClassification.NON_PII,
     columns: ['initiatedAt', 'completedAt', 'channel', 'status'],
-    roles: [Role.ADMIN, Role.SUPER_ADMIN], privileged: true,
-    retentionMs: 24 * 60 * 60 * 1000, signedUrlMs: 15 * 60 * 1000,
+    roles: [Role.ADMIN, Role.SUPER_ADMIN],
+    privileged: true,
+    retentionMs: 24 * 60 * 60 * 1000,
+    signedUrlMs: 15 * 60 * 1000,
   },
   REGISTRATIONS: {
     classification: ReportDataClassification.NON_PII,
     columns: ['createdAt', 'academicGradeId', 'governorateId', 'centerId'],
-    roles: [Role.ADMIN, Role.SUPER_ADMIN], privileged: false,
-    retentionMs: 24 * 60 * 60 * 1000, signedUrlMs: 15 * 60 * 1000,
+    roles: [Role.ADMIN, Role.SUPER_ADMIN],
+    privileged: false,
+    retentionMs: 24 * 60 * 60 * 1000,
+    signedUrlMs: 15 * 60 * 1000,
   },
   ACTIVE_PURCHASERS: {
     classification: ReportDataClassification.NON_PII,
     columns: ['approvedPurchasers', 'purchasersWithCurrentAccess'],
-    roles: [Role.ADMIN, Role.SUPER_ADMIN], privileged: true,
-    retentionMs: 24 * 60 * 60 * 1000, signedUrlMs: 15 * 60 * 1000,
+    roles: [Role.ADMIN, Role.SUPER_ADMIN],
+    privileged: true,
+    retentionMs: 24 * 60 * 60 * 1000,
+    signedUrlMs: 15 * 60 * 1000,
   },
   ENTITLEMENT_LIFECYCLE: {
     classification: ReportDataClassification.NON_PII,
-    columns: ['createdAt', 'source', 'status', 'startsAt', 'expiresAt', 'revokedAt'],
-    roles: [Role.ADMIN, Role.SUPER_ADMIN], privileged: false,
-    retentionMs: 24 * 60 * 60 * 1000, signedUrlMs: 15 * 60 * 1000,
+    columns: [
+      'createdAt',
+      'source',
+      'status',
+      'startsAt',
+      'expiresAt',
+      'revokedAt',
+    ],
+    roles: [Role.ADMIN, Role.SUPER_ADMIN],
+    privileged: false,
+    retentionMs: 24 * 60 * 60 * 1000,
+    signedUrlMs: 15 * 60 * 1000,
   },
   PARTNER_OBLIGATIONS: {
     classification: ReportDataClassification.NON_PII,
@@ -241,9 +280,15 @@ export class ReportsService {
       ? DateTime.fromISO(query.from, { zone: CAIRO }).startOf('day')
       : undefined;
     const to = query.to
-      ? DateTime.fromISO(query.to, { zone: CAIRO }).plus({ days: 1 }).startOf('day')
+      ? DateTime.fromISO(query.to, { zone: CAIRO })
+          .plus({ days: 1 })
+          .startOf('day')
       : undefined;
-    if ((from && !from.isValid) || (to && !to.isValid) || (from && to && to <= from))
+    if (
+      (from && !from.isValid) ||
+      (to && !to.isValid) ||
+      (from && to && to <= from)
+    )
       throw new BadRequestException('Invalid Cairo date range');
     return {
       ...(from ? { gte: from.toUTC().toJSDate() } : {}),
@@ -265,13 +310,20 @@ export class ReportsService {
       ...(query.orderStatus ? { orderStatus: query.orderStatus } : {}),
       ...(query.paymentStatus ? { paymentStatus: query.paymentStatus } : {}),
       ...(query.promotionId ? { promotionId: query.promotionId } : {}),
-      ...(query.couponCode ? { couponCode: query.couponCode.trim().toUpperCase() } : {}),
-      ...(query.referralCode ? { referralCode: query.referralCode.trim().toUpperCase() } : {}),
+      ...(query.couponCode
+        ? { couponCode: query.couponCode.trim().toUpperCase() }
+        : {}),
+      ...(query.referralCode
+        ? { referralCode: query.referralCode.trim().toUpperCase() }
+        : {}),
       ...(query.partnerUserId ? { partnerUserId: query.partnerUserId } : {}),
     };
   }
 
-  private assertSupportedFilters(query: PlatformReportQueryDto, supported: readonly string[]) {
+  private assertSupportedFilters(
+    query: PlatformReportQueryDto,
+    supported: readonly string[],
+  ) {
     const unsupported = FILTER_KEYS.filter(
       (key) => (query as any)[key] !== undefined && !supported.includes(key),
     );
@@ -281,13 +333,37 @@ export class ReportsService {
       );
   }
 
-  private assertReportFilters(reportType: string, query: PlatformReportQueryDto) {
+  private assertReportFilters(
+    reportType: string,
+    query: PlatformReportQueryDto,
+  ) {
     const orderFilters = FILTER_KEYS;
-    const studentFilters = ['from', 'to', 'subjectId', 'courseId', 'chapterId', 'gradeId', 'governorateId', 'centerId'] as const;
+    const studentFilters = [
+      'from',
+      'to',
+      'subjectId',
+      'courseId',
+      'chapterId',
+      'gradeId',
+      'governorateId',
+      'centerId',
+    ] as const;
     const ledgerFilters = ['from', 'to', 'partnerUserId'] as const;
-    if (['COMMERCE', 'PLATFORM_REVENUE', 'REFUNDS', 'PAYMENTS', 'ACTIVE_PURCHASERS'].includes(reportType))
+    if (
+      [
+        'COMMERCE',
+        'PLATFORM_REVENUE',
+        'REFUNDS',
+        'PAYMENTS',
+        'ACTIVE_PURCHASERS',
+      ].includes(reportType)
+    )
       return this.assertSupportedFilters(query, orderFilters);
-    if (['REGISTRATIONS', 'ENTITLEMENT_LIFECYCLE', 'ENTITLEMENTS'].includes(reportType))
+    if (
+      ['REGISTRATIONS', 'ENTITLEMENT_LIFECYCLE', 'ENTITLEMENTS'].includes(
+        reportType,
+      )
+    )
       return this.assertSupportedFilters(query, studentFilters);
     return this.assertSupportedFilters(query, ledgerFilters);
   }
@@ -304,55 +380,123 @@ export class ReportsService {
     const predicates: any[] = [];
     if (query.chapterId) predicates.push({ chapterId: query.chapterId });
     if (query.courseId)
-      predicates.push({ OR: [{ courseId: query.courseId }, { chapter: { courseId: query.courseId } }] });
+      predicates.push({
+        OR: [
+          { courseId: query.courseId },
+          { chapter: { courseId: query.courseId } },
+        ],
+      });
     if (query.subjectId)
-      predicates.push({ OR: [{ course: { subjectId: query.subjectId } }, { chapter: { course: { subjectId: query.subjectId } } }] });
+      predicates.push({
+        OR: [
+          { course: { subjectId: query.subjectId } },
+          { chapter: { course: { subjectId: query.subjectId } } },
+        ],
+      });
     if (query.promotionId)
-      predicates.push({ appliedPromotionSnapshot: { path: ['campaignId'], equals: query.promotionId } });
+      predicates.push({
+        appliedPromotionSnapshot: {
+          path: ['campaignId'],
+          equals: query.promotionId,
+        },
+      });
     return predicates.length ? { AND: predicates } : undefined;
   }
 
-  private entitlementWhere(query: PlatformReportQueryDto, dates: any, dateField = 'createdAt') {
+  private entitlementWhere(
+    query: PlatformReportQueryDto,
+    dates: any,
+    dateField = 'createdAt',
+  ) {
     const predicates: any[] = [];
     if (query.chapterId) predicates.push({ chapterId: query.chapterId });
     if (query.courseId)
-      predicates.push({ OR: [{ courseId: query.courseId }, { chapter: { courseId: query.courseId } }] });
+      predicates.push({
+        OR: [
+          { courseId: query.courseId },
+          { chapter: { courseId: query.courseId } },
+        ],
+      });
     if (query.subjectId)
-      predicates.push({ OR: [{ course: { subjectId: query.subjectId } }, { chapter: { course: { subjectId: query.subjectId } } }] });
+      predicates.push({
+        OR: [
+          { course: { subjectId: query.subjectId } },
+          { chapter: { course: { subjectId: query.subjectId } } },
+        ],
+      });
     return {
       ...(Object.keys(dates).length ? { [dateField]: dates } : {}),
-      ...(Object.keys(this.studentWhere(query)).length ? { student: this.studentWhere(query) } : {}),
+      ...(Object.keys(this.studentWhere(query)).length
+        ? { student: this.studentWhere(query) }
+        : {}),
       ...(predicates.length ? { AND: predicates } : {}),
     } as any;
   }
 
-  private orderWhere(query: PlatformReportQueryDto, dateField: string, dates: any) {
+  private orderWhere(
+    query: PlatformReportQueryDto,
+    dateField: string,
+    dates: any,
+  ) {
     const items = this.itemWhere(query);
     return {
       ...(Object.keys(dates).length ? { [dateField]: dates } : {}),
       ...(query.paymentChannel ? { paymentChannel: query.paymentChannel } : {}),
       ...(query.orderStatus ? { status: query.orderStatus } : {}),
-      ...(query.paymentStatus ? { paymentAttempts: { some: { status: query.paymentStatus } } } : {}),
-      ...(Object.keys(this.studentWhere(query)).length ? { student: this.studentWhere(query) } : {}),
+      ...(query.paymentStatus
+        ? { paymentAttempts: { some: { status: query.paymentStatus } } }
+        : {}),
+      ...(Object.keys(this.studentWhere(query)).length
+        ? { student: this.studentWhere(query) }
+        : {}),
       ...(items ? { items: { some: items } } : {}),
-      ...(query.couponCode ? { couponReservation: { coupon: { code: query.couponCode.trim().toUpperCase() } } } : {}),
-      ...(query.referralCode ? { referralAttribution: { referralCode: { code: query.referralCode.trim().toUpperCase() } } } : {}),
-      ...(query.partnerUserId ? { referralAttribution: { referralProgram: { partnerUserId: query.partnerUserId } } } : {}),
+      ...(query.couponCode
+        ? {
+            couponReservation: {
+              coupon: { code: query.couponCode.trim().toUpperCase() },
+            },
+          }
+        : {}),
+      ...(query.referralCode
+        ? {
+            referralAttribution: {
+              referralCode: { code: query.referralCode.trim().toUpperCase() },
+            },
+          }
+        : {}),
+      ...(query.partnerUserId
+        ? {
+            referralAttribution: {
+              referralProgram: { partnerUserId: query.partnerUserId },
+            },
+          }
+        : {}),
     } as any;
   }
 
-  private contract(name: string, metricDefinitions: Record<string, string>, filters: PlatformReportQueryDto) {
+  private contract(
+    name: string,
+    metricDefinitions: Record<string, string>,
+    filters: PlatformReportQueryDto,
+  ) {
     return {
       report: name,
       period: { ...this.normalizedFilters(filters), timeZone: CAIRO },
       metricDefinitions,
-      emptyResultBehavior: 'Returns data: [] and zero-valued totals; it never substitutes a prior period.',
-      pagination: 'Aggregate endpoints are not paginated. Their group dimensions are fixed and bounded; source-record CSV exports are capped at 100,000 rows.',
-      rollup: 'No derived rollup is used. Results are reproducible from the referenced source records at request time.',
+      emptyResultBehavior:
+        'Returns data: [] and zero-valued totals; it never substitutes a prior period.',
+      pagination:
+        'Aggregate endpoints are not paginated. Their group dimensions are fixed and bounded; source-record CSV exports are capped at 100,000 rows.',
+      rollup:
+        'No derived rollup is used. Results are reproducible from the referenced source records at request time.',
     };
   }
 
-  private async auditReportView(actor: RequestUser, reportType: string, query: PlatformReportQueryDto) {
+  private async auditReportView(
+    actor: RequestUser,
+    reportType: string,
+    query: PlatformReportQueryDto,
+  ) {
     await this.audit.record({
       actorUserId: actor.id,
       action: 'PLATFORM_REPORT_VIEWED',
@@ -380,12 +524,20 @@ export class ReportsService {
       _sum: { subtotalMinor: true, discountMinor: true, totalMinor: true },
     });
     return {
-      ...this.contract('PLATFORM_REVENUE', {
-        orders: 'Orders grouped by current order status and selected payment channel; date filtering uses approvedAt.',
-        subtotalMinor: 'Sum of immutable order subtotal snapshots in EGP minor units.',
-        discountMinor: 'Sum of immutable order discount snapshots in EGP minor units.',
-        totalMinor: 'Sum of immutable order total snapshots in EGP minor units. Approved rows are recognized revenue.',
-      }, query),
+      ...this.contract(
+        'PLATFORM_REVENUE',
+        {
+          orders:
+            'Orders grouped by current order status and selected payment channel; date filtering uses approvedAt.',
+          subtotalMinor:
+            'Sum of immutable order subtotal snapshots in EGP minor units.',
+          discountMinor:
+            'Sum of immutable order discount snapshots in EGP minor units.',
+          totalMinor:
+            'Sum of immutable order total snapshots in EGP minor units. Approved rows are recognized revenue.',
+        },
+        query,
+      ),
       data: rows.map((row) => ({
         ...row,
         orders: row._count,
@@ -408,7 +560,9 @@ export class ReportsService {
       where: {
         ...(Object.keys(requestedAt).length ? { requestedAt } : {}),
         order,
-        ...(Object.keys(this.studentWhere(query)).length ? { student: this.studentWhere(query) } : {}),
+        ...(Object.keys(this.studentWhere(query)).length
+          ? { student: this.studentWhere(query) }
+          : {}),
       } as any,
       _count: true,
     });
@@ -425,12 +579,22 @@ export class ReportsService {
       _sum: { amountMinor: true },
     });
     return {
-      ...this.contract('REFUNDS', {
-        requests: 'Refund requests created in the selected Cairo period, grouped by current request status.',
-        approvedAmountMinor: 'Sum of complete order-item reimbursement amounts for approved requests; no fractional item refunds exist.',
-      }, query),
+      ...this.contract(
+        'REFUNDS',
+        {
+          requests:
+            'Refund requests created in the selected Cairo period, grouped by current request status.',
+          approvedAmountMinor:
+            'Sum of complete order-item reimbursement amounts for approved requests; no fractional item refunds exist.',
+        },
+        query,
+      ),
       data: rows.map((row) => ({ status: row.status, requests: row._count })),
-      approvedAmounts: approved.map((row) => ({ currency: row.currency, refundedItems: row._count, approvedAmountMinor: row._sum.amountMinor ?? 0 })),
+      approvedAmounts: approved.map((row) => ({
+        currency: row.currency,
+        refundedItems: row._count,
+        approvedAmountMinor: row._sum.amountMinor ?? 0,
+      })),
     };
   }
 
@@ -451,11 +615,21 @@ export class ReportsService {
       _count: true,
     });
     return {
-      ...this.contract('PAYMENTS', {
-        attempts: 'Payment attempts initiated in the selected Cairo period, grouped by channel and current provider/manual status.',
-        status: 'The latest persisted payment-attempt status; an order can have retry attempts.',
-      }, query),
-      data: rows.map((row) => ({ channel: row.channel, status: row.status, attempts: row._count })),
+      ...this.contract(
+        'PAYMENTS',
+        {
+          attempts:
+            'Payment attempts initiated in the selected Cairo period, grouped by channel and current provider/manual status.',
+          status:
+            'The latest persisted payment-attempt status; an order can have retry attempts.',
+        },
+        query,
+      ),
+      data: rows.map((row) => ({
+        channel: row.channel,
+        status: row.status,
+        attempts: row._count,
+      })),
     };
   }
 
@@ -473,9 +647,14 @@ export class ReportsService {
       _count: true,
     });
     return {
-      ...this.contract('REGISTRATIONS', {
-        registrations: 'Student profile records created in the selected Cairo period, grouped by their current grade and managed geography IDs.',
-      }, query),
+      ...this.contract(
+        'REGISTRATIONS',
+        {
+          registrations:
+            'Student profile records created in the selected Cairo period, grouped by their current grade and managed geography IDs.',
+        },
+        query,
+      ),
       data: rows.map((row) => ({ ...row, registrations: row._count })),
     };
   }
@@ -486,10 +665,16 @@ export class ReportsService {
     await this.auditReportView(actor, 'ACTIVE_PURCHASERS', query);
     const data = await this.activePurchaserSummary(query);
     return {
-      ...this.contract('ACTIVE_PURCHASERS', {
-        approvedPurchasers: 'Distinct students with an approved order in the selected Cairo period.',
-        purchasersWithCurrentAccess: 'Approved purchasers from the selected period who have one or more effective, non-expired active entitlements at report time.',
-      }, query),
+      ...this.contract(
+        'ACTIVE_PURCHASERS',
+        {
+          approvedPurchasers:
+            'Distinct students with an approved order in the selected Cairo period.',
+          purchasersWithCurrentAccess:
+            'Approved purchasers from the selected period who have one or more effective, non-expired active entitlements at report time.',
+        },
+        query,
+      ),
       data: [data],
     };
   }
@@ -513,28 +698,73 @@ export class ReportsService {
       select: { studentUserId: true },
       distinct: ['studentUserId'],
     });
-    return { approvedPurchasers: rows.length, purchasersWithCurrentAccess: active.length };
+    return {
+      approvedPurchasers: rows.length,
+      purchasersWithCurrentAccess: active.length,
+    };
   }
 
-  async entitlementLifecycle(actor: RequestUser, query: PlatformReportQueryDto) {
+  async entitlementLifecycle(
+    actor: RequestUser,
+    query: PlatformReportQueryDto,
+  ) {
     this.admin(actor);
     this.assertReportFilters('ENTITLEMENT_LIFECYCLE', query);
     await this.auditReportView(actor, 'ENTITLEMENT_LIFECYCLE', query);
     const range = this.dates(query);
     const [grants, revocations, expiries, currentActive] = await Promise.all([
-      this.prisma.studentEntitlement.groupBy({ by: ['source'], where: this.entitlementWhere(query, range), _count: true }),
-      this.prisma.studentEntitlement.count({ where: { ...this.entitlementWhere(query, range, 'revokedAt'), revokedAt: { not: null, ...range } } }),
-      this.prisma.studentEntitlement.count({ where: { ...this.entitlementWhere(query, range, 'expiresAt'), expiresAt: { not: null, ...range } } }),
-      this.prisma.studentEntitlement.count({ where: { ...this.entitlementWhere(query, {}), status: 'ACTIVE', startsAt: { lte: new Date() }, AND: [{ OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] }] } }),
+      this.prisma.studentEntitlement.groupBy({
+        by: ['source'],
+        where: this.entitlementWhere(query, range),
+        _count: true,
+      }),
+      this.prisma.studentEntitlement.count({
+        where: {
+          ...this.entitlementWhere(query, range, 'revokedAt'),
+          revokedAt: { not: null, ...range },
+        },
+      }),
+      this.prisma.studentEntitlement.count({
+        where: {
+          ...this.entitlementWhere(query, range, 'expiresAt'),
+          expiresAt: { not: null, ...range },
+        },
+      }),
+      this.prisma.studentEntitlement.count({
+        where: {
+          ...this.entitlementWhere(query, {}),
+          status: 'ACTIVE',
+          startsAt: { lte: new Date() },
+          AND: [
+            { OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] },
+          ],
+        },
+      }),
     ]);
     return {
-      ...this.contract('ENTITLEMENT_LIFECYCLE', {
-        grants: 'Entitlement rows created in the selected Cairo period, grouped by source.',
-        revocations: 'Entitlement rows whose revokedAt falls in the selected Cairo period.',
-        expiries: 'Entitlement rows whose expiresAt falls in the selected Cairo period. Expiry is access-time derived, not a mutable state transition.',
-        currentActive: 'Effective active entitlement rows at report time, independent of the selected period.',
-      }, query),
-      data: { grants: grants.map((row) => ({ source: row.source, grants: row._count })), revocations, expiries, currentActive },
+      ...this.contract(
+        'ENTITLEMENT_LIFECYCLE',
+        {
+          grants:
+            'Entitlement rows created in the selected Cairo period, grouped by source.',
+          revocations:
+            'Entitlement rows whose revokedAt falls in the selected Cairo period.',
+          expiries:
+            'Entitlement rows whose expiresAt falls in the selected Cairo period. Expiry is access-time derived, not a mutable state transition.',
+          currentActive:
+            'Effective active entitlement rows at report time, independent of the selected period.',
+        },
+        query,
+      ),
+      data: {
+        grants: grants.map((row) => ({
+          source: row.source,
+          grants: row._count,
+        })),
+        revocations,
+        expiries,
+        currentActive,
+      },
     };
   }
 
@@ -861,36 +1091,71 @@ export class ReportsService {
       return this.prisma.order.findMany({
         where: this.orderWhere(filters, 'approvedAt', createdAt),
         take: MAX_EXPORT_ROWS + 1,
-        select: { approvedAt: true, status: true, paymentChannel: true, subtotalMinor: true, discountMinor: true, totalMinor: true, currency: true },
+        select: {
+          approvedAt: true,
+          status: true,
+          paymentChannel: true,
+          subtotalMinor: true,
+          discountMinor: true,
+          totalMinor: true,
+          currency: true,
+        },
       });
     if (reportType === 'REFUNDS') {
       const rows = await this.prisma.refundRequest.findMany({
         where: {
           ...(Object.keys(createdAt).length ? { requestedAt: createdAt } : {}),
           order: this.orderWhere(filters, 'createdAt', {}),
-          ...(Object.keys(this.studentWhere(filters)).length ? { student: this.studentWhere(filters) } : {}),
+          ...(Object.keys(this.studentWhere(filters)).length
+            ? { student: this.studentWhere(filters) }
+            : {}),
         } as any,
         take: MAX_EXPORT_ROWS + 1,
-        select: { requestedAt: true, reviewedAt: true, status: true, items: { select: { amountMinor: true, currency: true } } },
+        select: {
+          requestedAt: true,
+          reviewedAt: true,
+          status: true,
+          items: { select: { amountMinor: true, currency: true } },
+        },
       });
-      return rows.flatMap((row) => row.items.map((item) => ({ requestedAt: row.requestedAt, reviewedAt: row.reviewedAt, status: row.status, amountMinor: item.amountMinor, currency: item.currency })));
+      return rows.flatMap((row) =>
+        row.items.map((item) => ({
+          requestedAt: row.requestedAt,
+          reviewedAt: row.reviewedAt,
+          status: row.status,
+          amountMinor: item.amountMinor,
+          currency: item.currency,
+        })),
+      );
     }
     if (reportType === 'PAYMENTS')
       return this.prisma.paymentAttempt.findMany({
         where: {
           ...(Object.keys(createdAt).length ? { initiatedAt: createdAt } : {}),
-          ...(filters.paymentChannel ? { channel: filters.paymentChannel } : {}),
+          ...(filters.paymentChannel
+            ? { channel: filters.paymentChannel }
+            : {}),
           ...(filters.paymentStatus ? { status: filters.paymentStatus } : {}),
           order: this.orderWhere(filters, 'createdAt', {}),
         } as any,
         take: MAX_EXPORT_ROWS + 1,
-        select: { initiatedAt: true, completedAt: true, channel: true, status: true },
+        select: {
+          initiatedAt: true,
+          completedAt: true,
+          channel: true,
+          status: true,
+        },
       });
     if (reportType === 'REGISTRATIONS')
       return this.prisma.studentProfile.findMany({
         where: { ...dateFilter, ...this.studentWhere(filters) },
         take: MAX_EXPORT_ROWS + 1,
-        select: { createdAt: true, academicGradeId: true, governorateId: true, centerId: true },
+        select: {
+          createdAt: true,
+          academicGradeId: true,
+          governorateId: true,
+          centerId: true,
+        },
       });
     if (reportType === 'ACTIVE_PURCHASERS') {
       return [await this.activePurchaserSummary(filters)];
@@ -899,7 +1164,14 @@ export class ReportsService {
       return this.prisma.studentEntitlement.findMany({
         where: this.entitlementWhere(filters, createdAt),
         take: MAX_EXPORT_ROWS + 1,
-        select: { createdAt: true, source: true, status: true, startsAt: true, expiresAt: true, revokedAt: true },
+        select: {
+          createdAt: true,
+          source: true,
+          status: true,
+          startsAt: true,
+          expiresAt: true,
+          revokedAt: true,
+        },
       });
     if (reportType === 'COMMERCE')
       return this.prisma.order.findMany({

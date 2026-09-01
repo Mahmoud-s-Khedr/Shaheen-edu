@@ -8,5 +8,11 @@ import { ContentAccessPolicyService } from './content-access-policy.service';
 @Controller({ path: 'catalog/content-items', version: '1' })
 export class PublicContentController {
   constructor(private readonly policy: ContentAccessPolicyService) {}
-  @Get(':id') @ApiOperation({ summary: 'Get a published content item' }) async get(@Param('id') id: string) { return this.policy.toDeliveryDto(await this.policy.assertContentItemAccess(id)); }
+  @Get(':id')
+  @ApiOperation({ summary: 'Get a published content item' })
+  async get(@Param('id') id: string) {
+    return this.policy.toDeliveryDto(
+      await this.policy.assertContentItemAccess(id),
+    );
+  }
 }

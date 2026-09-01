@@ -106,9 +106,7 @@ export class SubjectsController {
   @ApiOperation({ summary: 'Publish a subject' })
   @ApiOkResponse({ type: SubjectSummaryDto })
   @ApiStandardErrors(401, 403, 404, 409)
-  publish(
-    @CurrentUser() actor: RequestUser,
-    @Param('id') id: string,  ) {
+  publish(@CurrentUser() actor: RequestUser, @Param('id') id: string) {
     return this.subjectsService.publish(actor, id);
   }
 
@@ -116,9 +114,7 @@ export class SubjectsController {
   @ApiOperation({ summary: 'Archive a subject' })
   @ApiOkResponse({ type: SubjectSummaryDto })
   @ApiStandardErrors(401, 403, 404, 409)
-  archive(
-    @CurrentUser() actor: RequestUser,
-    @Param('id') id: string,  ) {
+  archive(@CurrentUser() actor: RequestUser, @Param('id') id: string) {
     return this.subjectsService.archive(actor, id);
   }
 
@@ -126,18 +122,14 @@ export class SubjectsController {
   @ApiOperation({ summary: 'Restore an archived subject' })
   @ApiOkResponse({ type: SubjectSummaryDto })
   @ApiStandardErrors(401, 403, 404, 409)
-  restore(
-    @CurrentUser() actor: RequestUser,
-    @Param('id') id: string,  ) {
+  restore(@CurrentUser() actor: RequestUser, @Param('id') id: string) {
     return this.subjectsService.restore(actor, id);
   }
 
   @Delete(':id')
   @ApiOperation({ summary: 'Delete an eligible draft subject' })
   @ApiStandardErrors(401, 403, 404, 409)
-  delete(
-    @CurrentUser() actor: RequestUser,
-    @Param('id') id: string,  ) {
+  delete(@CurrentUser() actor: RequestUser, @Param('id') id: string) {
     return this.subjectsService.delete(actor, id);
   }
 }

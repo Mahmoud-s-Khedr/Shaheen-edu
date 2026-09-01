@@ -13,5 +13,4 @@ export class MoveChapterDto {
   @IsInt()
   @Min(1)
   sortOrder?: number;
-
 }

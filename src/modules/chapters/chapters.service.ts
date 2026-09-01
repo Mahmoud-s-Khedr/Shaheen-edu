@@ -18,7 +18,10 @@ import {
 import type { CreateChapterDto } from './dto/create-chapter.dto';
 import type { UpdateChapterDto } from './dto/update-chapter.dto';
 import type { QueryChapterDto } from './dto/query-chapter.dto';
-import { paginateArabicSearch, sqlAnd } from '../../common/search/arabic-search';
+import {
+  paginateArabicSearch,
+  sqlAnd,
+} from '../../common/search/arabic-search';
 import { contentStatusScope } from '../../common/search/content-scope';
 import type { ReorderChapterDto } from './dto/reorder-chapter.dto';
 import type { MoveChapterDto } from './dto/move-chapter.dto';
@@ -49,9 +52,20 @@ export class ChaptersService {
     const record = await this.prisma.chapter.findUnique({
       where: { id },
       include: {
-        course: { select: { title: true, isPurchasable: true, priceMinor: true, currency: true } },
+        course: {
+          select: {
+            title: true,
+            isPurchasable: true,
+            priceMinor: true,
+            currency: true,
+          },
+        },
         coverAsset: { select: { filename: true } },
-        _count: { select: { lessons: { where: { status: { not: ContentStatus.ARCHIVED } } } } },
+        _count: {
+          select: {
+            lessons: { where: { status: { not: ContentStatus.ARCHIVED } } },
+          },
+        },
       },
     });
     if (!record) {
@@ -123,7 +137,15 @@ export class ChaptersService {
     this.assertActorRole(actor);
     const record = await this.prisma.chapter.findUnique({
       where: { id },
-      include: { course: true, coverAsset: { select: { filename: true } }, _count: { select: { lessons: { where: { status: { not: ContentStatus.ARCHIVED } } } } } },
+      include: {
+        course: true,
+        coverAsset: { select: { filename: true } },
+        _count: {
+          select: {
+            lessons: { where: { status: { not: ContentStatus.ARCHIVED } } },
+          },
+        },
+      },
     });
     if (!record) {
       throw new NotFoundException('Chapter not found');
@@ -145,7 +167,9 @@ export class ChaptersService {
       scope: {
         where: sqlAnd(
           contentStatusScope(query.status),
-          query.courseId ? Prisma.sql`t."courseId" = ${query.courseId}` : undefined,
+          query.courseId
+            ? Prisma.sql`t."courseId" = ${query.courseId}`
+            : undefined,
         ),
       },
       orderBySql: Prisma.sql`t."sortOrder" ASC, t.id ASC`,
@@ -153,9 +177,21 @@ export class ChaptersService {
       where,
       args: {
         include: {
-          course: { select: { id: true, title: true, isPurchasable: true, priceMinor: true, currency: true } },
+          course: {
+            select: {
+              id: true,
+              title: true,
+              isPurchasable: true,
+              priceMinor: true,
+              currency: true,
+            },
+          },
           coverAsset: { select: { filename: true } },
-          _count: { select: { lessons: { where: { status: { not: ContentStatus.ARCHIVED } } } } },
+          _count: {
+            select: {
+              lessons: { where: { status: { not: ContentStatus.ARCHIVED } } },
+            },
+          },
         },
       },
       page: query.page,
@@ -193,7 +229,7 @@ export class ChaptersService {
         slug,
         description: dto.description,
         updatedById: actor.id,
-        },
+      },
     });
 
     await this.auditService.record({
@@ -208,9 +244,19 @@ export class ChaptersService {
   }
 
   async updateAccess(actor: RequestUser, id: string, accessType: AccessType) {
-    this.assertActorRole(actor); await this.getOrThrow(id);
-    await this.prisma.chapter.update({ where: { id }, data: { accessType, updatedById: actor.id } });
-    await this.auditService.record({ actorUserId: actor.id, action: 'CHAPTER_ACCESS_UPDATED', targetType: 'Chapter', targetId: id, metadata: { accessType } });
+    this.assertActorRole(actor);
+    await this.getOrThrow(id);
+    await this.prisma.chapter.update({
+      where: { id },
+      data: { accessType, updatedById: actor.id },
+    });
+    await this.auditService.record({
+      actorUserId: actor.id,
+      action: 'CHAPTER_ACCESS_UPDATED',
+      targetType: 'Chapter',
+      targetId: id,
+      metadata: { accessType },
+    });
     return this.toSummary(await this.getOrThrow(id));
   }
 
@@ -225,7 +271,9 @@ export class ChaptersService {
     }
 
     const ids = dto.items.map((item) => item.id);
-    const siblings = await this.prisma.chapter.findMany({ where: { courseId: dto.courseId } });
+    const siblings = await this.prisma.chapter.findMany({
+      where: { courseId: dto.courseId },
+    });
     assertCompleteSequentialReorder(dto.items, siblings);
 
     const plan = computeTwoPhaseRenumber(dto.items);
@@ -233,9 +281,9 @@ export class ChaptersService {
     try {
       await this.prisma.$transaction(async (tx) => {
         for (const phase1 of plan.phase1) {
-    await tx.chapter.updateMany({
+          await tx.chapter.updateMany({
             where: { id: phase1.id },
-            data: { sortOrder: phase1.sortOrder, updatedById: actor.id, },
+            data: { sortOrder: phase1.sortOrder, updatedById: actor.id },
           });
         }
         for (const phase2 of plan.phase2) {
@@ -264,7 +312,10 @@ export class ChaptersService {
   async move(actor: RequestUser, id: string, dto: MoveChapterDto) {
     this.assertActorRole(actor);
     const record = await this.getOrThrow(id);
-    if (record.courseId === dto.newCourseId) throw new ConflictException('Use reorder to change position within the same parent');
+    if (record.courseId === dto.newCourseId)
+      throw new ConflictException(
+        'Use reorder to change position within the same parent',
+      );
 
     const newParent = await this.prisma.course.findUnique({
       where: { id: dto.newCourseId },
@@ -276,8 +327,13 @@ export class ChaptersService {
     if (newParent.status === ContentStatus.ARCHIVED) {
       throw new ConflictException('Cannot move into an archived course');
     }
-    if (record.status === ContentStatus.PUBLISHED && newParent.status !== ContentStatus.PUBLISHED) {
-      throw new ConflictException('A published chapter must remain under a published course');
+    if (
+      record.status === ContentStatus.PUBLISHED &&
+      newParent.status !== ContentStatus.PUBLISHED
+    ) {
+      throw new ConflictException(
+        'A published chapter must remain under a published course',
+      );
     }
 
     const slugCollision = await this.prisma.chapter.findUnique({
@@ -296,9 +352,19 @@ export class ChaptersService {
       _max: { sortOrder: true },
     });
     const targetSortOrder =
-      dto.sortOrder ?? (dto.newCourseId === record.courseId ? (targetMax._max.sortOrder ?? 1) : (targetMax._max.sortOrder ?? 0) + 1);
-    if (targetSortOrder < 1 || targetSortOrder > (targetMax._max.sortOrder ?? 0) + (dto.newCourseId === record.courseId ? 0 : 1)) {
-      throw new ConflictException('Target sortOrder is outside the sibling scope');
+      dto.sortOrder ??
+      (dto.newCourseId === record.courseId
+        ? (targetMax._max.sortOrder ?? 1)
+        : (targetMax._max.sortOrder ?? 0) + 1);
+    if (
+      targetSortOrder < 1 ||
+      targetSortOrder >
+        (targetMax._max.sortOrder ?? 0) +
+          (dto.newCourseId === record.courseId ? 0 : 1)
+    ) {
+      throw new ConflictException(
+        'Target sortOrder is outside the sibling scope',
+      );
     }
     const oldCourseId = record.courseId;
     const oldSortOrder = record.sortOrder;
@@ -307,12 +373,12 @@ export class ChaptersService {
       await this.prisma.$transaction(async (tx) => {
         await tx.chapter.updateMany({
           where: { id },
-          data: { sortOrder: 1_000_000_000, updatedById: actor.id, },
+          data: { sortOrder: 1_000_000_000, updatedById: actor.id },
         });
 
         await tx.chapter.updateMany({
           where: { courseId: oldCourseId, sortOrder: { gt: oldSortOrder } },
-          data: { sortOrder: { decrement: 1 }, updatedById: actor.id, },
+          data: { sortOrder: { decrement: 1 }, updatedById: actor.id },
         });
 
         await tx.chapter.updateMany({
@@ -320,12 +386,16 @@ export class ChaptersService {
             courseId: dto.newCourseId,
             sortOrder: { gte: targetSortOrder },
           },
-          data: { sortOrder: { increment: 1 }, updatedById: actor.id, },
+          data: { sortOrder: { increment: 1 }, updatedById: actor.id },
         });
 
         await tx.chapter.updateMany({
           where: { id },
-          data: { courseId: dto.newCourseId, sortOrder: targetSortOrder, updatedById: actor.id },
+          data: {
+            courseId: dto.newCourseId,
+            sortOrder: targetSortOrder,
+            updatedById: actor.id,
+          },
         });
 
         await contentPlacementAncestry.chapterMoved(tx, id, {
@@ -378,7 +448,7 @@ export class ChaptersService {
       data: {
         status: ContentStatus.ARCHIVED,
         archivedAt: new Date(),
-        },
+      },
     });
 
     await this.auditService.record({
@@ -399,7 +469,7 @@ export class ChaptersService {
         status: ContentStatus.DRAFT,
         publishedAt: null,
         archivedAt: null,
-        },
+      },
     });
 
     await this.auditService.record({
@@ -412,10 +482,7 @@ export class ChaptersService {
     return this.toSummary(await this.getOrThrow(id));
   }
 
-  async delete(
-    actor: RequestUser,
-    id: string
-  ): Promise<void> {
+  async delete(actor: RequestUser, id: string): Promise<void> {
     this.assertActorRole(actor);
     const record = await this.getOrThrow(id);
     if (record.status !== ContentStatus.DRAFT) {

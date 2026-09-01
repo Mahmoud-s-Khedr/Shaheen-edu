@@ -415,7 +415,7 @@ export class QuestionImportService {
   ) {
     this.admin(actor);
     const batch = await this.rootPdfImport(id);
-    const pdf = await this.storage.download(batch.sourceAsset.storageKey!);
+    const pdf = await this.storage.download(batch.sourceAsset.storageKey);
     const image = await this.pdfRanges.renderPage(pdf, dto.pageNumber, 350);
     const media = await this.mediaExtraction.createManualRegion(
       batch,
@@ -462,7 +462,7 @@ export class QuestionImportService {
       );
     let updated: any;
     if (dto.bounds) {
-      const pdf = await this.storage.download(batch.sourceAsset.storageKey!);
+      const pdf = await this.storage.download(batch.sourceAsset.storageKey);
       const image = await this.pdfRanges.renderPage(pdf, media.pageNumber, 350);
       updated = await this.mediaExtraction.replaceCanonicalRegion(
         media,
@@ -563,7 +563,7 @@ export class QuestionImportService {
     if (!media) throw new NotFoundException('Question import media not found');
     if (media.status !== QuestionImportMediaStatus.FAILED)
       throw new ConflictException('Only failed media can be retried');
-    const pdf = await this.storage.download(batch.sourceAsset.storageKey!);
+    const pdf = await this.storage.download(batch.sourceAsset.storageKey);
     const image = await this.pdfRanges.renderPage(pdf, media.pageNumber, 350);
     const updated = await this.mediaExtraction.replaceCanonicalRegion(
       media,
@@ -641,8 +641,8 @@ export class QuestionImportService {
         throw new BadRequestException(
           'Assignments may reference only eligible media from this PDF import',
         );
-      const optionCount = Array.isArray((item.normalizedOutput as any)?.options)
-        ? (item.normalizedOutput as any).options.length
+      const optionCount = Array.isArray(item.normalizedOutput?.options)
+        ? item.normalizedOutput.options.length
         : 0;
       for (const assignment of dto.assignments) {
         if (
@@ -1061,7 +1061,7 @@ export class QuestionImportService {
           questionId: question.id,
           answerOrigin: QuestionAnswerProvenance.HUMAN_REVIEWED,
           citedEvidenceKeys: normalized.citedEvidenceKeys,
-          reviewerCandidate: normalized as any,
+          reviewerCandidate: normalized,
           reviewedAt: new Date(),
           reviewedById: actor.id,
           reviewNote:

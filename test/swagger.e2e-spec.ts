@@ -129,7 +129,9 @@ describe('Swagger (e2e)', () => {
       ]),
     );
     expect(document.paths['/api/v1/admin/assets'].get.parameters).not.toEqual(
-      expect.arrayContaining([expect.objectContaining({ name: 'q', in: 'query' })]),
+      expect.arrayContaining([
+        expect.objectContaining({ name: 'q', in: 'query' }),
+      ]),
     );
 
     expect(document.paths['/api/v1/student/my-subjects'].get.summary).toBe(
@@ -161,24 +163,31 @@ describe('Swagger (e2e)', () => {
     ).filter(
       ([path]) =>
         path.startsWith('/api/v1/student/catalog') ||
-        ['/api/v1/student/library', '/api/v1/student/my-subjects', '/api/v1/student/entitlements'].includes(path),
+        [
+          '/api/v1/student/library',
+          '/api/v1/student/my-subjects',
+          '/api/v1/student/entitlements',
+        ].includes(path),
     );
     expect(studentCatalogPaths).not.toHaveLength(0);
-    const undocumentedCatalogOps = studentCatalogPaths.flatMap(([path, operations]) =>
-      Object.entries(operations)
-        .filter(([method]) => method === 'get')
-        .filter(([, operation]) => {
-          const ok = operation.responses['200'] ?? operation.responses['201'];
-          return !ok?.content?.['application/json']?.schema?.$ref;
-        })
-        .map(([method]) => `${method.toUpperCase()} ${path}`),
+    const undocumentedCatalogOps = studentCatalogPaths.flatMap(
+      ([path, operations]) =>
+        Object.entries(operations)
+          .filter(([method]) => method === 'get')
+          .filter(([, operation]) => {
+            const ok = operation.responses['200'] ?? operation.responses['201'];
+            return !ok?.content?.['application/json']?.schema?.$ref;
+          })
+          .map(([method]) => `${method.toUpperCase()} ${path}`),
     );
     expect(undocumentedCatalogOps).toEqual([]);
 
     expect(
       document.paths['/api/v1/geography/governorates'].get.responses['200']
         .content['application/json'].schema,
-    ).toMatchObject({ $ref: '#/components/schemas/PaginatedGovernorateResponseDto' });
+    ).toMatchObject({
+      $ref: '#/components/schemas/PaginatedGovernorateResponseDto',
+    });
     expect(
       document.paths['/api/v1/student/content-items/{id}/study-state'].put
         .requestBody.content['application/json'].schema,
@@ -342,19 +351,7 @@ describe('Swagger (e2e)', () => {
     };
 
     const emptyRequestSchemas: string[] = [];
-    for (const [pathName, path] of Object.entries(document.paths) as Array<
-      [
-        string,
-        Record<
-          string,
-          {
-            requestBody?: {
-              content?: Record<string, { schema?: Record<string, unknown> }>;
-            };
-          }
-        >,
-      ]
-    >) {
+    for (const [pathName, path] of Object.entries(document.paths)) {
       for (const method of ['post', 'put', 'patch']) {
         const requestBody = path[method]?.requestBody;
         if (!requestBody) continue;
@@ -381,9 +378,7 @@ describe('Swagger (e2e)', () => {
       'trace',
     ]);
     const undocumented: string[] = [];
-    for (const [pathName, path] of Object.entries(document.paths) as Array<
-      [string, Record<string, { summary?: string }>]
-    >) {
+    for (const [pathName, path] of Object.entries(document.paths)) {
       for (const [method, operation] of Object.entries(path)) {
         if (
           httpMethods.has(method) &&

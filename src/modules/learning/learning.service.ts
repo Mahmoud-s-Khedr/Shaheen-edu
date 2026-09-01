@@ -20,7 +20,10 @@ import { AssetsService } from '../assets/assets.service';
 import { VideosService } from '../videos/videos.service';
 import { QuestionCommunityStatsService } from '../question-banks/question-community-stats.service';
 import { AssessmentsService } from '../assessments/assessments.service';
-import { CompletionService, type CompletionContainerType } from '../completion/completion.service';
+import {
+  CompletionService,
+  type CompletionContainerType,
+} from '../completion/completion.service';
 import type {
   PracticeScopeQueryDto,
   ParentAnalyticsScopeQueryDto,
@@ -312,12 +315,23 @@ export class LearningService {
         const path = this.itemPath(item);
         const completions = await this.completion.containers(studentId, [
           { id: path.course.id, type: 'course' },
-          ...(path.chapter ? [{ id: path.chapter.id, type: 'chapter' as const }] : []),
-          ...(path.lesson ? [{ id: path.lesson.id, type: 'lesson' as const }] : []),
-          ...(path.section ? [{ id: path.section.id, type: 'section' as const }] : []),
+          ...(path.chapter
+            ? [{ id: path.chapter.id, type: 'chapter' as const }]
+            : []),
+          ...(path.lesson
+            ? [{ id: path.lesson.id, type: 'lesson' as const }]
+            : []),
+          ...(path.section
+            ? [{ id: path.section.id, type: 'section' as const }]
+            : []),
         ]);
         const completedNode = (node: any, type: CompletionContainerType) =>
-          node ? { ...this.node(node), isCompleted: completions.get(`${type}:${node.id}`) ?? false } : null;
+          node
+            ? {
+                ...this.node(node),
+                isCompleted: completions.get(`${type}:${node.id}`) ?? false,
+              }
+            : null;
         const progress = await this.contentProgress(studentId, item.id);
         const subjectItems = (
           await this.eligibleItems(studentId, false, path.course.subjectId)
@@ -376,9 +390,9 @@ export class LearningService {
       const path = this.itemPath(item);
       for (const [kind, node] of Object.entries(path))
         if (node) {
-          const existing = nodes.get((node as any).id) ?? {
-            id: (node as any).id,
-            title: (node as any).title,
+          const existing = nodes.get(node.id) ?? {
+            id: node.id,
+            title: node.title,
             kind,
             totalContentItems: 0,
             completedContentItems: 0,
@@ -392,15 +406,22 @@ export class LearningService {
     const shared = this.completion.containers
       ? await this.completion.containers(
           studentId,
-          derived.map((node) => ({ id: node.id, type: node.kind as CompletionContainerType })),
+          derived.map((node) => ({
+            id: node.id,
+            type: node.kind as CompletionContainerType,
+          })),
         )
       : new Map<string, boolean>();
     return derived.map((node) => {
-      const isCompleted = node.totalContentItems > 0 && node.completedContentItems === node.totalContentItems;
+      const isCompleted =
+        node.totalContentItems > 0 &&
+        node.completedContentItems === node.totalContentItems;
       return {
         ...node,
         completionPercent: node.totalContentItems
-          ? Math.round((node.completedContentItems / node.totalContentItems) * 100)
+          ? Math.round(
+              (node.completedContentItems / node.totalContentItems) * 100,
+            )
           : 0,
         completed: isCompleted,
         isCompleted: shared.get(`${node.kind}:${node.id}`) ?? isCompleted,

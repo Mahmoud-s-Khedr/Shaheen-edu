@@ -46,7 +46,9 @@ export class VideosController {
     return this.videos.get(actor, id);
   }
   @Get(':id/playback')
-  @ApiOperation({ summary: 'Get a short-lived preview URL for an admin video asset' })
+  @ApiOperation({
+    summary: 'Get a short-lived preview URL for an admin video asset',
+  })
   playback(@CurrentUser() actor: RequestUser, @Param('id') id: string) {
     return this.videos.adminPlayback(actor, id);
   }

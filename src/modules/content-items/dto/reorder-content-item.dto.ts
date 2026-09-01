@@ -22,7 +22,6 @@ export class ReorderContentItemEntryDto {
   @IsInt()
   @Min(1)
   sortOrder!: number;
-
 }
 
 export class ReorderContentItemDto {

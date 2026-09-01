@@ -22,7 +22,10 @@ import type { ReorderAcademicGradeDto } from './dto/reorder-academic-grade.dto';
 import type { SearchPaginationQueryDto } from '../../common/dto/pagination-query.dto';
 import { PublicationService } from '../publication/publication.service';
 import { paginateArabicSearch } from '../../common/search/arabic-search';
-import { contentStatusScope, publishedScope } from '../../common/search/content-scope';
+import {
+  contentStatusScope,
+  publishedScope,
+} from '../../common/search/content-scope';
 
 /**
  * Renumber one phase with a single statement. The temporary first phase is
@@ -37,8 +40,7 @@ function updateAcademicGradeSortOrders(
 ) {
   const rows = Prisma.join(
     items.map(
-      ({ id, sortOrder }) =>
-        Prisma.sql`(${id}::text, ${sortOrder}::integer)`,
+      ({ id, sortOrder }) => Prisma.sql`(${id}::text, ${sortOrder}::integer)`,
     ),
     ', ',
   );
@@ -77,7 +79,14 @@ export class AcademicGradesService {
   private async getOrThrow(id: string) {
     const record = await this.prisma.academicGrade.findUnique({
       where: { id },
-      include: { coverAsset: { select: { filename: true } }, _count: { select: { subjects: { where: { status: { not: ContentStatus.ARCHIVED } } } } } },
+      include: {
+        coverAsset: { select: { filename: true } },
+        _count: {
+          select: {
+            subjects: { where: { status: { not: ContentStatus.ARCHIVED } } },
+          },
+        },
+      },
     });
     if (!record) {
       throw new NotFoundException('Academic grade not found');
@@ -141,7 +150,16 @@ export class AcademicGradesService {
       orderBySql: Prisma.sql`t."sortOrder" ASC, t.id ASC`,
       orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
       where,
-      args: { include: { coverAsset: { select: { filename: true } }, _count: { select: { subjects: { where: { status: { not: ContentStatus.ARCHIVED } } } } } } },
+      args: {
+        include: {
+          coverAsset: { select: { filename: true } },
+          _count: {
+            select: {
+              subjects: { where: { status: { not: ContentStatus.ARCHIVED } } },
+            },
+          },
+        },
+      },
       page: query.page,
       limit: query.limit,
     });
@@ -162,7 +180,16 @@ export class AcademicGradesService {
       orderBySql: Prisma.sql`t."sortOrder" ASC, t.id ASC`,
       orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
       where,
-      args: { include: { coverAsset: { select: { filename: true } }, _count: { select: { subjects: { where: { status: ContentStatus.PUBLISHED } } } } } },
+      args: {
+        include: {
+          coverAsset: { select: { filename: true } },
+          _count: {
+            select: {
+              subjects: { where: { status: ContentStatus.PUBLISHED } },
+            },
+          },
+        },
+      },
       page: query.page,
       limit: query.limit,
     });
@@ -178,7 +205,9 @@ export class AcademicGradesService {
 
     let slug = record.slug;
     if (dto.slug !== undefined || dto.title !== undefined) {
-      const candidate = dto.slug ?? slugifyOrThrow(dto.title?.en ?? record.titleEn ?? record.titleAr);
+      const candidate =
+        dto.slug ??
+        slugifyOrThrow(dto.title?.en ?? record.titleEn ?? record.titleAr);
       if (candidate !== record.slug) {
         const collision = await this.prisma.academicGrade.findUnique({
           where: { slug: candidate },
@@ -195,12 +224,14 @@ export class AcademicGradesService {
         titleAr: dto.title?.ar,
         titleEn: dto.title?.en,
         slug,
-        ...(dto.description === undefined ? {} : {
-          descriptionAr: dto.description?.ar ?? null,
-          descriptionEn: dto.description?.en ?? null,
-        }),
+        ...(dto.description === undefined
+          ? {}
+          : {
+              descriptionAr: dto.description?.ar ?? null,
+              descriptionEn: dto.description?.en ?? null,
+            }),
         updatedById: actor.id,
-        },
+      },
     });
 
     await this.auditService.record({
@@ -277,7 +308,7 @@ export class AcademicGradesService {
       data: {
         status: ContentStatus.ARCHIVED,
         archivedAt: new Date(),
-        },
+      },
     });
 
     await this.auditService.record({
@@ -298,7 +329,7 @@ export class AcademicGradesService {
         status: ContentStatus.DRAFT,
         publishedAt: null,
         archivedAt: null,
-        },
+      },
     });
 
     await this.auditService.record({
@@ -311,10 +342,7 @@ export class AcademicGradesService {
     return this.toSummary(await this.getOrThrow(id));
   }
 
-  async delete(
-    actor: RequestUser,
-    id: string
-  ): Promise<void> {
+  async delete(actor: RequestUser, id: string): Promise<void> {
     this.assertActorRole(actor);
     const record = await this.getOrThrow(id);
     if (record.status !== ContentStatus.DRAFT) {

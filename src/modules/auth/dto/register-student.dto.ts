@@ -47,7 +47,10 @@ export class RegisterStudentDto {
   @IsNotEmpty()
   academicGradeId!: string;
 
-  @ApiProperty({ description: 'ID of a managed center in the selected governorate', required: false })
+  @ApiProperty({
+    description: 'ID of a managed center in the selected governorate',
+    required: false,
+  })
   @IsOptional()
   @IsString()
   centerId?: string;

@@ -65,7 +65,10 @@ export class ParentSessionService {
       this.prisma.studentProfile.count({ where }),
     ]);
     return {
-      data: children.map(({ user, ...child }) => ({ ...child, status: user.status })),
+      data: children.map(({ user, ...child }) => ({
+        ...child,
+        status: user.status,
+      })),
       meta: toPaginationMeta(pagination.page, pagination.limit, total),
     };
   }

@@ -13,5 +13,4 @@ export class MoveLessonDto {
   @IsInt()
   @Min(1)
   sortOrder?: number;
-
 }

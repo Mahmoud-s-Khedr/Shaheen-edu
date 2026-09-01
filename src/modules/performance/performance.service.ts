@@ -310,7 +310,7 @@ export class PerformanceService {
     const assessments: Activity[] = assessmentAnswers.map((answer) => ({
       id: `ASSESSMENT:${answer.id}`,
       source: 'ASSESSMENT',
-      questionId: answer.assessmentQuestion.sourceQuestionId!,
+      questionId: answer.assessmentQuestion.sourceQuestionId,
       outcome: this.outcome(answer),
       submittedAt: answer.attempt.submittedAt!,
       placements: this.uniquePlacements(

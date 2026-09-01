@@ -12,5 +12,19 @@ import { QuestionImportQueue } from './question-import.queue';
 import { QuestionImportService } from './question-import.service';
 import { QuestionImportWorker } from './question-import.worker';
 
-@Module({ imports: [AssetsModule, AuditModule, QuestionBanksModule], controllers: [QuestionImportController], providers: [QuestionImportService, QuestionImportQueue, QuestionImportWorker, DocumentTextExtractor, OpenRouterQuestionImportClient, PdfPageRangeService, PdfTranscriptionClient, QuestionImportMediaService], exports: [QuestionImportWorker] })
+@Module({
+  imports: [AssetsModule, AuditModule, QuestionBanksModule],
+  controllers: [QuestionImportController],
+  providers: [
+    QuestionImportService,
+    QuestionImportQueue,
+    QuestionImportWorker,
+    DocumentTextExtractor,
+    OpenRouterQuestionImportClient,
+    PdfPageRangeService,
+    PdfTranscriptionClient,
+    QuestionImportMediaService,
+  ],
+  exports: [QuestionImportWorker],
+})
 export class QuestionImportModule {}

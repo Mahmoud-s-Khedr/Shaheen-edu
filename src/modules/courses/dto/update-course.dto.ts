@@ -27,5 +27,4 @@ export class UpdateCourseDto {
   @IsString()
   @MaxLength(2000)
   description?: string;
-
 }

@@ -7,7 +7,11 @@ import { Prisma } from '@prisma/client';
  */
 @Injectable()
 export class QuestionCommunityStatsService {
-  async recordResponse(tx: Prisma.TransactionClient, questionId: string, correct: boolean) {
+  async recordResponse(
+    tx: Prisma.TransactionClient,
+    questionId: string,
+    correct: boolean,
+  ) {
     const correctIncrement = correct ? 1 : 0;
     const incorrectIncrement = correct ? 0 : 1;
     const initialRate = incorrectIncrement * 100;

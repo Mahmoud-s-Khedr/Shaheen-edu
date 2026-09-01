@@ -312,7 +312,7 @@ export class PartnerFinanceService {
 
   private referralExpected(item: any, attribution: any) {
     if (!attribution) return null;
-    const terms = attribution.snapshot as any;
+    const terms = attribution.snapshot;
     const amount =
       terms.kind === 'FIXED_PER_SALE'
         ? (terms.fixedCommissionMinor ?? 0)
@@ -438,7 +438,7 @@ export class PartnerFinanceService {
       if (!order.receipt)
         findings.push(this.discrepancy({ type: 'MISSING_RECEIPT' }));
       if (order.receipt) {
-        const receiptSnapshot = order.receipt.snapshot as any;
+        const receiptSnapshot = order.receipt.snapshot;
         if (
           receiptSnapshot?.orderId !== order.id ||
           receiptSnapshot?.totalMinor !== order.totalMinor ||

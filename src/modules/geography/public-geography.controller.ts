@@ -12,7 +12,11 @@ export class PublicGeographyController {
   constructor(private readonly service: GeographyService) {}
 
   @Get('governorates')
-  @ApiOperation({ summary: 'List governorates and centers for student registration' })
+  @ApiOperation({
+    summary: 'List governorates and centers for student registration',
+  })
   @ApiOkResponse({ type: PaginatedGovernorateResponseDto })
-  list(@Query() query: GovernoratesQueryDto) { return this.service.listGovernorates(query); }
+  list(@Query() query: GovernoratesQueryDto) {
+    return this.service.listGovernorates(query);
+  }
 }

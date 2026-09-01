@@ -16,18 +16,22 @@ import { GovernoratesQueryDto } from '../../modules/geography/dto/query-governor
  * of that behaviour are load-bearing here, so both are pinned.
  */
 function errorsFor(cls: any, payload: object): string[] {
-  return validateSync(plainToInstance(cls, payload) as object).map(
+  return validateSync(plainToInstance(cls, payload)).map(
     (error) => error.property,
   );
 }
 
 describe('StudentCatalogSearchDto', () => {
   it('rejects a missing q rather than inheriting the base class optionality', () => {
-    expect(errorsFor(StudentCatalogSearchDto, { subjectId: 'x' })).toContain('q');
+    expect(errorsFor(StudentCatalogSearchDto, { subjectId: 'x' })).toContain(
+      'q',
+    );
   });
 
   it('rejects an empty q', () => {
-    expect(errorsFor(StudentCatalogSearchDto, { subjectId: 'x', q: '' })).toContain('q');
+    expect(
+      errorsFor(StudentCatalogSearchDto, { subjectId: 'x', q: '' }),
+    ).toContain('q');
   });
 
   it('accepts and trims a supplied q', () => {
@@ -40,7 +44,10 @@ describe('StudentCatalogSearchDto', () => {
   });
 
   it('defaults limit without requiring a cursor', () => {
-    const dto = plainToInstance(StudentCatalogSearchDto, { subjectId: 'x', q: 'a' });
+    const dto = plainToInstance(StudentCatalogSearchDto, {
+      subjectId: 'x',
+      q: 'a',
+    });
     expect(dto.limit).toBe(20);
     expect(dto.cursor).toBeUndefined();
   });
@@ -64,14 +71,20 @@ describe('CursorPaginationQueryDto', () => {
   });
 
   it('trims and validates q on the search variant', () => {
-    const dto = plainToInstance(SearchCursorPaginationQueryDto, { q: '  إسلام ' });
+    const dto = plainToInstance(SearchCursorPaginationQueryDto, {
+      q: '  إسلام ',
+    });
     expect(validateSync(dto as object)).toEqual([]);
     expect(dto.q).toBe('إسلام');
-    expect(errorsFor(SearchCursorPaginationQueryDto, { q: 'x'.repeat(121) })).toContain('q');
+    expect(
+      errorsFor(SearchCursorPaginationQueryDto, { q: 'x'.repeat(121) }),
+    ).toContain('q');
   });
 
   it('caps limit at 100', () => {
-    expect(errorsFor(SearchCursorPaginationQueryDto, { limit: 101 })).toContain('limit');
+    expect(errorsFor(SearchCursorPaginationQueryDto, { limit: 101 })).toContain(
+      'limit',
+    );
   });
 });
 

@@ -4,20 +4,18 @@ import { PaymobService } from './paymob.service';
 describe('PaymobService HMAC verification', () => {
   const secret = 'paymob-hmac-secret';
   const config: any = {
-    get: jest
-      .fn()
-      .mockReturnValue({
-        paymobBaseUrl: 'https://accept.paymob.com',
-        paymobSecretKey: 'secret',
-        paymobPublicKey: 'public',
-        paymobHmacSecret: secret,
-        paymobIntegrationIds: [1],
-        paymobNotificationUrl: 'https://api.example.test/webhook',
-        paymobRedirectUrl: 'https://app.example.test/result',
-        paymobTimeoutMs: 1000,
-        paymobOrderExpirySeconds: 1800,
-        manualOrderExpirySeconds: 86400,
-      }),
+    get: jest.fn().mockReturnValue({
+      paymobBaseUrl: 'https://accept.paymob.com',
+      paymobSecretKey: 'secret',
+      paymobPublicKey: 'public',
+      paymobHmacSecret: secret,
+      paymobIntegrationIds: [1],
+      paymobNotificationUrl: 'https://api.example.test/webhook',
+      paymobRedirectUrl: 'https://app.example.test/result',
+      paymobTimeoutMs: 1000,
+      paymobOrderExpirySeconds: 1800,
+      manualOrderExpirySeconds: 86400,
+    }),
   };
 
   const transaction = {

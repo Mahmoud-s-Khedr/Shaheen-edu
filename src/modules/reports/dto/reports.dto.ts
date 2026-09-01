@@ -104,7 +104,9 @@ export class PlatformReportQueryDto {
   @IsString()
   referralCode?: string;
 
-  @ApiPropertyOptional({ description: 'Publisher or referral partner user ID.' })
+  @ApiPropertyOptional({
+    description: 'Publisher or referral partner user ID.',
+  })
   @IsOptional()
   @IsString()
   partnerUserId?: string;

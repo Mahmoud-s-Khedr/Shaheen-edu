@@ -18,7 +18,10 @@ import {
 import type { CreateCourseDto } from './dto/create-course.dto';
 import type { UpdateCourseDto } from './dto/update-course.dto';
 import type { QueryCourseDto } from './dto/query-course.dto';
-import { paginateArabicSearch, sqlAnd } from '../../common/search/arabic-search';
+import {
+  paginateArabicSearch,
+  sqlAnd,
+} from '../../common/search/arabic-search';
 import { contentStatusScope } from '../../common/search/content-scope';
 import type { ReorderCourseDto } from './dto/reorder-course.dto';
 import type { MoveCourseDto } from './dto/move-course.dto';
@@ -51,7 +54,11 @@ export class CoursesService {
       include: {
         subject: { select: { title: true } },
         coverAsset: { select: { filename: true } },
-        _count: { select: { chapters: { where: { status: { not: ContentStatus.ARCHIVED } } } } },
+        _count: {
+          select: {
+            chapters: { where: { status: { not: ContentStatus.ARCHIVED } } },
+          },
+        },
       },
     });
     if (!record) {
@@ -139,7 +146,9 @@ export class CoursesService {
       scope: {
         where: sqlAnd(
           contentStatusScope(query.status),
-          query.subjectId ? Prisma.sql`t."subjectId" = ${query.subjectId}` : undefined,
+          query.subjectId
+            ? Prisma.sql`t."subjectId" = ${query.subjectId}`
+            : undefined,
         ),
       },
       orderBySql: Prisma.sql`t."sortOrder" ASC, t.id ASC`,
@@ -149,7 +158,11 @@ export class CoursesService {
         include: {
           subject: { select: { title: true } },
           coverAsset: { select: { filename: true } },
-          _count: { select: { chapters: { where: { status: { not: ContentStatus.ARCHIVED } } } } },
+          _count: {
+            select: {
+              chapters: { where: { status: { not: ContentStatus.ARCHIVED } } },
+            },
+          },
         },
       },
       page: query.page,
@@ -189,7 +202,7 @@ export class CoursesService {
         slug,
         description: dto.description,
         updatedById: actor.id,
-        },
+      },
     });
 
     await this.auditService.record({
@@ -209,8 +222,17 @@ export class CoursesService {
       throw new ConflictException('A course must have an explicit access type');
     }
     await this.getOrThrow(id);
-    await this.prisma.course.update({ where: { id }, data: { accessType, updatedById: actor.id } });
-    await this.auditService.record({ actorUserId: actor.id, action: 'COURSE_ACCESS_UPDATED', targetType: 'Course', targetId: id, metadata: { accessType } });
+    await this.prisma.course.update({
+      where: { id },
+      data: { accessType, updatedById: actor.id },
+    });
+    await this.auditService.record({
+      actorUserId: actor.id,
+      action: 'COURSE_ACCESS_UPDATED',
+      targetType: 'Course',
+      targetId: id,
+      metadata: { accessType },
+    });
     return this.toSummary(await this.getOrThrow(id));
   }
 
@@ -225,7 +247,9 @@ export class CoursesService {
     }
 
     const ids = dto.items.map((item) => item.id);
-    const siblings = await this.prisma.course.findMany({ where: { subjectId: dto.subjectId } });
+    const siblings = await this.prisma.course.findMany({
+      where: { subjectId: dto.subjectId },
+    });
     assertCompleteSequentialReorder(dto.items, siblings);
 
     const plan = computeTwoPhaseRenumber(dto.items);
@@ -233,9 +257,9 @@ export class CoursesService {
     try {
       await this.prisma.$transaction(async (tx) => {
         for (const phase1 of plan.phase1) {
-    await tx.course.updateMany({
+          await tx.course.updateMany({
             where: { id: phase1.id },
-            data: { sortOrder: phase1.sortOrder, updatedById: actor.id, },
+            data: { sortOrder: phase1.sortOrder, updatedById: actor.id },
           });
         }
         for (const phase2 of plan.phase2) {
@@ -264,7 +288,10 @@ export class CoursesService {
   async move(actor: RequestUser, id: string, dto: MoveCourseDto) {
     this.assertActorRole(actor);
     const record = await this.getOrThrow(id);
-    if (record.subjectId === dto.newSubjectId) throw new ConflictException('Use reorder to change position within the same parent');
+    if (record.subjectId === dto.newSubjectId)
+      throw new ConflictException(
+        'Use reorder to change position within the same parent',
+      );
 
     const newParent = await this.prisma.subject.findUnique({
       where: { id: dto.newSubjectId },
@@ -275,8 +302,13 @@ export class CoursesService {
     if (newParent.status === ContentStatus.ARCHIVED) {
       throw new ConflictException('Cannot move into an archived subject');
     }
-    if (record.status === ContentStatus.PUBLISHED && newParent.status !== ContentStatus.PUBLISHED) {
-      throw new ConflictException('A published course must remain under a published subject');
+    if (
+      record.status === ContentStatus.PUBLISHED &&
+      newParent.status !== ContentStatus.PUBLISHED
+    ) {
+      throw new ConflictException(
+        'A published course must remain under a published subject',
+      );
     }
 
     const slugCollision = await this.prisma.course.findUnique({
@@ -295,9 +327,19 @@ export class CoursesService {
       _max: { sortOrder: true },
     });
     const targetSortOrder =
-      dto.sortOrder ?? (dto.newSubjectId === record.subjectId ? (targetMax._max.sortOrder ?? 1) : (targetMax._max.sortOrder ?? 0) + 1);
-    if (targetSortOrder < 1 || targetSortOrder > (targetMax._max.sortOrder ?? 0) + (dto.newSubjectId === record.subjectId ? 0 : 1)) {
-      throw new ConflictException('Target sortOrder is outside the sibling scope');
+      dto.sortOrder ??
+      (dto.newSubjectId === record.subjectId
+        ? (targetMax._max.sortOrder ?? 1)
+        : (targetMax._max.sortOrder ?? 0) + 1);
+    if (
+      targetSortOrder < 1 ||
+      targetSortOrder >
+        (targetMax._max.sortOrder ?? 0) +
+          (dto.newSubjectId === record.subjectId ? 0 : 1)
+    ) {
+      throw new ConflictException(
+        'Target sortOrder is outside the sibling scope',
+      );
     }
     const oldSubjectId = record.subjectId;
     const oldSortOrder = record.sortOrder;
@@ -306,12 +348,12 @@ export class CoursesService {
       await this.prisma.$transaction(async (tx) => {
         await tx.course.updateMany({
           where: { id },
-          data: { sortOrder: 1_000_000_000, updatedById: actor.id, },
+          data: { sortOrder: 1_000_000_000, updatedById: actor.id },
         });
 
         await tx.course.updateMany({
           where: { subjectId: oldSubjectId, sortOrder: { gt: oldSortOrder } },
-          data: { sortOrder: { decrement: 1 }, updatedById: actor.id, },
+          data: { sortOrder: { decrement: 1 }, updatedById: actor.id },
         });
 
         await tx.course.updateMany({
@@ -319,12 +361,16 @@ export class CoursesService {
             subjectId: dto.newSubjectId,
             sortOrder: { gte: targetSortOrder },
           },
-          data: { sortOrder: { increment: 1 }, updatedById: actor.id, },
+          data: { sortOrder: { increment: 1 }, updatedById: actor.id },
         });
 
         await tx.course.updateMany({
           where: { id },
-          data: { subjectId: dto.newSubjectId, sortOrder: targetSortOrder, updatedById: actor.id },
+          data: {
+            subjectId: dto.newSubjectId,
+            sortOrder: targetSortOrder,
+            updatedById: actor.id,
+          },
         });
 
         await contentPlacementAncestry.courseMoved(tx, id, {
@@ -377,7 +423,7 @@ export class CoursesService {
       data: {
         status: ContentStatus.ARCHIVED,
         archivedAt: new Date(),
-        },
+      },
     });
 
     await this.auditService.record({
@@ -398,7 +444,7 @@ export class CoursesService {
         status: ContentStatus.DRAFT,
         publishedAt: null,
         archivedAt: null,
-        },
+      },
     });
 
     await this.auditService.record({
@@ -411,10 +457,7 @@ export class CoursesService {
     return this.toSummary(await this.getOrThrow(id));
   }
 
-  async delete(
-    actor: RequestUser,
-    id: string
-  ): Promise<void> {
+  async delete(actor: RequestUser, id: string): Promise<void> {
     this.assertActorRole(actor);
     const record = await this.getOrThrow(id);
     if (record.status !== ContentStatus.DRAFT) {

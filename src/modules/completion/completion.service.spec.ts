@@ -5,14 +5,30 @@ describe('CompletionService', () => {
     const prisma: any = {
       contentPlacement: {
         findMany: jest.fn().mockResolvedValue([
-          { contentItemId: 'one', resolvedCourseId: 'course', resolvedChapterId: 'chapter', resolvedLessonId: null, resolvedSectionId: null },
-          { contentItemId: 'two', resolvedCourseId: 'course', resolvedChapterId: 'chapter', resolvedLessonId: 'lesson', resolvedSectionId: 'section' },
+          {
+            contentItemId: 'one',
+            resolvedCourseId: 'course',
+            resolvedChapterId: 'chapter',
+            resolvedLessonId: null,
+            resolvedSectionId: null,
+          },
+          {
+            contentItemId: 'two',
+            resolvedCourseId: 'course',
+            resolvedChapterId: 'chapter',
+            resolvedLessonId: 'lesson',
+            resolvedSectionId: 'section',
+          },
         ]),
       },
-      studentContentProgress: { findMany: jest.fn().mockResolvedValue([{ contentItemId: 'one' }]) },
+      studentContentProgress: {
+        findMany: jest.fn().mockResolvedValue([{ contentItemId: 'one' }]),
+      },
     };
     const result = await new CompletionService(prisma).containers('student', [
-      { type: 'course', id: 'course' }, { type: 'chapter', id: 'chapter' }, { type: 'section', id: 'section' },
+      { type: 'course', id: 'course' },
+      { type: 'chapter', id: 'chapter' },
+      { type: 'section', id: 'section' },
     ]);
     expect(result.get('course:course')).toBe(false);
     expect(result.get('chapter:chapter')).toBe(false);
@@ -24,7 +40,9 @@ describe('CompletionService', () => {
       contentPlacement: { findMany: jest.fn().mockResolvedValue([]) },
       studentContentProgress: { findMany: jest.fn().mockResolvedValue([]) },
     };
-    const result = await new CompletionService(prisma).containers('student', [{ type: 'course', id: 'empty' }]);
+    const result = await new CompletionService(prisma).containers('student', [
+      { type: 'course', id: 'empty' },
+    ]);
     expect(result.get('course:empty')).toBe(false);
   });
 });

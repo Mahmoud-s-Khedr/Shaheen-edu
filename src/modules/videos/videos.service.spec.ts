@@ -458,11 +458,11 @@ describe('VideosService', () => {
       prisma.asset.findUnique
         .mockResolvedValueOnce(processing)
         .mockResolvedValueOnce({
-        ...processing,
-        video: {
-          ...processing.video,
-          clientUploadCompletedAt: new Date('2026-08-05T16:18:21.000Z'),
-        },
+          ...processing,
+          video: {
+            ...processing.video,
+            clientUploadCompletedAt: new Date('2026-08-05T16:18:21.000Z'),
+          },
         });
       await expect(service.confirmation(admin, 'a1')).resolves.toMatchObject({
         status: AssetStatus.PROCESSING,

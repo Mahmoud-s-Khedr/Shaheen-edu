@@ -20,7 +20,11 @@ describe('PartnerFinanceService settlements', () => {
     };
     return {
       tx,
-      service: new PartnerFinanceService(prisma, { record: jest.fn() } as any, {} as any),
+      service: new PartnerFinanceService(
+        prisma,
+        { record: jest.fn() } as any,
+        {} as any,
+      ),
     };
   }
 
@@ -97,7 +101,11 @@ describe('PartnerFinanceService reconciliation evidence', () => {
     return {
       prisma,
       tx,
-      service: new PartnerFinanceService(prisma, { record: jest.fn() } as any, {} as any),
+      service: new PartnerFinanceService(
+        prisma,
+        { record: jest.fn() } as any,
+        {} as any,
+      ),
     };
   }
 

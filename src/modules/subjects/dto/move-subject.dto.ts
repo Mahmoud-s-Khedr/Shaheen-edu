@@ -13,5 +13,4 @@ export class MoveSubjectDto {
   @IsInt()
   @Min(1)
   sortOrder?: number;
-
 }

@@ -7,7 +7,21 @@ import { StudentContentController } from './student-content.controller';
 import { PublicContentController } from './public-content.controller';
 import { AssetsModule } from '../assets/assets.module';
 import { VideosModule } from '../videos/videos.module';
-import { ContentAssetAccessController, StudentContentAssetAccessController } from './content-asset-access.controller';
+import {
+  ContentAssetAccessController,
+  StudentContentAssetAccessController,
+} from './content-asset-access.controller';
 
-@Module({ imports: [AuditModule, AssetsModule, VideosModule], controllers: [EntitlementsController, StudentContentController, PublicContentController, ContentAssetAccessController, StudentContentAssetAccessController], providers: [EntitlementsService, ContentAccessPolicyService], exports: [EntitlementsService, ContentAccessPolicyService] })
+@Module({
+  imports: [AuditModule, AssetsModule, VideosModule],
+  controllers: [
+    EntitlementsController,
+    StudentContentController,
+    PublicContentController,
+    ContentAssetAccessController,
+    StudentContentAssetAccessController,
+  ],
+  providers: [EntitlementsService, ContentAccessPolicyService],
+  exports: [EntitlementsService, ContentAccessPolicyService],
+})
 export class EntitlementsModule {}

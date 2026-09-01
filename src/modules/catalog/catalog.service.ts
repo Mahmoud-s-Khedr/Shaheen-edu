@@ -10,8 +10,16 @@ import { PrismaService } from '../../database/prisma.service';
 import { CatalogCoursesQueryDto } from './dto/catalog-courses-query.dto';
 import { CatalogSubjectsQueryDto } from './dto/catalog-subjects-query.dto';
 import { SearchCursorPaginationQueryDto } from '../../common/dto/cursor-pagination-query.dto';
-import { normalizeArabic, paginateArabicSearch, searchArabicIds, sqlAnd } from '../../common/search/arabic-search';
-import { publishedScope, sortOrderSql } from '../../common/search/content-scope';
+import {
+  normalizeArabic,
+  paginateArabicSearch,
+  searchArabicIds,
+  sqlAnd,
+} from '../../common/search/arabic-search';
+import {
+  publishedScope,
+  sortOrderSql,
+} from '../../common/search/content-scope';
 
 const published = ContentStatus.PUBLISHED;
 const order = [{ sortOrder: 'asc' as const }, { id: 'asc' as const }];
@@ -52,13 +60,20 @@ export class CatalogService {
       scope: {
         where: sqlAnd(
           publishedScope,
-          query.academicGradeId ? Prisma.sql`t."academicGradeId" = ${query.academicGradeId}` : undefined,
+          query.academicGradeId
+            ? Prisma.sql`t."academicGradeId" = ${query.academicGradeId}`
+            : undefined,
         ),
       },
       orderBySql: sortOrderSql,
       orderBy: order,
       where,
-      args: { include: { coverAsset: { select: { filename: true } }, _count: { select: { courses: { where: { status: published } } } } } },
+      args: {
+        include: {
+          coverAsset: { select: { filename: true } },
+          _count: { select: { courses: { where: { status: published } } } },
+        },
+      },
       page: query.page,
       limit: query.limit,
     });
@@ -78,13 +93,20 @@ export class CatalogService {
       scope: {
         where: sqlAnd(
           publishedScope,
-          query.subjectId ? Prisma.sql`t."subjectId" = ${query.subjectId}` : undefined,
+          query.subjectId
+            ? Prisma.sql`t."subjectId" = ${query.subjectId}`
+            : undefined,
         ),
       },
       orderBySql: sortOrderSql,
       orderBy: order,
       where,
-      args: { include: { coverAsset: { select: { filename: true } }, _count: { select: { chapters: { where: { status: published } } } } } },
+      args: {
+        include: {
+          coverAsset: { select: { filename: true } },
+          _count: { select: { chapters: { where: { status: published } } } },
+        },
+      },
       page: query.page,
       limit: query.limit,
     });
@@ -108,16 +130,38 @@ export class CatalogService {
           include: {
             coverAsset: { select: { filename: true } },
             _count: { select: { courses: { where: { status: published } } } },
-            academicGrade: { include: { coverAsset: { select: { filename: true } }, _count: { select: { subjects: { where: { status: published } } } } } },
+            academicGrade: {
+              include: {
+                coverAsset: { select: { filename: true } },
+                _count: {
+                  select: { subjects: { where: { status: published } } },
+                },
+              },
+            },
           },
         },
       },
     });
     if (!record) throw new NotFoundException('Published course not found');
     const [chapters, lessons, sections] = await this.prisma.$transaction([
-      this.prisma.chapter.count({ where: { courseId: record.id, status: published } }),
-      this.prisma.lesson.count({ where: { chapter: { courseId: record.id, status: published }, status: published } }),
-      this.prisma.section.count({ where: { lesson: { chapter: { courseId: record.id, status: published }, status: published }, status: published } }),
+      this.prisma.chapter.count({
+        where: { courseId: record.id, status: published },
+      }),
+      this.prisma.lesson.count({
+        where: {
+          chapter: { courseId: record.id, status: published },
+          status: published,
+        },
+      }),
+      this.prisma.section.count({
+        where: {
+          lesson: {
+            chapter: { courseId: record.id, status: published },
+            status: published,
+          },
+          status: published,
+        },
+      }),
     ]);
     return {
       ...publicNode(record),
@@ -131,7 +175,11 @@ export class CatalogService {
     if (!cursor) return undefined;
     try {
       const value = JSON.parse(Buffer.from(cursor, 'base64url').toString());
-      if (!Number.isInteger(value.sortOrder) || typeof value.id !== 'string' || (value.q ?? '') !== normalizeArabic(q ?? ''))
+      if (
+        !Number.isInteger(value.sortOrder) ||
+        typeof value.id !== 'string' ||
+        (value.q ?? '') !== normalizeArabic(q ?? '')
+      )
         throw new Error();
       return value as { sortOrder: number; id: string };
     } catch {
@@ -149,7 +197,11 @@ export class CatalogService {
         nextCursor:
           hasNextPage && last
             ? Buffer.from(
-                JSON.stringify({ sortOrder: last.sortOrder, id: last.id, q: normalizeArabic(q ?? '') }),
+                JSON.stringify({
+                  sortOrder: last.sortOrder,
+                  id: last.id,
+                  q: normalizeArabic(q ?? ''),
+                }),
               ).toString('base64url')
             : null,
       },
@@ -165,7 +217,11 @@ export class CatalogService {
         nextCursor:
           items.length > limit && last
             ? Buffer.from(
-                JSON.stringify({ sortOrder: last.sortOrder, id: last.id, q: normalizeArabic(q ?? '') }),
+                JSON.stringify({
+                  sortOrder: last.sortOrder,
+                  id: last.id,
+                  q: normalizeArabic(q ?? ''),
+                }),
               ).toString('base64url')
             : null,
       },
@@ -190,15 +246,26 @@ export class CatalogService {
         status: published,
         subject: { status: published, academicGrade: { status: published } },
       },
-      include: { coverAsset: { select: { filename: true } }, _count: { select: { chapters: { where: { status: published } } } } },
+      include: {
+        coverAsset: { select: { filename: true } },
+        _count: { select: { chapters: { where: { status: published } } } },
+      },
     });
     if (!parent) throw new NotFoundException('Published course not found');
     const ids = await searchArabicIds(this.prisma, 'chapter', query.q, {
       where: Prisma.sql`t."courseId" = ${courseId} AND ${publishedScope}`,
     });
     const items = await this.prisma.chapter.findMany({
-      where: { courseId, status: published, ...(ids ? { id: { in: ids } } : {}), ...this.after(query.cursor, query.q) },
-      include: { coverAsset: { select: { filename: true } }, _count: { select: { lessons: { where: { status: published } } } } },
+      where: {
+        courseId,
+        status: published,
+        ...(ids ? { id: { in: ids } } : {}),
+        ...this.after(query.cursor, query.q),
+      },
+      include: {
+        coverAsset: { select: { filename: true } },
+        _count: { select: { lessons: { where: { status: published } } } },
+      },
       orderBy: order,
       take: query.limit + 1,
     });
@@ -217,15 +284,26 @@ export class CatalogService {
           subject: { status: published, academicGrade: { status: published } },
         },
       },
-      include: { coverAsset: { select: { filename: true } }, _count: { select: { lessons: { where: { status: published } } } } },
+      include: {
+        coverAsset: { select: { filename: true } },
+        _count: { select: { lessons: { where: { status: published } } } },
+      },
     });
     if (!parent) throw new NotFoundException('Published chapter not found');
     const ids = await searchArabicIds(this.prisma, 'lesson', query.q, {
       where: Prisma.sql`t."chapterId" = ${chapterId} AND ${publishedScope}`,
     });
     const items = await this.prisma.lesson.findMany({
-      where: { chapterId, status: published, ...(ids ? { id: { in: ids } } : {}), ...this.after(query.cursor, query.q) },
-      include: { coverAsset: { select: { filename: true } }, _count: { select: { sections: { where: { status: published } } } } },
+      where: {
+        chapterId,
+        status: published,
+        ...(ids ? { id: { in: ids } } : {}),
+        ...this.after(query.cursor, query.q),
+      },
+      include: {
+        coverAsset: { select: { filename: true } },
+        _count: { select: { sections: { where: { status: published } } } },
+      },
       orderBy: order,
       take: query.limit + 1,
     });
@@ -250,14 +328,22 @@ export class CatalogService {
           },
         },
       },
-      include: { coverAsset: { select: { filename: true } }, _count: { select: { sections: { where: { status: published } } } } },
+      include: {
+        coverAsset: { select: { filename: true } },
+        _count: { select: { sections: { where: { status: published } } } },
+      },
     });
     if (!parent) throw new NotFoundException('Published lesson not found');
     const ids = await searchArabicIds(this.prisma, 'section', query.q, {
       where: Prisma.sql`t."lessonId" = ${lessonId} AND ${publishedScope}`,
     });
     const items = await this.prisma.section.findMany({
-      where: { lessonId, status: published, ...(ids ? { id: { in: ids } } : {}), ...this.after(query.cursor, query.q) },
+      where: {
+        lessonId,
+        status: published,
+        ...(ids ? { id: { in: ids } } : {}),
+        ...this.after(query.cursor, query.q),
+      },
       orderBy: order,
       take: query.limit + 1,
     });
@@ -322,9 +408,15 @@ export class CatalogService {
       },
     };
     const childCounts: Record<string, any> = {
-      courses: { _count: { select: { chapters: { where: { status: published } } } } },
-      chapters: { _count: { select: { lessons: { where: { status: published } } } } },
-      lessons: { _count: { select: { sections: { where: { status: published } } } } },
+      courses: {
+        _count: { select: { chapters: { where: { status: published } } } },
+      },
+      chapters: {
+        _count: { select: { lessons: { where: { status: published } } } },
+      },
+      lessons: {
+        _count: { select: { sections: { where: { status: published } } } },
+      },
       sections: {},
     };
     if (!models[resource])

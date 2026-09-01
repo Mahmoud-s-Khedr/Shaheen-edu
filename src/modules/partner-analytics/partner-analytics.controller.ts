@@ -34,7 +34,8 @@ export class PartnerAnalyticsController {
       'Get content publisher dashboard metrics and compact earnings trend',
   })
   @ApiOkResponse({
-    description: 'All money is EGP minor units and is derived solely from immutable allocation ledger rows.',
+    description:
+      'All money is EGP minor units and is derived solely from immutable allocation ledger rows.',
   })
   @ApiStandardErrors(400, 401, 403)
   dashboard(
@@ -57,22 +58,50 @@ export class PartnerAnalyticsController {
   }
 
   @Get('analytics/allocations')
-  @ApiOperation({ summary: 'List immutable ledger allocations for the authenticated partner' })
-  allocations(@CurrentUser() user: RequestUser, @Query() query: PartnerAllocationsQueryDto) {
+  @ApiOperation({
+    summary: 'List immutable ledger allocations for the authenticated partner',
+  })
+  allocations(
+    @CurrentUser() user: RequestUser,
+    @Query() query: PartnerAllocationsQueryDto,
+  ) {
     return this.analytics.allocations(user.id, query);
   }
 
   @Get('analytics/question-usage')
-  @ApiOperation({ summary: 'Get aggregate-only publisher question usage and correctness metrics' })
-  questionUsage(@CurrentUser() user: RequestUser, @Query() query: PartnerQuestionUsageQueryDto) { return this.analytics.questionUsage(user.id, query); }
+  @ApiOperation({
+    summary:
+      'Get aggregate-only publisher question usage and correctness metrics',
+  })
+  questionUsage(
+    @CurrentUser() user: RequestUser,
+    @Query() query: PartnerQuestionUsageQueryDto,
+  ) {
+    return this.analytics.questionUsage(user.id, query);
+  }
 
   @Get('analytics/question-usage/sources')
-  @ApiOperation({ summary: 'Get a paginated source breakdown without learner identity' })
-  questionUsageSources(@CurrentUser() user: RequestUser, @Query() query: PartnerQuestionUsageQueryDto) { return this.analytics.questionUsageSources(user.id, query); }
+  @ApiOperation({
+    summary: 'Get a paginated source breakdown without learner identity',
+  })
+  questionUsageSources(
+    @CurrentUser() user: RequestUser,
+    @Query() query: PartnerQuestionUsageQueryDto,
+  ) {
+    return this.analytics.questionUsageSources(user.id, query);
+  }
 
   @Get('analytics/question-usage/questions')
-  @ApiOperation({ summary: 'Get a paginated frozen-question usage breakdown without learner identity' })
-  questionUsageQuestions(@CurrentUser() user: RequestUser, @Query() query: PartnerQuestionUsageQueryDto) { return this.analytics.questionUsageQuestions(user.id, query); }
+  @ApiOperation({
+    summary:
+      'Get a paginated frozen-question usage breakdown without learner identity',
+  })
+  questionUsageQuestions(
+    @CurrentUser() user: RequestUser,
+    @Query() query: PartnerQuestionUsageQueryDto,
+  ) {
+    return this.analytics.questionUsageQuestions(user.id, query);
+  }
 
   @Get('analytics/content')
   @ApiOperation({
@@ -85,5 +114,4 @@ export class PartnerAnalyticsController {
   ) {
     return this.analytics.content(user.id, query);
   }
-
 }

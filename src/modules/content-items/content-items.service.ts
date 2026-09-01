@@ -304,11 +304,7 @@ export class ContentItemsService {
         targetId: target.id,
       },
     });
-    return this.toSummary(
-      created as typeof created & {
-        placement: NonNullable<typeof created.placement>;
-      },
-    );
+    return this.toSummary(created);
   }
 
   async getById(actor: RequestUser, id: string) {
@@ -387,13 +383,7 @@ export class ContentItemsService {
       limit: query.limit,
     });
     return {
-      data: items.map((item) =>
-        this.toSummary(
-          item as typeof item & {
-            placement: NonNullable<typeof item.placement>;
-          },
-        ),
-      ),
+      data: items.map((item) => this.toSummary(item)),
       meta: toPaginationMeta(query.page, query.limit, total),
     };
   }

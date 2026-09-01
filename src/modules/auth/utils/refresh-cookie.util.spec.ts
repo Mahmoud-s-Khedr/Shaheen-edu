@@ -2,7 +2,10 @@ import { clearRefreshCookie, setRefreshCookie } from './refresh-cookie.util';
 import type { AppConfig } from '../../../config/configuration';
 import type { ConfigService } from '@nestjs/config';
 
-function config(cookieSecure: boolean, cookieSameSite: AppConfig['cookieSameSite']) {
+function config(
+  cookieSecure: boolean,
+  cookieSameSite: AppConfig['cookieSameSite'],
+) {
   return {
     get: jest.fn((key: string) => {
       if (key === 'cookieSecure') return cookieSecure;

@@ -25,20 +25,52 @@ describe('Catalog search (e2e)', () => {
     prisma = app.get(PrismaService);
     await cleanDatabase(app);
 
-    ownerId = (await seedSuperAdmin(app, 'catalog-search@example.com', 'SuperAdminP@ss1!')).id;
+    ownerId = (
+      await seedSuperAdmin(
+        app,
+        'catalog-search@example.com',
+        'SuperAdminP@ss1!',
+      )
+    ).id;
     const audit = { createdById: ownerId, updatedById: ownerId };
 
     const grade = await prisma.academicGrade.create({
-      data: { titleAr: 'الصف الأول', titleEn: 'Grade One', slug: 'grade-one', sortOrder: 1, status: PUBLISHED, publishedAt: new Date(), ...audit },
+      data: {
+        titleAr: 'الصف الأول',
+        titleEn: 'Grade One',
+        slug: 'grade-one',
+        sortOrder: 1,
+        status: PUBLISHED,
+        publishedAt: new Date(),
+        ...audit,
+      },
     });
     const subject = await prisma.subject.create({
-      data: { academicGradeId: grade.id, title: 'إسلاميات', slug: 'islamic', sortOrder: 1, status: PUBLISHED, publishedAt: new Date(), ...audit },
+      data: {
+        academicGradeId: grade.id,
+        title: 'إسلاميات',
+        slug: 'islamic',
+        sortOrder: 1,
+        status: PUBLISHED,
+        publishedAt: new Date(),
+        ...audit,
+      },
     });
 
     const makeCourse = async (slug: string, sortOrder: number) =>
-      (await prisma.course.create({
-        data: { subjectId: subject.id, title: `مقرر ${slug}`, slug, sortOrder, status: PUBLISHED, publishedAt: new Date(), ...audit },
-      })).id;
+      (
+        await prisma.course.create({
+          data: {
+            subjectId: subject.id,
+            title: `مقرر ${slug}`,
+            slug,
+            sortOrder,
+            status: PUBLISHED,
+            publishedAt: new Date(),
+            ...audit,
+          },
+        })
+      ).id;
     courseA = await makeCourse('course-a', 1);
     courseB = await makeCourse('course-b', 2);
 
@@ -65,7 +97,15 @@ describe('Catalog search (e2e)', () => {
 
     // One chapter whose title carries diacritics, to prove normalization.
     await prisma.chapter.create({
-      data: { courseId: courseA, title: 'مُعَلَّم', slug: 'a-chapter-diacritics', sortOrder: 7, status: PUBLISHED, publishedAt: new Date(), ...audit },
+      data: {
+        courseId: courseA,
+        title: 'مُعَلَّم',
+        slug: 'a-chapter-diacritics',
+        sortOrder: 7,
+        status: PUBLISHED,
+        publishedAt: new Date(),
+        ...audit,
+      },
     });
 
     const governorates = Array.from({ length: 27 }, (_, i) => ({
@@ -81,33 +121,45 @@ describe('Catalog search (e2e)', () => {
 
   describe('search scope', () => {
     it('confines a chapter search to the requested course', async () => {
-      const response = await get(`/api/v1/catalog/courses/${courseA}/chapters?q=${encodeURIComponent('الفصل')}&limit=100`);
+      const response = await get(
+        `/api/v1/catalog/courses/${courseA}/chapters?q=${encodeURIComponent('الفصل')}&limit=100`,
+      );
       expect(response.statusCode).toBe(200);
       const body = JSON.parse(response.body);
       expect(body.data).toHaveLength(6);
-      for (const chapter of body.data) expect(chapter.slug).toMatch(/^a-chapter-/);
+      for (const chapter of body.data)
+        expect(chapter.slug).toMatch(/^a-chapter-/);
     });
 
     it('does not leak the other course even for a single-character query', async () => {
       // "%a%" is the cheapest possible needle and previously resolved every
       // chapter id in the database before Prisma narrowed it by course.
-      const response = await get(`/api/v1/catalog/courses/${courseB}/chapters?q=a&limit=100`);
+      const response = await get(
+        `/api/v1/catalog/courses/${courseB}/chapters?q=a&limit=100`,
+      );
       expect(response.statusCode).toBe(200);
       const body = JSON.parse(response.body);
-      for (const chapter of body.data) expect(chapter.slug).toMatch(/^b-chapter-/);
+      for (const chapter of body.data)
+        expect(chapter.slug).toMatch(/^b-chapter-/);
     });
   });
 
   describe('Arabic normalization', () => {
     it('matches a diacritic-free query against a diacritic-bearing title', async () => {
-      const response = await get(`/api/v1/catalog/courses/${courseA}/chapters?q=${encodeURIComponent('معلم')}&limit=100`);
+      const response = await get(
+        `/api/v1/catalog/courses/${courseA}/chapters?q=${encodeURIComponent('معلم')}&limit=100`,
+      );
       expect(response.statusCode).toBe(200);
       const body = JSON.parse(response.body);
-      expect(body.data.map((c: { slug: string }) => c.slug)).toEqual(['a-chapter-diacritics']);
+      expect(body.data.map((c: { slug: string }) => c.slug)).toEqual([
+        'a-chapter-diacritics',
+      ]);
     });
 
     it('rejects a query that normalizes to nothing', async () => {
-      const response = await get(`/api/v1/catalog/courses/${courseA}/chapters?q=${encodeURIComponent('!!!')}`);
+      const response = await get(
+        `/api/v1/catalog/courses/${courseA}/chapters?q=${encodeURIComponent('!!!')}`,
+      );
       expect(response.statusCode).toBe(400);
     });
   });
@@ -128,7 +180,13 @@ describe('Catalog search (e2e)', () => {
 
     it('paginates an offset search without duplicating or dropping rows', async () => {
       const page = async (n: number) =>
-        JSON.parse((await get(`/api/v1/catalog/subjects?q=${encodeURIComponent('اسلاميات')}&page=${n}&limit=1`)).body);
+        JSON.parse(
+          (
+            await get(
+              `/api/v1/catalog/subjects?q=${encodeURIComponent('اسلاميات')}&page=${n}&limit=1`,
+            )
+          ).body,
+        );
       const first = await page(1);
       expect(first.meta.total).toBe(1);
       expect(first.data).toHaveLength(1);
@@ -145,13 +203,17 @@ describe('Catalog search (e2e)', () => {
     });
 
     it('still supports an explicit smaller page', async () => {
-      const body = JSON.parse((await get('/api/v1/geography/governorates?limit=5')).body);
+      const body = JSON.parse(
+        (await get('/api/v1/geography/governorates?limit=5')).body,
+      );
       expect(body.data).toHaveLength(5);
       expect(body.meta.total).toBe(27);
     });
 
     it('rejects a limit above the ceiling', async () => {
-      expect((await get('/api/v1/geography/governorates?limit=500')).statusCode).toBe(400);
+      expect(
+        (await get('/api/v1/geography/governorates?limit=500')).statusCode,
+      ).toBe(400);
     });
   });
 });

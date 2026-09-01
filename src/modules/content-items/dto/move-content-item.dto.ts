@@ -24,5 +24,4 @@ export class MoveContentItemDto {
   @IsInt()
   @Min(1)
   sortOrder?: number;
-
 }

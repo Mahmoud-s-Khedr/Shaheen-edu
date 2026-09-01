@@ -1,10 +1,20 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
-import { IsInt, IsOptional, IsString, Max, MaxLength, Min, MinLength } from 'class-validator';
+import {
+  IsInt,
+  IsOptional,
+  IsString,
+  Max,
+  MaxLength,
+  Min,
+  MinLength,
+} from 'class-validator';
 
 /** Stable pagination for ordered catalog children. */
 export class CursorPaginationQueryDto {
-  @ApiPropertyOptional({ description: 'Opaque cursor returned by the preceding page.' })
+  @ApiPropertyOptional({
+    description: 'Opaque cursor returned by the preceding page.',
+  })
   @IsOptional()
   @IsString()
   cursor?: string;
@@ -29,7 +39,8 @@ export class CursorPaginationQueryDto {
  */
 export class SearchCursorPaginationQueryDto extends CursorPaginationQueryDto {
   @ApiPropertyOptional({
-    description: 'Case-insensitive text search. Search cursors are bound to this query.',
+    description:
+      'Case-insensitive text search. Search cursors are bound to this query.',
     minLength: 1,
     maxLength: 120,
   })

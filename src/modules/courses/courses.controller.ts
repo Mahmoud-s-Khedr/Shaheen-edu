@@ -85,7 +85,11 @@ export class CoursesController {
 
   @Patch(':id/access')
   @ApiOperation({ summary: 'Set the course access type' })
-  updateAccess(@CurrentUser() actor: RequestUser, @Param('id') id: string, @Body() dto: UpdateAccessTypeDto) {
+  updateAccess(
+    @CurrentUser() actor: RequestUser,
+    @Param('id') id: string,
+    @Body() dto: UpdateAccessTypeDto,
+  ) {
     return this.coursesService.updateAccess(actor, id, dto.accessType);
   }
 
@@ -112,9 +116,7 @@ export class CoursesController {
   @ApiOperation({ summary: 'Publish a course' })
   @ApiOkResponse({ type: CourseSummaryDto })
   @ApiStandardErrors(401, 403, 404, 409)
-  publish(
-    @CurrentUser() actor: RequestUser,
-    @Param('id') id: string,  ) {
+  publish(@CurrentUser() actor: RequestUser, @Param('id') id: string) {
     return this.coursesService.publish(actor, id);
   }
 
@@ -122,9 +124,7 @@ export class CoursesController {
   @ApiOperation({ summary: 'Archive a course' })
   @ApiOkResponse({ type: CourseSummaryDto })
   @ApiStandardErrors(401, 403, 404, 409)
-  archive(
-    @CurrentUser() actor: RequestUser,
-    @Param('id') id: string,  ) {
+  archive(@CurrentUser() actor: RequestUser, @Param('id') id: string) {
     return this.coursesService.archive(actor, id);
   }
 
@@ -132,18 +132,14 @@ export class CoursesController {
   @ApiOperation({ summary: 'Restore an archived course' })
   @ApiOkResponse({ type: CourseSummaryDto })
   @ApiStandardErrors(401, 403, 404, 409)
-  restore(
-    @CurrentUser() actor: RequestUser,
-    @Param('id') id: string,  ) {
+  restore(@CurrentUser() actor: RequestUser, @Param('id') id: string) {
     return this.coursesService.restore(actor, id);
   }
 
   @Delete(':id')
   @ApiOperation({ summary: 'Delete an eligible draft course' })
   @ApiStandardErrors(401, 403, 404, 409)
-  delete(
-    @CurrentUser() actor: RequestUser,
-    @Param('id') id: string,  ) {
+  delete(@CurrentUser() actor: RequestUser, @Param('id') id: string) {
     return this.coursesService.delete(actor, id);
   }
 }

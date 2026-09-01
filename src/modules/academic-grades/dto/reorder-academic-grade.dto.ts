@@ -17,7 +17,6 @@ export class ReorderAcademicGradeItemDto {
   @IsInt()
   @Min(1)
   sortOrder!: number;
-
 }
 
 export class ReorderAcademicGradeDto {

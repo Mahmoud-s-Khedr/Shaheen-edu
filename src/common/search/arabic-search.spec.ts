@@ -1,5 +1,11 @@
 import { BadRequestException } from '@nestjs/common';
-import { NORMALIZER_FIXTURES, likePattern, normalizeArabic, resolveSearchQuery, searchTerms } from './arabic-search';
+import {
+  NORMALIZER_FIXTURES,
+  likePattern,
+  normalizeArabic,
+  resolveSearchQuery,
+  searchTerms,
+} from './arabic-search';
 
 describe('Arabic search helpers', () => {
   it('normalizes Arabic spelling, diacritics, Persian letters, digits, and spacing', () => {
@@ -15,7 +21,9 @@ describe('Arabic search helpers', () => {
   });
 
   it('rejects conflicting q and search values', () => {
-    expect(() => resolveSearchQuery({ q: 'رياضيات', search: 'فيزياء' })).toThrow(BadRequestException);
+    expect(() =>
+      resolveSearchQuery({ q: 'رياضيات', search: 'فيزياء' }),
+    ).toThrow(BadRequestException);
   });
 
   it('normalizes punctuation out of a LIKE pattern', () => {

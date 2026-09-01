@@ -35,17 +35,41 @@ export class CatalogController {
 
   @Get('courses/:id/chapters')
   @ApiOperation({ summary: 'List published course chapters' })
-  chapters(@Param('id') id: string, @Query() query: SearchCursorPaginationQueryDto) { return this.catalog.chapters(id, query); }
+  chapters(
+    @Param('id') id: string,
+    @Query() query: SearchCursorPaginationQueryDto,
+  ) {
+    return this.catalog.chapters(id, query);
+  }
 
   @Get('chapters/:id/lessons')
   @ApiOperation({ summary: 'List published chapter lessons' })
-  lessons(@Param('id') id: string, @Query() query: SearchCursorPaginationQueryDto) { return this.catalog.lessons(id, query); }
+  lessons(
+    @Param('id') id: string,
+    @Query() query: SearchCursorPaginationQueryDto,
+  ) {
+    return this.catalog.lessons(id, query);
+  }
 
   @Get('lessons/:id/sections')
   @ApiOperation({ summary: 'List published lesson sections' })
-  sections(@Param('id') id: string, @Query() query: SearchCursorPaginationQueryDto) { return this.catalog.sections(id, query); }
+  sections(
+    @Param('id') id: string,
+    @Query() query: SearchCursorPaginationQueryDto,
+  ) {
+    return this.catalog.sections(id, query);
+  }
 
   @Get(':resource/:id/content-items')
-  @ApiOperation({ summary: 'List published content previews directly placed on a hierarchy node' })
-  contentItems(@Param('resource') resource: string, @Param('id') id: string, @Query() query: SearchCursorPaginationQueryDto) { return this.catalog.contentItems(resource, id, query); }
+  @ApiOperation({
+    summary:
+      'List published content previews directly placed on a hierarchy node',
+  })
+  contentItems(
+    @Param('resource') resource: string,
+    @Param('id') id: string,
+    @Query() query: SearchCursorPaginationQueryDto,
+  ) {
+    return this.catalog.contentItems(resource, id, query);
+  }
 }

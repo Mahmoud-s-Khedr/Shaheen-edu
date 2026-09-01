@@ -13,8 +13,18 @@ export class CoverAccessController {
   constructor(private readonly assets: AssetsService) {}
 
   @Get(':resource/:id/cover/access')
-  @ApiOperation({ summary: 'Get a protected URL for a visible hierarchy cover image' })
-  access(@Param('resource') resource: string, @Param('id') id: string, @Req() request: any) {
-    return this.assets.coverAccess(resource, id, request.user?.role === 'STUDENT' ? request.user.id : undefined);
+  @ApiOperation({
+    summary: 'Get a protected URL for a visible hierarchy cover image',
+  })
+  access(
+    @Param('resource') resource: string,
+    @Param('id') id: string,
+    @Req() request: any,
+  ) {
+    return this.assets.coverAccess(
+      resource,
+      id,
+      request.user?.role === 'STUDENT' ? request.user.id : undefined,
+    );
   }
 }

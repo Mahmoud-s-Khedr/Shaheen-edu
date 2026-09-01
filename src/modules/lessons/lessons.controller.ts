@@ -84,7 +84,11 @@ export class LessonsController {
 
   @Patch(':id/access')
   @ApiOperation({ summary: 'Set the lesson access type' })
-  updateAccess(@CurrentUser() actor: RequestUser, @Param('id') id: string, @Body() dto: UpdateAccessTypeDto) {
+  updateAccess(
+    @CurrentUser() actor: RequestUser,
+    @Param('id') id: string,
+    @Body() dto: UpdateAccessTypeDto,
+  ) {
     return this.lessonsService.updateAccess(actor, id, dto.accessType);
   }
 
@@ -111,9 +115,7 @@ export class LessonsController {
   @ApiOperation({ summary: 'Publish a lesson' })
   @ApiOkResponse({ type: LessonSummaryDto })
   @ApiStandardErrors(401, 403, 404, 409)
-  publish(
-    @CurrentUser() actor: RequestUser,
-    @Param('id') id: string,  ) {
+  publish(@CurrentUser() actor: RequestUser, @Param('id') id: string) {
     return this.lessonsService.publish(actor, id);
   }
 
@@ -121,9 +123,7 @@ export class LessonsController {
   @ApiOperation({ summary: 'Archive a lesson' })
   @ApiOkResponse({ type: LessonSummaryDto })
   @ApiStandardErrors(401, 403, 404, 409)
-  archive(
-    @CurrentUser() actor: RequestUser,
-    @Param('id') id: string,  ) {
+  archive(@CurrentUser() actor: RequestUser, @Param('id') id: string) {
     return this.lessonsService.archive(actor, id);
   }
 
@@ -131,18 +131,14 @@ export class LessonsController {
   @ApiOperation({ summary: 'Restore an archived lesson' })
   @ApiOkResponse({ type: LessonSummaryDto })
   @ApiStandardErrors(401, 403, 404, 409)
-  restore(
-    @CurrentUser() actor: RequestUser,
-    @Param('id') id: string,  ) {
+  restore(@CurrentUser() actor: RequestUser, @Param('id') id: string) {
     return this.lessonsService.restore(actor, id);
   }
 
   @Delete(':id')
   @ApiOperation({ summary: 'Delete an eligible draft lesson' })
   @ApiStandardErrors(401, 403, 404, 409)
-  delete(
-    @CurrentUser() actor: RequestUser,
-    @Param('id') id: string,  ) {
+  delete(@CurrentUser() actor: RequestUser, @Param('id') id: string) {
     return this.lessonsService.delete(actor, id);
   }
 }

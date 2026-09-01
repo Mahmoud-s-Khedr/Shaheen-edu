@@ -1,10 +1,25 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { ArrayMinSize, IsArray, IsEnum, IsInt, IsOptional, IsString, Max, MaxLength, Min, MinLength } from 'class-validator';
+import {
+  ArrayMinSize,
+  IsArray,
+  IsEnum,
+  IsInt,
+  IsOptional,
+  IsString,
+  Max,
+  MaxLength,
+  Min,
+  MinLength,
+} from 'class-validator';
 import { PaginationQueryDto } from '../../../common/dto/pagination-query.dto';
 import { RefundRequestStatus } from '../../../common/types/roles.enum';
 
 export class CreateRefundRequestDto {
-  @ApiPropertyOptional({ type: [String], description: 'Omit to request refunds for every item in the approved order.' })
+  @ApiPropertyOptional({
+    type: [String],
+    description:
+      'Omit to request refunds for every item in the approved order.',
+  })
   @IsOptional()
   @IsArray()
   @ArrayMinSize(1)
@@ -33,7 +48,10 @@ export class AdminRefundRequestsQueryDto extends RefundRequestsQueryDto {
 }
 
 export class ApproveRefundDto {
-  @ApiProperty({ description: 'Manual reimbursement reference, such as an email or transfer reference.' })
+  @ApiProperty({
+    description:
+      'Manual reimbursement reference, such as an email or transfer reference.',
+  })
   @IsString()
   @MinLength(1)
   @MaxLength(200)
@@ -67,7 +85,11 @@ export class RefundPolicyDto {
   @Max(365)
   eligibilityWindowDays!: number;
 
-  @ApiProperty({ minimum: 1, maximum: 10000, description: 'Maximum completed-content consumption in basis points.' })
+  @ApiProperty({
+    minimum: 1,
+    maximum: 10000,
+    description: 'Maximum completed-content consumption in basis points.',
+  })
   @IsInt()
   @Min(1)
   @Max(10_000)

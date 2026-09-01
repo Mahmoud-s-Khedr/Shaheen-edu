@@ -204,7 +204,10 @@ describe('Content publisher partner analytics (e2e)', () => {
       payable: { amountMinor: 2_500, currency: 'EGP' },
     });
     expect(JSON.stringify(body)).not.toContain('Private Student');
-    expect(body.agreements[0]).toMatchObject({ agreementId, net: { amountMinor: 2_500 } });
+    expect(body.agreements[0]).toMatchObject({
+      agreementId,
+      net: { amountMinor: 2_500 },
+    });
   });
 
   it('scopes content and ledger earnings to the authenticated publisher and rejects referral partners', async () => {

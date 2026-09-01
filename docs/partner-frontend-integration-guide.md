@@ -2004,7 +2004,7 @@ Authorization: Bearer <admin-access-token>
     "timeZone": "Africa/Cairo"
   },
   "privacy": {
-    "minimumCohort": 5,
+    "minimumCohort": 1,
     "suppressed": true,
     "reason": "The selected period has too few approved referred learners."
   },
@@ -2038,7 +2038,7 @@ Authorization: Bearer <admin-access-token>
     "timeZone": "Africa/Cairo"
   },
   "privacy": {
-    "minimumCohort": 5,
+    "minimumCohort": 1,
     "settlementRowsBelowMinimumAreOmitted": true
   },
   "data": []
@@ -2066,7 +2066,7 @@ Authorization: Bearer <admin-access-token>
     "timeZone": "Africa/Cairo"
   },
   "privacy": {
-    "minimumCohort": 5,
+    "minimumCohort": 1,
     "suppressed": false,
     "breakdownsSuppressSmallCohorts": false
   },

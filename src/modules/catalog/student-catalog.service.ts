@@ -19,10 +19,23 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { SearchCursorPaginationQueryDto } from '../../common/dto/cursor-pagination-query.dto';
 import { StudentCatalogSearchDto } from './dto/student-catalog-search.dto';
-import { arabicMatchText, normalizeArabic, paginateArabicSearch, searchArabicIds, searchNeedle, sqlAnd } from '../../common/search/arabic-search';
-import { publishedScope, sortOrderSql } from '../../common/search/content-scope';
+import {
+  arabicMatchText,
+  normalizeArabic,
+  paginateArabicSearch,
+  searchArabicIds,
+  searchNeedle,
+  sqlAnd,
+} from '../../common/search/arabic-search';
+import {
+  publishedScope,
+  sortOrderSql,
+} from '../../common/search/content-scope';
 import { nodeMatches } from '../../common/search/node-match';
-import { CompletionService, type CompletionContainerType } from '../completion/completion.service';
+import {
+  CompletionService,
+  type CompletionContainerType,
+} from '../completion/completion.service';
 
 const published = ContentStatus.PUBLISHED;
 const order = [{ sortOrder: 'asc' as const }, { id: 'asc' as const }];
@@ -84,11 +97,21 @@ export class StudentCatalogService {
       delegate: this.prisma.subject,
       target: 'subject',
       q: query.q,
-      scope: { where: sqlAnd(publishedScope, Prisma.sql`t."academicGradeId" = ${grade.id}`) },
+      scope: {
+        where: sqlAnd(
+          publishedScope,
+          Prisma.sql`t."academicGradeId" = ${grade.id}`,
+        ),
+      },
       orderBySql: sortOrderSql,
       orderBy: order,
       where,
-      args: { include: { coverAsset: { select: { filename: true } }, _count: { select: { courses: { where: { status: published } } } } } },
+      args: {
+        include: {
+          coverAsset: { select: { filename: true } },
+          _count: { select: { courses: { where: { status: published } } } },
+        },
+      },
       page: query.page,
       limit: query.limit,
     });
@@ -106,7 +129,10 @@ export class StudentCatalogService {
     const grade = await this.gradeFor(studentUserId);
     const subject = await this.prisma.subject.findFirst({
       where: { id: subjectId, academicGradeId: grade.id, status: published },
-      include: { coverAsset: { select: { filename: true } }, _count: { select: { courses: { where: { status: published } } } } },
+      include: {
+        coverAsset: { select: { filename: true } },
+        _count: { select: { courses: { where: { status: published } } } },
+      },
     });
     if (!subject) throw new NotFoundException('Published subject not found');
     const grants = await this.activeGrants(studentUserId);
@@ -116,11 +142,18 @@ export class StudentCatalogService {
       delegate: this.prisma.course,
       target: 'course',
       q: query.q,
-      scope: { where: sqlAnd(publishedScope, Prisma.sql`t."subjectId" = ${subjectId}`) },
+      scope: {
+        where: sqlAnd(publishedScope, Prisma.sql`t."subjectId" = ${subjectId}`),
+      },
       orderBySql: sortOrderSql,
       orderBy: order,
       where,
-      args: { include: { coverAsset: { select: { filename: true } }, _count: { select: { chapters: { where: { status: published } } } } } },
+      args: {
+        include: {
+          coverAsset: { select: { filename: true } },
+          _count: { select: { chapters: { where: { status: published } } } },
+        },
+      },
       page: query.page,
       limit: query.limit,
     });
@@ -133,7 +166,13 @@ export class StudentCatalogService {
         this.withCompletion(
           this.withAccess(
             this.node(course),
-            this.access(grants, course.id, undefined, [course.accessType], course),
+            this.access(
+              grants,
+              course.id,
+              undefined,
+              [course.accessType],
+              course,
+            ),
           ),
           'course',
           completions,
@@ -233,51 +272,116 @@ export class StudentCatalogService {
     const page = rows.slice(0, query.limit);
     const [chapters, lessons, sections, grants] = await Promise.all([
       this.prisma.chapter.findMany({
-        where: { id: { in: page.filter((row) => row.type === 'CHAPTER').map((row) => row.id) } },
+        where: {
+          id: {
+            in: page
+              .filter((row) => row.type === 'CHAPTER')
+              .map((row) => row.id),
+          },
+        },
         include: { course: true },
       }),
       this.prisma.lesson.findMany({
-        where: { id: { in: page.filter((row) => row.type === 'LESSON').map((row) => row.id) } },
+        where: {
+          id: {
+            in: page
+              .filter((row) => row.type === 'LESSON')
+              .map((row) => row.id),
+          },
+        },
         include: { chapter: { include: { course: true } } },
       }),
       this.prisma.section.findMany({
-        where: { id: { in: page.filter((row) => row.type === 'SECTION').map((row) => row.id) } },
-        include: { lesson: { include: { chapter: { include: { course: true } } } } },
+        where: {
+          id: {
+            in: page
+              .filter((row) => row.type === 'SECTION')
+              .map((row) => row.id),
+          },
+        },
+        include: {
+          lesson: { include: { chapter: { include: { course: true } } } },
+        },
       }),
       this.activeGrants(studentUserId),
     ]);
-    const chaptersById = new Map(chapters.map((chapter) => [chapter.id, chapter]));
+    const chaptersById = new Map(
+      chapters.map((chapter) => [chapter.id, chapter]),
+    );
     const lessonsById = new Map(lessons.map((lesson) => [lesson.id, lesson]));
-    const sectionsById = new Map(sections.map((section) => [section.id, section]));
+    const sectionsById = new Map(
+      sections.map((section) => [section.id, section]),
+    );
     const data = page.map((row) => {
       if (row.type === 'CHAPTER') {
         const chapter = chaptersById.get(row.id)!;
-        return this.searchNode(subject, chapter.course, chapter, null, null, grants);
+        return this.searchNode(
+          subject,
+          chapter.course,
+          chapter,
+          null,
+          null,
+          grants,
+        );
       }
       if (row.type === 'LESSON') {
         const lesson = lessonsById.get(row.id)!;
-        return this.searchNode(subject, lesson.chapter.course, lesson.chapter, lesson, null, grants);
+        return this.searchNode(
+          subject,
+          lesson.chapter.course,
+          lesson.chapter,
+          lesson,
+          null,
+          grants,
+        );
       }
       const section = sectionsById.get(row.id)!;
-      return this.searchNode(subject, section.lesson.chapter.course, section.lesson.chapter, section.lesson, section, grants);
+      return this.searchNode(
+        subject,
+        section.lesson.chapter.course,
+        section.lesson.chapter,
+        section.lesson,
+        section,
+        grants,
+      );
     });
     const completions = await this.completion.containers(
       studentUserId,
       data.flatMap((hit) => [
         { id: hit.breadcrumb.course.id, type: 'course' as const },
-        ...(hit.breadcrumb.chapter ? [{ id: hit.breadcrumb.chapter.id, type: 'chapter' as const }] : []),
-        ...(hit.breadcrumb.lesson ? [{ id: hit.breadcrumb.lesson.id, type: 'lesson' as const }] : []),
-        ...(hit.breadcrumb.section ? [{ id: hit.breadcrumb.section.id, type: 'section' as const }] : []),
+        ...(hit.breadcrumb.chapter
+          ? [{ id: hit.breadcrumb.chapter.id, type: 'chapter' as const }]
+          : []),
+        ...(hit.breadcrumb.lesson
+          ? [{ id: hit.breadcrumb.lesson.id, type: 'lesson' as const }]
+          : []),
+        ...(hit.breadcrumb.section
+          ? [{ id: hit.breadcrumb.section.id, type: 'section' as const }]
+          : []),
       ]),
     );
     const completedData = data.map((hit) => ({
-      ...this.withCompletion(hit, hit.type.toLowerCase() as CompletionContainerType, completions),
+      ...this.withCompletion(
+        hit,
+        hit.type.toLowerCase() as CompletionContainerType,
+        completions,
+      ),
       breadcrumb: {
         ...hit.breadcrumb,
-        course: this.withCompletion(hit.breadcrumb.course, 'course', completions),
-        chapter: hit.breadcrumb.chapter && this.withCompletion(hit.breadcrumb.chapter, 'chapter', completions),
-        lesson: hit.breadcrumb.lesson && this.withCompletion(hit.breadcrumb.lesson, 'lesson', completions),
-        section: hit.breadcrumb.section && this.withCompletion(hit.breadcrumb.section, 'section', completions),
+        course: this.withCompletion(
+          hit.breadcrumb.course,
+          'course',
+          completions,
+        ),
+        chapter:
+          hit.breadcrumb.chapter &&
+          this.withCompletion(hit.breadcrumb.chapter, 'chapter', completions),
+        lesson:
+          hit.breadcrumb.lesson &&
+          this.withCompletion(hit.breadcrumb.lesson, 'lesson', completions),
+        section:
+          hit.breadcrumb.section &&
+          this.withCompletion(hit.breadcrumb.section, 'section', completions),
       },
     }));
     const last = page.at(-1);
@@ -287,9 +391,19 @@ export class StudentCatalogService {
         hasNextPage: rows.length > query.limit,
         nextCursor:
           rows.length > query.limit && last
-            ? Buffer.from(JSON.stringify({ key: [last.course_order, last.chapter_order, last.lesson_order, last.section_order, last.type_order, last.id], q: normalizeArabic(searchQuery) })).toString(
-                'base64url',
-              )
+            ? Buffer.from(
+                JSON.stringify({
+                  key: [
+                    last.course_order,
+                    last.chapter_order,
+                    last.lesson_order,
+                    last.section_order,
+                    last.type_order,
+                    last.id,
+                  ],
+                  q: normalizeArabic(searchQuery),
+                }),
+              ).toString('base64url')
             : null,
       },
     };
@@ -330,8 +444,9 @@ export class StudentCatalogService {
       group.entitlements.push(entitlement);
       grouped.set(subject.id, group);
     }
-    const matchingSubjects = [...grouped.values()]
-      .filter(({ subject }) => this.nodeMatches(subject, query.q));
+    const matchingSubjects = [...grouped.values()].filter(({ subject }) =>
+      this.nodeMatches(subject, query.q),
+    );
     const subjectPage = matchingSubjects
       .sort(
         (a, b) =>
@@ -399,7 +514,8 @@ export class StudentCatalogService {
         })
       ).map((row) => row.contentItemId),
     );
-    const rows = subjectPage.map(({ subject, entitlements: activeEntitlements }) => {
+    const rows = subjectPage.map(
+      ({ subject, entitlements: activeEntitlements }) => {
         const items = accessibleBySubject.get(subject.id) ?? [];
         const completedContentItems = items.filter((item) =>
           completed.has(item.id),
@@ -412,7 +528,8 @@ export class StudentCatalogService {
               id: entitlement.id,
               targetType: entitlement.courseId ? 'COURSE' : 'CHAPTER',
               targetId: entitlement.courseId ?? entitlement.chapterId,
-              targetName: entitlement.course?.title ?? entitlement.chapter?.title ?? null,
+              targetName:
+                entitlement.course?.title ?? entitlement.chapter?.title ?? null,
               expiresAt: entitlement.expiresAt,
             })),
           },
@@ -424,7 +541,8 @@ export class StudentCatalogService {
               : 0,
           },
         };
-    });
+      },
+    );
     return {
       data: rows,
       meta: toPaginationMeta(query.page, query.limit, matchingSubjects.length),
@@ -446,29 +564,51 @@ export class StudentCatalogService {
       include: {
         coverAsset: { select: { filename: true } },
         _count: { select: { chapters: { where: { status: published } } } },
-        subject: { include: { coverAsset: { select: { filename: true } }, _count: { select: { courses: { where: { status: published } } } } } },
+        subject: {
+          include: {
+            coverAsset: { select: { filename: true } },
+            _count: { select: { courses: { where: { status: published } } } },
+          },
+        },
       },
     });
     if (!course) throw new NotFoundException('Published course not found');
-    const [grants, completions, chapters, lessons, sections] = await Promise.all([
-      this.activeGrants(studentUserId),
-      this.completion.containers(studentUserId, [{ id: course.id, type: 'course' }]),
-      this.prisma.chapter.count({ where: { courseId: course.id, status: published } }),
-      this.prisma.lesson.count({
-        where: { status: published, chapter: { courseId: course.id, status: published } },
-      }),
-      this.prisma.section.count({
-        where: {
-          status: published,
-          lesson: { status: published, chapter: { courseId: course.id, status: published } },
-        },
-      }),
-    ]);
+    const [grants, completions, chapters, lessons, sections] =
+      await Promise.all([
+        this.activeGrants(studentUserId),
+        this.completion.containers(studentUserId, [
+          { id: course.id, type: 'course' },
+        ]),
+        this.prisma.chapter.count({
+          where: { courseId: course.id, status: published },
+        }),
+        this.prisma.lesson.count({
+          where: {
+            status: published,
+            chapter: { courseId: course.id, status: published },
+          },
+        }),
+        this.prisma.section.count({
+          where: {
+            status: published,
+            lesson: {
+              status: published,
+              chapter: { courseId: course.id, status: published },
+            },
+          },
+        }),
+      ]);
     return {
       ...this.withCompletion(
         this.withAccess(
           this.node(course),
-          this.access(grants, course.id, undefined, [course.accessType], course),
+          this.access(
+            grants,
+            course.id,
+            undefined,
+            [course.accessType],
+            course,
+          ),
         ),
         'course',
         completions,
@@ -494,7 +634,10 @@ export class StudentCatalogService {
           academicGrade: { status: published },
         },
       },
-      include: { coverAsset: { select: { filename: true } }, _count: { select: { chapters: { where: { status: published } } } } },
+      include: {
+        coverAsset: { select: { filename: true } },
+        _count: { select: { chapters: { where: { status: published } } } },
+      },
     });
     if (!course) throw new NotFoundException('Published course not found');
     const grants = await this.activeGrants(studentUserId);
@@ -502,8 +645,16 @@ export class StudentCatalogService {
       where: Prisma.sql`t."courseId" = ${courseId} AND ${publishedScope}`,
     });
     const rows = await this.prisma.chapter.findMany({
-      where: { courseId, status: published, ...(ids ? { id: { in: ids } } : {}), ...this.after(query.cursor, query.q) },
-      include: { coverAsset: { select: { filename: true } }, _count: { select: { lessons: { where: { status: published } } } } },
+      where: {
+        courseId,
+        status: published,
+        ...(ids ? { id: { in: ids } } : {}),
+        ...this.after(query.cursor, query.q),
+      },
+      include: {
+        coverAsset: { select: { filename: true } },
+        _count: { select: { lessons: { where: { status: published } } } },
+      },
       orderBy: order,
       take: query.limit + 1,
     });
@@ -512,24 +663,39 @@ export class StudentCatalogService {
       ...rows.map((chapter) => ({ id: chapter.id, type: 'chapter' as const })),
     ]);
     return {
-      parent: this.withCompletion(this.withAccess(
-        this.node(course),
-        this.access(grants, course.id, undefined, [course.accessType], course),
-      ), 'course', completions),
+      parent: this.withCompletion(
+        this.withAccess(
+          this.node(course),
+          this.access(
+            grants,
+            course.id,
+            undefined,
+            [course.accessType],
+            course,
+          ),
+        ),
+        'course',
+        completions,
+      ),
       ...this.page(
         rows.map((chapter) =>
-          this.withCompletion(this.withAccess(
-            this.node(chapter),
-            this.access(
-              grants,
-              course.id,
-              chapter.id,
-              [chapter.accessType, course.accessType],
-              this.chapterPricing(chapter, course),
+          this.withCompletion(
+            this.withAccess(
+              this.node(chapter),
+              this.access(
+                grants,
+                course.id,
+                chapter.id,
+                [chapter.accessType, course.accessType],
+                this.chapterPricing(chapter, course),
+              ),
             ),
-          ), 'chapter', completions),
+            'chapter',
+            completions,
+          ),
         ),
-        query.limit, query.q,
+        query.limit,
+        query.q,
       ),
     };
   }
@@ -565,8 +731,16 @@ export class StudentCatalogService {
       where: Prisma.sql`t."chapterId" = ${chapterId} AND ${publishedScope}`,
     });
     const rows = await this.prisma.lesson.findMany({
-      where: { chapterId, status: published, ...(ids ? { id: { in: ids } } : {}), ...this.after(query.cursor, query.q) },
-      include: { coverAsset: { select: { filename: true } }, _count: { select: { sections: { where: { status: published } } } } },
+      where: {
+        chapterId,
+        status: published,
+        ...(ids ? { id: { in: ids } } : {}),
+        ...this.after(query.cursor, query.q),
+      },
+      include: {
+        coverAsset: { select: { filename: true } },
+        _count: { select: { sections: { where: { status: published } } } },
+      },
       orderBy: order,
       take: query.limit + 1,
     });
@@ -583,12 +757,21 @@ export class StudentCatalogService {
       ...rows.map((lesson) => ({ id: lesson.id, type: 'lesson' as const })),
     ]);
     return {
-      parent: this.withCompletion(this.withAccess(this.node(chapter), access(chapter)), 'chapter', completions),
+      parent: this.withCompletion(
+        this.withAccess(this.node(chapter), access(chapter)),
+        'chapter',
+        completions,
+      ),
       ...this.page(
         rows.map((lesson) =>
-          this.withCompletion(this.withAccess(this.node(lesson), access(lesson)), 'lesson', completions),
+          this.withCompletion(
+            this.withAccess(this.node(lesson), access(lesson)),
+            'lesson',
+            completions,
+          ),
         ),
-        query.limit, query.q,
+        query.limit,
+        query.q,
       ),
     };
   }
@@ -628,7 +811,12 @@ export class StudentCatalogService {
       where: Prisma.sql`t."lessonId" = ${lessonId} AND ${publishedScope}`,
     });
     const rows = await this.prisma.section.findMany({
-      where: { lessonId, status: published, ...(ids ? { id: { in: ids } } : {}), ...this.after(query.cursor, query.q) },
+      where: {
+        lessonId,
+        status: published,
+        ...(ids ? { id: { in: ids } } : {}),
+        ...this.after(query.cursor, query.q),
+      },
       include: { coverAsset: { select: { filename: true } } },
       orderBy: order,
       take: query.limit + 1,
@@ -651,12 +839,21 @@ export class StudentCatalogService {
       ...rows.map((section) => ({ id: section.id, type: 'section' as const })),
     ]);
     return {
-      parent: this.withCompletion(this.withAccess(this.node(lesson), access(lesson)), 'lesson', completions),
+      parent: this.withCompletion(
+        this.withAccess(this.node(lesson), access(lesson)),
+        'lesson',
+        completions,
+      ),
       ...this.page(
         rows.map((section) =>
-          this.withCompletion(this.withAccess(this.node(section), access(section)), 'section', completions),
+          this.withCompletion(
+            this.withAccess(this.node(section), access(section)),
+            'section',
+            completions,
+          ),
         ),
-        query.limit, query.q,
+        query.limit,
+        query.q,
       ),
     };
   }
@@ -813,10 +1010,15 @@ export class StudentCatalogService {
       { id: parent.id, type: parentType },
     ]);
     const completedItems = new Set(
-      (await this.prisma.studentContentProgress.findMany({
-        where: { studentUserId, contentItemId: { in: rows.map((row) => row.contentItemId) } },
-        select: { contentItemId: true },
-      })).map((row) => row.contentItemId),
+      (
+        await this.prisma.studentContentProgress.findMany({
+          where: {
+            studentUserId,
+            contentItemId: { in: rows.map((row) => row.contentItemId) },
+          },
+          select: { contentItemId: true },
+        })
+      ).map((row) => row.contentItemId),
     );
     const render = (placement: any) =>
       this.withAccess(
@@ -833,7 +1035,11 @@ export class StudentCatalogService {
         ),
       );
     return {
-      parent: this.withCompletion(this.withAccess(this.node(parent), parentAccess), parentType, completions),
+      parent: this.withCompletion(
+        this.withAccess(this.node(parent), parentAccess),
+        parentType,
+        completions,
+      ),
       ...this.placementPage(rows, query.limit, render, query.q),
     };
   }
@@ -856,13 +1062,18 @@ export class StudentCatalogService {
       },
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
     });
-    const completions = await this.completion.containers(studentUserId, records.flatMap((record) => {
-      const course = record.course ?? record.chapter?.course;
-      return [
-        ...(course ? [{ id: course.id, type: 'course' as const }] : []),
-        ...(record.chapter ? [{ id: record.chapter.id, type: 'chapter' as const }] : []),
-      ];
-    }));
+    const completions = await this.completion.containers(
+      studentUserId,
+      records.flatMap((record) => {
+        const course = record.course ?? record.chapter?.course;
+        return [
+          ...(course ? [{ id: course.id, type: 'course' as const }] : []),
+          ...(record.chapter
+            ? [{ id: record.chapter.id, type: 'chapter' as const }]
+            : []),
+        ];
+      }),
+    );
     const data = records.flatMap((record) => {
       const course = record.course ?? record.chapter?.course;
       const grade = course?.subject.academicGrade;
@@ -878,7 +1089,11 @@ export class StudentCatalogService {
       const target = record.course
         ? this.withCompletion(this.node(record.course), 'course', completions)
         : {
-            ...this.withCompletion(this.node(record.chapter!), 'chapter', completions),
+            ...this.withCompletion(
+              this.node(record.chapter!),
+              'chapter',
+              completions,
+            ),
             courseId: course.id,
           };
       return [
@@ -894,10 +1109,15 @@ export class StudentCatalogService {
         },
       ];
     });
-    const combined = [...data, ...(await this.archivedLibrary(studentUserId))]
-      .filter((item) => this.libraryMatches(item, query.q));
+    const combined = [
+      ...data,
+      ...(await this.archivedLibrary(studentUserId)),
+    ].filter((item) => this.libraryMatches(item, query.q));
     return {
-      data: combined.slice((query.page - 1) * query.limit, query.page * query.limit),
+      data: combined.slice(
+        (query.page - 1) * query.limit,
+        query.page * query.limit,
+      ),
       meta: toPaginationMeta(query.page, query.limit, combined.length),
     };
   }
@@ -929,7 +1149,9 @@ export class StudentCatalogService {
 
     const rows: any[] = [];
     for (const snapshot of snapshots) {
-      const record = records.get(`${snapshot.resourceType}:${snapshot.resourceId}`);
+      const record = records.get(
+        `${snapshot.resourceType}:${snapshot.resourceId}`,
+      );
       if (!record) continue;
       const path = this.archivedPath(snapshot.resourceType, record);
       rows.push({
@@ -1057,10 +1279,12 @@ export class StudentCatalogService {
       this.prisma.studentEntitlement.count({ where }),
     ]);
     const progress = await Promise.all(
-      data.map((record) => this.completion.progress(studentUserId, {
-        type: record.courseId ? 'course' : 'chapter',
-        id: record.courseId ?? record.chapterId!,
-      })),
+      data.map((record) =>
+        this.completion.progress(studentUserId, {
+          type: record.courseId ? 'course' : 'chapter',
+          id: record.courseId ?? record.chapterId!,
+        }),
+      ),
     );
     return {
       data: data.map((record, index) => ({
@@ -1079,7 +1303,11 @@ export class StudentCatalogService {
     if (!cursor) return undefined;
     try {
       const value = JSON.parse(Buffer.from(cursor, 'base64url').toString());
-      if (!Number.isInteger(value.sortOrder) || typeof value.id !== 'string' || (value.q ?? '') !== normalizeArabic(q ?? ''))
+      if (
+        !Number.isInteger(value.sortOrder) ||
+        typeof value.id !== 'string' ||
+        (value.q ?? '') !== normalizeArabic(q ?? '')
+      )
         throw new Error();
       return value as { sortOrder: number; id: string };
     } catch {
@@ -1119,7 +1347,11 @@ export class StudentCatalogService {
         nextCursor:
           hasNextPage && last
             ? Buffer.from(
-                JSON.stringify({ sortOrder: last.sortOrder, id: last.id, q: normalizeArabic(q ?? '') }),
+                JSON.stringify({
+                  sortOrder: last.sortOrder,
+                  id: last.id,
+                  q: normalizeArabic(q ?? ''),
+                }),
               ).toString('base64url')
             : null,
       },
@@ -1140,7 +1372,11 @@ export class StudentCatalogService {
         nextCursor:
           items.length > limit && last
             ? Buffer.from(
-                JSON.stringify({ sortOrder: last.sortOrder, id: last.id, q: normalizeArabic(q ?? '') }),
+                JSON.stringify({
+                  sortOrder: last.sortOrder,
+                  id: last.id,
+                  q: normalizeArabic(q ?? ''),
+                }),
               ).toString('base64url')
             : null,
       },
@@ -1301,7 +1537,10 @@ export class StudentCatalogService {
     if (!path) return false;
     const course = path.nodes.at(-1);
     const chapter = path.nodes.find((node: any) => node.courseId);
-    const accessTypes = [item.accessType, ...path.nodes.map((node: any) => node.accessType)];
+    const accessTypes = [
+      item.accessType,
+      ...path.nodes.map((node: any) => node.accessType),
+    ];
     const effective = this.effectiveAccess(accessTypes);
     if (effective === AccessType.PUBLIC || effective === AccessType.FREE)
       return true;
@@ -1420,6 +1659,9 @@ export class StudentCatalogService {
     type: CompletionContainerType,
     completions: Map<string, boolean>,
   ) {
-    return { ...node, isCompleted: completions.get(`${type}:${node.id}`) ?? false };
+    return {
+      ...node,
+      isCompleted: completions.get(`${type}:${node.id}`) ?? false,
+    };
   }
 }

@@ -27,5 +27,4 @@ export class UpdateChapterDto {
   @IsString()
   @MaxLength(2000)
   description?: string;
-
 }

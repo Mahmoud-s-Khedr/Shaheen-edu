@@ -1,6 +1,14 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
-import { AccessType, ContentStatus, EntitlementStatus } from '../../common/types/roles.enum';
+import {
+  AccessType,
+  ContentStatus,
+  EntitlementStatus,
+} from '../../common/types/roles.enum';
 
 @Injectable()
 export class ContentAccessPolicyService {
@@ -10,14 +18,71 @@ export class ContentAccessPolicyService {
     const item = await this.prisma.contentItem.findUnique({
       where: { id: contentItemId },
       include: {
-        primaryAsset: { select: { id: true, kind: true, filename: true, mimeType: true, sizeBytes: true } },
-        assetReferences: { orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }], include: { asset: { select: { id: true, kind: true, filename: true, mimeType: true, sizeBytes: true } } } },
+        primaryAsset: {
+          select: {
+            id: true,
+            kind: true,
+            filename: true,
+            mimeType: true,
+            sizeBytes: true,
+          },
+        },
+        assetReferences: {
+          orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
+          include: {
+            asset: {
+              select: {
+                id: true,
+                kind: true,
+                filename: true,
+                mimeType: true,
+                sizeBytes: true,
+              },
+            },
+          },
+        },
         placement: {
           include: {
-            course: { include: { subject: { include: { academicGrade: true } } } },
-            chapter: { include: { course: { include: { subject: { include: { academicGrade: true } } } } } },
-            lesson: { include: { chapter: { include: { course: { include: { subject: { include: { academicGrade: true } } } } } } } },
-            section: { include: { lesson: { include: { chapter: { include: { course: { include: { subject: { include: { academicGrade: true } } } } } } } } } },
+            course: {
+              include: { subject: { include: { academicGrade: true } } },
+            },
+            chapter: {
+              include: {
+                course: {
+                  include: { subject: { include: { academicGrade: true } } },
+                },
+              },
+            },
+            lesson: {
+              include: {
+                chapter: {
+                  include: {
+                    course: {
+                      include: {
+                        subject: { include: { academicGrade: true } },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            section: {
+              include: {
+                lesson: {
+                  include: {
+                    chapter: {
+                      include: {
+                        course: {
+                          include: {
+                            subject: { include: { academicGrade: true } },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
           },
         },
       },
@@ -26,28 +91,123 @@ export class ContentAccessPolicyService {
     const placement: any = item.placement;
     const nodes: any[] = [item];
     const hierarchyNodes: any[] = [];
-    if (placement.section) { nodes.push(placement.section, placement.section.lesson, placement.section.lesson.chapter, placement.section.lesson.chapter.course, placement.section.lesson.chapter.course.subject, placement.section.lesson.chapter.course.subject.academicGrade); hierarchyNodes.push({ ...placement.section, type: 'SECTION' }, { ...placement.section.lesson, type: 'LESSON' }, { ...placement.section.lesson.chapter, type: 'CHAPTER' }, { ...placement.section.lesson.chapter.course, type: 'COURSE' }, { ...placement.section.lesson.chapter.course.subject, type: 'SUBJECT' }, { ...placement.section.lesson.chapter.course.subject.academicGrade, type: 'ACADEMIC_GRADE' }); }
-    else if (placement.lesson) { nodes.push(placement.lesson, placement.lesson.chapter, placement.lesson.chapter.course, placement.lesson.chapter.course.subject, placement.lesson.chapter.course.subject.academicGrade); hierarchyNodes.push({ ...placement.lesson, type: 'LESSON' }, { ...placement.lesson.chapter, type: 'CHAPTER' }, { ...placement.lesson.chapter.course, type: 'COURSE' }, { ...placement.lesson.chapter.course.subject, type: 'SUBJECT' }, { ...placement.lesson.chapter.course.subject.academicGrade, type: 'ACADEMIC_GRADE' }); }
-    else if (placement.chapter) { nodes.push(placement.chapter, placement.chapter.course, placement.chapter.course.subject, placement.chapter.course.subject.academicGrade); hierarchyNodes.push({ ...placement.chapter, type: 'CHAPTER' }, { ...placement.chapter.course, type: 'COURSE' }, { ...placement.chapter.course.subject, type: 'SUBJECT' }, { ...placement.chapter.course.subject.academicGrade, type: 'ACADEMIC_GRADE' }); }
-    else if (placement.course) { nodes.push(placement.course, placement.course.subject, placement.course.subject.academicGrade); hierarchyNodes.push({ ...placement.course, type: 'COURSE' }, { ...placement.course.subject, type: 'SUBJECT' }, { ...placement.course.subject.academicGrade, type: 'ACADEMIC_GRADE' }); }
-    if (nodes.some((node) => node?.status === ContentStatus.DRAFT)) throw new ForbiddenException('Content is not published');
-    const archived = hierarchyNodes.find((node) => node.status === ContentStatus.ARCHIVED);
+    if (placement.section) {
+      nodes.push(
+        placement.section,
+        placement.section.lesson,
+        placement.section.lesson.chapter,
+        placement.section.lesson.chapter.course,
+        placement.section.lesson.chapter.course.subject,
+        placement.section.lesson.chapter.course.subject.academicGrade,
+      );
+      hierarchyNodes.push(
+        { ...placement.section, type: 'SECTION' },
+        { ...placement.section.lesson, type: 'LESSON' },
+        { ...placement.section.lesson.chapter, type: 'CHAPTER' },
+        { ...placement.section.lesson.chapter.course, type: 'COURSE' },
+        { ...placement.section.lesson.chapter.course.subject, type: 'SUBJECT' },
+        {
+          ...placement.section.lesson.chapter.course.subject.academicGrade,
+          type: 'ACADEMIC_GRADE',
+        },
+      );
+    } else if (placement.lesson) {
+      nodes.push(
+        placement.lesson,
+        placement.lesson.chapter,
+        placement.lesson.chapter.course,
+        placement.lesson.chapter.course.subject,
+        placement.lesson.chapter.course.subject.academicGrade,
+      );
+      hierarchyNodes.push(
+        { ...placement.lesson, type: 'LESSON' },
+        { ...placement.lesson.chapter, type: 'CHAPTER' },
+        { ...placement.lesson.chapter.course, type: 'COURSE' },
+        { ...placement.lesson.chapter.course.subject, type: 'SUBJECT' },
+        {
+          ...placement.lesson.chapter.course.subject.academicGrade,
+          type: 'ACADEMIC_GRADE',
+        },
+      );
+    } else if (placement.chapter) {
+      nodes.push(
+        placement.chapter,
+        placement.chapter.course,
+        placement.chapter.course.subject,
+        placement.chapter.course.subject.academicGrade,
+      );
+      hierarchyNodes.push(
+        { ...placement.chapter, type: 'CHAPTER' },
+        { ...placement.chapter.course, type: 'COURSE' },
+        { ...placement.chapter.course.subject, type: 'SUBJECT' },
+        {
+          ...placement.chapter.course.subject.academicGrade,
+          type: 'ACADEMIC_GRADE',
+        },
+      );
+    } else if (placement.course) {
+      nodes.push(
+        placement.course,
+        placement.course.subject,
+        placement.course.subject.academicGrade,
+      );
+      hierarchyNodes.push(
+        { ...placement.course, type: 'COURSE' },
+        { ...placement.course.subject, type: 'SUBJECT' },
+        { ...placement.course.subject.academicGrade, type: 'ACADEMIC_GRADE' },
+      );
+    }
+    if (nodes.some((node) => node?.status === ContentStatus.DRAFT))
+      throw new ForbiddenException('Content is not published');
+    const archived = hierarchyNodes.find(
+      (node) => node.status === ContentStatus.ARCHIVED,
+    );
     if (archived) {
-      if (!studentUserId) throw new ForbiddenException('Student authentication is required');
-      const snapshot = await (this.prisma as any).archivedAccessSnapshot.findFirst({ where: { studentUserId, resourceType: archived.type, resourceId: archived.id, revokedAt: null }, select: { id: true } });
-      if (!snapshot) throw new ForbiddenException('Archived access is required');
+      if (!studentUserId)
+        throw new ForbiddenException('Student authentication is required');
+      const snapshot = await (
+        this.prisma as any
+      ).archivedAccessSnapshot.findFirst({
+        where: {
+          studentUserId,
+          resourceType: archived.type,
+          resourceId: archived.id,
+          revokedAt: null,
+        },
+        select: { id: true },
+      });
+      if (!snapshot)
+        throw new ForbiddenException('Archived access is required');
       return item;
     }
-    if (item.status !== ContentStatus.PUBLISHED) throw new ForbiddenException('Content is not published');
-    const effective = nodes.find((node) => node.accessType && node.accessType !== AccessType.INHERIT)?.accessType as AccessType;
+    if (item.status !== ContentStatus.PUBLISHED)
+      throw new ForbiddenException('Content is not published');
+    const effective = nodes.find(
+      (node) => node.accessType && node.accessType !== AccessType.INHERIT,
+    )?.accessType as AccessType;
     if (effective === AccessType.PUBLIC) return item;
-    if (!studentUserId) throw new ForbiddenException('Student authentication is required');
+    if (!studentUserId)
+      throw new ForbiddenException('Student authentication is required');
     if (effective === AccessType.FREE) return item;
     const course = nodes.find((node) => node.subjectId)?.id as string;
-    const chapterIds = nodes.filter((node) => node.courseId).map((node) => node.id as string);
+    const chapterIds = nodes
+      .filter((node) => node.courseId)
+      .map((node) => node.id as string);
     const now = new Date();
-    const entitlement = await this.prisma.studentEntitlement.findFirst({ where: { studentUserId, status: EntitlementStatus.ACTIVE, revokedAt: null, startsAt: { lte: now }, AND: [{ OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] }, { OR: [{ courseId: course }, { chapterId: { in: chapterIds } }] }] } });
-    if (!entitlement) throw new ForbiddenException('A valid entitlement is required');
+    const entitlement = await this.prisma.studentEntitlement.findFirst({
+      where: {
+        studentUserId,
+        status: EntitlementStatus.ACTIVE,
+        revokedAt: null,
+        startsAt: { lte: now },
+        AND: [
+          { OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] },
+          { OR: [{ courseId: course }, { chapterId: { in: chapterIds } }] },
+        ],
+      },
+    });
+    if (!entitlement)
+      throw new ForbiddenException('A valid entitlement is required');
     return item;
   }
 
@@ -56,31 +216,47 @@ export class ContentAccessPolicyService {
    * that already has its own hierarchy nodes loaded (e.g. LearningService and
    * AssessmentsService question-placement checks) instead of a ContentItem id. */
   async entitledForNodes(studentId: string, nodes: any[]): Promise<boolean> {
-    if (nodes.some((node) => node.status !== ContentStatus.PUBLISHED)) return false;
-    const effective = nodes.find((node) => node.accessType && node.accessType !== AccessType.INHERIT)?.accessType;
-    if (effective === AccessType.PUBLIC || effective === AccessType.FREE) return true;
+    if (nodes.some((node) => node.status !== ContentStatus.PUBLISHED))
+      return false;
+    const effective = nodes.find(
+      (node) => node.accessType && node.accessType !== AccessType.INHERIT,
+    )?.accessType;
+    if (effective === AccessType.PUBLIC || effective === AccessType.FREE)
+      return true;
     const now = new Date();
     const course = nodes.at(-1);
-    const chapterIds = nodes.filter((node) => node.courseId).map((node) => node.id);
+    const chapterIds = nodes
+      .filter((node) => node.courseId)
+      .map((node) => node.id);
     const entitlement = await this.prisma.studentEntitlement.findFirst({
       where: {
         studentUserId: studentId,
         status: EntitlementStatus.ACTIVE,
         revokedAt: null,
         startsAt: { lte: now },
-        AND: [{ OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] }, { OR: [{ courseId: course.id }, { chapterId: { in: chapterIds } }] }],
+        AND: [
+          { OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] },
+          { OR: [{ courseId: course.id }, { chapterId: { in: chapterIds } }] },
+        ],
       },
     });
     return Boolean(entitlement);
   }
 
   /** A catalog-safe predicate for callers that need a lock indicator instead of a 403. */
-  async canAccessContentItem(contentItemId: string, studentUserId?: string): Promise<boolean> {
+  async canAccessContentItem(
+    contentItemId: string,
+    studentUserId?: string,
+  ): Promise<boolean> {
     try {
       await this.assertContentItemAccess(contentItemId, studentUserId);
       return true;
     } catch (error) {
-      if (error instanceof ForbiddenException || error instanceof NotFoundException) return false;
+      if (
+        error instanceof ForbiddenException ||
+        error instanceof NotFoundException
+      )
+        return false;
       throw error;
     }
   }
@@ -103,15 +279,28 @@ export class ContentAccessPolicyService {
         sortOrder: item.placement.sortOrder,
       },
       primaryAsset: item.primaryAsset,
-      attachments: item.assetReferences.map((reference: any) => ({ ...reference.asset, sortOrder: reference.sortOrder })),
+      attachments: item.assetReferences.map((reference: any) => ({
+        ...reference.asset,
+        sortOrder: reference.sortOrder,
+      })),
     };
   }
 
-  async assertAssetAttached(contentItemId: string, assetId: string): Promise<void> {
-    const item = await this.prisma.contentItem.findUnique({ where: { id: contentItemId }, select: { primaryAssetId: true } });
+  async assertAssetAttached(
+    contentItemId: string,
+    assetId: string,
+  ): Promise<void> {
+    const item = await this.prisma.contentItem.findUnique({
+      where: { id: contentItemId },
+      select: { primaryAssetId: true },
+    });
     if (!item) throw new NotFoundException('Content item not found');
     if (item.primaryAssetId === assetId) return;
-    const reference = await this.prisma.assetReference.findUnique({ where: { contentItemId_assetId: { contentItemId, assetId } }, select: { id: true } });
-    if (!reference) throw new ForbiddenException('Asset is not attached to content item');
+    const reference = await this.prisma.assetReference.findUnique({
+      where: { contentItemId_assetId: { contentItemId, assetId } },
+      select: { id: true },
+    });
+    if (!reference)
+      throw new ForbiddenException('Asset is not attached to content item');
   }
 }

@@ -26,7 +26,9 @@ export class ArabicSearchHealthIndicator implements OnApplicationBootstrap {
         SELECT arabic_normalize(${input}) AS out
       `;
       if (row?.out !== expected) {
-        mismatches.push(`${JSON.stringify(input)}: expected ${JSON.stringify(expected)}, got ${JSON.stringify(row?.out)}`);
+        mismatches.push(
+          `${JSON.stringify(input)}: expected ${JSON.stringify(expected)}, got ${JSON.stringify(row?.out)}`,
+        );
       }
     }
     if (mismatches.length) {
@@ -36,6 +38,8 @@ export class ArabicSearchHealthIndicator implements OnApplicationBootstrap {
           `and that migrations have been applied. Mismatches: ${mismatches.join('; ')}`,
       );
     }
-    this.logger.log(`Arabic search normalizer verified against the database (${NORMALIZER_FIXTURES.length} fixtures)`);
+    this.logger.log(
+      `Arabic search normalizer verified against the database (${NORMALIZER_FIXTURES.length} fixtures)`,
+    );
   }
 }

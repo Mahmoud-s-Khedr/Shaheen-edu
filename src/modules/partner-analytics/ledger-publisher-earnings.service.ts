@@ -15,7 +15,9 @@ export class LedgerPublisherEarningsService {
 
   private label(date: Date, granularity: 'day' | 'month') {
     const zoned = DateTime.fromJSDate(date).setZone(CAIRO);
-    return granularity === 'day' ? zoned.toISODate()! : zoned.toFormat('yyyy-LL');
+    return granularity === 'day'
+      ? zoned.toISODate()!
+      : zoned.toFormat('yyyy-LL');
   }
 
   /**
@@ -39,14 +41,57 @@ export class LedgerPublisherEarningsService {
         createdAt: { gte: period.from, lt: period.to },
       },
       include: {
-        publisherAgreement: { select: { id: true, version: true, contractReference: true, courseId: true, chapterId: true, lessonId: true } },
-        orderItem: { select: { courseId: true, chapterId: true, titleSnapshot: true } },
-        settlementLines: { select: { settlement: { select: { id: true, paidAt: true } } } },
+        publisherAgreement: {
+          select: {
+            id: true,
+            version: true,
+            contractReference: true,
+            courseId: true,
+            chapterId: true,
+            lessonId: true,
+          },
+        },
+        orderItem: {
+          select: { courseId: true, chapterId: true, titleSnapshot: true },
+        },
+        settlementLines: {
+          select: { settlement: { select: { id: true, paidAt: true } } },
+        },
       },
     });
-    const totals = { earned: 0, reversals: 0, net: 0, payable: 0, paid: 0, pending: 0 };
-    const trends = new Map<string, { period: string; earned: number; reversals: number; net: number; payable: number; paid: number }>();
-    const agreements = new Map<string, { agreementId: string | null; version: number | null; contractReference: string | null; target: object; earned: number; reversals: number; net: number; payable: number; paid: number }>();
+    const totals = {
+      earned: 0,
+      reversals: 0,
+      net: 0,
+      payable: 0,
+      paid: 0,
+      pending: 0,
+    };
+    const trends = new Map<
+      string,
+      {
+        period: string;
+        earned: number;
+        reversals: number;
+        net: number;
+        payable: number;
+        paid: number;
+      }
+    >();
+    const agreements = new Map<
+      string,
+      {
+        agreementId: string | null;
+        version: number | null;
+        contractReference: string | null;
+        target: object;
+        earned: number;
+        reversals: number;
+        net: number;
+        payable: number;
+        paid: number;
+      }
+    >();
     for (const row of rows) {
       if (row.currency !== EGP || !this.financial(row)) continue;
       const amount = row.amountMinor;
@@ -58,7 +103,14 @@ export class LedgerPublisherEarningsService {
       if (row.state === 'PAID') totals.paid += amount;
       if (row.state === 'PENDING') totals.pending += amount;
       const key = this.label(row.createdAt, granularity);
-      const trend = trends.get(key) ?? { period: key, earned: 0, reversals: 0, net: 0, payable: 0, paid: 0 };
+      const trend = trends.get(key) ?? {
+        period: key,
+        earned: 0,
+        reversals: 0,
+        net: 0,
+        payable: 0,
+        paid: 0,
+      };
       trend.earned += amount > 0 ? amount : 0;
       trend.reversals += reversal;
       trend.net += amount;
@@ -67,11 +119,27 @@ export class LedgerPublisherEarningsService {
       trends.set(key, trend);
       const agreement = row.publisherAgreement;
       const agreementKey = agreement?.id ?? 'unlinked';
-      const target = agreement?.courseId ? { type: 'COURSE', id: agreement.courseId }
-        : agreement?.chapterId ? { type: 'CHAPTER', id: agreement.chapterId }
-          : agreement?.lessonId ? { type: 'LESSON', id: agreement.lessonId }
-            : { type: row.orderItem.courseId ? 'COURSE' : 'CHAPTER', id: row.orderItem.courseId ?? row.orderItem.chapterId };
-      const breakdown = agreements.get(agreementKey) ?? { agreementId: agreement?.id ?? null, version: agreement?.version ?? null, contractReference: agreement?.contractReference ?? null, target, earned: 0, reversals: 0, net: 0, payable: 0, paid: 0 };
+      const target = agreement?.courseId
+        ? { type: 'COURSE', id: agreement.courseId }
+        : agreement?.chapterId
+          ? { type: 'CHAPTER', id: agreement.chapterId }
+          : agreement?.lessonId
+            ? { type: 'LESSON', id: agreement.lessonId }
+            : {
+                type: row.orderItem.courseId ? 'COURSE' : 'CHAPTER',
+                id: row.orderItem.courseId ?? row.orderItem.chapterId,
+              };
+      const breakdown = agreements.get(agreementKey) ?? {
+        agreementId: agreement?.id ?? null,
+        version: agreement?.version ?? null,
+        contractReference: agreement?.contractReference ?? null,
+        target,
+        earned: 0,
+        reversals: 0,
+        net: 0,
+        payable: 0,
+        paid: 0,
+      };
       breakdown.earned += amount > 0 ? amount : 0;
       breakdown.reversals += reversal;
       breakdown.net += amount;
@@ -79,7 +147,14 @@ export class LedgerPublisherEarningsService {
       if (row.state === 'PAID') breakdown.paid += amount;
       agreements.set(agreementKey, breakdown);
     }
-    const asMoney = (item: Record<string, any>) => Object.fromEntries(Object.entries(item).map(([key, value]) => /earned|reversals|net|payable|paid|pending/.test(key) ? [key, this.money(value as number)] : [key, value]));
+    const asMoney = (item: Record<string, any>) =>
+      Object.fromEntries(
+        Object.entries(item).map(([key, value]) =>
+          /earned|reversals|net|payable|paid|pending/.test(key)
+            ? [key, this.money(value as number)]
+            : [key, value],
+        ),
+      );
     return {
       period: { from: period.fromDate, to: period.toDate, timeZone: CAIRO },
       granularity,
@@ -89,8 +164,12 @@ export class LedgerPublisherEarningsService {
         net: 'Signed financial allocations; reversed original rows are audit-only and excluded.',
       },
       totals: asMoney(totals),
-      trend: [...trends.values()].sort((a, b) => a.period.localeCompare(b.period)).map(asMoney),
-      agreements: [...agreements.values()].sort((a, b) => b.net - a.net).map(asMoney),
+      trend: [...trends.values()]
+        .sort((a, b) => a.period.localeCompare(b.period))
+        .map(asMoney),
+      agreements: [...agreements.values()]
+        .sort((a, b) => b.net - a.net)
+        .map(asMoney),
     };
   }
 }

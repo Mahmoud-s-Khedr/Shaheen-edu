@@ -13,7 +13,11 @@ describe('ParentSelectedChildGuard', () => {
   beforeEach(() => jest.resetAllMocks());
 
   it('requires a selected child', async () => {
-    await expect(guard.canActivate(context({ parentSession: { id: 'parent-1', activeStudentId: null } }))).rejects.toBeInstanceOf(BadRequestException);
+    await expect(
+      guard.canActivate(
+        context({ parentSession: { id: 'parent-1', activeStudentId: null } }),
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
   });
 
   it.each([
@@ -23,11 +27,26 @@ describe('ParentSelectedChildGuard', () => {
     [{ role: Role.STUDENT, status: AccountStatus.DISABLED }],
   ])('rejects unavailable selected children', async (student) => {
     prisma.user.findUnique.mockResolvedValue(student);
-    await expect(guard.canActivate(context({ parentSession: { id: 'parent-1', activeStudentId: 'student-1' } }))).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(
+      guard.canActivate(
+        context({
+          parentSession: { id: 'parent-1', activeStudentId: 'student-1' },
+        }),
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
   });
 
   it('allows an active student', async () => {
-    prisma.user.findUnique.mockResolvedValue({ role: Role.STUDENT, status: AccountStatus.ACTIVE });
-    await expect(guard.canActivate(context({ parentSession: { id: 'parent-1', activeStudentId: 'student-1' } }))).resolves.toBe(true);
+    prisma.user.findUnique.mockResolvedValue({
+      role: Role.STUDENT,
+      status: AccountStatus.ACTIVE,
+    });
+    await expect(
+      guard.canActivate(
+        context({
+          parentSession: { id: 'parent-1', activeStudentId: 'student-1' },
+        }),
+      ),
+    ).resolves.toBe(true);
   });
 });

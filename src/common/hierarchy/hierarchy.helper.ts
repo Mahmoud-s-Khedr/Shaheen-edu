@@ -77,7 +77,9 @@ export function assertCompleteSequentialReorder(
     ids.size !== requested.length ||
     orders.size !== requested.length ||
     requested.some((item) => !siblingIds.has(item.id)) ||
-    requested.some((item) => item.sortOrder < 1 || item.sortOrder > requested.length)
+    requested.some(
+      (item) => item.sortOrder < 1 || item.sortOrder > requested.length,
+    )
   ) {
     throw new AppException(
       'Reorder items must contain each sibling once with sortOrder values 1 through N.',

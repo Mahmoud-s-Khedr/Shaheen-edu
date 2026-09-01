@@ -18,7 +18,10 @@ import {
 import type { CreateLessonDto } from './dto/create-lesson.dto';
 import type { UpdateLessonDto } from './dto/update-lesson.dto';
 import type { QueryLessonDto } from './dto/query-lesson.dto';
-import { paginateArabicSearch, sqlAnd } from '../../common/search/arabic-search';
+import {
+  paginateArabicSearch,
+  sqlAnd,
+} from '../../common/search/arabic-search';
 import { contentStatusScope } from '../../common/search/content-scope';
 import type { ReorderLessonDto } from './dto/reorder-lesson.dto';
 import type { MoveLessonDto } from './dto/move-lesson.dto';
@@ -51,7 +54,11 @@ export class LessonsService {
       include: {
         chapter: { select: { title: true } },
         coverAsset: { select: { filename: true } },
-        _count: { select: { sections: { where: { status: { not: ContentStatus.ARCHIVED } } } } },
+        _count: {
+          select: {
+            sections: { where: { status: { not: ContentStatus.ARCHIVED } } },
+          },
+        },
       },
     });
     if (!record) {
@@ -138,7 +145,9 @@ export class LessonsService {
       scope: {
         where: sqlAnd(
           contentStatusScope(query.status),
-          query.chapterId ? Prisma.sql`t."chapterId" = ${query.chapterId}` : undefined,
+          query.chapterId
+            ? Prisma.sql`t."chapterId" = ${query.chapterId}`
+            : undefined,
         ),
       },
       orderBySql: Prisma.sql`t."sortOrder" ASC, t.id ASC`,
@@ -148,7 +157,11 @@ export class LessonsService {
         include: {
           chapter: { select: { title: true } },
           coverAsset: { select: { filename: true } },
-          _count: { select: { sections: { where: { status: { not: ContentStatus.ARCHIVED } } } } },
+          _count: {
+            select: {
+              sections: { where: { status: { not: ContentStatus.ARCHIVED } } },
+            },
+          },
         },
       },
       page: query.page,
@@ -188,7 +201,7 @@ export class LessonsService {
         slug,
         description: dto.description,
         updatedById: actor.id,
-        },
+      },
     });
 
     await this.auditService.record({
@@ -203,9 +216,19 @@ export class LessonsService {
   }
 
   async updateAccess(actor: RequestUser, id: string, accessType: AccessType) {
-    this.assertActorRole(actor); await this.getOrThrow(id);
-    await this.prisma.lesson.update({ where: { id }, data: { accessType, updatedById: actor.id } });
-    await this.auditService.record({ actorUserId: actor.id, action: 'LESSON_ACCESS_UPDATED', targetType: 'Lesson', targetId: id, metadata: { accessType } });
+    this.assertActorRole(actor);
+    await this.getOrThrow(id);
+    await this.prisma.lesson.update({
+      where: { id },
+      data: { accessType, updatedById: actor.id },
+    });
+    await this.auditService.record({
+      actorUserId: actor.id,
+      action: 'LESSON_ACCESS_UPDATED',
+      targetType: 'Lesson',
+      targetId: id,
+      metadata: { accessType },
+    });
     return this.toSummary(await this.getOrThrow(id));
   }
 
@@ -220,7 +243,9 @@ export class LessonsService {
     }
 
     const ids = dto.items.map((item) => item.id);
-    const siblings = await this.prisma.lesson.findMany({ where: { chapterId: dto.chapterId } });
+    const siblings = await this.prisma.lesson.findMany({
+      where: { chapterId: dto.chapterId },
+    });
     assertCompleteSequentialReorder(dto.items, siblings);
 
     const plan = computeTwoPhaseRenumber(dto.items);
@@ -228,9 +253,9 @@ export class LessonsService {
     try {
       await this.prisma.$transaction(async (tx) => {
         for (const phase1 of plan.phase1) {
-    await tx.lesson.updateMany({
+          await tx.lesson.updateMany({
             where: { id: phase1.id },
-            data: { sortOrder: phase1.sortOrder, updatedById: actor.id, },
+            data: { sortOrder: phase1.sortOrder, updatedById: actor.id },
           });
         }
         for (const phase2 of plan.phase2) {
@@ -259,7 +284,10 @@ export class LessonsService {
   async move(actor: RequestUser, id: string, dto: MoveLessonDto) {
     this.assertActorRole(actor);
     const record = await this.getOrThrow(id);
-    if (record.chapterId === dto.newChapterId) throw new ConflictException('Use reorder to change position within the same parent');
+    if (record.chapterId === dto.newChapterId)
+      throw new ConflictException(
+        'Use reorder to change position within the same parent',
+      );
 
     const newParent = await this.prisma.chapter.findUnique({
       where: { id: dto.newChapterId },
@@ -271,8 +299,13 @@ export class LessonsService {
     if (newParent.status === ContentStatus.ARCHIVED) {
       throw new ConflictException('Cannot move into an archived chapter');
     }
-    if (record.status === ContentStatus.PUBLISHED && newParent.status !== ContentStatus.PUBLISHED) {
-      throw new ConflictException('A published lesson must remain under a published chapter');
+    if (
+      record.status === ContentStatus.PUBLISHED &&
+      newParent.status !== ContentStatus.PUBLISHED
+    ) {
+      throw new ConflictException(
+        'A published lesson must remain under a published chapter',
+      );
     }
 
     const slugCollision = await this.prisma.lesson.findUnique({
@@ -291,9 +324,19 @@ export class LessonsService {
       _max: { sortOrder: true },
     });
     const targetSortOrder =
-      dto.sortOrder ?? (dto.newChapterId === record.chapterId ? (targetMax._max.sortOrder ?? 1) : (targetMax._max.sortOrder ?? 0) + 1);
-    if (targetSortOrder < 1 || targetSortOrder > (targetMax._max.sortOrder ?? 0) + (dto.newChapterId === record.chapterId ? 0 : 1)) {
-      throw new ConflictException('Target sortOrder is outside the sibling scope');
+      dto.sortOrder ??
+      (dto.newChapterId === record.chapterId
+        ? (targetMax._max.sortOrder ?? 1)
+        : (targetMax._max.sortOrder ?? 0) + 1);
+    if (
+      targetSortOrder < 1 ||
+      targetSortOrder >
+        (targetMax._max.sortOrder ?? 0) +
+          (dto.newChapterId === record.chapterId ? 0 : 1)
+    ) {
+      throw new ConflictException(
+        'Target sortOrder is outside the sibling scope',
+      );
     }
     const oldChapterId = record.chapterId;
     const oldSortOrder = record.sortOrder;
@@ -302,12 +345,12 @@ export class LessonsService {
       await this.prisma.$transaction(async (tx) => {
         await tx.lesson.updateMany({
           where: { id },
-          data: { sortOrder: 1_000_000_000, updatedById: actor.id, },
+          data: { sortOrder: 1_000_000_000, updatedById: actor.id },
         });
 
         await tx.lesson.updateMany({
           where: { chapterId: oldChapterId, sortOrder: { gt: oldSortOrder } },
-          data: { sortOrder: { decrement: 1 }, updatedById: actor.id, },
+          data: { sortOrder: { decrement: 1 }, updatedById: actor.id },
         });
 
         await tx.lesson.updateMany({
@@ -315,12 +358,16 @@ export class LessonsService {
             chapterId: dto.newChapterId,
             sortOrder: { gte: targetSortOrder },
           },
-          data: { sortOrder: { increment: 1 }, updatedById: actor.id, },
+          data: { sortOrder: { increment: 1 }, updatedById: actor.id },
         });
 
         await tx.lesson.updateMany({
           where: { id },
-          data: { chapterId: dto.newChapterId, sortOrder: targetSortOrder, updatedById: actor.id },
+          data: {
+            chapterId: dto.newChapterId,
+            sortOrder: targetSortOrder,
+            updatedById: actor.id,
+          },
         });
 
         await contentPlacementAncestry.lessonMoved(tx, id, {
@@ -374,7 +421,7 @@ export class LessonsService {
       data: {
         status: ContentStatus.ARCHIVED,
         archivedAt: new Date(),
-        },
+      },
     });
 
     await this.auditService.record({
@@ -395,7 +442,7 @@ export class LessonsService {
         status: ContentStatus.DRAFT,
         publishedAt: null,
         archivedAt: null,
-        },
+      },
     });
 
     await this.auditService.record({
@@ -408,10 +455,7 @@ export class LessonsService {
     return this.toSummary(await this.getOrThrow(id));
   }
 
-  async delete(
-    actor: RequestUser,
-    id: string
-  ): Promise<void> {
+  async delete(actor: RequestUser, id: string): Promise<void> {
     this.assertActorRole(actor);
     const record = await this.getOrThrow(id);
     if (record.status !== ContentStatus.DRAFT) {

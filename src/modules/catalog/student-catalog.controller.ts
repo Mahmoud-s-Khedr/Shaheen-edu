@@ -1,5 +1,10 @@
 import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOkResponse,
+  ApiOperation,
+  ApiTags,
+} from '@nestjs/swagger';
 import {
   CursorCatalogContentItemResponseDto,
   CursorCatalogNodeResponseDto,
@@ -13,7 +18,10 @@ import {
 } from './dto/student-catalog-response.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
-import { PaginationQueryDto, SearchPaginationQueryDto } from '../../common/dto/pagination-query.dto';
+import {
+  PaginationQueryDto,
+  SearchPaginationQueryDto,
+} from '../../common/dto/pagination-query.dto';
 import { SearchCursorPaginationQueryDto } from '../../common/dto/cursor-pagination-query.dto';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Role } from '../../common/types/roles.enum';

@@ -17,7 +17,6 @@ export class ReorderSubjectItemDto {
   @IsInt()
   @Min(1)
   sortOrder!: number;
-
 }
 
 export class ReorderSubjectDto {

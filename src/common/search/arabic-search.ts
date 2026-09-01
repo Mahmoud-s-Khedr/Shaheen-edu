@@ -37,23 +37,38 @@ const ID_RESOLUTION_CAP = 10_000;
  * a bare `title` parse to the same Var, so the planner still matches them.
  */
 const searchTargets = {
-  academicGrade: { table: '"AcademicGrade"', columns: ['titleAr', 'titleEn', 'slug', 'descriptionAr', 'descriptionEn'] },
+  academicGrade: {
+    table: '"AcademicGrade"',
+    columns: ['titleAr', 'titleEn', 'slug', 'descriptionAr', 'descriptionEn'],
+  },
   subject: { table: '"Subject"', columns: ['title', 'slug', 'description'] },
   course: { table: '"Course"', columns: ['title', 'slug', 'description'] },
   chapter: { table: '"Chapter"', columns: ['title', 'slug', 'description'] },
   lesson: { table: '"Lesson"', columns: ['title', 'slug', 'description'] },
   section: { table: '"Section"', columns: ['title', 'slug', 'description'] },
-  contentItem: { table: '"ContentItem"', columns: ['title', 'description', 'textBody'] },
+  contentItem: {
+    table: '"ContentItem"',
+    columns: ['title', 'description', 'textBody'],
+  },
   question: { table: '"Question"', columns: ['body', 'explanation'] },
   questionBank: { table: '"QuestionBank"', columns: ['title', 'description'] },
-  questionSource: { table: '"QuestionSource"', columns: ['titleAr', 'titleEn', 'noteAr', 'noteEn'] },
-  manualPaymentMethod: { table: '"ManualPaymentMethod"', columns: ['titleAr', 'titleEn', 'instructionsAr', 'instructionsEn'] },
+  questionSource: {
+    table: '"QuestionSource"',
+    columns: ['titleAr', 'titleEn', 'noteAr', 'noteEn'],
+  },
+  manualPaymentMethod: {
+    table: '"ManualPaymentMethod"',
+    columns: ['titleAr', 'titleEn', 'instructionsAr', 'instructionsEn'],
+  },
   governorate: { table: '"Governorate"', columns: ['nameAr', 'nameEn'] },
   center: { table: '"Center"', columns: ['nameAr', 'nameEn'] },
   assessment: { table: '"Assessment"', columns: ['title'] },
   user: { table: '"User"', columns: ['loginIdentifier'] },
   studentProfile: { table: '"StudentProfile"', columns: ['fullName'] },
-  partnerProfile: { table: '"PartnerProfile"', columns: ['displayName', 'legalName'] },
+  partnerProfile: {
+    table: '"PartnerProfile"',
+    columns: ['displayName', 'legalName'],
+  },
 } as const;
 
 /**
@@ -72,7 +87,9 @@ function searchableText(target: ArabicSearchTarget, alias: string): string {
 export type ArabicSearchTarget = keyof typeof searchTargets;
 
 /** Every target must be reachable from a service; see arabic-search.spec.ts. */
-export const ARABIC_SEARCH_TARGETS = Object.keys(searchTargets) as ArabicSearchTarget[];
+export const ARABIC_SEARCH_TARGETS = Object.keys(
+  searchTargets,
+) as ArabicSearchTarget[];
 
 /**
  * Narrows the searched table to the rows the caller is already allowed to see.
@@ -132,15 +149,21 @@ export const NORMALIZER_FIXTURES: ReadonlyArray<readonly [string, string]> = [
 ].map((input) => [input, normalizeArabic(input)] as const);
 
 /** Resolves the deprecated `search` parameter without silently changing intent. */
-export function resolveSearchQuery(input: { q?: string; search?: string }): string | undefined {
+export function resolveSearchQuery(input: {
+  q?: string;
+  search?: string;
+}): string | undefined {
   const q = input.q?.trim();
   const legacy = input.search?.trim();
   if (!q && !legacy) return undefined;
   if (q && legacy && normalizeArabic(q) !== normalizeArabic(legacy)) {
-    throw new BadRequestException('q and search must contain the same value when both are supplied');
+    throw new BadRequestException(
+      'q and search must contain the same value when both are supplied',
+    );
   }
   const result = q ?? legacy!;
-  if (!normalizeArabic(result)) throw new BadRequestException('q must contain searchable text');
+  if (!normalizeArabic(result))
+    throw new BadRequestException('q must contain searchable text');
   return result;
 }
 
@@ -152,7 +175,8 @@ export function resolveSearchQuery(input: { q?: string; search?: string }): stri
 export function searchNeedle(q?: string): string | undefined {
   const trimmed = q?.trim();
   if (!trimmed) return undefined;
-  if (!normalizeArabic(trimmed)) throw new BadRequestException('q must contain searchable text');
+  if (!normalizeArabic(trimmed))
+    throw new BadRequestException('q must contain searchable text');
   return trimmed;
 }
 
@@ -167,16 +191,23 @@ export function searchTerms(query: string): string[] {
 }
 
 /** ANDs the defined fragments; returns undefined when none apply. */
-export function sqlAnd(...parts: Array<Prisma.Sql | undefined | false>): Prisma.Sql | undefined {
+export function sqlAnd(
+  ...parts: Array<Prisma.Sql | undefined | false>
+): Prisma.Sql | undefined {
   const defined = parts.filter((part): part is Prisma.Sql => Boolean(part));
   if (!defined.length) return undefined;
   return defined.length === 1 ? defined[0] : Prisma.join(defined, ' AND ');
 }
 
 /** Restores the order the SQL page established, which `IN (...)` does not preserve. */
-export function orderByIds<T extends { id: string }>(rows: T[], ids: string[]): T[] {
+export function orderByIds<T extends { id: string }>(
+  rows: T[],
+  ids: string[],
+): T[] {
   const byId = new Map(rows.map((row) => [row.id, row]));
-  return ids.map((id) => byId.get(id)).filter((row): row is T => row !== undefined);
+  return ids
+    .map((id) => byId.get(id))
+    .filter((row): row is T => row !== undefined);
 }
 
 /**
@@ -186,16 +217,26 @@ export function orderByIds<T extends { id: string }>(rows: T[], ids: string[]): 
  * matching through one of its centers, a user through their profile) without
  * restating the text expression and risking drift from the index.
  */
-export function arabicMatchText(normalizedText: Prisma.Sql, query: string): Prisma.Sql {
+export function arabicMatchText(
+  normalizedText: Prisma.Sql,
+  query: string,
+): Prisma.Sql {
   const terms = searchTerms(query);
   if (!terms.length) return Prisma.sql`FALSE`;
   return Prisma.sql`(${Prisma.join(
-    terms.map((term) => Prisma.sql`${normalizedText} LIKE ${likePattern(term)} ESCAPE E'\\\\'`),
+    terms.map(
+      (term) =>
+        Prisma.sql`${normalizedText} LIKE ${likePattern(term)} ESCAPE E'\\\\'`,
+    ),
     ' AND ',
   )})`;
 }
 
-export function arabicMatch(target: ArabicSearchTarget, query: string, alias = 't'): Prisma.Sql {
+export function arabicMatch(
+  target: ArabicSearchTarget,
+  query: string,
+  alias = 't',
+): Prisma.Sql {
   // Four backslashes: the template literal collapses them to two, so Postgres
   // receives E'\\' -- a single literal backslash. Fewer would be unterminated.
   return arabicMatchText(
@@ -204,12 +245,22 @@ export function arabicMatch(target: ArabicSearchTarget, query: string, alias = '
   );
 }
 
-function matchPredicate(target: ArabicSearchTarget, query: string, scope?: ArabicSearchScope): Prisma.Sql {
+function matchPredicate(
+  target: ArabicSearchTarget,
+  query: string,
+  scope?: ArabicSearchScope,
+): Prisma.Sql {
   const own = arabicMatch(target, query);
-  return scope?.alsoMatches ? Prisma.sql`(${own} OR ${scope.alsoMatches})` : Prisma.sql`(${own})`;
+  return scope?.alsoMatches
+    ? Prisma.sql`(${own} OR ${scope.alsoMatches})`
+    : Prisma.sql`(${own})`;
 }
 
-function whereClause(target: ArabicSearchTarget, query: string, scope?: ArabicSearchScope): Prisma.Sql {
+function whereClause(
+  target: ArabicSearchTarget,
+  query: string,
+  scope?: ArabicSearchScope,
+): Prisma.Sql {
   const match = matchPredicate(target, query, scope);
   return scope?.where ? Prisma.sql`${match} AND (${scope.where})` : match;
 }
@@ -255,10 +306,17 @@ export async function searchArabicOffsetPage(
   prisma: RawQueryClient,
   target: ArabicSearchTarget,
   query: string,
-  options: { scope?: ArabicSearchScope; orderBy: Prisma.Sql; page: number; limit: number },
+  options: {
+    scope?: ArabicSearchScope;
+    orderBy: Prisma.Sql;
+    page: number;
+    limit: number;
+  },
 ): Promise<{ ids: string[]; total: number }> {
   const config = searchTargets[target];
-  const rows = await prisma.$queryRaw<Array<{ id: string; total: bigint }>>(Prisma.sql`
+  const rows = await prisma.$queryRaw<
+    Array<{ id: string; total: bigint }>
+  >(Prisma.sql`
     SELECT t.id, count(*) OVER () AS total
     FROM ${Prisma.raw(config.table)} t
     ${options.scope?.join ?? Prisma.empty}
@@ -266,7 +324,10 @@ export async function searchArabicOffsetPage(
     ORDER BY ${options.orderBy}
     LIMIT ${options.limit} OFFSET ${(options.page - 1) * options.limit}
   `);
-  return { ids: rows.map((row) => row.id), total: rows.length ? Number(rows[0].total) : 0 };
+  return {
+    ids: rows.map((row) => row.id),
+    total: rows.length ? Number(rows[0].total) : 0,
+  };
 }
 
 /**
@@ -307,17 +368,25 @@ export async function paginateArabicSearch<T = any>(options: {
     return { data, total };
   }
 
-  const page = await searchArabicOffsetPage(options.prisma, options.target, needle, {
-    scope: options.scope,
-    orderBy: options.orderBySql,
-    page: options.page,
-    limit: options.limit,
-  });
+  const page = await searchArabicOffsetPage(
+    options.prisma,
+    options.target,
+    needle,
+    {
+      scope: options.scope,
+      orderBy: options.orderBySql,
+      page: options.page,
+      limit: options.limit,
+    },
+  );
   if (!page.ids.length) return { data: [], total: page.total };
 
   const data = await options.delegate.findMany({
     ...options.args,
     where: { ...options.where, id: { in: page.ids } },
   });
-  return { data: orderByIds(data as Array<{ id: string }>, page.ids) as T[], total: page.total };
+  return {
+    data: orderByIds(data as Array<{ id: string }>, page.ids) as T[],
+    total: page.total,
+  };
 }

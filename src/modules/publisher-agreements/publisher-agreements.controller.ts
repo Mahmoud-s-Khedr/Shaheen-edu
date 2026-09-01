@@ -55,7 +55,10 @@ export class PublisherAgreementsController {
     return this.service.activate(actor, id);
   }
   @Post(':id/replace')
-  @ApiOperation({ summary: 'Create an immutable successor version for an active publisher agreement' })
+  @ApiOperation({
+    summary:
+      'Create an immutable successor version for an active publisher agreement',
+  })
   replace(
     @CurrentUser() actor: RequestUser,
     @Param('id') id: string,

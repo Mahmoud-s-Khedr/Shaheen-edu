@@ -199,9 +199,14 @@ export class AuthService {
     });
     if (!governorate) throw new NotFoundException('Governorate not found');
     const center = dto.centerId
-      ? await this.prisma.center.findFirst({ where: { id: dto.centerId, governorateId: governorate.id } })
+      ? await this.prisma.center.findFirst({
+          where: { id: dto.centerId, governorateId: governorate.id },
+        })
       : null;
-    if (dto.centerId && !center) throw new BadRequestException('Center must belong to the selected governorate');
+    if (dto.centerId && !center)
+      throw new BadRequestException(
+        'Center must belong to the selected governorate',
+      );
 
     const passwordHash = await this.passwordService.hash(dto.password);
     const nationalIdEncrypted =

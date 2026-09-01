@@ -51,5 +51,4 @@ export class UpdateContentItemDto {
   @IsInt()
   @Min(0)
   estimatedDuration?: number | null;
-
 }

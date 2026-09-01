@@ -23,7 +23,13 @@ function multipart(
   fileBuffer: Buffer,
   filename: string,
   mimetype: string,
-): { body: Buffer; contentType: string; fileBuffer: Buffer; filename: string; mimetype: string } {
+): {
+  body: Buffer;
+  contentType: string;
+  fileBuffer: Buffer;
+  filename: string;
+  mimetype: string;
+} {
   const boundary = `----eduTestBoundary${Date.now()}${Math.random().toString(16).slice(2)}`;
   const head = Buffer.from(
     `--${boundary}\r\n` +
@@ -33,7 +39,10 @@ function multipart(
   const tail = Buffer.from(`\r\n--${boundary}--\r\n`);
   return {
     body: Buffer.concat([head, fileBuffer, tail]),
-    contentType: `multipart/form-data; boundary=${boundary}`, fileBuffer, filename, mimetype,
+    contentType: `multipart/form-data; boundary=${boundary}`,
+    fileBuffer,
+    filename,
+    mimetype,
   };
 }
 
@@ -49,7 +58,13 @@ describe('Assets (e2e)', () => {
 
   const upload = async (
     kind: string,
-    file: { body: Buffer; contentType: string; fileBuffer: Buffer; filename: string; mimetype: string },
+    file: {
+      body: Buffer;
+      contentType: string;
+      fileBuffer: Buffer;
+      filename: string;
+      mimetype: string;
+    },
     headers: Record<string, string> = admin(),
   ) => {
     const authorization = await app.inject({
@@ -59,8 +74,16 @@ describe('Assets (e2e)', () => {
       payload: file.body,
     });
     if (authorization.statusCode !== 201) return authorization;
-    inspectSpy.mockResolvedValueOnce({ sizeBytes: file.fileBuffer.length, mimeType: file.mimetype, first: file.fileBuffer.subarray(0, 16) });
-    return app.inject({ method: 'POST', url: `/api/v1/admin/assets/${json(authorization).asset.id}/complete`, headers });
+    inspectSpy.mockResolvedValueOnce({
+      sizeBytes: file.fileBuffer.length,
+      mimeType: file.mimetype,
+      first: file.fileBuffer.subarray(0, 16),
+    });
+    return app.inject({
+      method: 'POST',
+      url: `/api/v1/admin/assets/${json(authorization).asset.id}/complete`,
+      headers,
+    });
   };
 
   beforeAll(async () => {
@@ -69,7 +92,9 @@ describe('Assets (e2e)', () => {
     await flushTestRedis(app);
 
     // Never touch real Bunny Storage: drain the stream and report success.
-    jest.spyOn(BunnyStorageProvider.prototype, 'createUploadUrl').mockResolvedValue('https://bunny.example.test/presigned');
+    jest
+      .spyOn(BunnyStorageProvider.prototype, 'createUploadUrl')
+      .mockResolvedValue('https://bunny.example.test/presigned');
     inspectSpy = jest.spyOn(BunnyStorageProvider.prototype, 'inspect');
     deleteSpy = jest
       .spyOn(BunnyStorageProvider.prototype, 'delete')

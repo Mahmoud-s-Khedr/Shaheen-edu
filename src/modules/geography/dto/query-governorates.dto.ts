@@ -15,7 +15,8 @@ import { SearchPaginationQueryDto } from '../../../common/dto/pagination-query.d
  */
 export class GovernoratesQueryDto extends SearchPaginationQueryDto {
   @ApiPropertyOptional({
-    description: 'Maximum governorates per page. Defaults high enough to return every governorate.',
+    description:
+      'Maximum governorates per page. Defaults high enough to return every governorate.',
     default: 100,
     minimum: 1,
     maximum: 200,

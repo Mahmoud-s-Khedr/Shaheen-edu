@@ -26,7 +26,11 @@ export class LocalizedDescriptionDto {
   @ApiProperty({ type: String, nullable: true, example: 'وصف اختياري' })
   ar!: string | null;
 
-  @ApiProperty({ type: String, nullable: true, example: 'Optional description' })
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    example: 'Optional description',
+  })
   en!: string | null;
 }
 
@@ -64,13 +68,20 @@ export class CatalogNodeDto {
   @ApiProperty({ type: String, nullable: true })
   coverAssetName!: string | null;
 
-  @ApiPropertyOptional({ description: 'Present when child counts were requested.' })
+  @ApiPropertyOptional({
+    description: 'Present when child counts were requested.',
+  })
   hasChildren?: boolean;
 
-  @ApiPropertyOptional({ description: 'Resolved access for the requesting student.' })
+  @ApiPropertyOptional({
+    description: 'Resolved access for the requesting student.',
+  })
   access?: Record<string, unknown>;
 
-  @ApiPropertyOptional({ description: 'Whether every published descendant content item is complete for this student.' })
+  @ApiPropertyOptional({
+    description:
+      'Whether every published descendant content item is complete for this student.',
+  })
   isCompleted?: boolean;
 }
 
@@ -139,7 +150,10 @@ export class PaginatedCatalogNodeResponseDto {
 }
 
 export class CursorCatalogNodeResponseDto {
-  @ApiPropertyOptional({ type: CatalogNodeDto, description: 'The parent the page was requested under.' })
+  @ApiPropertyOptional({
+    type: CatalogNodeDto,
+    description: 'The parent the page was requested under.',
+  })
   parent?: CatalogNodeDto;
 
   @ApiProperty({ type: [CatalogNodeDto] })
@@ -171,7 +185,9 @@ export class CatalogContentItemDto {
   @ApiProperty()
   sortOrder!: number;
 
-  @ApiPropertyOptional({ description: 'Whether this content item is complete for this student.' })
+  @ApiPropertyOptional({
+    description: 'Whether this content item is complete for this student.',
+  })
   isCompleted?: boolean;
 }
 
@@ -212,10 +228,21 @@ export class StudentLibraryItemDto {
   @ApiPropertyOptional()
   entitlementId?: string;
 
-  @ApiPropertyOptional({ description: 'Set on rows retained after the content was archived.' })
+  @ApiPropertyOptional({
+    description: 'Set on rows retained after the content was archived.',
+  })
   archivedAccessSnapshotId?: string;
 
-  @ApiProperty({ enum: ['COURSE', 'CHAPTER', 'ACADEMIC_GRADE', 'SUBJECT', 'LESSON', 'SECTION'] })
+  @ApiProperty({
+    enum: [
+      'COURSE',
+      'CHAPTER',
+      'ACADEMIC_GRADE',
+      'SUBJECT',
+      'LESSON',
+      'SECTION',
+    ],
+  })
   targetType!: string;
 
   @ApiProperty({ type: CatalogNodeDto })
@@ -246,7 +273,9 @@ export class MySubjectDto {
   @ApiProperty({ type: CatalogNodeDto })
   subject!: CatalogNodeDto;
 
-  @ApiPropertyOptional({ description: 'Completed / total content items for the student.' })
+  @ApiPropertyOptional({
+    description: 'Completed / total content items for the student.',
+  })
   progress?: Record<string, unknown>;
 }
 
@@ -271,10 +300,18 @@ export class StudentEntitlementDto {
   @ApiProperty({ type: String, nullable: true })
   targetName!: string | null;
 
-  @ApiProperty({ type: String, nullable: true, description: 'Owning course for either a course or chapter entitlement.' })
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: 'Owning course for either a course or chapter entitlement.',
+  })
   courseId!: string | null;
 
-  @ApiProperty({ minimum: 0, maximum: 100, description: 'Completion percentage across descendant content items.' })
+  @ApiProperty({
+    minimum: 0,
+    maximum: 100,
+    description: 'Completion percentage across descendant content items.',
+  })
   progress!: number;
 
   @ApiProperty({ example: 'ACTIVE' })

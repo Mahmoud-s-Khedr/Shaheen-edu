@@ -1794,7 +1794,7 @@ Accept: application/json
     "timeZone": "Africa/Cairo"
   },
   "privacy": {
-    "minimumCohort": 5,
+    "minimumCohort": 1,
     "suppressed": true,
     "reason": "The selected period has too few approved referred learners."
   },
@@ -1829,7 +1829,7 @@ Accept: application/json
     "timeZone": "Africa/Cairo"
   },
   "privacy": {
-    "minimumCohort": 5,
+    "minimumCohort": 1,
     "settlementRowsBelowMinimumAreOmitted": true
   },
   "data": []
@@ -1858,7 +1858,7 @@ Accept: application/json
     "timeZone": "Africa/Cairo"
   },
   "privacy": {
-    "minimumCohort": 5,
+    "minimumCohort": 1,
     "suppressed": false,
     "breakdownsSuppressSmallCohorts": false
   },
