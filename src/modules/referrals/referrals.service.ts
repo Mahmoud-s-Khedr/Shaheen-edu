@@ -10,7 +10,6 @@ import {
   ReferralCommissionKind,
   ReferralProgramStatus,
   ReferralReviewAction,
-  ReferralReviewDisposition,
   ReferralReviewFlagSource,
   ReferralReviewStatus,
   Role,
