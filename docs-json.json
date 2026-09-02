@@ -16035,27 +16035,18 @@
               "default": 20,
               "type": "number"
             }
-          },
-          {
-            "name": "subjectId",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "orderItemId",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
           }
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ParentAnalyticsScopesResponseDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -16063,7 +16054,7 @@
             "bearer": []
           }
         ],
-        "summary": "List selected child approved purchase analytics scopes",
+        "summary": "List selected child active entitlement analytics scopes",
         "tags": [
           "parent/learning"
         ]
@@ -16100,6 +16091,16 @@
             "name": "subjectId",
             "required": false,
             "in": "query",
+            "description": "Aggregate every active access grant in this subject.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "entitlementId",
+            "required": false,
+            "in": "query",
+            "description": "Select one active entitlement exactly.",
             "schema": {
               "type": "string"
             }
@@ -16108,6 +16109,7 @@
             "name": "orderItemId",
             "required": false,
             "in": "query",
+            "description": "Legacy selector. It resolves only when its linked entitlement is currently active.",
             "schema": {
               "type": "string"
             }
@@ -16123,7 +16125,7 @@
             "bearer": []
           }
         ],
-        "summary": "Get purchased-scope content progress",
+        "summary": "Get active-entitlement content progress",
         "tags": [
           "parent/learning"
         ]
@@ -16160,6 +16162,16 @@
             "name": "subjectId",
             "required": false,
             "in": "query",
+            "description": "Aggregate every active access grant in this subject.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "entitlementId",
+            "required": false,
+            "in": "query",
+            "description": "Select one active entitlement exactly.",
             "schema": {
               "type": "string"
             }
@@ -16168,6 +16180,7 @@
             "name": "orderItemId",
             "required": false,
             "in": "query",
+            "description": "Legacy selector. It resolves only when its linked entitlement is currently active.",
             "schema": {
               "type": "string"
             }
@@ -16183,7 +16196,7 @@
             "bearer": []
           }
         ],
-        "summary": "Get purchased-scope assessment performance",
+        "summary": "Get active-entitlement assessment performance",
         "tags": [
           "parent/learning"
         ]
@@ -16220,6 +16233,16 @@
             "name": "subjectId",
             "required": false,
             "in": "query",
+            "description": "Aggregate every active access grant in this subject.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "entitlementId",
+            "required": false,
+            "in": "query",
+            "description": "Select one active entitlement exactly.",
             "schema": {
               "type": "string"
             }
@@ -16228,6 +16251,7 @@
             "name": "orderItemId",
             "required": false,
             "in": "query",
+            "description": "Legacy selector. It resolves only when its linked entitlement is currently active.",
             "schema": {
               "type": "string"
             }
@@ -16243,7 +16267,7 @@
             "bearer": []
           }
         ],
-        "summary": "Get purchased-scope direct-practice performance",
+        "summary": "Get active-entitlement direct-practice performance",
         "tags": [
           "parent/learning"
         ]
@@ -30252,6 +30276,134 @@
         },
         "required": [
           "optionIds"
+        ]
+      },
+      "ParentAnalyticsChildDto": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string"
+          },
+          "fullName": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "userId",
+          "fullName"
+        ]
+      },
+      "ParentAnalyticsSubjectDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ]
+      },
+      "ParentAnalyticsTargetDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "COURSE",
+              "CHAPTER"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "id",
+          "title"
+        ]
+      },
+      "ParentAnalyticsAccessGrantDto": {
+        "type": "object",
+        "properties": {
+          "entitlementId": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "ADMIN",
+              "PROMOTION",
+              "MIGRATION",
+              "PAYMENT"
+            ]
+          },
+          "orderId": {
+            "type": "string",
+            "nullable": true
+          },
+          "orderItemId": {
+            "type": "string",
+            "nullable": true
+          },
+          "target": {
+            "$ref": "#/components/schemas/ParentAnalyticsTargetDto"
+          }
+        },
+        "required": [
+          "entitlementId",
+          "source",
+          "orderId",
+          "orderItemId",
+          "target"
+        ]
+      },
+      "ParentAnalyticsSubjectScopesDto": {
+        "type": "object",
+        "properties": {
+          "subject": {
+            "$ref": "#/components/schemas/ParentAnalyticsSubjectDto"
+          },
+          "accessGrants": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ParentAnalyticsAccessGrantDto"
+            }
+          }
+        },
+        "required": [
+          "subject",
+          "accessGrants"
+        ]
+      },
+      "ParentAnalyticsScopesResponseDto": {
+        "type": "object",
+        "properties": {
+          "child": {
+            "$ref": "#/components/schemas/ParentAnalyticsChildDto"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ParentAnalyticsSubjectScopesDto"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/PaginationMetaDto"
+          }
+        },
+        "required": [
+          "child",
+          "data",
+          "meta"
         ]
       },
       "GenerateStudentAssessmentDto": {

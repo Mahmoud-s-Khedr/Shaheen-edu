@@ -212,7 +212,7 @@ POST /auth/parents/login
 before requesting analytics. A `403` from a parent analytics route usually
 means that no child is selected or the selection is not linked to the parent.
 
-### Purchased-scope analytics
+### Active-entitlement analytics
 
 First load the scopes:
 
@@ -220,31 +220,35 @@ First load the scopes:
 GET /parent/selected-child/analytics/scopes?page=1&limit=20
 ```
 
-Each scope response provides the child identity plus approved purchases grouped
-by subject. Persist the returned `orderItemId` only as a UI selection value;
-do not invent one from a course or chapter ID.
+Each scope response provides the child identity plus active access grants grouped
+by subject. A grant identifies its `entitlementId`, `source`, target, and any
+linked `orderId`/`orderItemId` (both are `null` for a non-order grant). Revoked,
+expired, future, and otherwise inactive entitlements are never returned. Course
+access hides chapter grants in that same course to prevent overlapping analytics.
 
-Every detail endpoint requires **exactly one** of `subjectId` or `orderItemId`.
-Passing neither or both is a `400`. Detail rows are paginated; their maximum
-effective `limit` is `50`.
+Every detail endpoint requires **exactly one** of `subjectId`, `entitlementId`,
+or `orderItemId`. `entitlementId` is the preferred exact selector. `orderItemId`
+is retained temporarily for backward compatibility and resolves only to a
+currently active entitlement. Passing neither or more than one is a `400`.
+Detail rows are paginated; their maximum effective `limit` is `50`.
 
 | Endpoint | Job | Required scope query |
 | --- | --- | --- |
-| `GET /parent/selected-child/analytics/content` | Completion, total items, completion percentage, and recent activity for purchased content. | `subjectId` **or** `orderItemId` |
-| `GET /parent/selected-child/analytics/assessments` | Completed-assessment counts and correct/incorrect/omitted score metrics. | `subjectId` **or** `orderItemId` |
-| `GET /parent/selected-child/analytics/practice` | Direct-practice attempts, accuracy, first-attempt success, retry success, and recent activity. | `subjectId` **or** `orderItemId` |
+| `GET /parent/selected-child/analytics/content` | Completion, total items, completion percentage, and recent activity for accessible content. | `subjectId`, `entitlementId`, or legacy `orderItemId` |
+| `GET /parent/selected-child/analytics/assessments` | Completed-assessment counts and correct/incorrect/omitted score metrics. | `subjectId`, `entitlementId`, or legacy `orderItemId` |
+| `GET /parent/selected-child/analytics/practice` | Direct-practice attempts, accuracy, first-attempt success, retry success, and recent activity. | `subjectId`, `entitlementId`, or legacy `orderItemId` |
 
 Example:
 
 ```http
-GET /parent/selected-child/analytics/practice?orderItemId=order_item_123&page=1&limit=20
+GET /parent/selected-child/analytics/practice?entitlementId=entitlement_123&page=1&limit=20
 ```
 
 All three detail responses follow this pattern:
 
 ```json
 {
-  "scope": { "type": "COURSE", "id": "course_123", "title": "Biology", "orderItemId": "order_item_123" },
+  "scope": { "type": "COURSE", "id": "course_123", "title": "Biology", "entitlementId": "entitlement_123", "source": "PAYMENT", "orderId": "order_123", "orderItemId": "order_item_123" },
   "summary": { "...": "aggregate for the complete selected scope" },
   "data": [{ "type": "COURSE", "id": "course_123", "title": "Biology", "...": "per-target metrics" }],
   "meta": { "page": 1, "limit": 20, "total": 1, "totalPages": 1 }
@@ -414,7 +418,7 @@ Recommended behavior:
 - [ ] Protected requests attach the correct token for the active role.
 - [ ] User refresh uses credentialed requests and retries once at most.
 - [ ] Parent login → children → select-child flow is complete before rendering parent data.
-- [ ] Parent purchased-scope detail calls pass exactly one of `subjectId` or `orderItemId`.
+- [ ] Parent analytics detail calls pass exactly one of `subjectId`, `entitlementId`, or legacy `orderItemId`.
 - [ ] Money is displayed from minor units with the returned currency.
 - [ ] `null` percentages and cohort-suppressed data have intentional UI states.
 - [ ] Pagination, empty state, `400`, `401`, `403`, `404`, `409`, and `429` are handled.
@@ -845,11 +849,12 @@ Accept: application/json
         "id": "cmt88ve3c002utd010b06ph0h",
         "title": "Covered subjects journey-20260825054824-b27b-92"
       },
-      "purchases": [
+      "accessGrants": [
         {
+          "entitlementId": "cmt_active_entitlement",
+          "source": "PAYMENT",
           "orderId": "cmt88yqtc00outd01243zzdyb",
           "orderItemId": "cmt88yqtc00owtd0109mbj6d6",
-          "approvedAt": "2026-08-25T05:51:34.618Z",
           "target": {
             "type": "CHAPTER",
             "id": "cmt88veyb0032td01ubdgqwq9",
@@ -875,7 +880,7 @@ Captured successful response — `200`. The test URL below includes historical t
 **Request**
 
 ```http
-GET /api/v1/parent/selected-child/analytics/content?orderItemId=cmt88yqtc00owtd0109mbj6d6
+GET /api/v1/parent/selected-child/analytics/content?entitlementId=cmt_active_entitlement
 Authorization: Bearer <parent-access-token>
 Accept: application/json
 ```
@@ -888,6 +893,9 @@ Accept: application/json
     "type": "CHAPTER",
     "id": "cmt88veyb0032td01ubdgqwq9",
     "title": "Covered chapters journey-20260825054824-b27b-94",
+    "entitlementId": "cmt_active_entitlement",
+    "source": "PAYMENT",
+    "orderId": "cmt88yqtc00outd01243zzdyb",
     "orderItemId": "cmt88yqtc00owtd0109mbj6d6"
   },
   "summary": {
@@ -923,7 +931,7 @@ Captured successful response — `200`. The test URL below includes historical t
 **Request**
 
 ```http
-GET /api/v1/parent/selected-child/analytics/assessments?orderItemId=cmt88yqtc00owtd0109mbj6d6
+GET /api/v1/parent/selected-child/analytics/assessments?entitlementId=cmt_active_entitlement
 Authorization: Bearer <parent-access-token>
 Accept: application/json
 ```
@@ -936,6 +944,9 @@ Accept: application/json
     "type": "CHAPTER",
     "id": "cmt88veyb0032td01ubdgqwq9",
     "title": "Covered chapters journey-20260825054824-b27b-94",
+    "entitlementId": "cmt_active_entitlement",
+    "source": "PAYMENT",
+    "orderId": "cmt88yqtc00outd01243zzdyb",
     "orderItemId": "cmt88yqtc00owtd0109mbj6d6"
   },
   "summary": {
@@ -979,7 +990,7 @@ Captured successful response — `200`. The test URL below includes historical t
 **Request**
 
 ```http
-GET /api/v1/parent/selected-child/analytics/practice?orderItemId=cmt88yqtc00owtd0109mbj6d6
+GET /api/v1/parent/selected-child/analytics/practice?entitlementId=cmt_active_entitlement
 Authorization: Bearer <parent-access-token>
 Accept: application/json
 ```
@@ -992,6 +1003,9 @@ Accept: application/json
     "type": "CHAPTER",
     "id": "cmt88veyb0032td01ubdgqwq9",
     "title": "Covered chapters journey-20260825054824-b27b-94",
+    "entitlementId": "cmt_active_entitlement",
+    "source": "PAYMENT",
+    "orderId": "cmt88yqtc00outd01243zzdyb",
     "orderItemId": "cmt88yqtc00owtd0109mbj6d6"
   },
   "summary": {

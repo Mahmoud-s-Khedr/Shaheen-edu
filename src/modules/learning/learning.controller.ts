@@ -8,7 +8,12 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOkResponse,
+  ApiOperation,
+  ApiTags,
+} from '@nestjs/swagger';
 import {
   CurrentParentSession,
   CurrentUser,
@@ -26,6 +31,8 @@ import type {
 import { LearningService } from './learning.service';
 import {
   PracticeScopeQueryDto,
+  ParentAnalyticsScopesResponseDto,
+  ParentAnalyticsScopesQueryDto,
   ParentAnalyticsScopeQueryDto,
   SubmitQuestionAttemptDto,
   UpdateContentStudyStateDto,
@@ -144,16 +151,17 @@ export class ParentLearningController {
   constructor(private readonly learning: LearningService) {}
   @Get('analytics/scopes')
   @ApiOperation({
-    summary: 'List selected child approved purchase analytics scopes',
+    summary: 'List selected child active entitlement analytics scopes',
   })
+  @ApiOkResponse({ type: ParentAnalyticsScopesResponseDto })
   analyticsScopes(
     @CurrentParentSession() parent: RequestParentSession,
-    @Query() query: ParentAnalyticsScopeQueryDto,
+    @Query() query: ParentAnalyticsScopesQueryDto,
   ) {
     return this.learning.parentAnalyticsScopes(parent, query);
   }
   @Get('analytics/content')
-  @ApiOperation({ summary: 'Get purchased-scope content progress' })
+  @ApiOperation({ summary: 'Get active-entitlement content progress' })
   analyticsContent(
     @CurrentParentSession() parent: RequestParentSession,
     @Query() query: ParentAnalyticsScopeQueryDto,
@@ -161,7 +169,7 @@ export class ParentLearningController {
     return this.learning.parentAnalyticsContent(parent, query);
   }
   @Get('analytics/assessments')
-  @ApiOperation({ summary: 'Get purchased-scope assessment performance' })
+  @ApiOperation({ summary: 'Get active-entitlement assessment performance' })
   analyticsAssessments(
     @CurrentParentSession() parent: RequestParentSession,
     @Query() query: ParentAnalyticsScopeQueryDto,
@@ -169,7 +177,9 @@ export class ParentLearningController {
     return this.learning.parentAnalyticsAssessments(parent, query);
   }
   @Get('analytics/practice')
-  @ApiOperation({ summary: 'Get purchased-scope direct-practice performance' })
+  @ApiOperation({
+    summary: 'Get active-entitlement direct-practice performance',
+  })
   analyticsPractice(
     @CurrentParentSession() parent: RequestParentSession,
     @Query() query: ParentAnalyticsScopeQueryDto,

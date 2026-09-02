@@ -182,11 +182,22 @@ operation inventory aligned with that document.
 
 ### `GET /api/v1/parent/selected-child/analytics/scopes`
 
+Lists the selected child’s current active access grants, grouped by subject.
+Each `accessGrants` entry has `entitlementId`, `source`, target, and nullable
+`orderId`/`orderItemId`; it excludes revoked, expired, and future access.
+
 ### `GET /api/v1/parent/selected-child/analytics/content`
+
+Requires exactly one of `subjectId`, `entitlementId`, or legacy `orderItemId`.
+Exact selectors resolve only active selected-child access.
 
 ### `GET /api/v1/parent/selected-child/analytics/assessments`
 
+Requires exactly one of `subjectId`, `entitlementId`, or legacy `orderItemId`.
+
 ### `GET /api/v1/parent/selected-child/analytics/practice`
+
+Requires exactly one of `subjectId`, `entitlementId`, or legacy `orderItemId`.
 
 ### `POST /api/v1/student/content-items/{id}/complete`
 

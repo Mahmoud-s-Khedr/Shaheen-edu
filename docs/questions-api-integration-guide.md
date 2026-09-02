@@ -1025,9 +1025,9 @@ These endpoints use the parent session and selected-child context. They do not c
 
 | Method and endpoint | Request | Response/job |
 |---|---|---|
-| `GET /parent/selected-child/analytics/scopes` | Query: optional `subjectId`, `orderItemId`, `page`, `limit` | Approved/purchased scopes available for analytics. |
-| `GET /parent/selected-child/analytics/assessments` | Same scope query | Selected child’s assessment performance for the approved scope. |
-| `GET /parent/selected-child/analytics/practice` | Same scope query | Selected child’s direct-practice performance for the approved scope. |
+| `GET /parent/selected-child/analytics/scopes` | Query: `page`, `limit` | Current active entitlement scopes available for analytics. |
+| `GET /parent/selected-child/analytics/assessments` | Exactly one: `subjectId`, `entitlementId`, or legacy `orderItemId` | Selected child’s assessment performance for current access. |
+| `GET /parent/selected-child/analytics/practice` | Exactly one: `subjectId`, `entitlementId`, or legacy `orderItemId` | Selected child’s direct-practice performance for current access. |
 
 ### 17.4 Partner question-usage analytics
 

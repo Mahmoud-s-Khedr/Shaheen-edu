@@ -10,6 +10,7 @@ import { PrismaService } from '../src/database/prisma.service';
 import {
   CommerceTargetType,
   ContentStatus,
+  EntitlementStatus,
   OrderStatus,
   Role,
 } from '../src/common/types/roles.enum';
@@ -44,6 +45,7 @@ const unrelatedChild = {
 describe('Parent (e2e)', () => {
   let app: NestFastifyApplication;
   let childAUserId: string;
+  let childBUserId: string;
   let unrelatedChildUserId: string;
   let academicGradeId: string;
   let governorateId: string;
@@ -70,6 +72,7 @@ describe('Parent (e2e)', () => {
       });
       const body = JSON.parse(response.body);
       if (payload === childA) childAUserId = body.user.id;
+      if (payload === childB) childBUserId = body.user.id;
       if (payload === unrelatedChild) unrelatedChildUserId = body.user.id;
     }
   });
@@ -247,7 +250,7 @@ describe('Parent (e2e)', () => {
     expect(response.statusCode).toBe(403);
   });
 
-  it('discovers approved purchased scopes and reads scoped analytics', async () => {
+  it('discovers only selected-child active entitlement scopes and reads scoped analytics', async () => {
     const prisma = app.get(PrismaService);
     const admin = await prisma.user.findFirstOrThrow({
       where: { role: Role.SUPER_ADMIN },
@@ -307,6 +310,198 @@ describe('Parent (e2e)', () => {
       },
       include: { items: true },
     });
+    const createApprovedCourseOrder = (titleSnapshot: string) =>
+      prisma.order.create({
+        data: {
+          studentUserId: childAUserId,
+          manualPaymentMethodId: method.id,
+          paymentMethodSnapshot: {},
+          subtotalMinor: 1000,
+          totalMinor: 1000,
+          currency: 'EGP',
+          status: OrderStatus.APPROVED,
+          approvedAt: new Date(),
+          items: {
+            create: {
+              targetType: CommerceTargetType.COURSE,
+              courseId: course.id,
+              titleSnapshot,
+              basePriceMinor: 1000,
+              priceMinor: 1000,
+              currency: 'EGP',
+            },
+          },
+        },
+        include: { items: true },
+      });
+    const [revokedOrder, expiredOrder] = await Promise.all([
+      createApprovedCourseOrder('Revoked historical purchase'),
+      createApprovedCourseOrder('Expired historical purchase'),
+    ]);
+    const manualCourse = await prisma.course.create({
+      data: {
+        subjectId: subject.id,
+        title: 'Parent analytics manual grant course',
+        slug: 'parent-analytics-manual-grant-course',
+        sortOrder: 2,
+        status: ContentStatus.PUBLISHED,
+        publishedAt: new Date(),
+        createdById: admin.id,
+        updatedById: admin.id,
+      },
+    });
+    const chapterOnlyCourse = await prisma.course.create({
+      data: {
+        subjectId: subject.id,
+        title: 'Parent analytics chapter-only course',
+        slug: 'parent-analytics-chapter-only-course',
+        sortOrder: 3,
+        status: ContentStatus.PUBLISHED,
+        publishedAt: new Date(),
+        createdById: admin.id,
+        updatedById: admin.id,
+      },
+    });
+    const [coveredChapter, firstChapterOnly, secondChapterOnly] =
+      await Promise.all([
+        prisma.chapter.create({
+          data: {
+            courseId: course.id,
+            title: 'Covered by course access chapter',
+            slug: 'covered-by-course-access-chapter',
+            sortOrder: 1,
+            status: ContentStatus.PUBLISHED,
+            publishedAt: new Date(),
+            createdById: admin.id,
+            updatedById: admin.id,
+          },
+        }),
+        prisma.chapter.create({
+          data: {
+            courseId: chapterOnlyCourse.id,
+            title: 'First chapter-only access',
+            slug: 'first-chapter-only-access',
+            sortOrder: 1,
+            status: ContentStatus.PUBLISHED,
+            publishedAt: new Date(),
+            createdById: admin.id,
+            updatedById: admin.id,
+          },
+        }),
+        prisma.chapter.create({
+          data: {
+            courseId: chapterOnlyCourse.id,
+            title: 'Second chapter-only access',
+            slug: 'second-chapter-only-access',
+            sortOrder: 2,
+            status: ContentStatus.PUBLISHED,
+            publishedAt: new Date(),
+            createdById: admin.id,
+            updatedById: admin.id,
+          },
+        }),
+      ]);
+    const [
+      activeCourse,
+      revoked,
+      expired,
+      manual,
+      coveredChapterGrant,
+      firstChapterGrant,
+      secondChapterGrant,
+      future,
+      unselectedChildGrant,
+      unrelatedChildGrant,
+    ] = await Promise.all([
+      prisma.studentEntitlement.create({
+        data: {
+          studentUserId: childAUserId,
+          courseId: course.id,
+          orderItemId: order.items[0].id,
+          source: 'PAYMENT',
+          grantedById: admin.id,
+        },
+      }),
+      prisma.studentEntitlement.create({
+        data: {
+          studentUserId: childAUserId,
+          courseId: course.id,
+          orderItemId: revokedOrder.items[0].id,
+          source: 'PAYMENT',
+          status: EntitlementStatus.REVOKED,
+          revokedAt: new Date(),
+          revokedById: admin.id,
+          grantedById: admin.id,
+        },
+      }),
+      prisma.studentEntitlement.create({
+        data: {
+          studentUserId: childAUserId,
+          courseId: course.id,
+          orderItemId: expiredOrder.items[0].id,
+          source: 'PAYMENT',
+          expiresAt: new Date(Date.now() - 60_000),
+          grantedById: admin.id,
+        },
+      }),
+      prisma.studentEntitlement.create({
+        data: {
+          studentUserId: childAUserId,
+          courseId: manualCourse.id,
+          source: 'ADMIN',
+          grantedById: admin.id,
+        },
+      }),
+      prisma.studentEntitlement.create({
+        data: {
+          studentUserId: childAUserId,
+          chapterId: coveredChapter.id,
+          source: 'ADMIN',
+          grantedById: admin.id,
+        },
+      }),
+      prisma.studentEntitlement.create({
+        data: {
+          studentUserId: childAUserId,
+          chapterId: firstChapterOnly.id,
+          source: 'ADMIN',
+          grantedById: admin.id,
+        },
+      }),
+      prisma.studentEntitlement.create({
+        data: {
+          studentUserId: childAUserId,
+          chapterId: secondChapterOnly.id,
+          source: 'ADMIN',
+          grantedById: admin.id,
+        },
+      }),
+      prisma.studentEntitlement.create({
+        data: {
+          studentUserId: childAUserId,
+          courseId: manualCourse.id,
+          source: 'ADMIN',
+          startsAt: new Date(Date.now() + 60_000),
+          grantedById: admin.id,
+        },
+      }),
+      prisma.studentEntitlement.create({
+        data: {
+          studentUserId: childBUserId,
+          courseId: manualCourse.id,
+          source: 'ADMIN',
+          grantedById: admin.id,
+        },
+      }),
+      prisma.studentEntitlement.create({
+        data: {
+          studentUserId: unrelatedChildUserId,
+          courseId: manualCourse.id,
+          source: 'ADMIN',
+          grantedById: admin.id,
+        },
+      }),
+    ]);
 
     const login = await app.inject({
       method: 'POST',
@@ -334,20 +529,60 @@ describe('Parent (e2e)', () => {
       headers,
     });
     expect(scopes.statusCode).toBe(200);
-    expect(JSON.parse(scopes.body)).toMatchObject({
-      data: [
-        {
-          subject: { id: subject.id, title: subject.title },
-          purchases: [
-            {
-              orderId: order.id,
-              orderItemId: order.items[0].id,
-              target: { type: 'COURSE', id: course.id, title: course.title },
-            },
-          ],
-        },
-      ],
-    });
+    const body = JSON.parse(scopes.body);
+    const grants = body.data.find(
+      (group: any) => group.subject.id === subject.id,
+    ).accessGrants;
+    expect(grants).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          entitlementId: activeCourse.id,
+          source: 'PAYMENT',
+          orderId: order.id,
+          orderItemId: order.items[0].id,
+          target: { type: 'COURSE', id: course.id, title: course.title },
+        }),
+        expect.objectContaining({
+          entitlementId: manual.id,
+          source: 'ADMIN',
+          orderId: null,
+          orderItemId: null,
+          target: {
+            type: 'COURSE',
+            id: manualCourse.id,
+            title: manualCourse.title,
+          },
+        }),
+        expect.objectContaining({
+          entitlementId: firstChapterGrant.id,
+          target: {
+            type: 'CHAPTER',
+            id: firstChapterOnly.id,
+            title: firstChapterOnly.title,
+          },
+        }),
+        expect.objectContaining({
+          entitlementId: secondChapterGrant.id,
+          target: {
+            type: 'CHAPTER',
+            id: secondChapterOnly.id,
+            title: secondChapterOnly.title,
+          },
+        }),
+      ]),
+    );
+    expect(grants).toHaveLength(4);
+    expect(
+      grants.filter((grant: any) => grant.target.id === course.id),
+    ).toHaveLength(1);
+    expect(grants.map((grant: any) => grant.entitlementId)).not.toEqual(
+      expect.arrayContaining([
+        revoked.id,
+        expired.id,
+        future.id,
+        coveredChapterGrant.id,
+      ]),
+    );
 
     for (const resource of ['content', 'assessments', 'practice']) {
       const response = await app.inject({
@@ -367,6 +602,43 @@ describe('Parent (e2e)', () => {
       headers,
     });
     expect(foreign.statusCode).toBe(404);
+
+    for (const inactiveOrderItemId of [
+      revokedOrder.items[0].id,
+      expiredOrder.items[0].id,
+    ]) {
+      const inactive = await app.inject({
+        method: 'GET',
+        url: `/api/v1/parent/selected-child/analytics/content?orderItemId=${inactiveOrderItemId}`,
+        headers,
+      });
+      expect(inactive.statusCode).toBe(404);
+    }
+
+    const exact = await app.inject({
+      method: 'GET',
+      url: `/api/v1/parent/selected-child/analytics/content?entitlementId=${manual.id}`,
+      headers,
+    });
+    expect(exact.statusCode).toBe(200);
+    expect(JSON.parse(exact.body).scope).toMatchObject({
+      entitlementId: manual.id,
+      source: 'ADMIN',
+      orderId: null,
+      orderItemId: null,
+    });
+
+    for (const foreignEntitlementId of [
+      unselectedChildGrant.id,
+      unrelatedChildGrant.id,
+    ]) {
+      const foreignEntitlement = await app.inject({
+        method: 'GET',
+        url: `/api/v1/parent/selected-child/analytics/content?entitlementId=${foreignEntitlementId}`,
+        headers,
+      });
+      expect(foreignEntitlement.statusCode).toBe(404);
+    }
   });
 
   it('is blocked from /api/v1/admin/* routes', async () => {

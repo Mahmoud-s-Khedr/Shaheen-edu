@@ -451,7 +451,7 @@ export const manualCommerceJourney: JourneyDefinition = {
       );
     });
     await step(
-      'Letting the parent discover the approved purchase and read focused analytics',
+      'Letting the parent discover active access and read focused analytics',
       async () => {
         const login = await clients.public.request<any>(
           'POST',
@@ -473,24 +473,24 @@ export const manualCommerceJourney: JourneyDefinition = {
           { accessToken: selected.body.accessToken },
         );
         expectStatus(scopes, 200);
-        const purchase = scopes.body.data
-          .flatMap((group: any) => group.purchases)
+        const grant = scopes.body.data
+          .flatMap((group: any) => group.accessGrants)
           .find((item: any) => item.target.id === chapterId);
         assert(
-          purchase?.orderId === orderId && purchase?.orderItemId,
-          'Parent analytics scopes must expose the approved purchased chapter key',
+          grant?.orderId === orderId && grant?.entitlementId,
+          'Parent analytics scopes must expose the active chapter entitlement key',
         );
         for (const resource of ['content', 'assessments', 'practice']) {
           const response = await clients.public.request<any>(
             'GET',
-            `/parent/selected-child/analytics/${resource}?orderItemId=${purchase.orderItemId}`,
+            `/parent/selected-child/analytics/${resource}?entitlementId=${grant.entitlementId}`,
             undefined,
             { accessToken: selected.body.accessToken },
           );
           expectStatus(response, 200);
           assert(
-            response.body.scope.orderItemId === purchase.orderItemId,
-            `Parent ${resource} analytics must resolve the selected purchased scope`,
+            response.body.scope.entitlementId === grant.entitlementId,
+            `Parent ${resource} analytics must resolve the selected active entitlement`,
           );
         }
       },

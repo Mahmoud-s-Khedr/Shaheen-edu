@@ -8,11 +8,14 @@ import {
   AssessmentAttemptStatus,
   AssessmentQuestionOutcome,
   ContentStatus,
-  OrderStatus,
+  EntitlementStatus,
   QuestionStatus,
   QuestionType,
 } from '../../common/types/roles.enum';
-import { toPaginationMeta } from '../../common/dto/pagination-query.dto';
+import {
+  PaginationQueryDto,
+  toPaginationMeta,
+} from '../../common/dto/pagination-query.dto';
 import type { RequestParentSession } from '../../common/types/request-with-user.types';
 import { PrismaService } from '../../database/prisma.service';
 import { ContentAccessPolicyService } from '../entitlements/content-access-policy.service';
@@ -1007,17 +1010,45 @@ export class LearningService {
     return child;
   }
 
-  private async parentAnalyticsPurchases(studentId: string) {
-    const orders = await this.prisma.order.findMany({
-      where: { studentUserId: studentId, status: OrderStatus.APPROVED },
+  /**
+   * The parent dashboard is an access view, not a commerce-history view.
+   * Keep its scopes aligned with the entitlement policy used to grant access.
+   */
+  private async parentAnalyticsEntitlements(studentId: string) {
+    const now = new Date();
+    const entitlements = await this.prisma.studentEntitlement.findMany({
+      where: {
+        studentUserId: studentId,
+        status: EntitlementStatus.ACTIVE,
+        revokedAt: null,
+        startsAt: { lte: now },
+        OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+        AND: [
+          { OR: [{ courseId: { not: null } }, { chapterId: { not: null } }] },
+        ],
+      },
       select: {
         id: true,
-        approvedAt: true,
-        items: {
+        source: true,
+        startsAt: true,
+        orderItemId: true,
+        orderItem: {
           select: {
             id: true,
-            targetType: true,
-            titleSnapshot: true,
+            order: { select: { id: true } },
+          },
+        },
+        course: {
+          select: {
+            id: true,
+            title: true,
+            subject: { select: { id: true, title: true } },
+          },
+        },
+        chapter: {
+          select: {
+            id: true,
+            title: true,
             course: {
               select: {
                 id: true,
@@ -1025,42 +1056,46 @@ export class LearningService {
                 subject: { select: { id: true, title: true } },
               },
             },
-            chapter: {
-              select: {
-                id: true,
-                title: true,
-                course: {
-                  select: {
-                    id: true,
-                    subject: { select: { id: true, title: true } },
-                  },
-                },
-              },
-            },
           },
         },
       },
-      orderBy: [{ approvedAt: 'desc' }, { id: 'desc' }],
+      orderBy: [{ startsAt: 'desc' }, { createdAt: 'desc' }, { id: 'desc' }],
     });
-    return orders.flatMap((order) =>
-      order.items.map((item) => {
-        const course = item.course ?? item.chapter?.course;
-        const subject = course?.subject;
-        return {
-          orderId: order.id,
-          orderItemId: item.id,
-          approvedAt: order.approvedAt!,
-          targetType: item.targetType,
-          targetId: item.course?.id ?? item.chapter?.id!,
-          targetTitle:
-            item.course?.title ?? item.chapter?.title ?? item.titleSnapshot,
-          courseId: item.course?.id ?? item.chapter?.course.id!,
-          chapterId: item.chapter?.id ?? null,
-          subjectId: subject!.id,
-          subjectTitle: subject!.title,
-        };
-      }),
+    const grants = entitlements.map((entitlement) => {
+      const course = entitlement.course ?? entitlement.chapter!.course;
+      const subject = course.subject;
+      return {
+        entitlementId: entitlement.id,
+        source: entitlement.source,
+        orderId: entitlement.orderItem?.order.id ?? null,
+        orderItemId: entitlement.orderItemId ?? null,
+        startsAt: entitlement.startsAt,
+        targetType: entitlement.course ? 'COURSE' : 'CHAPTER',
+        targetId: entitlement.course?.id ?? entitlement.chapter!.id,
+        targetTitle: entitlement.course?.title ?? entitlement.chapter!.title,
+        courseId: course.id,
+        chapterId: entitlement.chapter?.id ?? null,
+        subjectId: subject.id,
+        subjectTitle: subject.title,
+      };
+    });
+
+    // One target is enough for analytics. The ordered first grant is the
+    // representative returned to clients. Course access covers all of its
+    // chapters, so it intentionally hides chapter-level grants in that course.
+    const courseIds = new Set(
+      grants.filter((grant) => !grant.chapterId).map((grant) => grant.courseId),
     );
+    const uniqueTargets = new Set<string>();
+    return grants.filter((grant) => {
+      if (grant.chapterId && courseIds.has(grant.courseId)) return false;
+      const key = grant.chapterId
+        ? `CHAPTER:${grant.chapterId}`
+        : `COURSE:${grant.courseId}`;
+      if (uniqueTargets.has(key)) return false;
+      uniqueTargets.add(key);
+      return true;
+    });
   }
 
   private async parentAnalyticsScope(
@@ -1068,17 +1103,25 @@ export class LearningService {
     query: ParentAnalyticsScopeQueryDto,
   ) {
     const child = await this.parentAnalyticsChild(parent);
-    const selected = [query.subjectId, query.orderItemId].filter(Boolean);
+    const selected = [
+      query.subjectId,
+      query.entitlementId,
+      query.orderItemId,
+    ].filter(Boolean);
     if (selected.length !== 1)
       throw new BadRequestException(
-        'Provide exactly one of subjectId or orderItemId',
+        'Provide exactly one of subjectId, entitlementId, or orderItemId',
       );
-    const purchases = await this.parentAnalyticsPurchases(child.userId);
+    const entitlements = await this.parentAnalyticsEntitlements(child.userId);
     const targets = query.subjectId
-      ? purchases.filter((item) => item.subjectId === query.subjectId)
-      : purchases.filter((item) => item.orderItemId === query.orderItemId);
+      ? entitlements.filter((item) => item.subjectId === query.subjectId)
+      : query.entitlementId
+        ? entitlements.filter(
+            (item) => item.entitlementId === query.entitlementId,
+          )
+        : entitlements.filter((item) => item.orderItemId === query.orderItemId);
     if (!targets.length)
-      throw new NotFoundException('Purchased analytics scope not found');
+      throw new NotFoundException('Active analytics entitlement not found');
     return {
       child,
       targets,
@@ -1092,34 +1135,35 @@ export class LearningService {
             type: targets[0].targetType,
             id: targets[0].targetId,
             title: targets[0].targetTitle,
+            entitlementId: targets[0].entitlementId,
+            source: targets[0].source,
+            orderId: targets[0].orderId,
             orderItemId: targets[0].orderItemId,
           },
     };
   }
 
-  private parentAnalyticsMeta(
-    query: ParentAnalyticsScopeQueryDto,
-    total: number,
-  ) {
+  private parentAnalyticsMeta(query: PaginationQueryDto, total: number) {
     return toPaginationMeta(query.page, Math.min(query.limit, 50), total);
   }
 
   async parentAnalyticsScopes(
     parent: RequestParentSession,
-    query: ParentAnalyticsScopeQueryDto,
+    query: PaginationQueryDto,
   ) {
     const child = await this.parentAnalyticsChild(parent);
-    const purchases = await this.parentAnalyticsPurchases(child.userId);
+    const entitlements = await this.parentAnalyticsEntitlements(child.userId);
     const subjects = new Map<string, any>();
-    for (const item of purchases) {
+    for (const item of entitlements) {
       const subject = subjects.get(item.subjectId) ?? {
         subject: { id: item.subjectId, title: item.subjectTitle },
-        purchases: [],
+        accessGrants: [],
       };
-      subject.purchases.push({
+      subject.accessGrants.push({
+        entitlementId: item.entitlementId,
+        source: item.source,
         orderId: item.orderId,
         orderItemId: item.orderItemId,
-        approvedAt: item.approvedAt,
         target: {
           type: item.targetType,
           id: item.targetId,

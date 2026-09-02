@@ -99,6 +99,38 @@ describe('Swagger (e2e)', () => {
         .summary,
     ).toBe('Remove a hierarchy record cover image');
 
+    const parentAnalytics =
+      document.paths['/api/v1/parent/selected-child/analytics/content'].get;
+    expect(parentAnalytics.summary).toBe(
+      'Get active-entitlement content progress',
+    );
+    expect(parentAnalytics.parameters).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: 'subjectId', in: 'query' }),
+        expect.objectContaining({
+          name: 'entitlementId',
+          in: 'query',
+          description: 'Select one active entitlement exactly.',
+        }),
+        expect.objectContaining({ name: 'orderItemId', in: 'query' }),
+      ]),
+    );
+    expect(
+      document.paths['/api/v1/parent/selected-child/analytics/scopes'].get
+        .responses['200'].content['application/json'].schema.$ref,
+    ).toBe('#/components/schemas/ParentAnalyticsScopesResponseDto');
+    expect(
+      document.components.schemas.ParentAnalyticsAccessGrantDto.properties,
+    ).toEqual(
+      expect.objectContaining({
+        entitlementId: expect.objectContaining({ type: 'string' }),
+        source: expect.objectContaining({ type: 'string' }),
+        orderId: expect.objectContaining({ nullable: true }),
+        orderItemId: expect.objectContaining({ nullable: true }),
+        target: expect.any(Object),
+      }),
+    );
+
     const publicGrades = document.paths['/api/v1/academic-grades'].get;
     expect(publicGrades.summary).toBe('List published academic grades');
     expect(publicGrades.parameters).toEqual(
