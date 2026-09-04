@@ -74,10 +74,12 @@ The backup script calls host `pg_dump` through root-only libpq configuration,
 then writes an encrypted Restic snapshot to the configured private Bunny
 destination. It never starts, stops, installs, or configures PostgreSQL.
 
-Run bootstrap exactly once for a new database. Set
-`ALLOW_PRODUCTION_BOOTSTRAP=true` plus the approved bootstrap values, run the
-job, and immediately return it to `false` before starting long-running
-services:
+Run bootstrap exactly once for a new database after the migration job has
+completed. The bootstrap job takes the same database advisory lock as the
+migration job and refuses to run unless Prisma reports that every repository
+migration is applied, the history is non-divergent, and no migration is active.
+Set the approved bootstrap values, run the job, then remove those credentials
+from the deployed environment before starting long-running services:
 
 ```sh
 editor .env

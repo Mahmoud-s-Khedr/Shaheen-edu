@@ -44,7 +44,7 @@ production Compose file adds the explicit Linux `host-gateway` mapping. Set
 `API_HOST_PORT=13000` (or another unused loopback port), `API_DOMAIN`, CORS,
 release revision, `REDIS_MAXMEMORY`, and a larger `REDIS_MEMORY_LIMIT`; use
 separate test Bunny credentials. Keep
-`ALLOW_PRODUCTION_BOOTSTRAP=false` initially.
+Keep the bootstrap credentials empty initially.
 
 ## 2. Start a clean production-shaped deployment
 
@@ -58,9 +58,10 @@ docker compose build migrate api worker
 docker compose --profile migration run --rm migrate
 ```
 
-For this new database only, set `ALLOW_PRODUCTION_BOOTSTRAP=true` and the
-approved test bootstrap values. Run bootstrap once, then return the setting to
-`false` before launching API and worker:
+For this new database only, set the approved test bootstrap values. The
+bootstrap job refuses to run until Prisma reports a fully applied, non-active
+migration history. Run it once, then remove the bootstrap credentials before
+launching API and worker:
 
 ```sh
 editor .env
@@ -127,8 +128,9 @@ sudo ./scripts/export-incident-logs.sh 30m
 
 The rehearsal passes only when the following are recorded:
 
-- The new dedicated host database migrated; bootstrap ran once; and
-  `ALLOW_PRODUCTION_BOOTSTRAP=false` afterwards.
+- The new dedicated host database migrated; bootstrap ran once only after
+  Prisma reported no pending, failed, divergent, or active migrations; and the
+  bootstrap credentials were removed afterwards.
 - API and worker are healthy; the API is reachable through
   `https://<test-domain>:3000/health/ready`; only the Docker gateway port is
   loopback-only; API replicas and Redis have no host port.

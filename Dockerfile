@@ -26,7 +26,7 @@ USER node
 # Cache the package-manager version pinned in package.json for the same
 # non-root user that executes migrations and the production bootstrap job.
 RUN corepack install
-CMD ["pnpm", "prisma", "migrate", "deploy"]
+CMD ["pnpm", "prisma:migrate:deploy"]
 
 FROM node:24-alpine AS runtime
 WORKDIR /app

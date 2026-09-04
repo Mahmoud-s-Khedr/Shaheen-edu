@@ -65,11 +65,6 @@ function refundPolicySeed(): RefundPolicySeed {
   if (process.env.NODE_ENV !== 'production') {
     return { eligibilityWindowDays: 7, maximumConsumptionBps: 1_000 };
   }
-  if (process.env.ALLOW_PRODUCTION_BOOTSTRAP !== 'true') {
-    throw new Error(
-      'FATAL: refusing to seed production. Set ALLOW_PRODUCTION_BOOTSTRAP=true for the one-off bootstrap job.',
-    );
-  }
   return {
     eligibilityWindowDays: requiredProductionInteger(
       'INITIAL_REFUND_ELIGIBILITY_WINDOW_DAYS',
