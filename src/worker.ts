@@ -46,7 +46,7 @@ async function bootstrap() {
         'question-import-chunk',
         'report-export',
       ],
-      release: process.env.RELEASE_REVISION ?? 'unknown',
+      version: process.env.VERSION ?? 'unknown',
     },
     'Worker started',
   );
@@ -68,7 +68,7 @@ async function bootstrap() {
         event: 'worker_queue_readiness_lost',
         context: 'WorkerBootstrap',
         service: 'worker',
-        release: process.env.RELEASE_REVISION ?? 'unknown',
+        version: process.env.VERSION ?? 'unknown',
       },
       'Worker lost queue readiness; restarting process',
     );
@@ -87,7 +87,7 @@ bootstrap().catch((error: unknown) => {
       event: 'worker_bootstrap_failed',
       service: 'worker',
       ...safeErrorRecord(error),
-      release: process.env.RELEASE_REVISION ?? 'unknown',
+      version: process.env.VERSION ?? 'unknown',
     }),
   );
   process.exit(1);
@@ -113,6 +113,7 @@ function createWorkerHealthServer(
       .end(
         JSON.stringify({
           status: ready ? 'ready' : 'unready',
+          version: process.env.VERSION ?? 'unknown',
           workers: { questionImport, reportExports },
         }),
       );

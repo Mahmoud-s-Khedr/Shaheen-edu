@@ -114,7 +114,8 @@ server {
 }
 ```
 
-Verify the public path and private worker path:
+Verify the public path and private worker path. Both health responses include
+the deployed `VERSION` as `version`:
 
 ```sh
 curl --fail-with-body "https://<api-domain>:3000/health/ready"

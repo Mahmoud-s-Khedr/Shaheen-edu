@@ -8,6 +8,7 @@ export const envValidationSchema = Joi.object({
   HOST: Joi.string().default('0.0.0.0'),
   WORKER_HEALTH_PORT: Joi.number().port().default(3001),
   TRUST_PROXY_HOPS: Joi.number().integer().min(0).max(10).default(0),
+  VERSION: Joi.string().min(1).default('unknown'),
 
   DATABASE_URL: Joi.string().uri().required(),
   REDIS_URL: Joi.string().uri().required(),

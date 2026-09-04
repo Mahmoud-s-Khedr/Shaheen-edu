@@ -48,7 +48,7 @@ readonly compose_sha256="$(sha256sum "${bundle_dir}/compose.log" | awk '{print $
 cat >"${bundle_dir}/manifest.txt" <<EOF
 bundle_created_at=$(date --utc +%Y-%m-%dT%H:%M:%SZ)
 window=${since}
-release_revision=${RELEASE_REVISION:-unknown}
+version=${VERSION:-unknown}
 compose_log_sha256=${compose_sha256}
 host_postgres_backup_logs=operator-managed; not collected by this repository
 handling=restricted; copy only to an encrypted, access-controlled machine; delete after incident closure

@@ -4,6 +4,7 @@ export interface AppConfig {
   host: string;
   workerHealthPort: number;
   trustProxyHops: number;
+  version: string;
   corsOrigins: string[];
   cookieSecure: boolean;
   cookieSameSite: 'lax' | 'strict' | 'none';
@@ -116,6 +117,7 @@ export default (): AppConfig => ({
   host: process.env.HOST ?? '0.0.0.0',
   workerHealthPort: parseInt(process.env.WORKER_HEALTH_PORT ?? '3001', 10),
   trustProxyHops: envInteger('TRUST_PROXY_HOPS', 0),
+  version: process.env.VERSION ?? 'unknown',
   corsOrigins: (process.env.CORS_ORIGINS ?? '')
     .split(',')
     .map((origin) => origin.trim())

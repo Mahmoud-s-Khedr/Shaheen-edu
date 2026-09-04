@@ -15,6 +15,11 @@ describe('Health (e2e)', () => {
   it('GET /health returns 200 ok', async () => {
     const response = await app.inject({ method: 'GET', url: '/health' });
     expect(response.statusCode).toBe(200);
-    expect(JSON.parse(response.body)).toMatchObject({ status: 'ok' });
+    const body = JSON.parse(response.body) as {
+      status?: unknown;
+      version?: unknown;
+    };
+    expect(body.status).toBe('ok');
+    expect(typeof body.version).toBe('string');
   });
 });

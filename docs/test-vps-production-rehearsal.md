@@ -42,7 +42,7 @@ docker compose --env-file .env config --quiet
 Use a test-only `DATABASE_URL` with `host.docker.internal` as its host. The
 production Compose file adds the explicit Linux `host-gateway` mapping. Set
 `API_HOST_PORT=13000` (or another unused loopback port), `API_DOMAIN`, CORS,
-release revision, `REDIS_MAXMEMORY`, and a larger `REDIS_MEMORY_LIMIT`; use
+deployment `VERSION`, `REDIS_MAXMEMORY`, and a larger `REDIS_MEMORY_LIMIT`; use
 separate test Bunny credentials. Keep
 Keep the bootstrap credentials empty initially.
 

@@ -46,7 +46,7 @@ import { normalizeCorrelationId } from './correlation-id';
             customProps: (_request, response: { statusCode?: number }) => ({
               event: 'http_request_completed',
               statusCode: response.statusCode ?? 0,
-              release: process.env.RELEASE_REVISION ?? 'unknown',
+              version: process.env.VERSION ?? 'unknown',
             }),
             customLogLevel: (_request, response, error) => {
               if (error || response.statusCode >= 500) return 'error';

@@ -19,7 +19,7 @@ services:
       - ./nginx/api-gateway.conf:/etc/nginx/conf.d/default.conf:ro
     labels:
       com.shaheen.edu.service: api-gateway
-      com.shaheen.edu.release: ${RELEASE_REVISION:-unknown}
+      com.shaheen.edu.version: ${VERSION:-unknown}
     logging: &bounded_logging
       driver: local
       options:
@@ -55,7 +55,7 @@ services:
       - redis_data:/data
     labels:
       com.shaheen.edu.service: redis
-      com.shaheen.edu.release: ${RELEASE_REVISION:-unknown}
+      com.shaheen.edu.version: ${VERSION:-unknown}
     logging: *bounded_logging
     # Leave headroom for AOF rewrite and the Redis allocator. This must be
     # larger than REDIS_MAXMEMORY; tune both to the host's available RAM.
@@ -87,7 +87,7 @@ services:
     restart: 'no'
     labels:
       com.shaheen.edu.service: migrate
-      com.shaheen.edu.release: ${RELEASE_REVISION:-unknown}
+      com.shaheen.edu.version: ${VERSION:-unknown}
     logging: *bounded_logging
     depends_on:
       redis:
@@ -109,7 +109,7 @@ services:
     restart: 'no'
     labels:
       com.shaheen.edu.service: bootstrap
-      com.shaheen.edu.release: ${RELEASE_REVISION:-unknown}
+      com.shaheen.edu.version: ${VERSION:-unknown}
     logging: *bounded_logging
     depends_on:
       redis:
@@ -138,7 +138,7 @@ services:
     restart: 'no'
     labels:
       com.shaheen.edu.service: queue-recovery
-      com.shaheen.edu.release: ${RELEASE_REVISION:-unknown}
+      com.shaheen.edu.version: ${VERSION:-unknown}
     logging: *bounded_logging
     depends_on:
       redis:
@@ -154,11 +154,11 @@ services:
       DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL in .env}
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
       TRUST_PROXY_HOPS: ${TRUST_PROXY_HOPS:-2}
-      RELEASE_REVISION: ${RELEASE_REVISION:-unknown}
+      VERSION: ${VERSION:-unknown}
     extra_hosts: *host_postgres
     labels:
       com.shaheen.edu.service: api
-      com.shaheen.edu.release: ${RELEASE_REVISION:-unknown}
+      com.shaheen.edu.version: ${VERSION:-unknown}
     logging: *bounded_logging
     stop_grace_period: 45s
     depends_on:
@@ -183,12 +183,12 @@ services:
     environment:
       DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL in .env}
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
-      RELEASE_REVISION: ${RELEASE_REVISION:-unknown}
+      VERSION: ${VERSION:-unknown}
     extra_hosts: *host_postgres
     command: ['node', 'dist/worker']
     labels:
       com.shaheen.edu.service: worker
-      com.shaheen.edu.release: ${RELEASE_REVISION:-unknown}
+      com.shaheen.edu.version: ${VERSION:-unknown}
     logging: *bounded_logging
     # Active AI jobs may legitimately outlive a normal HTTP shutdown. BullMQ
     # closes workers gracefully before Docker sends SIGKILL.

@@ -99,7 +99,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
           route,
           statusCode,
           correlationId,
-          release: process.env.RELEASE_REVISION ?? 'unknown',
+          version: process.env.VERSION ?? 'unknown',
         },
         'Unhandled API exception',
       );
@@ -112,7 +112,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
           statusCode,
           code,
           correlationId,
-          release: process.env.RELEASE_REVISION ?? 'unknown',
+          version: process.env.VERSION ?? 'unknown',
         },
         'Expected API client error',
       );
