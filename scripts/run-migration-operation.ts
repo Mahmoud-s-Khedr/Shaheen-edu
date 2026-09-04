@@ -68,8 +68,8 @@ async function main(): Promise<void> {
       async (tx) => {
         const [lock] = await tx.$queryRaw<[{ acquired: boolean }]>`
           SELECT pg_try_advisory_xact_lock(
-            ${DEPLOYMENT_LOCK_NAMESPACE},
-            ${DEPLOYMENT_LOCK_KEY}
+            ${DEPLOYMENT_LOCK_NAMESPACE}::integer,
+            ${DEPLOYMENT_LOCK_KEY}::integer
           ) AS acquired
         `;
 
