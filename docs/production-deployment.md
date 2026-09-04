@@ -164,10 +164,11 @@ sudo ./scripts/postgres-restore.sh \
   --confirm-target <same-database>
 ```
 
-Every successful backup also applies the configured 14-daily, 8-weekly, and
-12-monthly Restic retention policy (override those values only through the
-root-only backup environment). After one successful manual backup and isolated
-restore proof, operators may install the included four-hour backup unit/timer
+Every successful backup retains every snapshot from the configured 14-day
+window. At the included four-hour schedule this is approximately 84 recovery
+points; snapshots older than the window are pruned. Override the window only
+through the root-only backup environment. After one successful manual backup
+and isolated restore proof, operators may install the included four-hour backup unit/timer
 and weekly `shaheen-edu-postgres-backup-verify` unit/timer through their normal
 host-systemd change process. The weekly unit reads a sample of encrypted remote
 pack data; it complements, but does not replace, a restore drill.

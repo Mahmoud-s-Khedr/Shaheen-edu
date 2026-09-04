@@ -43,16 +43,15 @@ fi
 readonly run_started_at="$(date --utc +%Y-%m-%dT%H:%M:%SZ)"
 readonly run_id="$(date --utc +%Y%m%dT%H%M%SZ)-$(hostname -s)"
 readonly operations_prefix="${OPERATIONS_PREFIX:-operations}"
-readonly keep_daily="${RESTIC_KEEP_DAILY:-14}"
-readonly keep_weekly="${RESTIC_KEEP_WEEKLY:-8}"
-readonly keep_monthly="${RESTIC_KEEP_MONTHLY:-12}"
-
-for retention_value in "${keep_daily}" "${keep_weekly}" "${keep_monthly}"; do
-  if [[ ! "${retention_value}" =~ ^[1-9][0-9]*$ ]]; then
-    echo '{"event":"backup_failed","reason":"invalid_retention_policy"}' >&2
-    exit 78
-  fi
-done
+# Keep every scheduled snapshot from the most recent window. At the bundled
+# four-hour schedule, 14 days retains approximately 84 snapshots. A duration
+# window, rather than daily/weekly/monthly grouping, is required so that every
+# four-hour recovery point survives until it is older than the chosen window.
+readonly keep_within="${RESTIC_KEEP_WITHIN:-14d}"
+if [[ ! "${keep_within}" =~ ^[1-9][0-9]*d$ ]]; then
+  echo '{"event":"backup_failed","reason":"invalid_retention_policy"}' >&2
+  exit 78
+fi
 
 if [[ ! -d "${BACKUP_STAGING_DIR}" || ! -w "${BACKUP_STAGING_DIR}" ]]; then
   echo '{"event":"backup_failed","reason":"backup_staging_directory_unavailable"}' >&2
@@ -136,9 +135,7 @@ restic snapshots "${snapshot_id}" >/dev/null
 # operation prevents an indefinitely growing repository while never touching
 # incident-log or other operations data stored under the same prefix.
 restic forget --tag 'service:postgres' \
-  --keep-daily "${keep_daily}" \
-  --keep-weekly "${keep_weekly}" \
-  --keep-monthly "${keep_monthly}" \
+  --keep-within "${keep_within}" \
   --prune >/dev/null
 
 readonly run_completed_at="$(date --utc +%Y-%m-%dT%H:%M:%SZ)"
