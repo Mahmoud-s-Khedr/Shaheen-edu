@@ -90,7 +90,7 @@ export class AssignReconciliationDiscrepancyDto {
 
 export class ResolveReconciliationDiscrepancyDto {
   @ApiProperty({ enum: ['RESOLVED', 'ACCEPTED'] })
-  @IsEnum(['RESOLVED', 'ACCEPTED'])
+  @IsEnum({ RESOLVED: 'RESOLVED', ACCEPTED: 'ACCEPTED' })
   status!: 'RESOLVED' | 'ACCEPTED';
   @ApiProperty()
   @IsString()

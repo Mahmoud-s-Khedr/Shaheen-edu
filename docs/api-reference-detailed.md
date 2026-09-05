@@ -2,6 +2,7 @@
 
 Implementation-backed API contract. Every endpoint below is self-contained: its authorization, parameter/body fields, and success response fields appear in the same section. Base URL is `/api/v1`; `/health` and `/health/ready` are unversioned. Unknown JSON fields are rejected. Errors use `{ statusCode, code, message: { ar, en }, error: { ar, en }, details?, correlationId }`; `details` contains field-level bilingual validation feedback.
 
+DTO validation failures return HTTP 400 with code `BAD_REQUEST.VALIDATION_FAILED`. The top-level `message` contains the first validation issue in Arabic and English; render every entry in `details` for full form feedback. Each detail has `{ field, code, message: { ar, en } }`. Field paths use dots and array indexes (for example, `items.0.title.en`); an empty field denotes a request-level issue. Unknown fields are rejected with `VALIDATION.WHITELISTVALIDATION`. Use codes and field paths for client logic, rather than matching message text. Malformed JSON, oversized bodies, and unsupported content types return actionable HTTP 400, 413, and 415 errors respectively.
 ## Generated operations inventory
 
 The OpenAPI document in `docs-json.json` is the authoritative schema. The

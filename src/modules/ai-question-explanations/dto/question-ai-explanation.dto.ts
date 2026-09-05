@@ -13,6 +13,7 @@ import {
   IsString,
   MaxLength,
   Min,
+  ValidateNested,
 } from 'class-validator';
 import { QuestionAiExplanationRunMode } from '../../../common/types/roles.enum';
 
@@ -52,6 +53,8 @@ export class CreateAiQuestionExplanationRunDto {
   @ApiPropertyOptional({ type: AiQuestionAnswerDto })
   @IsOptional()
   @IsObject()
+  @ValidateNested()
+  @Type(() => AiQuestionAnswerDto)
   suppliedAnswer?: AiQuestionAnswerDto;
 
   @ApiPropertyOptional()

@@ -38,6 +38,10 @@ export class CreateCourseDto {
   subjectId!: string;
 
   @ApiProperty({ enum: [AccessType.PUBLIC, AccessType.FREE, AccessType.PAID] })
-  @IsEnum([AccessType.PUBLIC, AccessType.FREE, AccessType.PAID])
+  @IsEnum({
+    PUBLIC: AccessType.PUBLIC,
+    FREE: AccessType.FREE,
+    PAID: AccessType.PAID,
+  })
   accessType!: AccessType;
 }

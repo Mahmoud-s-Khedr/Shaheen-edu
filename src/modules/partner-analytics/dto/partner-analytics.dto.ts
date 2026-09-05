@@ -27,7 +27,7 @@ export class PartnerEarningsQueryDto extends PartnerPeriodQueryDto {
     description: 'Defaults to day for ranges up to 93 days, otherwise month.',
   })
   @IsOptional()
-  @IsEnum(['day', 'month'])
+  @IsEnum({ day: 'day', month: 'month' })
   granularity?: 'day' | 'month';
 }
 
@@ -71,7 +71,7 @@ export class PartnerQuestionUsageQueryDto extends PaginationQueryDto {
       'Defaults to day for ranges up to 93 days and month afterwards.',
   })
   @IsOptional()
-  @IsEnum(['day', 'month'])
+  @IsEnum({ day: 'day', month: 'month' })
   granularity?: 'day' | 'month';
   @ApiPropertyOptional() @IsOptional() @IsString() subjectId?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() courseId?: string;

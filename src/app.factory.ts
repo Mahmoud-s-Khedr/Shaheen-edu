@@ -5,23 +5,14 @@ import {
 } from '@nestjs/platform-fastify';
 import { ConfigService } from '@nestjs/config';
 import { Logger as PinoNestLogger, PinoLogger } from 'nestjs-pino';
-import {
-  BadRequestException,
-  RequestMethod,
-  ValidationPipe,
-  VersioningType,
-} from '@nestjs/common';
-import type { ValidationError } from 'class-validator';
+import { RequestMethod, VersioningType } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import fastifyCookie from '@fastify/cookie';
 import fastifyHelmet from '@fastify/helmet';
 import fastifyMultipart from '@fastify/multipart';
 import { AppModule } from './app.module';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
-import {
-  validationDetail,
-  type ValidationDetail,
-} from './common/i18n/api-messages';
+import { createRequestValidationPipe } from './common/validation/request-validation.pipe';
 import type { AppConfig } from './config/configuration';
 import { normalizeCorrelationId } from './common/logging/correlation-id';
 import type { IncomingMessage } from 'node:http';
@@ -88,19 +79,7 @@ export async function createApp(
     ],
   });
   app.enableVersioning({ type: VersioningType.URI, defaultVersion: '1' });
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      transform: true,
-      transformOptions: { enableImplicitConversion: true },
-      exceptionFactory: (errors: ValidationError[]) =>
-        new BadRequestException({
-          message: 'Validation failed',
-          details: flattenValidationErrors(errors),
-        }),
-    }),
-  );
+  app.useGlobalPipes(createRequestValidationPipe());
   // PinoLogger is transient-scoped, so resolving it is required. The Nest
   // Logger wrapper used by app.useLogger() exposes `log`, not `info`; passing
   // it to this filter turned ordinary 4xx responses into 500s while logging.
@@ -135,17 +114,4 @@ export async function createApp(
   }
 
   return app;
-}
-
-function flattenValidationErrors(
-  errors: ValidationError[],
-  parent = '',
-): ValidationDetail[] {
-  return errors.flatMap((error) => {
-    const field = parent ? `${parent}.${error.property}` : error.property;
-    const own = Object.entries(error.constraints ?? {}).map(
-      ([constraint, message]) => validationDetail(field, constraint, message),
-    );
-    return [...own, ...flattenValidationErrors(error.children ?? [], field)];
-  });
 }

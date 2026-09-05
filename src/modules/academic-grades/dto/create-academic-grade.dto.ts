@@ -1,5 +1,11 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsString, Matches } from 'class-validator';
+import {
+  IsDefined,
+  IsObject,
+  IsOptional,
+  IsString,
+  Matches,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 import { ValidateNested } from 'class-validator';
 import { SLUG_PATTERN } from '../../../common/hierarchy/hierarchy.helper';
@@ -10,6 +16,8 @@ import {
 
 export class CreateAcademicGradeDto {
   @ApiProperty({ type: LocalizedTextDto })
+  @IsDefined()
+  @IsObject()
   @ValidateNested()
   @Type(() => LocalizedTextDto)
   title!: LocalizedTextDto;

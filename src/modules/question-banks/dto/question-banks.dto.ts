@@ -5,6 +5,7 @@ import {
   ArrayMinSize,
   IsArray,
   IsBoolean,
+  IsDefined,
   IsEnum,
   IsInt,
   IsObject,
@@ -35,6 +36,8 @@ export class CreateQuestionSourceDto {
   @IsEnum(QuestionSourceType)
   type!: QuestionSourceType;
   @ApiProperty({ type: LocalizedTextDto })
+  @IsDefined()
+  @IsObject()
   @ValidateNested()
   @Type(() => LocalizedTextDto)
   title!: LocalizedTextDto;
@@ -408,11 +411,13 @@ export class UpdateQuestionOptionDto {
 }
 export class ReorderQuestionOptionsDto {
   @ApiProperty({ type: [String] })
+  @IsArray()
   @IsString({ each: true })
   optionIds!: string[];
 }
 export class ReorderQuestionAssetsDto {
   @ApiProperty({ type: [String] })
+  @IsArray()
   @IsString({ each: true })
   assetIds!: string[];
 }

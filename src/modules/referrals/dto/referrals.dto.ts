@@ -204,7 +204,7 @@ export class AddReferralReviewNoteDto {
 
 export class ResolveReferralReviewFlagDto {
   @ApiProperty({ enum: ['RESOLVED', 'ACCEPTED'] })
-  @IsEnum(['RESOLVED', 'ACCEPTED'])
+  @IsEnum({ RESOLVED: 'RESOLVED', ACCEPTED: 'ACCEPTED' })
   status!: 'RESOLVED' | 'ACCEPTED';
   @ApiProperty({ enum: ReferralReviewDisposition })
   @IsEnum(ReferralReviewDisposition)
@@ -234,7 +234,7 @@ export class ReferralReportingQueryDto {
   to?: string;
   @ApiPropertyOptional({ enum: ['day', 'month'] })
   @IsOptional()
-  @IsEnum(['day', 'month'])
+  @IsEnum({ day: 'day', month: 'month' })
   granularity?: 'day' | 'month';
 }
 

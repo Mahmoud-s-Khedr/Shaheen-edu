@@ -47,8 +47,15 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     let explicitCode: string | undefined;
     let details: ValidationDetail[] | undefined;
     let meta: Record<string, unknown> | undefined;
+    let translatedMessage: LocalizedMessage | undefined;
 
-    if (exception instanceof Prisma.PrismaClientKnownRequestError) {
+    const parserError = this.mapParserError(exception);
+
+    if (parserError) {
+      statusCode = parserError.statusCode;
+      message = parserError.message;
+      explicitCode = parserError.code;
+    } else if (exception instanceof Prisma.PrismaClientKnownRequestError) {
       const mapped = this.mapPrismaError(exception.code);
       statusCode = mapped.statusCode;
       message = mapped.message;
@@ -61,14 +68,42 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       } else if (typeof body === 'object' && body !== null) {
         const bodyObj = body as Record<string, unknown>;
         const rawMessage = bodyObj.message ?? exception.message;
-        message = Array.isArray(rawMessage)
-          ? (rawMessage[0] ?? exception.message)
-          : String(rawMessage);
         details = bodyObj.details as ValidationDetail[] | undefined;
+        if (Array.isArray(rawMessage)) {
+          const messages = rawMessage.filter(
+            (value): value is string => typeof value === 'string',
+          );
+          message = messages[0] ?? exception.message;
+          if (!details?.length) {
+            details = messages.map((value) => ({
+              field: '',
+              code: 'VALIDATION.INVALID',
+              message: localizedMessage(value, statusCode),
+            }));
+          }
+        } else if (
+          typeof rawMessage === 'object' &&
+          rawMessage !== null &&
+          'en' in rawMessage &&
+          'ar' in rawMessage &&
+          typeof rawMessage.en === 'string' &&
+          typeof rawMessage.ar === 'string'
+        ) {
+          translatedMessage = { en: rawMessage.en, ar: rawMessage.ar };
+          message = rawMessage.en;
+        } else {
+          message =
+            typeof rawMessage === 'string' ? rawMessage : exception.message;
+        }
+        if (typeof bodyObj.code === 'string') explicitCode = bodyObj.code;
         meta = bodyObj.meta as Record<string, unknown> | undefined;
       }
-      if ('code' in exception)
-        explicitCode = String((exception as { code?: unknown }).code ?? '');
+      if (
+        'code' in exception &&
+        typeof exception.code === 'string' &&
+        exception.code
+      )
+        explicitCode = exception.code;
       if ('meta' in exception)
         meta = (exception as { meta?: Record<string, unknown> }).meta;
     }
@@ -76,12 +111,13 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     const isProduction = process.env.NODE_ENV === 'production';
     if (isProduction && statusCode === HttpStatus.INTERNAL_SERVER_ERROR) {
       message = 'Internal server error';
+      translatedMessage = undefined;
     }
 
     const payload: ErrorResponseShape = {
       statusCode,
       code: errorCode(message, statusCode, explicitCode),
-      message: localizedMessage(message, statusCode),
+      message: translatedMessage ?? localizedMessage(message, statusCode),
       error: localizedError(statusCode),
       ...(details?.length ? { details } : {}),
       ...(meta ? { meta } : {}),
@@ -123,6 +159,52 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     }
 
     void response.status(statusCode).send(payload);
+  }
+
+  private mapParserError(exception: unknown) {
+    if (!(exception instanceof Error)) return;
+    let parserCode = 'code' in exception ? exception.code : undefined;
+    // Nest converts FastifyError into HttpException before invoking filters,
+    // dropping its code. Match only known static parser messages and statuses.
+    if (exception instanceof HttpException) {
+      const status = exception.getStatus();
+      const message = exception.getResponse();
+      if (
+        status === 400 &&
+        (message ===
+          "Body is not valid JSON but content-type is set to 'application/json'" ||
+          message ===
+            "Body cannot be empty when content-type is set to 'application/json'")
+      ) {
+        parserCode = 'FST_ERR_CTP_INVALID_JSON_BODY';
+      } else if (status === 413 && message === 'Request body is too large') {
+        parserCode = 'FST_ERR_CTP_BODY_TOO_LARGE';
+      } else if (status === 415 && message === 'Unsupported Media Type') {
+        parserCode = 'FST_ERR_CTP_INVALID_MEDIA_TYPE';
+      }
+    }
+    switch (parserCode) {
+      case 'FST_ERR_CTP_INVALID_JSON_BODY':
+      case 'FST_ERR_CTP_EMPTY_JSON_BODY':
+        return {
+          statusCode: HttpStatus.BAD_REQUEST,
+          message: 'Request body must contain valid JSON',
+          code: 'BAD_REQUEST.INVALID_JSON',
+        };
+      case 'FST_ERR_CTP_BODY_TOO_LARGE':
+        return {
+          statusCode: HttpStatus.PAYLOAD_TOO_LARGE,
+          message: 'Request body is too large. Reduce its size and try again.',
+          code: 'PAYLOAD_TOO_LARGE.REQUEST_BODY',
+        };
+      case 'FST_ERR_CTP_INVALID_MEDIA_TYPE':
+        return {
+          statusCode: HttpStatus.UNSUPPORTED_MEDIA_TYPE,
+          message:
+            'Unsupported Content-Type. Use a media type accepted by this endpoint.',
+          code: 'UNSUPPORTED_MEDIA_TYPE.CONTENT_TYPE',
+        };
+    }
   }
 
   private mapPrismaError(code: string) {

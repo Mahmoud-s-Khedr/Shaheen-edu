@@ -59,6 +59,26 @@ export class StudentProfileDetailsDto {
   parentPhone!: string;
 }
 
+export class ApiValidationDetailDto {
+  @ApiProperty({
+    example: 'items.0.title.en',
+    description:
+      'Dotted field path, including array indexes. Empty for request-level errors.',
+  })
+  field!: string;
+
+  @ApiProperty({ example: 'VALIDATION.MINLENGTH' })
+  code!: string;
+
+  @ApiProperty({
+    example: {
+      ar: 'يجب ألا يقل طول القيمة عن 8 أحرف',
+      en: 'password must be longer than or equal to 8 characters',
+    },
+  })
+  message!: { ar: string; en: string };
+}
+
 export class ApiErrorResponseDto {
   @ApiProperty({ example: 401 })
   statusCode!: number;
@@ -75,7 +95,7 @@ export class ApiErrorResponseDto {
   error!: { ar: string; en: string };
 
   @ApiPropertyOptional({
-    type: 'array',
+    type: [ApiValidationDetailDto],
     example: [
       {
         field: 'phone',
@@ -87,11 +107,10 @@ export class ApiErrorResponseDto {
       },
     ],
   })
-  details?: Array<{
-    field: string;
-    code: string;
-    message: { ar: string; en: string };
-  }>;
+  details?: ApiValidationDetailDto[];
+
+  @ApiPropertyOptional({ type: 'object', additionalProperties: true })
+  meta?: Record<string, unknown>;
 
   @ApiProperty({ example: '3eb75610-8bc8-4fc2-b821-dc90d7f3f39a' })
   correlationId!: string;

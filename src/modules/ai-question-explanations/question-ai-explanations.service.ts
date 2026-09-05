@@ -109,8 +109,8 @@ export class QuestionAiExplanationsService {
     };
   }
   private validAnswer(type: QuestionType, value: any) {
-    if (!value || typeof value !== 'object')
-      throw new BadRequestException('A type-valid answer is required');
+    if (!value || typeof value !== 'object' || Array.isArray(value))
+      throw new BadRequestException('Provide an answer object for this question');
     if (
       type === QuestionType.SINGLE_CHOICE ||
       type === QuestionType.MULTIPLE_CHOICE
@@ -123,6 +123,14 @@ export class QuestionAiExplanationsService {
       )
         throw new BadRequestException(
           'Choice questions require selectedOptionIndexes only',
+        );
+      if (
+        value.selectedOptionIndexes.some(
+          (index: unknown) => !Number.isInteger(index) || (index as number) < 0,
+        )
+      )
+        throw new BadRequestException(
+          'selectedOptionIndexes must contain only non-negative whole numbers',
         );
       return {
         selectedOptionIndexes: [
@@ -156,6 +164,14 @@ export class QuestionAiExplanationsService {
     )
       throw new BadRequestException(
         'Written questions require acceptedAnswers only',
+      );
+    if (
+      value.acceptedAnswers.some(
+        (answer: unknown) => typeof answer !== 'string' || !answer.trim(),
+      )
+    )
+      throw new BadRequestException(
+        'acceptedAnswers must contain only non-blank text answers',
       );
     return {
       selectedOptionIndexes: null,

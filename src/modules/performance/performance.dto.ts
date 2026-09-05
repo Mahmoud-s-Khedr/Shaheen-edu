@@ -16,8 +16,14 @@ export class PerformanceScopeQueryDto extends PerformancePeriodQueryDto {
 }
 
 export class PerformanceAnalysisQueryDto extends SearchPaginationQueryDto {
-  @IsEnum(['subject', 'course', 'chapter', 'lesson', 'section']) level:
-    'subject' | 'course' | 'chapter' | 'lesson' | 'section' = 'subject';
+  @IsEnum({
+    subject: 'subject',
+    course: 'course',
+    chapter: 'chapter',
+    lesson: 'lesson',
+    section: 'section',
+  })
+  level: 'subject' | 'course' | 'chapter' | 'lesson' | 'section' = 'subject';
   @IsOptional() @IsDateString() from?: string;
   @IsOptional() @IsDateString() to?: string;
   @IsOptional() @IsString() subjectId?: string;
