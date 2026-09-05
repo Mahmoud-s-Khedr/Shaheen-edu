@@ -18,7 +18,8 @@ export class CreateCourseDto {
   title!: string;
 
   @ApiPropertyOptional({
-    description: 'Kebab-case; derived from title if omitted',
+    description:
+      'Letters (a-z, A-Z) and digits separated by hyphens; derived from title if omitted',
     example: 'algebra-fundamentals',
   })
   @IsOptional()

@@ -16,7 +16,8 @@ export class CreateLessonDto {
   title!: string;
 
   @ApiPropertyOptional({
-    description: 'Kebab-case; derived from title if omitted',
+    description:
+      'Letters (a-z, A-Z) and digits separated by hyphens; derived from title if omitted',
     example: 'lesson-1-solving-for-x',
   })
   @IsOptional()

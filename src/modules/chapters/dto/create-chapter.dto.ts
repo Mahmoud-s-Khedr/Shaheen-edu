@@ -16,7 +16,8 @@ export class CreateChapterDto {
   title!: string;
 
   @ApiPropertyOptional({
-    description: 'Kebab-case; derived from title if omitted',
+    description:
+      'Letters (a-z, A-Z) and digits separated by hyphens; derived from title if omitted',
     example: 'chapter-1-linear-equations',
   })
   @IsOptional()

@@ -2,7 +2,7 @@ import { HttpStatus } from '@nestjs/common';
 import { AppException } from '../exceptions/app.exception';
 import { ErrorCode } from '../exceptions/error-codes';
 
-export const SLUG_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+export const SLUG_PATTERN = /^[a-zA-Z0-9]+(-[a-zA-Z0-9]+)*$/;
 
 export interface RenumberItem {
   id: string;
