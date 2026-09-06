@@ -242,6 +242,43 @@ describe('CommerceService payment proofs', () => {
   });
 });
 
+describe('CommerceService chapter product eligibility', () => {
+  it('rejects an inherited chapter even when its course has a valid price', async () => {
+    const prisma: any = {
+      studentProfile: {
+        findUnique: jest.fn().mockResolvedValue({ academicGradeId: 'grade-1' }),
+      },
+      chapter: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: 'chapter-1',
+          title: 'Included chapter',
+          courseId: 'course-1',
+          accessType: 'INHERIT',
+          isPurchasable: null,
+          course: {
+            id: 'course-1',
+            isPurchasable: true,
+            priceMinor: 20_000,
+            currency: 'EGP',
+          },
+        }),
+      },
+    };
+    const service = new CommerceService(
+      prisma,
+      {} as any,
+      { record: jest.fn(), recordWithClient: jest.fn() } as any,
+    );
+
+    await expect(
+      (service as any).target('student-1', {
+        targetType: 'CHAPTER',
+        targetId: 'chapter-1',
+      }),
+    ).rejects.toThrow('not sold separately');
+  });
+});
+
 describe('CommerceService referral review rules', () => {
   const program = {
     id: 'program-1',

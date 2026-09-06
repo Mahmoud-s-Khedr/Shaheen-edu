@@ -68,7 +68,7 @@ describe('AcademicGradesService', () => {
         publishedAt: null,
         archivedAt: null,
         coverAsset: null,
-        _count: { subjects: 0 },
+        _count: { subjectAssignments: 0 },
       });
     prisma.academicGrade.aggregate.mockResolvedValue({
       _max: { sortOrder: 4 },
@@ -143,8 +143,8 @@ describe('AcademicGradesService', () => {
       coverAssetId: null,
     };
     prisma.academicGrade.findMany.mockResolvedValueOnce([
-      { ...grade, _count: { subjects: 1 } },
-      { ...grade, _count: { subjects: 0 } },
+      { ...grade, _count: { subjectAssignments: 1 } },
+      { ...grade, _count: { subjectAssignments: 0 } },
     ]);
     prisma.academicGrade.count.mockResolvedValueOnce(2);
 
@@ -155,7 +155,11 @@ describe('AcademicGradesService', () => {
       expect.objectContaining({
         include: expect.objectContaining({
           _count: {
-            select: { subjects: { where: { status: { not: 'ARCHIVED' } } } },
+            select: {
+              subjectAssignments: {
+                where: { subject: { status: { not: 'ARCHIVED' } } },
+              },
+            },
           },
         }),
       }),

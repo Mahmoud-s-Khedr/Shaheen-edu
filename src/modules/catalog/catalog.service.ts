@@ -13,7 +13,9 @@ import { SearchCursorPaginationQueryDto } from '../../common/dto/cursor-paginati
 import {
   normalizeArabic,
   paginateArabicSearch,
+  searchArabicOffsetPage,
   searchArabicIds,
+  searchNeedle,
   sqlAnd,
 } from '../../common/search/arabic-search';
 import {
@@ -51,19 +53,18 @@ export class CatalogService {
   constructor(private readonly prisma: PrismaService) {}
 
   async subjects(query: CatalogSubjectsQueryDto) {
-    const where = { status: published, academicGradeId: query.academicGradeId };
+    if (query.academicGradeId)
+      return this.subjectsForGrade(query.academicGradeId, query);
+    const where = {
+      status: published,
+    };
     const { data, total } = await paginateArabicSearch({
       prisma: this.prisma,
       delegate: this.prisma.subject,
       target: 'subject',
       q: query.q,
       scope: {
-        where: sqlAnd(
-          publishedScope,
-          query.academicGradeId
-            ? Prisma.sql`t."academicGradeId" = ${query.academicGradeId}`
-            : undefined,
-        ),
+        where: publishedScope,
       },
       orderBySql: sortOrderSql,
       orderBy: order,
@@ -83,8 +84,98 @@ export class CatalogService {
     };
   }
 
+  private async subjectsForGrade(
+    academicGradeId: string,
+    query: CatalogSubjectsQueryDto,
+  ) {
+    const where = {
+      academicGradeId,
+      subject: { status: published },
+    };
+    const include = {
+      subject: {
+        include: {
+          coverAsset: { select: { filename: true } },
+          _count: {
+            select: {
+              courses: { where: { academicGradeId, status: published } },
+            },
+          },
+        },
+      },
+    };
+    const needle = searchNeedle(query.q);
+    if (!needle) {
+      const [assignments, total] = await this.prisma.$transaction([
+        this.prisma.subjectGrade.findMany({
+          where,
+          include,
+          orderBy: [{ sortOrder: 'asc' }, { subjectId: 'asc' }],
+          skip: (query.page - 1) * query.limit,
+          take: query.limit,
+        }),
+        this.prisma.subjectGrade.count({ where }),
+      ]);
+      return {
+        data: assignments.map((assignment) =>
+          publicNode({
+            ...assignment.subject,
+            sortOrder: assignment.sortOrder,
+          }),
+        ),
+        meta: toPaginationMeta(query.page, query.limit, total),
+      };
+    }
+    const page = await searchArabicOffsetPage(this.prisma, 'subject', needle, {
+      scope: {
+        join: Prisma.sql`JOIN "SubjectGrade" sg ON sg."subjectId" = t.id`,
+        where: Prisma.sql`${publishedScope} AND sg."academicGradeId" = ${academicGradeId}`,
+      },
+      orderBy: Prisma.sql`sg."sortOrder" ASC, t.id ASC`,
+      page: query.page,
+      limit: query.limit,
+    });
+    const assignments = page.ids.length
+      ? await this.prisma.subjectGrade.findMany({
+          where: { ...where, subjectId: { in: page.ids } },
+          include,
+        })
+      : [];
+    const bySubjectId = new Map(
+      assignments.map((assignment) => [assignment.subjectId, assignment]),
+    );
+    return {
+      data: page.ids.flatMap((subjectId) => {
+        const assignment = bySubjectId.get(subjectId);
+        return assignment
+          ? [
+              publicNode({
+                ...assignment.subject,
+                sortOrder: assignment.sortOrder,
+              }),
+            ]
+          : [];
+      }),
+      meta: toPaginationMeta(query.page, query.limit, page.total),
+    };
+  }
+
   async courses(query: CatalogCoursesQueryDto) {
-    const where = { status: published, subjectId: query.subjectId };
+    if (query.subjectId && !query.academicGradeId) {
+      const subject = await this.prisma.subject.findUnique({
+        where: { id: query.subjectId },
+        select: { _count: { select: { gradeAssignments: true } } },
+      });
+      if (subject && subject._count.gradeAssignments > 1)
+        throw new BadRequestException(
+          'academicGradeId is required when listing courses for a shared subject',
+        );
+    }
+    const where = {
+      status: published,
+      subjectId: query.subjectId,
+      academicGradeId: query.academicGradeId,
+    };
     const { data, total } = await paginateArabicSearch({
       prisma: this.prisma,
       delegate: this.prisma.course,
@@ -95,6 +186,9 @@ export class CatalogService {
           publishedScope,
           query.subjectId
             ? Prisma.sql`t."subjectId" = ${query.subjectId}`
+            : undefined,
+          query.academicGradeId
+            ? Prisma.sql`t."academicGradeId" = ${query.academicGradeId}`
             : undefined,
         ),
       },
@@ -121,7 +215,8 @@ export class CatalogService {
       where: {
         id,
         status: published,
-        subject: { status: published, academicGrade: { status: published } },
+        subject: { status: published },
+        academicGrade: { status: published },
       },
       include: {
         coverAsset: { select: { filename: true } },
@@ -130,11 +225,15 @@ export class CatalogService {
           include: {
             coverAsset: { select: { filename: true } },
             _count: { select: { courses: { where: { status: published } } } },
-            academicGrade: {
-              include: {
-                coverAsset: { select: { filename: true } },
-                _count: {
-                  select: { subjects: { where: { status: published } } },
+          },
+        },
+        academicGrade: {
+          include: {
+            coverAsset: { select: { filename: true } },
+            _count: {
+              select: {
+                subjectAssignments: {
+                  where: { subject: { status: published } },
                 },
               },
             },
@@ -166,7 +265,7 @@ export class CatalogService {
     return {
       ...publicNode(record),
       subject: publicNode(record.subject),
-      academicGrade: publicNode(record.subject.academicGrade),
+      academicGrade: publicNode(record.academicGrade),
       contentCounts: { chapters, lessons, sections },
     };
   }
@@ -244,7 +343,8 @@ export class CatalogService {
       where: {
         id: courseId,
         status: published,
-        subject: { status: published, academicGrade: { status: published } },
+        subject: { status: published },
+        academicGrade: { status: published },
       },
       include: {
         coverAsset: { select: { filename: true } },
@@ -281,7 +381,8 @@ export class CatalogService {
         status: published,
         course: {
           status: published,
-          subject: { status: published, academicGrade: { status: published } },
+          subject: { status: published },
+          academicGrade: { status: published },
         },
       },
       include: {
@@ -321,10 +422,8 @@ export class CatalogService {
           status: published,
           course: {
             status: published,
-            subject: {
-              status: published,
-              academicGrade: { status: published },
-            },
+            subject: { status: published },
+            academicGrade: { status: published },
           },
         },
       },
@@ -371,12 +470,14 @@ export class CatalogService {
     };
     const ancestry: Record<string, any> = {
       courses: {
-        subject: { status: published, academicGrade: { status: published } },
+        subject: { status: published },
+        academicGrade: { status: published },
       },
       chapters: {
         course: {
           status: published,
-          subject: { status: published, academicGrade: { status: published } },
+          subject: { status: published },
+          academicGrade: { status: published },
         },
       },
       lessons: {
@@ -384,10 +485,8 @@ export class CatalogService {
           status: published,
           course: {
             status: published,
-            subject: {
-              status: published,
-              academicGrade: { status: published },
-            },
+            subject: { status: published },
+            academicGrade: { status: published },
           },
         },
       },
@@ -398,10 +497,8 @@ export class CatalogService {
             status: published,
             course: {
               status: published,
-              subject: {
-                status: published,
-                academicGrade: { status: published },
-              },
+              subject: { status: published },
+              academicGrade: { status: published },
             },
           },
         },

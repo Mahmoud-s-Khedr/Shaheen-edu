@@ -7,4 +7,12 @@ export class CatalogCoursesQueryDto extends SearchPaginationQueryDto {
   @IsOptional()
   @IsString()
   subjectId?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Restrict results to one academic grade. Required for a shared subject.',
+  })
+  @IsOptional()
+  @IsString()
+  academicGradeId?: string;
 }

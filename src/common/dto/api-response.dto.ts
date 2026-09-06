@@ -406,6 +406,30 @@ export class SubjectSummaryDto extends HierarchySummaryDto {
   @ApiProperty({ type: LocalizedResponseTextDto })
   academicGradeName!: LocalizedResponseTextDto;
 
+  @ApiProperty({ type: [String] })
+  academicGradeIds!: string[];
+
+  @ApiProperty({
+    type: 'array',
+    items: {
+      type: 'object',
+      required: ['id', 'name', 'sortOrder'],
+      properties: {
+        id: { type: 'string' },
+        name: {
+          allOf: [{ $ref: '#/components/schemas/LocalizedResponseTextDto' }],
+          nullable: true,
+        },
+        sortOrder: { type: 'integer', minimum: 1 },
+      },
+    },
+  })
+  academicGrades!: Array<{
+    id: string;
+    name: LocalizedResponseTextDto | null;
+    sortOrder: number;
+  }>;
+
   @ApiProperty({
     example: true,
     description: 'Whether this subject has visible course children.',
@@ -419,6 +443,9 @@ export class CourseSummaryDto extends HierarchySummaryDto {
 
   @ApiProperty()
   subjectName!: string;
+
+  @ApiProperty({ type: String, nullable: true })
+  academicGradeId!: string | null;
 
   @ApiProperty({
     example: true,

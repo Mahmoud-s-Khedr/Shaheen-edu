@@ -23,6 +23,7 @@ import {
   arabicMatchText,
   normalizeArabic,
   paginateArabicSearch,
+  searchArabicOffsetPage,
   searchArabicIds,
   searchNeedle,
   sqlAnd,
@@ -65,12 +66,16 @@ export class StudentCatalogService {
     const grade = await this.gradeFor(studentUserId);
     const [subjects, courses, chapters] = await this.prisma.$transaction([
       this.prisma.subject.count({
-        where: { academicGradeId: grade.id, status: published },
+        where: {
+          status: published,
+          gradeAssignments: { some: { academicGradeId: grade.id } },
+        },
       }),
       this.prisma.course.count({
         where: {
           status: published,
-          subject: { academicGradeId: grade.id, status: published },
+          academicGradeId: grade.id,
+          subject: { status: published },
         },
       }),
       this.prisma.chapter.count({
@@ -78,7 +83,8 @@ export class StudentCatalogService {
           status: published,
           course: {
             status: published,
-            subject: { academicGradeId: grade.id, status: published },
+            academicGradeId: grade.id,
+            subject: { status: published },
           },
         },
       }),
@@ -91,33 +97,82 @@ export class StudentCatalogService {
 
   async subjects(studentUserId: string, query: SearchPaginationQueryDto) {
     const grade = await this.gradeFor(studentUserId);
-    const where = { academicGradeId: grade.id, status: published };
-    const { data, total } = await paginateArabicSearch({
-      prisma: this.prisma,
-      delegate: this.prisma.subject,
-      target: 'subject',
-      q: query.q,
-      scope: {
-        where: sqlAnd(
-          publishedScope,
-          Prisma.sql`t."academicGradeId" = ${grade.id}`,
-        ),
-      },
-      orderBySql: sortOrderSql,
-      orderBy: order,
-      where,
-      args: {
+    return this.subjectsForGrade(grade.id, query);
+  }
+
+  private async subjectsForGrade(
+    academicGradeId: string,
+    query: SearchPaginationQueryDto,
+  ) {
+    const where = {
+      academicGradeId,
+      subject: { status: published },
+    };
+    const include = {
+      subject: {
         include: {
           coverAsset: { select: { filename: true } },
-          _count: { select: { courses: { where: { status: published } } } },
+          _count: {
+            select: {
+              courses: { where: { academicGradeId, status: published } },
+            },
+          },
         },
       },
+    };
+    const needle = searchNeedle(query.q);
+    if (!needle) {
+      const [assignments, total] = await this.prisma.$transaction([
+        this.prisma.subjectGrade.findMany({
+          where,
+          include,
+          orderBy: [{ sortOrder: 'asc' }, { subjectId: 'asc' }],
+          skip: (query.page - 1) * query.limit,
+          take: query.limit,
+        }),
+        this.prisma.subjectGrade.count({ where }),
+      ]);
+      return {
+        data: assignments.map((assignment) =>
+          this.node({ ...assignment.subject, sortOrder: assignment.sortOrder }),
+        ),
+        meta: toPaginationMeta(query.page, query.limit, total),
+      };
+    }
+    const page = await searchArabicOffsetPage(this.prisma, 'subject', needle, {
+      scope: {
+        join: Prisma.sql`JOIN "SubjectGrade" sg ON sg."subjectId" = t.id`,
+        where: sqlAnd(
+          publishedScope,
+          Prisma.sql`sg."academicGradeId" = ${academicGradeId}`,
+        ),
+      },
+      orderBy: Prisma.sql`sg."sortOrder" ASC, t.id ASC`,
       page: query.page,
       limit: query.limit,
     });
+    const assignments = page.ids.length
+      ? await this.prisma.subjectGrade.findMany({
+          where: { ...where, subjectId: { in: page.ids } },
+          include,
+        })
+      : [];
+    const bySubjectId = new Map(
+      assignments.map((assignment) => [assignment.subjectId, assignment]),
+    );
     return {
-      data: data.map((subject) => this.node(subject)),
-      meta: toPaginationMeta(query.page, query.limit, total),
+      data: page.ids.flatMap((subjectId) => {
+        const assignment = bySubjectId.get(subjectId);
+        return assignment
+          ? [
+              this.node({
+                ...assignment.subject,
+                sortOrder: assignment.sortOrder,
+              }),
+            ]
+          : [];
+      }),
+      meta: toPaginationMeta(query.page, query.limit, page.total),
     };
   }
 
@@ -128,22 +183,36 @@ export class StudentCatalogService {
   ) {
     const grade = await this.gradeFor(studentUserId);
     const subject = await this.prisma.subject.findFirst({
-      where: { id: subjectId, academicGradeId: grade.id, status: published },
+      where: {
+        id: subjectId,
+        status: published,
+        gradeAssignments: { some: { academicGradeId: grade.id } },
+      },
       include: {
         coverAsset: { select: { filename: true } },
-        _count: { select: { courses: { where: { status: published } } } },
+        _count: {
+          select: {
+            courses: {
+              where: { academicGradeId: grade.id, status: published },
+            },
+          },
+        },
       },
     });
     if (!subject) throw new NotFoundException('Published subject not found');
     const grants = await this.activeGrants(studentUserId);
-    const where = { subjectId, status: published };
+    const where = { subjectId, academicGradeId: grade.id, status: published };
     const { data, total } = await paginateArabicSearch({
       prisma: this.prisma,
       delegate: this.prisma.course,
       target: 'course',
       q: query.q,
       scope: {
-        where: sqlAnd(publishedScope, Prisma.sql`t."subjectId" = ${subjectId}`),
+        where: sqlAnd(
+          publishedScope,
+          Prisma.sql`t."subjectId" = ${subjectId}`,
+          Prisma.sql`t."academicGradeId" = ${grade.id}`,
+        ),
       },
       orderBySql: sortOrderSql,
       orderBy: order,
@@ -187,7 +256,7 @@ export class StudentCatalogService {
     const subject = await this.prisma.subject.findFirst({
       where: {
         id: query.subjectId,
-        academicGradeId: grade.id,
+        gradeAssignments: { some: { academicGradeId: grade.id } },
         status: published,
       },
     });
@@ -206,6 +275,7 @@ export class StudentCatalogService {
         JOIN "Course" c ON c.id = h."courseId"
         WHERE h.status = ${published}::"ContentStatus" AND c.status = ${published}::"ContentStatus"
           AND c."subjectId" = ${subject.id}
+          AND c."academicGradeId" = ${grade.id}
           AND (
             ${arabicMatchText(Prisma.sql`arabic_normalize(coalesce(h.title, '') || ' ' || coalesce(h.slug, '') || ' ' || coalesce(h.description, ''))`, searchQuery)}
             OR to_tsvector('simple', arabic_normalize(coalesce(h.title, '') || ' ' || coalesce(h.slug, '') || ' ' || coalesce(h.description, ''))) @@ plainto_tsquery('simple', ${normalizedQuery})
@@ -222,6 +292,7 @@ export class StudentCatalogService {
         JOIN "Course" c ON c.id = h."courseId"
         WHERE l.status = ${published}::"ContentStatus" AND h.status = ${published}::"ContentStatus" AND c.status = ${published}::"ContentStatus"
           AND c."subjectId" = ${subject.id}
+          AND c."academicGradeId" = ${grade.id}
           AND (
             ${arabicMatchText(Prisma.sql`arabic_normalize(coalesce(l.title, '') || ' ' || coalesce(l.slug, '') || ' ' || coalesce(l.description, ''))`, searchQuery)}
             OR to_tsvector('simple', arabic_normalize(coalesce(l.title, '') || ' ' || coalesce(l.slug, '') || ' ' || coalesce(l.description, ''))) @@ plainto_tsquery('simple', ${normalizedQuery})
@@ -240,6 +311,7 @@ export class StudentCatalogService {
         WHERE x.status = ${published}::"ContentStatus" AND l.status = ${published}::"ContentStatus"
           AND h.status = ${published}::"ContentStatus" AND c.status = ${published}::"ContentStatus"
           AND c."subjectId" = ${subject.id}
+          AND c."academicGradeId" = ${grade.id}
           AND (
             ${arabicMatchText(Prisma.sql`arabic_normalize(coalesce(x.title, '') || ' ' || coalesce(x.slug, '') || ' ' || coalesce(x.description, ''))`, searchQuery)}
             OR to_tsvector('simple', arabic_normalize(coalesce(x.title, '') || ' ' || coalesce(x.slug, '') || ' ' || coalesce(x.description, ''))) @@ plainto_tsquery('simple', ${normalizedQuery})
@@ -416,11 +488,11 @@ export class StudentCatalogService {
     const entitlements = await this.prisma.studentEntitlement.findMany({
       where: this.activeGrantWhere(studentUserId),
       include: {
-        course: { include: { subject: { include: { academicGrade: true } } } },
+        course: { include: { subject: true, academicGrade: true } },
         chapter: {
           include: {
             course: {
-              include: { subject: { include: { academicGrade: true } } },
+              include: { subject: true, academicGrade: true },
             },
           },
         },
@@ -436,7 +508,7 @@ export class StudentCatalogService {
         !subject ||
         subject.status !== published ||
         course.status !== published ||
-        subject.academicGrade.status !== published ||
+        course.academicGrade?.status !== published ||
         (entitlement.chapter && entitlement.chapter.status !== published)
       )
         continue;
@@ -555,11 +627,9 @@ export class StudentCatalogService {
       where: {
         id: courseId,
         status: published,
-        subject: {
-          academicGradeId: grade.id,
-          status: published,
-          academicGrade: { status: published },
-        },
+        academicGradeId: grade.id,
+        subject: { status: published },
+        academicGrade: { status: published },
       },
       include: {
         coverAsset: { select: { filename: true } },
@@ -628,11 +698,9 @@ export class StudentCatalogService {
       where: {
         id: courseId,
         status: published,
-        subject: {
-          academicGradeId: grade.id,
-          status: published,
-          academicGrade: { status: published },
-        },
+        academicGradeId: grade.id,
+        subject: { status: published },
+        academicGrade: { status: published },
       },
       include: {
         coverAsset: { select: { filename: true } },
@@ -712,11 +780,9 @@ export class StudentCatalogService {
         status: published,
         course: {
           status: published,
-          subject: {
-            academicGradeId: grade.id,
-            status: published,
-            academicGrade: { status: published },
-          },
+          academicGradeId: grade.id,
+          subject: { status: published },
+          academicGrade: { status: published },
         },
       },
       include: {
@@ -790,11 +856,11 @@ export class StudentCatalogService {
           status: published,
           course: {
             status: published,
+            academicGradeId: grade.id,
             subject: {
-              academicGradeId: grade.id,
               status: published,
-              academicGrade: { status: published },
             },
+            academicGrade: { status: published },
           },
         },
       },
@@ -878,11 +944,11 @@ export class StudentCatalogService {
         accesses: (x: any) => [x.accessType],
         pricing: (x: any) => x,
         where: {
+          academicGradeId: grade.id,
           subject: {
-            academicGradeId: grade.id,
             status: published,
-            academicGrade: { status: published },
           },
+          academicGrade: { status: published },
         },
       },
       chapters: {
@@ -899,11 +965,11 @@ export class StudentCatalogService {
         where: {
           course: {
             status: published,
+            academicGradeId: grade.id,
             subject: {
-              academicGradeId: grade.id,
               status: published,
-              academicGrade: { status: published },
             },
+            academicGrade: { status: published },
           },
         },
       },
@@ -927,11 +993,11 @@ export class StudentCatalogService {
             status: published,
             course: {
               status: published,
+              academicGradeId: grade.id,
               subject: {
-                academicGradeId: grade.id,
                 status: published,
-                academicGrade: { status: published },
               },
+              academicGrade: { status: published },
             },
           },
         },
@@ -959,11 +1025,11 @@ export class StudentCatalogService {
               status: published,
               course: {
                 status: published,
+                academicGradeId: grade.id,
                 subject: {
-                  academicGradeId: grade.id,
                   status: published,
-                  academicGrade: { status: published },
                 },
+                academicGrade: { status: published },
               },
             },
           },
@@ -1051,11 +1117,11 @@ export class StudentCatalogService {
     const records = await this.prisma.studentEntitlement.findMany({
       where: this.activeGrantWhere(studentUserId),
       include: {
-        course: { include: { subject: { include: { academicGrade: true } } } },
+        course: { include: { subject: true, academicGrade: true } },
         chapter: {
           include: {
             course: {
-              include: { subject: { include: { academicGrade: true } } },
+              include: { subject: true, academicGrade: true },
             },
           },
         },
@@ -1076,7 +1142,7 @@ export class StudentCatalogService {
     );
     const data = records.flatMap((record) => {
       const course = record.course ?? record.chapter?.course;
-      const grade = course?.subject.academicGrade;
+      const grade = course?.academicGrade;
       if (
         !course ||
         !grade ||
@@ -1390,7 +1456,13 @@ export class StudentCatalogService {
         academicGrade: {
           include: {
             coverAsset: { select: { filename: true } },
-            _count: { select: { subjects: { where: { status: published } } } },
+            _count: {
+              select: {
+                subjectAssignments: {
+                  where: { subject: { status: published } },
+                },
+              },
+            },
           },
         },
       },
@@ -1595,12 +1667,17 @@ export class StudentCatalogService {
   }
   private chapterPricing(
     chapter: {
+      accessType: AccessType;
       isPurchasable: boolean | null;
       priceMinor: number | null;
       currency: string | null;
     },
     course: Pricing,
   ): Pricing {
+    // Inherited chapters are unlocked by the course purchase. They must not
+    // surface a chapter-level purchase state or price to student clients.
+    if (chapter.accessType === AccessType.INHERIT)
+      return { isPurchasable: false, priceMinor: null, currency: null };
     return chapter.isPurchasable === null
       ? course
       : {
@@ -1633,7 +1710,9 @@ export class StudentCatalogService {
       sortOrder: grade.sortOrder,
       coverAssetId: grade.coverAssetId ?? null,
       coverAssetName: grade.coverAsset?.filename ?? null,
-      ...(grade._count ? { hasChildren: grade._count.subjects > 0 } : {}),
+      ...(grade._count
+        ? { hasChildren: grade._count.subjectAssignments > 0 }
+        : {}),
     };
   }
   private contentItem(item: any, sortOrder: number) {

@@ -78,18 +78,28 @@ type ScopeRow = {
 };
 
 const scopeInclude = {
-  course: { include: { subject: true } },
-  chapter: { include: { course: { include: { subject: true } } } },
+  course: { include: { subject: true, academicGrade: true } },
+  chapter: {
+    include: { course: { include: { subject: true, academicGrade: true } } },
+  },
   lesson: {
     include: {
-      chapter: { include: { course: { include: { subject: true } } } },
+      chapter: {
+        include: {
+          course: { include: { subject: true, academicGrade: true } },
+        },
+      },
     },
   },
   section: {
     include: {
       lesson: {
         include: {
-          chapter: { include: { course: { include: { subject: true } } } },
+          chapter: {
+            include: {
+              course: { include: { subject: true, academicGrade: true } },
+            },
+          },
         },
       },
     },
@@ -369,11 +379,9 @@ export class AssessmentsService {
         },
         course: {
           status: ContentStatus.PUBLISHED,
-          subject: {
-            status: ContentStatus.PUBLISHED,
-            ...(gradeId ? { academicGradeId: gradeId } : {}),
-            academicGrade: { status: ContentStatus.PUBLISHED },
-          },
+          ...(gradeId ? { academicGradeId: gradeId } : {}),
+          subject: { status: ContentStatus.PUBLISHED },
+          academicGrade: { status: ContentStatus.PUBLISHED },
         },
       },
       include: {
@@ -828,8 +836,7 @@ export class AssessmentsService {
             status: ContentStatus.PUBLISHED,
             subject: {
               status: ContentStatus.PUBLISHED,
-              academicGradeId: gradeId,
-              academicGrade: { status: ContentStatus.PUBLISHED },
+              gradeAssignments: { some: { academicGradeId: gradeId } },
             },
           },
           select: { id: true, subjectId: true },
@@ -1133,7 +1140,10 @@ export class AssessmentsService {
       where: {
         id: bankId,
         status: ContentStatus.PUBLISHED,
-        subject: { academicGradeId: gradeId, status: ContentStatus.PUBLISHED },
+        subject: {
+          status: ContentStatus.PUBLISHED,
+          gradeAssignments: { some: { academicGradeId: gradeId } },
+        },
       },
     });
     if (!bank) throw new NotFoundException('Question bank is not accessible');
@@ -1585,7 +1595,11 @@ export class AssessmentsService {
       if (nodes.some((node) => node.status !== ContentStatus.PUBLISHED))
         return false;
       const course = nodes.at(-1);
-      if (gradeId && course.subject.academicGradeId !== gradeId) return false;
+      if (
+        course.academicGrade?.status !== ContentStatus.PUBLISHED ||
+        (gradeId && course.academicGradeId !== gradeId)
+      )
+        return false;
       if (!(await this.access.entitledForNodes(studentId, nodes))) return false;
     }
     return true;

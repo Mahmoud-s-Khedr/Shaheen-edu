@@ -745,7 +745,9 @@ model AcademicGrade {
   createdBy User @relation("AcademicGradeCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
   updatedBy User @relation("AcademicGradeUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
 
-  subjects        Subject[]
+  subjects           Subject[]
+  subjectAssignments SubjectGrade[]
+  courses            Course[]       @relation("CourseAcademicGrade")
   studentProfiles StudentProfile[]
   coverAsset      Asset?           @relation("AcademicGradeCover", fields: [coverAssetId], references: [id], onDelete: Restrict)
   coverAssetId    String?
@@ -757,6 +759,8 @@ model AcademicGrade {
 
 model Subject {
   id              String        @id @default(cuid())
+  /// Legacy primary grade retained for backwards-compatible clients. New
+  /// grade membership is represented by gradeAssignments below.
   academicGradeId String
   academicGrade   AcademicGrade @relation(fields: [academicGradeId], references: [id], onDelete: Restrict)
 
@@ -776,6 +780,7 @@ model Subject {
   createdBy User @relation("SubjectCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
   updatedBy User @relation("SubjectUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
 
+  gradeAssignments SubjectGrade[]
   courses       Course[]
   questionBanks QuestionBank[]
   assessments   Assessment[]
@@ -788,10 +793,34 @@ model Subject {
   @@index([academicGradeId, status, sortOrder, id])
 }
 
+/// A subject's grade-specific placement. This is deliberately separate from
+/// Subject so a single subject identity can have different ordering in several
+/// grades while courses stay scoped to one grade.
+model SubjectGrade {
+  id              String        @id @default(cuid())
+  academicGradeId String
+  subjectId       String
+  sortOrder       Int
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  academicGrade AcademicGrade @relation(fields: [academicGradeId], references: [id], onDelete: Restrict)
+  subject       Subject       @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+
+  @@unique([academicGradeId, subjectId])
+  @@unique([academicGradeId, sortOrder])
+  @@index([subjectId])
+}
+
 model Course {
-  id        String  @id @default(cuid())
-  subjectId String
-  subject   Subject @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  id              String        @id @default(cuid())
+  subjectId       String
+  /// Required for newly authored courses. Nullable only while pre-existing
+  /// fixture/data rows are being migrated; readers fall back to the subject's
+  /// legacy primary grade for those rows.
+  academicGradeId String?
+  subject         Subject       @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  academicGrade   AcademicGrade? @relation("CourseAcademicGrade", fields: [academicGradeId], references: [id], onDelete: Restrict)
 
   title       String
   slug        String
@@ -828,9 +857,9 @@ model Course {
   coverAsset          Asset?                   @relation("CourseCover", fields: [coverAssetId], references: [id], onDelete: Restrict)
   coverAssetId        String?
 
-  @@unique([subjectId, slug])
-  @@unique([subjectId, sortOrder])
-  @@index([subjectId, status, sortOrder, id])
+  @@unique([subjectId, academicGradeId, slug])
+  @@unique([subjectId, academicGradeId, sortOrder])
+  @@index([academicGradeId, subjectId, status, sortOrder, id])
 }
 
 model Chapter {

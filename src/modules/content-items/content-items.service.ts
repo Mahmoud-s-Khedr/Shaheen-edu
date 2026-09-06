@@ -154,7 +154,7 @@ export class ContentItemsService {
             ? record.chapter.course
             : record.lesson.chapter.course;
     return {
-      academicGradeId: course.subject.academicGradeId,
+      academicGradeId: course.academicGradeId ?? course.subject.academicGradeId,
       subjectId: course.subjectId,
       resolvedCourseId: course.id,
       resolvedChapterId:

@@ -10,6 +10,7 @@ import { ConfigService } from '@nestjs/config';
 import { createHash } from 'node:crypto';
 import {
   AssetKind,
+  AccessType,
   CommerceTargetType,
   ContentStatus,
   EntitlementStatus,
@@ -119,11 +120,9 @@ export class CommerceService {
         where: {
           id: dto.targetId,
           status: published,
-          subject: {
-            academicGradeId: gradeId,
-            status: published,
-            academicGrade: { status: published },
-          },
+          academicGradeId: gradeId,
+          academicGrade: { status: published },
+          subject: { status: published },
         },
       });
       if (!course) throw new NotFoundException('Purchasable course not found');
@@ -148,17 +147,22 @@ export class CommerceService {
         status: published,
         course: {
           status: published,
-          subject: {
-            academicGradeId: gradeId,
-            status: published,
-            academicGrade: { status: published },
-          },
+          academicGradeId: gradeId,
+          academicGrade: { status: published },
+          subject: { status: published },
         },
       },
       include: { course: true },
     });
     if (!chapter) throw new NotFoundException('Purchasable chapter not found');
-    const pricing = chapter.isPurchasable === null ? chapter.course : chapter;
+    // An inherited chapter is included in its course. Even though its effective
+    // price can be displayed by catalog/admin views, it is never a standalone
+    // commerce target and must not be accepted from a crafted cart request.
+    if (chapter.accessType === AccessType.INHERIT)
+      throw new ConflictException(
+        'An inherited chapter is not sold separately',
+      );
+    const pricing = chapter;
     if (
       !pricing.isPurchasable ||
       pricing.currency !== 'EGP' ||

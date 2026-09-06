@@ -82,6 +82,7 @@ export class CoursesService {
 
     const parent = await this.prisma.subject.findUnique({
       where: { id: dto.subjectId },
+      include: { gradeAssignments: { select: { academicGradeId: true } } },
     });
     if (!parent) {
       throw new NotFoundException('Subject not found');
@@ -89,22 +90,30 @@ export class CoursesService {
     if (parent.status === ContentStatus.ARCHIVED) {
       throw new ConflictException('Cannot add courses to an archived subject');
     }
+    const gradeIds = parent.gradeAssignments.map((x) => x.academicGradeId);
+    const academicGradeId =
+      dto.academicGradeId ?? (gradeIds.length === 1 ? gradeIds[0] : undefined);
+    if (!academicGradeId || !gradeIds.includes(academicGradeId))
+      throw new ConflictException(
+        'Course academic grade must be one of the subject grades',
+      );
 
     const slug = dto.slug ?? slugifyOrThrow(dto.title);
-    const existing = await this.prisma.course.findUnique({
-      where: { subjectId_slug: { subjectId: dto.subjectId, slug } },
+    const existing = await this.prisma.course.findFirst({
+      where: { subjectId: dto.subjectId, academicGradeId, slug },
     });
     if (existing) {
       throw new ConflictException('Slug already in use within this subject');
     }
 
     const maxOrder = await this.prisma.course.aggregate({
-      where: { subjectId: dto.subjectId },
+      where: { subjectId: dto.subjectId, academicGradeId },
       _max: { sortOrder: true },
     });
     const created = await this.prisma.course.create({
       data: {
         subjectId: dto.subjectId,
+        academicGradeId,
         title: dto.title,
         slug,
         description: dto.description,
@@ -121,7 +130,7 @@ export class CoursesService {
       action: 'COURSE_CREATED',
       targetType: 'Course',
       targetId: created.id,
-      metadata: { subjectId: dto.subjectId, slug },
+      metadata: { subjectId: dto.subjectId, academicGradeId, slug },
     });
 
     return this.toSummary(await this.getOrThrow(created.id));
@@ -136,6 +145,7 @@ export class CoursesService {
     this.assertActorRole(actor);
     const where = {
       subjectId: query.subjectId,
+      academicGradeId: query.academicGradeId,
       status: query.status ?? { not: ContentStatus.ARCHIVED },
     };
     const { data: items, total } = await paginateArabicSearch({
@@ -148,6 +158,9 @@ export class CoursesService {
           contentStatusScope(query.status),
           query.subjectId
             ? Prisma.sql`t."subjectId" = ${query.subjectId}`
+            : undefined,
+          query.academicGradeId
+            ? Prisma.sql`t."academicGradeId" = ${query.academicGradeId}`
             : undefined,
         ),
       },
@@ -182,9 +195,11 @@ export class CoursesService {
     if (dto.slug !== undefined || dto.title !== undefined) {
       const candidate = dto.slug ?? slugifyOrThrow(dto.title ?? record.title);
       if (candidate !== record.slug) {
-        const collision = await this.prisma.course.findUnique({
+        const collision = await this.prisma.course.findFirst({
           where: {
-            subjectId_slug: { subjectId: record.subjectId, slug: candidate },
+            subjectId: record.subjectId,
+            academicGradeId: record.academicGradeId,
+            slug: candidate,
           },
         });
         if (collision && collision.id !== id) {
@@ -248,7 +263,10 @@ export class CoursesService {
 
     const ids = dto.items.map((item) => item.id);
     const siblings = await this.prisma.course.findMany({
-      where: { subjectId: dto.subjectId },
+      where: {
+        subjectId: dto.subjectId,
+        academicGradeId: dto.academicGradeId,
+      },
     });
     assertCompleteSequentialReorder(dto.items, siblings);
 
@@ -281,7 +299,7 @@ export class CoursesService {
       action: 'COURSE_REORDERED',
       targetType: 'Course',
       targetId: dto.subjectId,
-      metadata: { itemIds: ids },
+      metadata: { academicGradeId: dto.academicGradeId, itemIds: ids },
     });
   }
 
@@ -311,9 +329,24 @@ export class CoursesService {
       );
     }
 
-    const slugCollision = await this.prisma.course.findUnique({
+    const targetGradeId = record.academicGradeId ?? newParent.academicGradeId;
+    const membership = await this.prisma.subjectGrade.findUnique({
       where: {
-        subjectId_slug: { subjectId: dto.newSubjectId, slug: record.slug },
+        academicGradeId_subjectId: {
+          academicGradeId: targetGradeId,
+          subjectId: dto.newSubjectId,
+        },
+      },
+    });
+    if (!membership)
+      throw new ConflictException(
+        'Target subject is not available in this course grade',
+      );
+    const slugCollision = await this.prisma.course.findFirst({
+      where: {
+        subjectId: dto.newSubjectId,
+        academicGradeId: targetGradeId,
+        slug: record.slug,
       },
     });
     if (slugCollision && slugCollision.id !== id) {
@@ -323,7 +356,7 @@ export class CoursesService {
     }
 
     const targetMax = await this.prisma.course.aggregate({
-      where: { subjectId: dto.newSubjectId },
+      where: { subjectId: dto.newSubjectId, academicGradeId: targetGradeId },
       _max: { sortOrder: true },
     });
     const targetSortOrder =
@@ -352,13 +385,18 @@ export class CoursesService {
         });
 
         await tx.course.updateMany({
-          where: { subjectId: oldSubjectId, sortOrder: { gt: oldSortOrder } },
+          where: {
+            subjectId: oldSubjectId,
+            academicGradeId: record.academicGradeId,
+            sortOrder: { gt: oldSortOrder },
+          },
           data: { sortOrder: { decrement: 1 }, updatedById: actor.id },
         });
 
         await tx.course.updateMany({
           where: {
             subjectId: dto.newSubjectId,
+            academicGradeId: targetGradeId,
             sortOrder: { gte: targetSortOrder },
           },
           data: { sortOrder: { increment: 1 }, updatedById: actor.id },
@@ -368,13 +406,14 @@ export class CoursesService {
           where: { id },
           data: {
             subjectId: dto.newSubjectId,
+            academicGradeId: targetGradeId,
             sortOrder: targetSortOrder,
             updatedById: actor.id,
           },
         });
 
         await contentPlacementAncestry.courseMoved(tx, id, {
-          academicGradeId: newParent.academicGradeId,
+          academicGradeId: targetGradeId,
           subjectId: newParent.id,
           courseId: id,
         });
@@ -485,6 +524,7 @@ export class CoursesService {
   private toSummary(record: {
     id: string;
     subjectId: string;
+    academicGradeId: string | null;
     title: string;
     slug: string;
     description: string | null;
@@ -503,6 +543,7 @@ export class CoursesService {
     return {
       id: record.id,
       subjectId: record.subjectId,
+      academicGradeId: record.academicGradeId,
       subjectName: record.subject?.title ?? null,
       title: record.title,
       slug: record.slug,
@@ -523,6 +564,7 @@ export class CoursesService {
   private toReadSummary(record: {
     id: string;
     subjectId: string;
+    academicGradeId: string | null;
     title: string;
     slug: string;
     description: string | null;

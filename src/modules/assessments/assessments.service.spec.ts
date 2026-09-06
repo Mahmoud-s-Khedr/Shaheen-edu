@@ -321,7 +321,11 @@ describe('AssessmentsService', () => {
           id: 'c1',
           status: ContentStatus.PUBLISHED,
           accessType: AccessType.PUBLIC,
-          subject: { academicGradeId: gradeId },
+          academicGradeId: gradeId,
+          academicGrade: { status: ContentStatus.PUBLISHED },
+          // A shared subject's legacy primary grade may differ from the
+          // course's canonical grade.
+          subject: { academicGradeId: 'legacy-primary-grade' },
           ...overrides,
         },
       };
@@ -375,7 +379,9 @@ describe('AssessmentsService', () => {
           course: {
             id: 'c1',
             status: ContentStatus.PUBLISHED,
-            subject: { academicGradeId: gradeId },
+            academicGradeId: gradeId,
+            academicGrade: { status: ContentStatus.PUBLISHED },
+            subject: { academicGradeId: 'legacy-primary-grade' },
           },
           ...overrides,
         },

@@ -189,7 +189,7 @@ export class PublicationService {
       };
     }
     const courses = await this.prisma.course.findMany({
-      where: { subject: { academicGradeId: id } },
+      where: { academicGradeId: id },
       include: { chapters: { select: { id: true } } },
     });
     return {
@@ -354,6 +354,25 @@ export class PublicationService {
         'Every parent in the ancestry must be published',
       );
     }
+    // Courses are grade-scoped even when their Subject is shared. The legacy
+    // Subject.academicGrade relation may point at a different grade, so always
+    // validate the grade carried by the course itself.
+    const course =
+      resource === 'course'
+        ? record
+        : nodes.find(
+            (node: any) => node?.subjectId && 'academicGradeId' in node,
+          );
+    if (course?.academicGradeId) {
+      const grade = await tx.academicGrade.findUnique({
+        where: { id: course.academicGradeId },
+        select: { status: true },
+      });
+      if (!grade || grade.status !== ContentStatus.PUBLISHED)
+        throw new ConflictException(
+          'Every parent in the ancestry must be published',
+        );
+    }
   }
 
   private async placementParent(placement: any, tx: any) {
@@ -452,7 +471,15 @@ export class PublicationService {
       section: 'lessonId',
     };
     const parentField = field[resource];
-    const where = parentField ? { [parentField]: record[parentField] } : {};
+    const where =
+      resource === 'course'
+        ? {
+            subjectId: record.subjectId,
+            academicGradeId: record.academicGradeId,
+          }
+        : parentField
+          ? { [parentField]: record[parentField] }
+          : {};
     const siblings = await tx[resource].findMany({
       where,
       orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
@@ -522,7 +549,7 @@ export class PublicationService {
     return Boolean(
       await this.prisma
         .$queryRawUnsafe<number[]>(
-          `SELECT 1 FROM \"AcademicGrade\" g LEFT JOIN \"Subject\" s ON s.\"academicGradeId\" = g.id LEFT JOIN \"Course\" c ON c.\"subjectId\" = s.id LEFT JOIN \"Chapter\" h ON h.\"courseId\" = c.id LEFT JOIN \"Lesson\" l ON l.\"chapterId\" = h.id LEFT JOIN \"Section\" x ON x.\"lessonId\" = l.id LEFT JOIN \"ContentPlacement\" p ON p.\"courseId\" = c.id OR p.\"chapterId\" = h.id OR p.\"lessonId\" = l.id OR p.\"sectionId\" = x.id LEFT JOIN \"ContentItem\" i ON i.id = p.\"contentItemId\" WHERE g.id = $1 AND (s.status = 'PUBLISHED' OR c.status = 'PUBLISHED' OR h.status = 'PUBLISHED' OR l.status = 'PUBLISHED' OR x.status = 'PUBLISHED' OR i.status = 'PUBLISHED') LIMIT 1`,
+          `SELECT 1 FROM \"AcademicGrade\" g LEFT JOIN \"SubjectGrade\" sg ON sg.\"academicGradeId\" = g.id LEFT JOIN \"Subject\" s ON s.id = sg.\"subjectId\" LEFT JOIN \"Course\" c ON c.\"academicGradeId\" = g.id LEFT JOIN \"Chapter\" h ON h.\"courseId\" = c.id LEFT JOIN \"Lesson\" l ON l.\"chapterId\" = h.id LEFT JOIN \"Section\" x ON x.\"lessonId\" = l.id LEFT JOIN \"ContentPlacement\" p ON p.\"courseId\" = c.id OR p.\"chapterId\" = h.id OR p.\"lessonId\" = l.id OR p.\"sectionId\" = x.id LEFT JOIN \"ContentItem\" i ON i.id = p.\"contentItemId\" WHERE g.id = $1 AND (s.status = 'PUBLISHED' OR c.status = 'PUBLISHED' OR h.status = 'PUBLISHED' OR l.status = 'PUBLISHED' OR x.status = 'PUBLISHED' OR i.status = 'PUBLISHED') LIMIT 1`,
           id,
         )
         .then((rows) => rows.length),

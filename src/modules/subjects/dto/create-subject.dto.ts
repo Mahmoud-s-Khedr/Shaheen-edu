@@ -1,5 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
+  ArrayMinSize,
+  IsArray,
   IsOptional,
   IsString,
   Matches,
@@ -31,7 +33,21 @@ export class CreateSubjectDto {
   @MaxLength(2000)
   description?: string;
 
-  @ApiProperty()
+  @ApiPropertyOptional({
+    description:
+      'Deprecated single-grade form. Use academicGradeIds for a reusable subject.',
+  })
+  @IsOptional()
   @IsString()
-  academicGradeId!: string;
+  academicGradeId?: string;
+
+  @ApiPropertyOptional({
+    type: [String],
+    description: 'Grades in which this subject is available.',
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMinSize(1)
+  @IsString({ each: true })
+  academicGradeIds?: string[];
 }

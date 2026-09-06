@@ -154,12 +154,13 @@ describe('Academic hierarchy (e2e)', () => {
         method: 'POST',
         url: '/api/v1/admin/subjects',
         headers: authHeader(adminToken),
-        payload: { title: 'Mathematics', academicGradeId: gradeId },
+        payload: { title: 'Mathematics', academicGradeIds: [gradeId] },
       });
       expect(response.statusCode).toBe(201);
       const body = await json(response);
       expect(body.status).toBe('DRAFT');
       expect(body.academicGradeId).toBe(gradeId);
+      expect(body.academicGradeIds).toEqual([gradeId]);
       subjectId = body.id;
     });
 
@@ -178,6 +179,121 @@ describe('Academic hierarchy (e2e)', () => {
       const body = await json(response);
       expect(body.subjectId).toBe(subjectId);
       courseId = body.id;
+    });
+
+    it('reuses the subject in another grade while keeping that grade’s course separate', async () => {
+      const grade = await app.inject({
+        method: 'POST',
+        url: '/api/v1/admin/academic-grades',
+        headers: authHeader(adminToken),
+        payload: {
+          title: {
+            ar: 'Shared Subject Secondary Grade',
+            en: 'Shared Subject Secondary Grade',
+          },
+        },
+      });
+      expect(grade.statusCode).toBe(201);
+      const secondGradeId = (await json(grade)).id;
+
+      const subject = await app.inject({
+        method: 'PATCH',
+        url: `/api/v1/admin/subjects/${subjectId}`,
+        headers: authHeader(adminToken),
+        payload: { academicGradeIds: [gradeId, secondGradeId] },
+      });
+      expect(subject.statusCode).toBe(200);
+      expect((await json(subject)).academicGradeIds).toEqual(
+        expect.arrayContaining([gradeId, secondGradeId]),
+      );
+
+      const course = await app.inject({
+        method: 'POST',
+        url: '/api/v1/admin/courses',
+        headers: authHeader(adminToken),
+        payload: {
+          title: 'Grade 11 Algebra',
+          subjectId,
+          academicGradeId: secondGradeId,
+          accessType: 'PUBLIC',
+        },
+      });
+      expect(course.statusCode).toBe(201);
+      const secondGradeCourseId = (await json(course)).id;
+
+      const otherSubject = await app.inject({
+        method: 'POST',
+        url: '/api/v1/admin/subjects',
+        headers: authHeader(adminToken),
+        payload: { title: 'Grade 11 Geometry', academicGradeId: secondGradeId },
+      });
+      expect(otherSubject.statusCode).toBe(201);
+      const otherSubjectId = (await json(otherSubject)).id;
+
+      const reorderedSubjects = await app.inject({
+        method: 'POST',
+        url: '/api/v1/admin/subjects/reorder',
+        headers: authHeader(adminToken),
+        payload: {
+          academicGradeId: secondGradeId,
+          items: [
+            { id: otherSubjectId, sortOrder: 1 },
+            { id: subjectId, sortOrder: 2 },
+          ],
+        },
+      });
+      expect(reorderedSubjects.statusCode).toBe(201);
+      const subjectsInSecondGrade = await app.inject({
+        method: 'GET',
+        url: `/api/v1/admin/subjects?academicGradeId=${secondGradeId}`,
+        headers: authHeader(adminToken),
+      });
+      expect((await json(subjectsInSecondGrade)).data).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ id: otherSubjectId, sortOrder: 1 }),
+          expect.objectContaining({ id: subjectId, sortOrder: 2 }),
+        ]),
+      );
+
+      const otherCourse = await app.inject({
+        method: 'POST',
+        url: '/api/v1/admin/courses',
+        headers: authHeader(adminToken),
+        payload: {
+          title: 'Grade 11 Algebra II',
+          subjectId,
+          academicGradeId: secondGradeId,
+          accessType: 'PUBLIC',
+        },
+      });
+      expect(otherCourse.statusCode).toBe(201);
+      const otherCourseId = (await json(otherCourse)).id;
+
+      const reorderedCourses = await app.inject({
+        method: 'POST',
+        url: '/api/v1/admin/courses/reorder',
+        headers: authHeader(adminToken),
+        payload: {
+          subjectId,
+          academicGradeId: secondGradeId,
+          items: [
+            { id: otherCourseId, sortOrder: 1 },
+            { id: secondGradeCourseId, sortOrder: 2 },
+          ],
+        },
+      });
+      expect(reorderedCourses.statusCode).toBe(201);
+      const coursesInSecondGrade = await app.inject({
+        method: 'GET',
+        url: `/api/v1/admin/courses?subjectId=${subjectId}&academicGradeId=${secondGradeId}`,
+        headers: authHeader(adminToken),
+      });
+      expect((await json(coursesInSecondGrade)).data).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ id: otherCourseId, sortOrder: 1 }),
+          expect.objectContaining({ id: secondGradeCourseId, sortOrder: 2 }),
+        ]),
+      );
     });
 
     it('creates a chapter under the course', async () => {

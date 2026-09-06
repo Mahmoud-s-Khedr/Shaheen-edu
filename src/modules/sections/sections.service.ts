@@ -364,7 +364,9 @@ export class SectionsService {
         });
 
         await contentPlacementAncestry.sectionMoved(tx, id, {
-          academicGradeId: newParent.chapter.course.subject.academicGradeId,
+          academicGradeId:
+            newParent.chapter.course.academicGradeId ??
+            newParent.chapter.course.subject.academicGradeId,
           subjectId: newParent.chapter.course.subjectId,
           courseId: newParent.chapter.courseId,
           chapterId: newParent.chapterId,

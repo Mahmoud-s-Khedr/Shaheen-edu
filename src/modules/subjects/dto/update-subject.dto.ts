@@ -1,5 +1,7 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import {
+  ArrayMinSize,
+  IsArray,
   IsOptional,
   IsString,
   Matches,
@@ -27,4 +29,14 @@ export class UpdateSubjectDto {
   @IsString()
   @MaxLength(2000)
   description?: string;
+
+  @ApiPropertyOptional({
+    type: [String],
+    description: 'Replaces the grades in which this subject is available.',
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMinSize(1)
+  @IsString({ each: true })
+  academicGradeIds?: string[];
 }

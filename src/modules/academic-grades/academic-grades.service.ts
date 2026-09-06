@@ -83,7 +83,9 @@ export class AcademicGradesService {
         coverAsset: { select: { filename: true } },
         _count: {
           select: {
-            subjects: { where: { status: { not: ContentStatus.ARCHIVED } } },
+            subjectAssignments: {
+              where: { subject: { status: { not: ContentStatus.ARCHIVED } } },
+            },
           },
         },
       },
@@ -155,7 +157,9 @@ export class AcademicGradesService {
           coverAsset: { select: { filename: true } },
           _count: {
             select: {
-              subjects: { where: { status: { not: ContentStatus.ARCHIVED } } },
+              subjectAssignments: {
+                where: { subject: { status: { not: ContentStatus.ARCHIVED } } },
+              },
             },
           },
         },
@@ -185,7 +189,9 @@ export class AcademicGradesService {
           coverAsset: { select: { filename: true } },
           _count: {
             select: {
-              subjects: { where: { status: ContentStatus.PUBLISHED } },
+              subjectAssignments: {
+                where: { subject: { status: ContentStatus.PUBLISHED } },
+              },
             },
           },
         },
@@ -349,7 +355,7 @@ export class AcademicGradesService {
       throw new ConflictException('Only a draft academic grade can be deleted');
     }
 
-    const childCount = await this.prisma.subject.count({
+    const childCount = await this.prisma.subjectGrade.count({
       where: { academicGradeId: id },
     });
     if (childCount > 0) {
@@ -384,7 +390,7 @@ export class AcademicGradesService {
     archivedAt: Date | null;
     coverAssetId: string | null;
     coverAsset?: { filename: string } | null;
-    _count?: { subjects: number };
+    _count?: { subjectAssignments: number };
   }) {
     return {
       id: record.id,
@@ -399,7 +405,7 @@ export class AcademicGradesService {
       archivedAt: record.archivedAt,
       coverAssetId: record.coverAssetId,
       coverAssetName: record.coverAsset?.filename ?? null,
-      hasChildren: (record._count?.subjects ?? 0) > 0,
+      hasChildren: (record._count?.subjectAssignments ?? 0) > 0,
     };
   }
 }

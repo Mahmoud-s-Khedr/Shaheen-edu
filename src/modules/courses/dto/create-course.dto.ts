@@ -37,6 +37,14 @@ export class CreateCourseDto {
   @IsString()
   subjectId!: string;
 
+  @ApiPropertyOptional({
+    description:
+      'Required when the selected subject belongs to more than one grade.',
+  })
+  @IsOptional()
+  @IsString()
+  academicGradeId?: string;
+
   @ApiProperty({ enum: [AccessType.PUBLIC, AccessType.FREE, AccessType.PAID] })
   @IsEnum({
     PUBLIC: AccessType.PUBLIC,

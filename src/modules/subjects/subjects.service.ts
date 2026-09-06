@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   Injectable,
@@ -20,6 +21,8 @@ import type { UpdateSubjectDto } from './dto/update-subject.dto';
 import type { QuerySubjectDto } from './dto/query-subject.dto';
 import {
   paginateArabicSearch,
+  searchArabicOffsetPage,
+  searchNeedle,
   sqlAnd,
 } from '../../common/search/arabic-search';
 import { contentStatusScope } from '../../common/search/content-scope';
@@ -53,6 +56,12 @@ export class SubjectsService {
       where: { id },
       include: {
         academicGrade: { select: { titleAr: true, titleEn: true } },
+        gradeAssignments: {
+          orderBy: [{ academicGradeId: 'asc' }],
+          include: {
+            academicGrade: { select: { titleAr: true, titleEn: true } },
+          },
+        },
         coverAsset: { select: { filename: true } },
         _count: {
           select: {
@@ -79,45 +88,71 @@ export class SubjectsService {
 
   async create(actor: RequestUser, dto: CreateSubjectDto) {
     this.assertActorRole(actor);
-
-    const parent = await this.prisma.academicGrade.findUnique({
-      where: { id: dto.academicGradeId },
+    if (
+      dto.academicGradeId &&
+      dto.academicGradeIds &&
+      dto.academicGradeId !== dto.academicGradeIds[0]
+    )
+      throw new BadRequestException(
+        'academicGradeId must match the first academicGradeIds value when both are supplied',
+      );
+    const gradeIds = [
+      ...new Set(
+        dto.academicGradeIds ??
+          (dto.academicGradeId ? [dto.academicGradeId] : []),
+      ),
+    ];
+    if (!gradeIds.length)
+      throw new BadRequestException('At least one academic grade is required');
+    const parents = await this.prisma.academicGrade.findMany({
+      where: { id: { in: gradeIds } },
     });
-    if (!parent) {
+    if (parents.length !== gradeIds.length)
       throw new NotFoundException('Academic grade not found');
-    }
-    if (parent.status === ContentStatus.ARCHIVED) {
+    if (parents.some((parent) => parent.status === ContentStatus.ARCHIVED)) {
       throw new ConflictException(
         'Cannot add subjects to an archived academic grade',
       );
     }
 
     const slug = dto.slug ?? slugifyOrThrow(dto.title);
-    const existing = await this.prisma.subject.findUnique({
+    const existing = await this.prisma.subject.findFirst({
       where: {
-        academicGradeId_slug: { academicGradeId: dto.academicGradeId, slug },
+        slug,
+        gradeAssignments: { some: { academicGradeId: { in: gradeIds } } },
       },
     });
     if (existing) {
       throw new ConflictException(
-        'Slug already in use within this academic grade',
+        'Slug already in use within one of the selected academic grades',
       );
     }
-
-    const maxOrder = await this.prisma.subject.aggregate({
-      where: { academicGradeId: dto.academicGradeId },
+    const orders = await this.prisma.subjectGrade.groupBy({
+      by: ['academicGradeId'],
+      where: { academicGradeId: { in: gradeIds } },
       _max: { sortOrder: true },
     });
+    const nextOrder = new Map(
+      orders.map((row) => [row.academicGradeId, (row._max.sortOrder ?? 0) + 1]),
+    );
     const created = await this.prisma.subject.create({
       data: {
-        academicGradeId: dto.academicGradeId,
+        // The first grade remains the legacy primary grade for old clients;
+        // gradeAssignments is the canonical multi-grade relationship.
+        academicGradeId: gradeIds[0],
         title: dto.title,
         slug,
         description: dto.description,
-        sortOrder: (maxOrder._max.sortOrder ?? 0) + 1,
+        sortOrder: nextOrder.get(gradeIds[0]) ?? 1,
         status: ContentStatus.DRAFT,
         createdById: actor.id,
         updatedById: actor.id,
+        gradeAssignments: {
+          create: gradeIds.map((academicGradeId) => ({
+            academicGradeId,
+            sortOrder: nextOrder.get(academicGradeId) ?? 1,
+          })),
+        },
       },
     });
 
@@ -126,7 +161,7 @@ export class SubjectsService {
       action: 'SUBJECT_CREATED',
       targetType: 'Subject',
       targetId: created.id,
-      metadata: { academicGradeId: dto.academicGradeId, slug },
+      metadata: { academicGradeIds: gradeIds, slug },
     });
 
     return this.toSummary(await this.getOrThrow(created.id));
@@ -139,8 +174,8 @@ export class SubjectsService {
 
   async list(actor: RequestUser, query: QuerySubjectDto) {
     this.assertActorRole(actor);
+    if (query.academicGradeId) return this.listGradeAssignments(query);
     const where = {
-      academicGradeId: query.academicGradeId,
       status: query.status ?? { not: ContentStatus.ARCHIVED },
     };
     const { data: items, total } = await paginateArabicSearch({
@@ -149,12 +184,7 @@ export class SubjectsService {
       target: 'subject',
       q: query.q,
       scope: {
-        where: sqlAnd(
-          contentStatusScope(query.status),
-          query.academicGradeId
-            ? Prisma.sql`t."academicGradeId" = ${query.academicGradeId}`
-            : undefined,
-        ),
+        where: contentStatusScope(query.status),
       },
       orderBySql: Prisma.sql`t."sortOrder" ASC, t.id ASC`,
       orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
@@ -162,6 +192,12 @@ export class SubjectsService {
       args: {
         include: {
           academicGrade: { select: { titleAr: true, titleEn: true } },
+          gradeAssignments: {
+            orderBy: [{ academicGradeId: 'asc' }],
+            include: {
+              academicGrade: { select: { titleAr: true, titleEn: true } },
+            },
+          },
           coverAsset: { select: { filename: true } },
           _count: {
             select: {
@@ -179,19 +215,113 @@ export class SubjectsService {
     };
   }
 
+  /** Grade membership, rather than Subject's legacy primary-grade fields, is
+   * the ordered parent relationship for a shared subject. */
+  private async listGradeAssignments(query: QuerySubjectDto) {
+    const assignmentWhere = {
+      academicGradeId: query.academicGradeId!,
+      subject: { status: query.status ?? { not: ContentStatus.ARCHIVED } },
+    };
+    const include = {
+      subject: {
+        include: {
+          academicGrade: { select: { titleAr: true, titleEn: true } },
+          gradeAssignments: {
+            orderBy: [{ academicGradeId: 'asc' as const }],
+            include: {
+              academicGrade: { select: { titleAr: true, titleEn: true } },
+            },
+          },
+          coverAsset: { select: { filename: true } },
+          _count: {
+            select: {
+              courses: {
+                where: {
+                  academicGradeId: query.academicGradeId!,
+                  status: { not: ContentStatus.ARCHIVED },
+                },
+              },
+            },
+          },
+        },
+      },
+    };
+    const needle = searchNeedle(query.q);
+    if (!needle) {
+      const [assignments, total] = await this.prisma.$transaction([
+        this.prisma.subjectGrade.findMany({
+          where: assignmentWhere,
+          include,
+          orderBy: [{ sortOrder: 'asc' }, { subjectId: 'asc' }],
+          skip: (query.page - 1) * query.limit,
+          take: query.limit,
+        }),
+        this.prisma.subjectGrade.count({ where: assignmentWhere }),
+      ]);
+      return {
+        data: assignments.map((assignment) =>
+          this.toPlacementSummary(assignment),
+        ),
+        meta: toPaginationMeta(query.page, query.limit, total),
+      };
+    }
+
+    const page = await searchArabicOffsetPage(this.prisma, 'subject', needle, {
+      scope: {
+        join: Prisma.sql`JOIN "SubjectGrade" sg ON sg."subjectId" = t.id`,
+        where: sqlAnd(
+          contentStatusScope(query.status),
+          Prisma.sql`sg."academicGradeId" = ${query.academicGradeId}`,
+        ),
+      },
+      orderBy: Prisma.sql`sg."sortOrder" ASC, t.id ASC`,
+      page: query.page,
+      limit: query.limit,
+    });
+    const assignments = page.ids.length
+      ? await this.prisma.subjectGrade.findMany({
+          where: {
+            academicGradeId: query.academicGradeId!,
+            subjectId: { in: page.ids },
+            subject: {
+              status: query.status ?? { not: ContentStatus.ARCHIVED },
+            },
+          },
+          include,
+        })
+      : [];
+    const bySubjectId = new Map(
+      assignments.map((item) => [item.subjectId, item]),
+    );
+    return {
+      data: page.ids
+        .map((subjectId) => bySubjectId.get(subjectId)?.subject)
+        .filter((subject): subject is NonNullable<typeof subject> =>
+          Boolean(subject),
+        )
+        .map((subject) =>
+          this.toPlacementSummary(bySubjectId.get(subject.id)!),
+        ),
+      meta: toPaginationMeta(query.page, query.limit, page.total),
+    };
+  }
+
   async update(actor: RequestUser, id: string, dto: UpdateSubjectDto) {
     this.assertActorRole(actor);
     const record = await this.getOrThrow(id);
-
     let slug = record.slug;
     if (dto.slug !== undefined || dto.title !== undefined) {
       const candidate = dto.slug ?? slugifyOrThrow(dto.title ?? record.title);
       if (candidate !== record.slug) {
-        const collision = await this.prisma.subject.findUnique({
+        const collision = await this.prisma.subject.findFirst({
           where: {
-            academicGradeId_slug: {
-              academicGradeId: record.academicGradeId,
-              slug: candidate,
+            slug: candidate,
+            gradeAssignments: {
+              some: {
+                academicGradeId: {
+                  in: record.gradeAssignments.map((x) => x.academicGradeId),
+                },
+              },
             },
           },
         });
@@ -203,22 +333,110 @@ export class SubjectsService {
         slug = candidate;
       }
     }
-    await this.prisma.subject.updateMany({
-      where: { id },
-      data: {
-        title: dto.title,
-        slug,
-        description: dto.description,
-        updatedById: actor.id,
-      },
-    });
+    const gradeIds = dto.academicGradeIds
+      ? [...new Set(dto.academicGradeIds)]
+      : undefined;
+    if (gradeIds) {
+      if (!gradeIds.length)
+        throw new BadRequestException(
+          'At least one academic grade is required',
+        );
+      const grades = await this.prisma.academicGrade.findMany({
+        where: { id: { in: gradeIds } },
+      });
+      if (grades.length !== gradeIds.length)
+        throw new NotFoundException('Academic grade not found');
+      if (grades.some((grade) => grade.status === ContentStatus.ARCHIVED))
+        throw new ConflictException(
+          'Cannot add a subject to an archived academic grade',
+        );
+      const assignmentCollision = await this.prisma.subject.findFirst({
+        where: {
+          id: { not: id },
+          slug,
+          gradeAssignments: {
+            some: { academicGradeId: { in: gradeIds } },
+          },
+        },
+      });
+      if (assignmentCollision)
+        throw new ConflictException(
+          'Slug already in use within one of the selected academic grades',
+        );
+      const currentIds = record.gradeAssignments.map((x) => x.academicGradeId);
+      const removed = currentIds.filter(
+        (gradeId) => !gradeIds.includes(gradeId),
+      );
+      if (
+        removed.length &&
+        (await this.prisma.course.count({
+          where: { subjectId: id, academicGradeId: { in: removed } },
+        }))
+      )
+        throw new ConflictException(
+          'Cannot remove a grade that still has courses for this subject',
+        );
+      const added = gradeIds.filter((gradeId) => !currentIds.includes(gradeId));
+      const orders = added.length
+        ? await this.prisma.subjectGrade.groupBy({
+            by: ['academicGradeId'],
+            where: { academicGradeId: { in: added } },
+            _max: { sortOrder: true },
+          })
+        : [];
+      const nextOrder = new Map(
+        orders.map((row) => [
+          row.academicGradeId,
+          (row._max.sortOrder ?? 0) + 1,
+        ]),
+      );
+      await this.prisma.$transaction(async (tx) => {
+        await tx.subjectGrade.deleteMany({
+          where: { subjectId: id, academicGradeId: { in: removed } },
+        });
+        for (const academicGradeId of added) {
+          await tx.subjectGrade.create({
+            data: {
+              subjectId: id,
+              academicGradeId,
+              sortOrder: nextOrder.get(academicGradeId) ?? 1,
+            },
+          });
+        }
+        await tx.subject.update({
+          where: { id },
+          data: {
+            title: dto.title,
+            slug,
+            description: dto.description,
+            ...(!gradeIds.includes(record.academicGradeId)
+              ? { academicGradeId: gradeIds[0] }
+              : {}),
+            updatedById: actor.id,
+          },
+        });
+      });
+    } else {
+      await this.prisma.subject.update({
+        where: { id },
+        data: {
+          title: dto.title,
+          slug,
+          description: dto.description,
+          updatedById: actor.id,
+        },
+      });
+    }
 
     await this.auditService.record({
       actorUserId: actor.id,
       action: 'SUBJECT_UPDATED',
       targetType: 'Subject',
       targetId: id,
-      metadata: { slug },
+      metadata: {
+        slug,
+        ...(gradeIds ? { academicGradeIds: gradeIds } : {}),
+      },
     });
 
     return this.toSummary(await this.getOrThrow(id));
@@ -235,24 +453,49 @@ export class SubjectsService {
     }
 
     const ids = dto.items.map((item) => item.id);
-    const siblings = await this.prisma.subject.findMany({
+    const siblings = await this.prisma.subjectGrade.findMany({
       where: { academicGradeId: dto.academicGradeId },
+      select: {
+        subjectId: true,
+        sortOrder: true,
+        subject: { select: { academicGradeId: true } },
+      },
     });
-    assertCompleteSequentialReorder(dto.items, siblings);
+    assertCompleteSequentialReorder(
+      dto.items,
+      siblings.map((item) => ({
+        id: item.subjectId,
+        sortOrder: item.sortOrder,
+      })),
+    );
 
     const plan = computeTwoPhaseRenumber(dto.items);
 
     try {
       await this.prisma.$transaction(async (tx) => {
         for (const phase1 of plan.phase1) {
+          await tx.subjectGrade.updateMany({
+            where: {
+              subjectId: phase1.id,
+              academicGradeId: dto.academicGradeId,
+            },
+            data: { sortOrder: phase1.sortOrder },
+          });
           await tx.subject.updateMany({
-            where: { id: phase1.id },
+            where: { id: phase1.id, academicGradeId: dto.academicGradeId },
             data: { sortOrder: phase1.sortOrder, updatedById: actor.id },
           });
         }
         for (const phase2 of plan.phase2) {
+          await tx.subjectGrade.updateMany({
+            where: {
+              subjectId: phase2.id,
+              academicGradeId: dto.academicGradeId,
+            },
+            data: { sortOrder: phase2.sortOrder },
+          });
           await tx.subject.updateMany({
-            where: { id: phase2.id },
+            where: { id: phase2.id, academicGradeId: dto.academicGradeId },
             data: { sortOrder: phase2.sortOrder },
           });
         }
@@ -276,6 +519,10 @@ export class SubjectsService {
   async move(actor: RequestUser, id: string, dto: MoveSubjectDto) {
     this.assertActorRole(actor);
     const record = await this.getOrThrow(id);
+    if (record.gradeAssignments.length > 1)
+      throw new ConflictException(
+        'Use academicGradeIds to change a shared subject’s grade assignments',
+      );
     if (record.academicGradeId === dto.newAcademicGradeId)
       throw new ConflictException(
         'Use reorder to change position within the same parent',
@@ -339,6 +586,33 @@ export class SubjectsService {
 
     try {
       await this.prisma.$transaction(async (tx) => {
+        // Keep the canonical grade-placement ordering in lockstep with the
+        // legacy Subject fields used by this backwards-compatible endpoint.
+        await tx.subjectGrade.updateMany({
+          where: { subjectId: id, academicGradeId: oldAcademicGradeId },
+          data: { sortOrder: 1_000_000_000 },
+        });
+        await tx.subjectGrade.updateMany({
+          where: {
+            academicGradeId: oldAcademicGradeId,
+            sortOrder: { gt: oldSortOrder },
+          },
+          data: { sortOrder: { decrement: 1 } },
+        });
+        await tx.subjectGrade.updateMany({
+          where: {
+            academicGradeId: dto.newAcademicGradeId,
+            sortOrder: { gte: targetSortOrder },
+          },
+          data: { sortOrder: { increment: 1 } },
+        });
+        await tx.subjectGrade.updateMany({
+          where: { subjectId: id, academicGradeId: oldAcademicGradeId },
+          data: {
+            academicGradeId: dto.newAcademicGradeId,
+            sortOrder: targetSortOrder,
+          },
+        });
         await tx.subject.updateMany({
           where: { id },
           data: { sortOrder: 1_000_000_000, updatedById: actor.id },
@@ -374,6 +648,10 @@ export class SubjectsService {
           id,
           dto.newAcademicGradeId,
         );
+        await tx.course.updateMany({
+          where: { subjectId: id, academicGradeId: oldAcademicGradeId },
+          data: { academicGradeId: dto.newAcademicGradeId },
+        });
       });
     } catch (error) {
       this.mapUniqueConstraintError(
@@ -496,6 +774,11 @@ export class SubjectsService {
     coverAssetId: string | null;
     coverAsset?: { filename: string } | null;
     academicGrade?: { titleAr: string; titleEn: string | null };
+    gradeAssignments?: Array<{
+      academicGradeId: string;
+      sortOrder: number;
+      academicGrade?: { titleAr: string; titleEn: string | null };
+    }>;
     _count?: { courses: number };
   }) {
     return {
@@ -504,6 +787,20 @@ export class SubjectsService {
       academicGradeName: record.academicGrade
         ? { ar: record.academicGrade.titleAr, en: record.academicGrade.titleEn }
         : null,
+      academicGradeIds: record.gradeAssignments?.map(
+        (assignment) => assignment.academicGradeId,
+      ) ?? [record.academicGradeId],
+      academicGrades:
+        record.gradeAssignments?.map((assignment) => ({
+          id: assignment.academicGradeId,
+          name: assignment.academicGrade
+            ? {
+                ar: assignment.academicGrade.titleAr,
+                en: assignment.academicGrade.titleEn,
+              }
+            : null,
+          sortOrder: assignment.sortOrder,
+        })) ?? [],
       title: record.title,
       slug: record.slug,
       description: record.description,
@@ -516,6 +813,24 @@ export class SubjectsService {
       coverAssetId: record.coverAssetId,
       coverAssetName: record.coverAsset?.filename ?? null,
       hasChildren: (record._count?.courses ?? 0) > 0,
+    };
+  }
+
+  /** A grade-filtered list describes a SubjectGrade placement, so expose the
+   * placement's grade and position instead of the Subject's legacy primary
+   * grade fields. */
+  private toPlacementSummary(assignment: any) {
+    const grade = assignment.subject.gradeAssignments.find(
+      (item: { academicGradeId: string }) =>
+        item.academicGradeId === assignment.academicGradeId,
+    )?.academicGrade;
+    return {
+      ...this.toSummary(assignment.subject),
+      academicGradeId: assignment.academicGradeId,
+      academicGradeName: grade
+        ? { ar: grade.titleAr, en: grade.titleEn }
+        : null,
+      sortOrder: assignment.sortOrder,
     };
   }
 }

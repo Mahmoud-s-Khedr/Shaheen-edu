@@ -185,7 +185,8 @@ export class LearningService {
     });
     const eligible: any[] = [];
     for (const item of items) {
-      const gradeId = this.itemPath(item).course.subject.academicGradeId;
+      const course = this.itemPath(item).course;
+      const gradeId = course.academicGradeId ?? course.subject.academicGradeId;
       if (currentGradeOnly && gradeId !== student.academicGradeId) continue;
       if (await this.access.canAccessContentItem(item.id, studentId))
         eligible.push(item);

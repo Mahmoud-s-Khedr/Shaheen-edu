@@ -143,7 +143,7 @@ export class QuestionBanksService {
       include: {
         source: { include: { publisher: { select: { displayName: true } } } },
         bank: true,
-        course: { include: { subject: { include: { academicGrade: true } } } },
+        course: { include: { subject: true, academicGrade: true } },
         placements: { include: this.placementInclude() },
         contentBlocks: {
           include: { asset: { include: { video: true } } },
@@ -1051,17 +1051,15 @@ export class QuestionBanksService {
       course:
         q.subjectId || q.academicGradeId
           ? {
-              subject: {
-                ...(q.subjectId ? { id: q.subjectId } : {}),
-                ...(q.academicGradeId
-                  ? { academicGradeId: q.academicGradeId }
-                  : {}),
-              },
+              ...(q.subjectId ? { subject: { id: q.subjectId } } : {}),
+              ...(q.academicGradeId
+                ? { academicGradeId: q.academicGradeId }
+                : {}),
             }
           : undefined,
     };
     const include: any = {
-      course: { include: { subject: { include: { academicGrade: true } } } },
+      course: { include: { subject: true, academicGrade: true } },
       placements: { include: this.placementInclude() },
       contentBlocks: {
         include: { asset: true },
@@ -1110,7 +1108,7 @@ export class QuestionBanksService {
             ? Prisma.sql`EXISTS (SELECT 1 FROM "QuestionPlacement" qp WHERE qp."questionId" = t.id AND ${Prisma.raw(`qp."${Object.keys(placementWhere)[0]}"`)} = ${Object.values(placementWhere)[0]})`
             : undefined,
           q.subjectId || q.academicGradeId
-            ? Prisma.sql`EXISTS (SELECT 1 FROM "Course" c JOIN "Subject" s ON s.id = c."subjectId" WHERE c.id = t."courseId" ${q.subjectId ? Prisma.sql`AND s.id = ${q.subjectId}` : Prisma.empty} ${q.academicGradeId ? Prisma.sql`AND s."academicGradeId" = ${q.academicGradeId}` : Prisma.empty})`
+            ? Prisma.sql`EXISTS (SELECT 1 FROM "Course" c JOIN "Subject" s ON s.id = c."subjectId" WHERE c.id = t."courseId" ${q.subjectId ? Prisma.sql`AND s.id = ${q.subjectId}` : Prisma.empty} ${q.academicGradeId ? Prisma.sql`AND c."academicGradeId" = ${q.academicGradeId}` : Prisma.empty})`
             : undefined,
         ),
       },
@@ -1432,7 +1430,7 @@ export class QuestionBanksService {
       [
         question.course,
         question.course.subject,
-        question.course.subject.academicGrade,
+        question.course.academicGrade,
       ].some((node: any) => node.status !== ContentStatus.PUBLISHED)
     )
       throw new ConflictException('Question course ancestry must be published');
@@ -1898,11 +1896,11 @@ export class QuestionBanksService {
         courseName: x.course?.title ?? null,
         subjectId: x.course?.subjectId,
         subjectName: x.course?.subject?.title ?? null,
-        academicGradeId: x.course?.subject?.academicGradeId,
-        academicGradeName: x.course?.subject?.academicGrade
+        academicGradeId: x.course?.academicGradeId,
+        academicGradeName: x.course?.academicGrade
           ? {
-              ar: x.course.subject.academicGrade.titleAr,
-              en: x.course.subject.academicGrade.titleEn,
+              ar: x.course.academicGrade.titleAr,
+              en: x.course.academicGrade.titleEn,
             }
           : null,
       },
