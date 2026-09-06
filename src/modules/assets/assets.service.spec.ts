@@ -47,6 +47,7 @@ function build() {
     assessmentQuestionOptionContentBlock: { count: jest.fn() },
     assessmentContextContentBlock: { count: jest.fn() },
     questionImportMedia: { count: jest.fn() },
+    testimonial: { count: jest.fn() },
     manualPaymentSubmission: { count: jest.fn().mockResolvedValue(0) },
     $transaction: jest.fn(),
   };
@@ -73,7 +74,7 @@ describe('AssetsService direct uploads', () => {
   it('keeps an asset referenced by an assessment video snapshot', async () => {
     const { service, prisma } = build();
     prisma.$transaction.mockResolvedValue([
-      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0,
     ]);
 
     await expect(service.isReferenced('video-1')).resolves.toBe(true);
@@ -85,7 +86,7 @@ describe('AssetsService direct uploads', () => {
   it('keeps an asset referenced by an assessment attachment snapshot', async () => {
     const { service, prisma } = build();
     prisma.$transaction.mockResolvedValue([
-      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0,
     ]);
 
     await expect(service.isReferenced('attachment-1')).resolves.toBe(true);
@@ -97,7 +98,7 @@ describe('AssetsService direct uploads', () => {
   it('keeps an asset referenced by a live question content block', async () => {
     const { service, prisma } = build();
     prisma.$transaction.mockResolvedValue([
-      0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     ]);
 
     await expect(service.isReferenced('block-asset-1')).resolves.toBe(true);
@@ -109,12 +110,26 @@ describe('AssetsService direct uploads', () => {
   it('keeps an asset referenced by extracted question-import media', async () => {
     const { service, prisma } = build();
     prisma.$transaction.mockResolvedValue([
-      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0,
     ]);
 
     await expect(service.isReferenced('media-asset-1')).resolves.toBe(true);
     expect(prisma.questionImportMedia.count).toHaveBeenCalledWith({
       where: { assetId: 'media-asset-1' },
+    });
+  });
+
+  it('keeps an asset referenced by a testimonial screenshot', async () => {
+    const { service, prisma } = build();
+    prisma.$transaction.mockResolvedValue([
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
+    ]);
+
+    await expect(service.isReferenced('testimonial-image-1')).resolves.toBe(
+      true,
+    );
+    expect(prisma.testimonial.count).toHaveBeenCalledWith({
+      where: { screenshotAssetId: 'testimonial-image-1' },
     });
   });
 
@@ -242,7 +257,7 @@ describe('AssetsService direct uploads', () => {
       storageKey: 'assets/pdf/a.pdf',
       video: null,
     });
-    prisma.$transaction.mockResolvedValue(new Array(19).fill(0));
+    prisma.$transaction.mockResolvedValue(new Array(20).fill(0));
     prisma.asset.delete.mockImplementation(async () => {
       operations.push('database');
     });
@@ -266,7 +281,7 @@ describe('AssetsService direct uploads', () => {
       status: AssetStatus.READY,
       storageKey: 'assets/pdf/a.pdf',
     });
-    prisma.$transaction.mockResolvedValue(new Array(19).fill(0));
+    prisma.$transaction.mockResolvedValue(new Array(20).fill(0));
     prisma.asset.update.mockResolvedValue({
       id: 'asset-1',
       kind: AssetKind.PDF,

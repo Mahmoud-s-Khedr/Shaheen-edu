@@ -42,6 +42,7 @@ import { PartnerAnalyticsModule } from './modules/partner-analytics/partner-anal
 import { QuestionImportModule } from './modules/ai-question-import/question-import.module';
 import { QuestionAiExplanationsModule } from './modules/ai-question-explanations/question-ai-explanations.module';
 import { StudentWorkspaceModule } from './modules/student-workspace/student-workspace.module';
+import { TestimonialsModule } from './modules/testimonials/testimonials.module';
 import { ReferralsModule } from './modules/referrals/referrals.module';
 import { PartnerFinanceModule } from './modules/partner-finance/partner-finance.module';
 import { ReportsModule } from './modules/reports/reports.module';
@@ -118,6 +119,7 @@ import { normalizeCorrelationId } from './common/logging/correlation-id';
     QuestionImportModule,
     QuestionAiExplanationsModule,
     StudentWorkspaceModule,
+    TestimonialsModule,
   ],
   providers: [
     // Global deny-by-default auth guard - @Public() opts a route out.

@@ -598,6 +598,8 @@ model User {
   discountCampaignsUpdated  DiscountCampaign[]        @relation("DiscountCampaignUpdatedBy")
   couponsCreated            Coupon[]                  @relation("CouponCreatedBy")
   couponsUpdated            Coupon[]                  @relation("CouponUpdatedBy")
+  testimonialsCreated       Testimonial[]             @relation("TestimonialCreatedBy")
+  testimonialsUpdated       Testimonial[]             @relation("TestimonialUpdatedBy")
 
   @@index([role])
   @@index([role, createdAt, id])
@@ -1012,8 +1014,33 @@ model Asset {
   paymentProofFor              ManualPaymentSubmission[]     @relation("ManualPaymentProof")
   questionImportBatches        QuestionImportBatch[]         @relation("QuestionImportSourceAsset")
   questionImportMedia          QuestionImportMedia[]         @relation("QuestionImportMediaAsset")
+  testimonialScreenshot        Testimonial?                  @relation("TestimonialScreenshot")
 
   @@index([status, kind, createdAt])
+}
+
+/// A hand-curated public review. A testimonial can be written, a screenshot,
+/// or both; screenshots never include a reviewer profile photo.
+model Testimonial {
+  id                  String        @id @default(cuid())
+  reviewText          String?       @db.Text
+  reviewerName        String?
+  screenshotAltText   String?       @db.Text
+  screenshotAssetId   String?       @unique
+  status              ContentStatus @default(DRAFT)
+  sortOrder           Int
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+  publishedAt         DateTime?
+  archivedAt          DateTime?
+  createdById         String
+  updatedById         String
+
+  screenshotAsset Asset? @relation("TestimonialScreenshot", fields: [screenshotAssetId], references: [id], onDelete: Restrict)
+  createdBy      User   @relation("TestimonialCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  updatedBy      User   @relation("TestimonialUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
+
+  @@index([status, sortOrder, id])
 }
 
 model AssetReference {

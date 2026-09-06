@@ -408,6 +408,7 @@ export class AssetsService {
       snapshotOptionBlocks,
       snapshotContextBlocks,
       questionImportMedia,
+      testimonials,
     ] = await this.prisma.$transaction([
       this.prisma.contentItem.count({ where: { primaryAssetId: id } }),
       this.prisma.assetReference.count({ where: { assetId: id } }),
@@ -434,6 +435,7 @@ export class AssetsService {
         where: { assetId: id },
       }),
       this.prisma.questionImportMedia.count({ where: { assetId: id } }),
+      this.prisma.testimonial.count({ where: { screenshotAssetId: id } }),
     ]);
     const paymentProofs = await this.prisma.manualPaymentSubmission.count({
       where: { proofAssetId: id },
@@ -458,6 +460,7 @@ export class AssetsService {
         snapshotOptionBlocks +
         snapshotContextBlocks +
         questionImportMedia +
+        testimonials +
         paymentProofs >
       0
     );

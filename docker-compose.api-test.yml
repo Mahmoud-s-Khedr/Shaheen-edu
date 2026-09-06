@@ -23,6 +23,35 @@ services:
       timeout: 3s
       retries: 20
 
+  # Local S3-compatible object storage for journeys that exercise direct
+  # uploads. It is intentionally separate from any Bunny test account.
+  minio:
+    image: minio/minio:RELEASE.2025-04-22T22-12-26Z
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minio-test-access-key
+      MINIO_ROOT_PASSWORD: minio-test-secret-key
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          'curl -fsS http://127.0.0.1:9000/minio/health/live >/dev/null',
+        ]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  minio-init:
+    image: minio/mc:RELEASE.2025-04-16T18-13-26Z
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >-
+      /bin/sh -c
+      "mc alias set local http://minio:9000 minio-test-access-key minio-test-secret-key &&
+      mc mb --ignore-existing local/edu-api-test &&
+      mc anonymous set download local/edu-api-test"
+
   api:
     build:
       context: .
@@ -43,6 +72,14 @@ services:
       FEATURE_PARTNER_LEDGER_ENABLED: 'true'
       FEATURE_PARTNER_LEDGER_ALLOWED_USER_IDS: '*'
       FEATURE_REPORT_EXPORTS_ENABLED: 'true'
+      BUNNY_STORAGE_S3_ENDPOINT: http://minio:9000
+      BUNNY_STORAGE_BUCKET: edu-api-test
+      BUNNY_STORAGE_ACCESS_KEY_ID: minio-test-access-key
+      BUNNY_STORAGE_SECRET_ACCESS_KEY: minio-test-secret-key
+      # The MinIO bucket is publicly readable only inside this disposable test
+      # stack; production continues to use Bunny tokenized delivery.
+      BUNNY_STORAGE_PULL_ZONE_URL: http://minio:9000/edu-api-test
+      BUNNY_STORAGE_TOKEN_KEY: minio_test_token_key_at_least_16_chars
       RATE_LIMIT_ADMIN_LOGIN_MAX_ATTEMPTS: '100'
       RATE_LIMIT_IP_MAX_ATTEMPTS: '100'
     ports:
@@ -52,6 +89,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
     healthcheck:
       test:
         - CMD-SHELL
@@ -76,7 +115,29 @@ services:
       FEATURE_PARTNER_LEDGER_ENABLED: 'true'
       FEATURE_PARTNER_LEDGER_ALLOWED_USER_IDS: '*'
       FEATURE_REPORT_EXPORTS_ENABLED: 'true'
+      BUNNY_STORAGE_S3_ENDPOINT: http://minio:9000
+      BUNNY_STORAGE_BUCKET: edu-api-test
+      BUNNY_STORAGE_ACCESS_KEY_ID: minio-test-access-key
+      BUNNY_STORAGE_SECRET_ACCESS_KEY: minio-test-secret-key
+      BUNNY_STORAGE_PULL_ZONE_URL: http://minio:9000/edu-api-test
+      BUNNY_STORAGE_TOKEN_KEY: minio_test_token_key_at_least_16_chars
     command: node dist/worker
+    depends_on:
+      api:
+        condition: service_healthy
+
+  journey:
+    build:
+      context: .
+      target: development
+    env_file:
+      - .env.api-tests.local
+    environment:
+      JOURNEY_ALLOW_MUTATIONS: 'true'
+      JOURNEY_DOCKER_NETWORK: 'true'
+      JOURNEY_TARGET: local
+      JOURNEY_BASE_URL: http://api:3000
+      JOURNEY_API_PREFIX: /api/v1
     depends_on:
       api:
         condition: service_healthy

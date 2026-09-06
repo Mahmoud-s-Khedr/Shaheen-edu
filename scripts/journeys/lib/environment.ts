@@ -27,12 +27,17 @@ export function loadEnvironment(): JourneyEnvironment {
   const baseUrl = required('JOURNEY_BASE_URL').replace(/\/$/, '');
   const host = new URL(baseUrl).hostname.toLowerCase();
   const localHosts = new Set(['localhost', '127.0.0.1', '::1']);
+  // A journey container can safely use the API service name on its isolated
+  // Compose network. Keep this opt-in so ordinary runs retain the strict
+  // localhost-only guard.
+  const dockerLocalHost =
+    process.env.JOURNEY_DOCKER_NETWORK === 'true' && host === 'api';
   const productionHost =
     /(^|\.)(prod|production)(\.|$)|\.com$|\.net$|\.org$/.test(host);
   if (productionHost)
     throw new Error(`Refusing production-like target host: ${host}`);
   const target = (process.env.JOURNEY_TARGET ?? 'local') as 'local' | 'staging';
-  if (!localHosts.has(host)) {
+  if (!localHosts.has(host) && !dockerLocalHost) {
     if (
       target !== 'staging' ||
       process.env.JOURNEY_CONFIRM_STAGING_MUTATIONS !== 'true'
@@ -74,14 +79,19 @@ export function loadEnvironment(): JourneyEnvironment {
   return {
     baseUrl,
     apiPrefix: (process.env.JOURNEY_API_PREFIX ?? '/api/v1').replace(/\/$/, ''),
-    superAdminEmail: required('JOURNEY_SUPER_ADMIN_EMAIL'),
-    superAdminPassword: required('JOURNEY_SUPER_ADMIN_PASSWORD'),
+    superAdminEmail:
+      process.env.JOURNEY_SUPER_ADMIN_EMAIL?.trim() ||
+      required('SUPER_ADMIN_EMAIL'),
+    superAdminPassword:
+      process.env.JOURNEY_SUPER_ADMIN_PASSWORD?.trim() ||
+      required('SUPER_ADMIN_PASSWORD'),
     timeoutMs,
     target,
     videoFile: process.env.JOURNEY_VIDEO_FILE?.trim() || undefined,
     videoReadyTimeoutMs,
     videoPollIntervalMs,
     bunnyWebhookUrl: process.env.JOURNEY_BUNNY_WEBHOOK_URL?.trim() || undefined,
-    bunnyReadOnlyKey: process.env.JOURNEY_BUNNY_READ_ONLY_KEY?.trim() || undefined,
+    bunnyReadOnlyKey:
+      process.env.JOURNEY_BUNNY_READ_ONLY_KEY?.trim() || undefined,
   };
 }
