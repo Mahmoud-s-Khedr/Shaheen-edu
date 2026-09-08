@@ -1,0 +1,12 @@
+# Include from host-managed PostgreSQL configuration. The operator normalizer
+# writes /var/log/postgresql/shaheen-edu-diagnostic.jsonl containing only
+# timestamp, timestampEpochSeconds, severity, durationMs, queryFingerprint,
+# correlationId when available, and reasonCode. timestampEpochSeconds must be
+# numeric UTC seconds so the bundle collector can apply an offset-safe window.
+# It must never copy query text or bind values.
+log_min_error_statement = error
+# Render this value from POSTGRES_SLOW_QUERY_THRESHOLD_MS (default 1000).
+log_min_duration_statement = 1000
+log_duration = off
+log_statement = 'none'
+log_line_prefix = '%m [%p] %e %u@%d '

@@ -128,8 +128,11 @@ repository's [example](../deploy/production/nginx/default.conf.template) is a
 reference only; it deliberately contains no certificate path or TLS-renewal
 configuration. Its required proxy headers are `Host`, `X-Real-IP`,
 `X-Forwarded-For`, `X-Forwarded-Proto https`, and, when needed,
-`X-Forwarded-Port`. The internal Compose gateway adds one controlled proxy
-hop, so keep `TRUST_PROXY_HOPS=2`.
+`X-Forwarded-Port`, plus `X-Correlation-ID $request_id`. The internal Compose
+gateway adds one controlled proxy hop, so keep `TRUST_PROXY_HOPS=2`. The
+reference template also defines HTTP-scope `map` and `log_format` directives
+for the redacted diagnostic log; retain them in the host's `http` context and
+install the accompanying logrotate policy described in the observability plan.
 
 ```nginx
 server {
@@ -143,6 +146,7 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto https;
         proxy_set_header X-Forwarded-Port $server_port;
+        proxy_set_header X-Correlation-ID $request_id;
     }
 }
 ```

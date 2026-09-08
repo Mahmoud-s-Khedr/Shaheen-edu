@@ -1,0 +1,19 @@
+# Host Nginx diagnostic source. The bundle exporter reads only the active file;
+# daily rotation keeps it bounded without mixing it into the normal access log.
+/var/log/nginx/shaheen-edu-diagnostic.jsonl {
+    daily
+    # One active file plus 29 daily rotations is at most 30 days of source.
+    rotate 29
+    maxage 30
+    missingok
+    notifempty
+    compress
+    delaycompress
+    create 0640 root adm
+    sharedscripts
+    postrotate
+        if [ -s /run/nginx.pid ]; then
+            kill -USR1 "$(cat /run/nginx.pid)"
+        fi
+    endscript
+}

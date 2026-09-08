@@ -5,6 +5,12 @@ export interface AppConfig {
   workerHealthPort: number;
   trustProxyHops: number;
   version: string;
+  observability: {
+    hmacSecret: string;
+    logRetentionDays: number;
+    postgresSlowQueryThresholdMs: number;
+    runIntegrityScans: boolean;
+  };
   corsOrigins: string[];
   cookieSecure: boolean;
   cookieSameSite: 'lax' | 'strict' | 'none';
@@ -118,6 +124,15 @@ export default (): AppConfig => ({
   workerHealthPort: parseInt(process.env.WORKER_HEALTH_PORT ?? '3001', 10),
   trustProxyHops: envInteger('TRUST_PROXY_HOPS', 0),
   version: process.env.VERSION ?? 'unknown',
+  observability: {
+    hmacSecret: process.env.OBSERVABILITY_HMAC_SECRET ?? '',
+    logRetentionDays: envInteger('OBSERVABILITY_LOG_RETENTION_DAYS', 30),
+    postgresSlowQueryThresholdMs: envInteger(
+      'POSTGRES_SLOW_QUERY_THRESHOLD_MS',
+      1000,
+    ),
+    runIntegrityScans: process.env.RUN_INTEGRITY_SCANS === 'true',
+  },
   corsOrigins: (process.env.CORS_ORIGINS ?? '')
     .split(',')
     .map((origin) => origin.trim())

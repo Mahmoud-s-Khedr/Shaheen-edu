@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { ClsService } from 'nestjs-cls';
 import { PrismaService } from '../../database/prisma.service';
 import type { Prisma } from '@prisma/client';
+import { ObservabilityService } from '../../common/logging/observability.service';
 
 export interface RecordAuditLogInput {
   actorUserId: string;
@@ -16,6 +17,7 @@ export class AuditService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly cls: ClsService,
+    private readonly diagnostics: ObservabilityService,
   ) {}
 
   async record(input: RecordAuditLogInput): Promise<void> {
@@ -35,6 +37,16 @@ export class AuditService {
         targetId: input.targetId,
         metadata: input.metadata,
         correlationId,
+      },
+    });
+    this.diagnostics.emit({
+      event: 'audit_relationship_changed',
+      operation: input.action,
+      outcome: 'success',
+      reasonCode: 'AUDIT_RECORDED',
+      actorUserId: input.actorUserId,
+      references: {
+        target: this.diagnostics.reference(input.targetType, input.targetId),
       },
     });
   }

@@ -9,6 +9,9 @@ import type { AppConfig } from './config/configuration';
 import { safeErrorRecord } from './common/logging/error-record';
 
 async function bootstrap() {
+  // Enables the one hourly integrity scan in the worker process only. API
+  // replicas load the same module but leave scheduled scans disabled.
+  process.env.OBSERVABILITY_SERVICE = 'worker';
   const app = await NestFactory.createApplicationContext(AppModule);
   // PinoLogger is transient-scoped; application contexts must resolve scoped
   // providers rather than retrieve them with app.get().

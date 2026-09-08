@@ -130,7 +130,15 @@ export class CoursesService {
       action: 'COURSE_CREATED',
       targetType: 'Course',
       targetId: created.id,
-      metadata: { subjectId: dto.subjectId, academicGradeId, slug },
+      // Audit metadata deliberately records relationship shape, not raw IDs or
+      // mutable titles/slugs. The target itself remains in the audited record.
+      metadata: {
+        relationship: {
+          subjectGradeAssignmentCount: gradeIds.length,
+          courseGradeBelongsToSubject: true,
+          relationshipInconsistencyDetected: false,
+        },
+      },
     });
 
     return this.toSummary(await this.getOrThrow(created.id));
@@ -190,6 +198,9 @@ export class CoursesService {
   async update(actor: RequestUser, id: string, dto: UpdateCourseDto) {
     this.assertActorRole(actor);
     const record = await this.getOrThrow(id);
+    const subjectGradeAssignmentCount = await this.prisma.subjectGrade.count({
+      where: { subjectId: record.subjectId },
+    });
 
     let slug = record.slug;
     if (dto.slug !== undefined || dto.title !== undefined) {
@@ -225,7 +236,13 @@ export class CoursesService {
       action: 'COURSE_UPDATED',
       targetType: 'Course',
       targetId: id,
-      metadata: { slug },
+      metadata: {
+        relationship: {
+          subjectGradeAssignmentCount,
+          courseGradeBelongsToSubject: true,
+          relationshipInconsistencyDetected: false,
+        },
+      },
     });
 
     return this.toSummary(await this.getOrThrow(id));
@@ -299,7 +316,13 @@ export class CoursesService {
       action: 'COURSE_REORDERED',
       targetType: 'Course',
       targetId: dto.subjectId,
-      metadata: { academicGradeId: dto.academicGradeId, itemIds: ids },
+      metadata: {
+        relationship: {
+          siblingCount: siblings.length,
+          submittedSiblingCount: ids.length,
+          sequentialInvariantSatisfied: true,
+        },
+      },
     });
   }
 
@@ -430,7 +453,13 @@ export class CoursesService {
       action: 'COURSE_MOVED',
       targetType: 'Course',
       targetId: id,
-      metadata: { fromSubjectId: oldSubjectId, toSubjectId: dto.newSubjectId },
+      metadata: {
+        relationship: {
+          subjectChanged: true,
+          courseGradeBelongsToTargetSubject: true,
+          relationshipInconsistencyDetected: false,
+        },
+      },
     });
 
     return this.toSummary(await this.getOrThrow(id));

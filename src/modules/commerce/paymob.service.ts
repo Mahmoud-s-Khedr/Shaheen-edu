@@ -2,11 +2,16 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import type { AppConfig } from '../../config/configuration';
+import { ObservabilityService } from '../../common/logging/observability.service';
+import { safeErrorRecord } from '../../common/logging/error-record';
 
 @Injectable()
 export class PaymobService {
   private readonly config: AppConfig['commerce'];
-  constructor(config: ConfigService<AppConfig, true>) {
+  constructor(
+    config: ConfigService<AppConfig, true>,
+    private readonly diagnostics?: ObservabilityService,
+  ) {
     this.config = config.get('commerce', { infer: true });
   }
 
@@ -30,47 +35,76 @@ export class PaymobService {
     if (!this.configured())
       throw new BadRequestException('Paymob is not configured');
     const names = input.customer.fullName.trim().split(/\s+/);
-    const response = await fetch(`${this.config.paymobBaseUrl}/v1/intention/`, {
-      method: 'POST',
-      signal: AbortSignal.timeout(this.config.paymobTimeoutMs),
-      headers: {
-        Authorization: `Token ${this.config.paymobSecretKey}`,
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-      },
-      body: JSON.stringify({
-        amount: input.amountMinor,
-        currency: 'EGP',
-        payment_methods: this.config.paymobIntegrationIds,
-        special_reference: input.merchantReference,
-        notification_url: this.config.paymobNotificationUrl,
-        redirection_url: this.config.paymobRedirectUrl,
-        billing_data: {
-          first_name: names[0] ?? 'Student',
-          last_name: names.slice(1).join(' ') || 'Student',
-          email: input.customer.email?.includes('@')
-            ? input.customer.email
-            : 'student@example.invalid',
-          phone_number: input.customer.phone,
+    const startedAt = performance.now();
+    try {
+      const response = await fetch(
+        `${this.config.paymobBaseUrl}/v1/intention/`,
+        {
+          method: 'POST',
+          signal: AbortSignal.timeout(this.config.paymobTimeoutMs),
+          headers: {
+            Authorization: `Token ${this.config.paymobSecretKey}`,
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+          },
+          body: JSON.stringify({
+            amount: input.amountMinor,
+            currency: 'EGP',
+            payment_methods: this.config.paymobIntegrationIds,
+            special_reference: input.merchantReference,
+            notification_url: this.config.paymobNotificationUrl,
+            redirection_url: this.config.paymobRedirectUrl,
+            billing_data: {
+              first_name: names[0] ?? 'Student',
+              last_name: names.slice(1).join(' ') || 'Student',
+              email: input.customer.email?.includes('@')
+                ? input.customer.email
+                : 'student@example.invalid',
+              phone_number: input.customer.phone,
+            },
+            items: input.items.map((item) => ({
+              name: item.title,
+              amount: item.amountMinor,
+              quantity: 1,
+            })),
+          }),
         },
-        items: input.items.map((item) => ({
-          name: item.title,
-          amount: item.amountMinor,
-          quantity: 1,
-        })),
-      }),
-    });
-    const payload: any = await response.json().catch(() => ({}));
-    if (!response.ok || !payload.client_secret)
-      throw new BadRequestException(
-        'Paymob could not create a payment intention',
       );
-    return {
-      providerOrderId: payload.id ? String(payload.id) : null,
-      clientSecret: String(payload.client_secret),
-      checkoutUrl: `${this.config.paymobBaseUrl}/unifiedcheckout/?publicKey=${encodeURIComponent(this.config.paymobPublicKey)}&clientSecret=${encodeURIComponent(payload.client_secret)}`,
-      payload,
-    };
+      const payload: any = await response.json().catch(() => ({}));
+      if (!response.ok || !payload.client_secret)
+        throw new BadRequestException(
+          'Paymob could not create a payment intention',
+        );
+      this.diagnostics?.emit({
+        event: 'provider_call_completed',
+        operation: 'paymob_create_intention',
+        outcome: 'success',
+        reasonCode: 'PAYMOB_OK',
+        durationMs: Math.round(performance.now() - startedAt),
+        references: {
+          merchantReference: this.diagnostics.reference(
+            'payment_attempt',
+            input.merchantReference,
+          ),
+        },
+      });
+      return {
+        providerOrderId: payload.id ? String(payload.id) : null,
+        clientSecret: String(payload.client_secret),
+        checkoutUrl: `${this.config.paymobBaseUrl}/unifiedcheckout/?publicKey=${encodeURIComponent(this.config.paymobPublicKey)}&clientSecret=${encodeURIComponent(payload.client_secret)}`,
+        payload,
+      };
+    } catch (error) {
+      this.diagnostics?.emit({
+        event: 'provider_call_completed',
+        operation: 'paymob_create_intention',
+        outcome: 'failure',
+        reasonCode: 'PAYMOB_REQUEST_FAILED',
+        durationMs: Math.round(performance.now() - startedAt),
+        ...safeErrorRecord(error),
+      });
+      throw error;
+    }
   }
 
   verifyTransactionHmac(obj: any, received: string) {

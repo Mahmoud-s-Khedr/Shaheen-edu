@@ -2,6 +2,7 @@ import { Injectable, OnModuleDestroy } from '@nestjs/common';
 import { Queue } from 'bullmq';
 import { ConfigService } from '@nestjs/config';
 import type { AppConfig } from '../../config/configuration';
+import { ObservabilityService } from '../../common/logging/observability.service';
 
 export const QUESTION_IMPORT_QUEUE = 'ai-question-import';
 export const QUESTION_IMPORT_PAGE_QUEUE = 'ai-question-import-page';
@@ -14,7 +15,10 @@ export class QuestionImportQueue implements OnModuleDestroy {
   readonly pageQueue: Queue;
   readonly chunkQueue: Queue;
   private readonly connection: any;
-  constructor(config: ConfigService<AppConfig, true>) {
+  constructor(
+    config: ConfigService<AppConfig, true>,
+    private readonly diagnostics: ObservabilityService,
+  ) {
     this.connection = { url: config.get('redisUrl', { infer: true }) };
     this.queue = new Queue(QUESTION_IMPORT_QUEUE, {
       connection: this.connection,
@@ -27,9 +31,10 @@ export class QuestionImportQueue implements OnModuleDestroy {
     });
   }
   async enqueue(batchId: string) {
+    const correlationId = this.diagnostics.correlationId();
     await this.queue.add(
       'process',
-      { batchId },
+      { batchId, correlationId },
       {
         attempts: QUESTION_IMPORT_MAX_ATTEMPTS,
         backoff: { type: 'exponential', delay: 1000 },
@@ -37,11 +42,21 @@ export class QuestionImportQueue implements OnModuleDestroy {
         removeOnFail: 1000,
       },
     );
+    this.diagnostics.emit({
+      event: 'queue_job_enqueued',
+      operation: 'question_import_process',
+      outcome: 'success',
+      reasonCode: 'QUEUE_ACCEPTED',
+      references: {
+        batch: this.diagnostics.reference('question_import', batchId),
+      },
+    });
   }
   async enqueuePage(batchId: string, pageNumber: number) {
+    const correlationId = this.diagnostics.correlationId();
     await this.pageQueue.add(
       'transcribe-page',
-      { batchId, pageNumber },
+      { batchId, pageNumber, correlationId },
       {
         // A coordinator may observe the page as PENDING while BullMQ has its
         // retry delayed. Reusing this id preserves that job's attempt counter
@@ -57,9 +72,10 @@ export class QuestionImportQueue implements OnModuleDestroy {
     );
   }
   async enqueueChunk(batchId: string, chunkId: string) {
+    const correlationId = this.diagnostics.correlationId();
     await this.chunkQueue.add(
       'extract-chunk',
-      { batchId, chunkId },
+      { batchId, chunkId, correlationId },
       {
         attempts: QUESTION_IMPORT_CHUNK_MAX_ATTEMPTS,
         backoff: { type: 'exponential', delay: 1000 },

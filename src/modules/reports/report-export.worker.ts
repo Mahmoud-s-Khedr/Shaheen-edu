@@ -5,6 +5,8 @@ import type { AppConfig } from '../../config/configuration';
 import { REPORT_EXPORT_QUEUE } from './report-export.queue';
 import { ReportsService } from './reports.service';
 import { safeErrorRecord } from '../../common/logging/error-record';
+import { ClsService, CLS_ID } from 'nestjs-cls';
+import { ObservabilityService } from '../../common/logging/observability.service';
 @Injectable()
 export class ReportExportWorker {
   private readonly logger = new Logger(ReportExportWorker.name);
@@ -14,12 +16,32 @@ export class ReportExportWorker {
   constructor(
     private readonly reports: ReportsService,
     private readonly config: ConfigService<AppConfig, true>,
+    private readonly cls: ClsService,
+    private readonly diagnostics: ObservabilityService,
   ) {}
   async start(): Promise<void> {
     if (this.worker) return;
     this.worker = new Worker(
       REPORT_EXPORT_QUEUE,
-      async (job) => this.reports.generate(job.data.jobId),
+      async (job) =>
+        this.cls.runWith(
+          { [CLS_ID]: job.data.correlationId } as any,
+          async () => {
+            this.diagnostics.emit({
+              event: 'queue_job_started',
+              operation: 'report_export_generate',
+              outcome: 'success',
+              reasonCode: 'QUEUE_PROCESSING',
+              references: {
+                job: this.diagnostics.reference(
+                  'report_export',
+                  job.data.jobId,
+                ),
+              },
+            });
+            return this.reports.generate(job.data.jobId);
+          },
+        ),
       { connection: { url: this.config.get('redisUrl', { infer: true }) } },
     );
     this.worker.on('error', (error) => {
@@ -37,6 +59,7 @@ export class ReportExportWorker {
         queue: REPORT_EXPORT_QUEUE,
         jobCategory: 'report_export',
         attemptsMade: job.attemptsMade,
+        correlationId: job.data.correlationId,
       }),
     );
     this.worker.on('failed', (job, error) => {
@@ -50,6 +73,7 @@ export class ReportExportWorker {
         jobCategory: 'report_export',
         attemptsMade: job?.attemptsMade,
         maxAttempts: job?.opts.attempts,
+        correlationId: job?.data.correlationId,
         ...safeErrorRecord(error),
       });
     });

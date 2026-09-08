@@ -1,5 +1,5 @@
 [Unit]
-Description=Shaheen Edu incident-log export to private Bunny Storage
+Description=Shaheen Edu hourly diagnostic bundle export to private Bunny Storage
 Wants=docker.service
 After=docker.service network-online.target
 
@@ -11,11 +11,15 @@ WorkingDirectory=/opt/shaheen-edu/deploy/production
 Environment=PROJECT_DIR=/opt/shaheen-edu/deploy/production
 Environment=BUNNY_STORAGE_ENV_FILE=/opt/shaheen-edu/deploy/production/.env
 Environment=OPERATIONS_PREFIX=operations
-ExecStart=/opt/shaheen-edu/deploy/production/scripts/export-incident-logs.sh 4h
+Environment=OBSERVABILITY_LOG_RETENTION_DAYS=30
+Environment=NGINX_DIAGNOSTIC_LOG=/var/log/nginx/shaheen-edu-diagnostic.jsonl
+Environment=POSTGRES_DIAGNOSTIC_LOG=/var/log/postgresql/shaheen-edu-diagnostic.jsonl
+ExecStart=/opt/shaheen-edu/deploy/production/scripts/export-incident-logs.sh 1h
 TimeoutStartSec=30m
 Nice=10
 IOSchedulingClass=best-effort
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectHome=true
-ReadWritePaths=/var/lib/shaheen-edu-incident-logs
+ReadWritePaths=/var/lib/shaheen-edu-diagnostics
+ReadOnlyPaths=/var/log/nginx/shaheen-edu-diagnostic.jsonl /var/log/postgresql/shaheen-edu-diagnostic.jsonl

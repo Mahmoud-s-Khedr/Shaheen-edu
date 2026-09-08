@@ -1,9 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Worker } from 'bullmq';
 import { ConfigService } from '@nestjs/config';
+import { ClsService, CLS_ID } from 'nestjs-cls';
 import { Prisma } from '@prisma/client';
 import { createHash } from 'node:crypto';
 import { safeErrorRecord } from '../../common/logging/error-record';
+import { ObservabilityService } from '../../common/logging/observability.service';
 import type { AppConfig } from '../../config/configuration';
 import {
   QuestionImportChunkStatus,
@@ -61,6 +63,8 @@ export class QuestionImportWorker {
     private readonly questions: QuestionBanksService,
     private readonly queue: QuestionImportQueue,
     config: ConfigService<AppConfig, true>,
+    private readonly cls: ClsService,
+    private readonly diagnostics: ObservabilityService,
   ) {
     this.config = config.get('ai', { infer: true });
     this.redisUrl = config.get('redisUrl', { infer: true });
@@ -88,7 +92,10 @@ export class QuestionImportWorker {
     this.workers = [
       new Worker(
         QUESTION_IMPORT_QUEUE,
-        async (job) => this.process(job.data.batchId),
+        async (job) =>
+          this.withCorrelation(job.data.correlationId, () =>
+            this.process(job.data.batchId),
+          ),
         // Control jobs only coordinate dependencies and the one global
         // segmentation request. Serializing them prevents duplicate control
         // deliveries from creating the same source blocks or chunks twice.
@@ -97,16 +104,21 @@ export class QuestionImportWorker {
       new Worker(
         QUESTION_IMPORT_PAGE_QUEUE,
         async (job) =>
-          this.processPage(
-            job.data.batchId,
-            job.data.pageNumber,
-            job.attemptsMade,
+          this.withCorrelation(job.data.correlationId, () =>
+            this.processPage(
+              job.data.batchId,
+              job.data.pageNumber,
+              job.attemptsMade,
+            ),
           ),
         options(this.config.questionImportOcrConcurrency ?? 8),
       ),
       new Worker(
         QUESTION_IMPORT_CHUNK_QUEUE,
-        async (job) => this.processChunkJob(job.data.batchId, job.data.chunkId),
+        async (job) =>
+          this.withCorrelation(job.data.correlationId, () =>
+            this.processChunkJob(job.data.batchId, job.data.chunkId),
+          ),
         options(this.config.questionImportExtractionConcurrency ?? 6),
       ),
     ];
@@ -121,6 +133,7 @@ export class QuestionImportWorker {
             queue: worker.name,
             jobCategory: 'question_import',
             attemptsMade: job.attemptsMade,
+            correlationId: job.data.correlationId,
           }),
         );
       }
@@ -171,6 +184,20 @@ export class QuestionImportWorker {
       attemptsMade,
       maxAttempts,
       ...safeErrorRecord(error),
+    });
+  }
+  private withCorrelation<T>(
+    correlationId: string | undefined,
+    callback: () => Promise<T>,
+  ): Promise<T> {
+    return this.cls.runWith({ [CLS_ID]: correlationId } as any, async () => {
+      this.diagnostics.emit({
+        event: 'queue_job_started',
+        operation: 'question_import_job',
+        outcome: 'success',
+        reasonCode: 'QUEUE_PROCESSING',
+      });
+      return callback();
     });
   }
   private async process(batchId: string) {

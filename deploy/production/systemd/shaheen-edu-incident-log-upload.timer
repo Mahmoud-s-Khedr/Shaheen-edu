@@ -1,8 +1,8 @@
 [Unit]
-Description=Upload Shaheen Edu incident-log bundles every four hours
+Description=Upload Shaheen Edu diagnostic bundles hourly
 
 [Timer]
-OnCalendar=*-*-* 00,04,08,12,16,20:45:00
+OnCalendar=hourly
 Persistent=true
 RandomizedDelaySec=60
 Unit=shaheen-edu-incident-log-upload.service

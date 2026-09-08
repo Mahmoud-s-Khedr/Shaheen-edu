@@ -1,11 +1,14 @@
 import { Module } from '@nestjs/common';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { ClsModule } from 'nestjs-cls';
 import { ConfigModule } from './config/config.module';
 import { ConfigService } from '@nestjs/config';
 import type { AppConfig } from './config/configuration';
 import { LoggerModule } from './common/logging/logger.module';
+import { ObservabilityModule } from './common/logging/observability.module';
+import { HttpDiagnosticInterceptor } from './common/logging/http-diagnostic.interceptor';
+import { IntegrityModule } from './modules/integrity/integrity.module';
 import { DatabaseModule } from './database/database.module';
 import { SearchModule } from './common/search/search.module';
 import { RedisModule } from './redis/redis.module';
@@ -54,6 +57,7 @@ import { normalizeCorrelationId } from './common/logging/correlation-id';
   imports: [
     ConfigModule,
     LoggerModule,
+    ObservabilityModule,
     ClsModule.forRoot({
       global: true,
       middleware: {
@@ -120,12 +124,14 @@ import { normalizeCorrelationId } from './common/logging/correlation-id';
     QuestionAiExplanationsModule,
     StudentWorkspaceModule,
     TestimonialsModule,
+    IntegrityModule,
   ],
   providers: [
     // Global deny-by-default auth guard - @Public() opts a route out.
     { provide: APP_GUARD, useClass: UserAuthGuard },
     // Generic per-route rate limiting shares Redis state across API replicas.
     { provide: APP_GUARD, useClass: ThrottlerGuard },
+    { provide: APP_INTERCEPTOR, useClass: HttpDiagnosticInterceptor },
   ],
 })
 export class AppModule {}

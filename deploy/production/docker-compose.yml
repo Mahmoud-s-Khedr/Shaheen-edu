@@ -155,6 +155,8 @@ services:
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
       TRUST_PROXY_HOPS: ${TRUST_PROXY_HOPS:-2}
       VERSION: ${VERSION:-unknown}
+      # Never inherit a worker scan setting from the shared .env file.
+      RUN_INTEGRITY_SCANS: 'false'
     extra_hosts: *host_postgres
     labels:
       com.shaheen.edu.service: api
@@ -184,6 +186,8 @@ services:
       DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL in .env}
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
       VERSION: ${VERSION:-unknown}
+      RUN_INTEGRITY_SCANS: 'true'
+      OBSERVABILITY_SERVICE: worker
     extra_hosts: *host_postgres
     command: ['node', 'dist/worker']
     labels:

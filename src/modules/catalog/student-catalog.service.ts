@@ -37,6 +37,7 @@ import {
   CompletionService,
   type CompletionContainerType,
 } from '../completion/completion.service';
+import { ObservabilityService } from '../../common/logging/observability.service';
 
 const published = ContentStatus.PUBLISHED;
 const order = [{ sortOrder: 'asc' as const }, { id: 'asc' as const }];
@@ -60,6 +61,7 @@ export class StudentCatalogService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly completion: CompletionService,
+    private readonly diagnostics: ObservabilityService,
   ) {}
 
   async summary(studentUserId: string) {
@@ -200,7 +202,10 @@ export class StudentCatalogService {
       },
     });
     if (!subject) throw new NotFoundException('Published subject not found');
-    const grants = await this.activeGrants(studentUserId);
+    const [grants, publishedCoursesBeforeGradeFilter] = await Promise.all([
+      this.activeGrants(studentUserId),
+      this.prisma.course.count({ where: { subjectId, status: published } }),
+    ]);
     const where = { subjectId, academicGradeId: grade.id, status: published };
     const { data, total } = await paginateArabicSearch({
       prisma: this.prisma,
@@ -230,6 +235,29 @@ export class StudentCatalogService {
       studentUserId,
       data.map((course) => ({ id: course.id, type: 'course' as const })),
     );
+    // The public contract remains 200 with an empty list. This event explains
+    // whether a grade filter, rather than missing content, caused that result.
+    this.diagnostics.emit({
+      event: 'business_decision_evaluated',
+      operation: 'student_catalog_subject_courses',
+      outcome: total === 0 ? 'empty' : 'success',
+      reasonCode:
+        total === 0 && publishedCoursesBeforeGradeFilter > 0
+          ? 'COURSE_GRADE_FILTER_EXCLUDED_ALL'
+          : total === 0
+            ? 'NO_PUBLISHED_COURSES'
+            : 'COURSE_GRADE_FILTER_INCLUDED',
+      actorUserId: studentUserId,
+      references: {
+        subject: this.diagnostics.reference('subject', subjectId),
+        grade: this.diagnostics.reference('grade', grade.id),
+      },
+      counts: {
+        publishedCoursesBeforeGradeFilter,
+        publishedCoursesAfterGradeFilter: total,
+        returnedCourses: data.length,
+      },
+    });
     return {
       data: data.map((course) =>
         this.withCompletion(

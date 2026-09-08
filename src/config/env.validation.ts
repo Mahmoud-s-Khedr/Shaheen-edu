@@ -9,6 +9,14 @@ export const envValidationSchema = Joi.object({
   WORKER_HEALTH_PORT: Joi.number().port().default(3001),
   TRUST_PROXY_HOPS: Joi.number().integer().min(0).max(10).default(0),
   VERSION: Joi.string().min(1).default('unknown'),
+  OBSERVABILITY_HMAC_SECRET: Joi.string().min(32).required(),
+  OBSERVABILITY_LOG_RETENTION_DAYS: Joi.number()
+    .integer()
+    .valid(30)
+    .default(30),
+  POSTGRES_SLOW_QUERY_THRESHOLD_MS: Joi.number().integer().min(1).default(1000),
+  // Only the worker enables scans; API replicas must not duplicate them.
+  RUN_INTEGRITY_SCANS: Joi.boolean().default(false),
 
   DATABASE_URL: Joi.string().uri().required(),
   REDIS_URL: Joi.string().uri().required(),

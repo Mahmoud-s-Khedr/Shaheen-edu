@@ -8,9 +8,9 @@ worker, and Redis; host operations run Nginx and PostgreSQL.
 
 | Area | Owner | Repository behavior |
 | --- | --- | --- |
-| API gateway, API replicas, worker, Redis logs | Repository-managed Docker services | Uses bounded Docker logs and can export an incident bundle. |
-| Nginx access/error logs | Host operations | Not collected by Compose or the incident-bundle script. |
-| PostgreSQL service, backup scheduling, restore-target creation, retention | Host operations | PostgreSQL remains host-managed; operator controls credentials and schedules. |
+| API gateway, API replicas, worker, Redis logs | Repository-managed Docker services | Emits structured diagnostic events and is collected hourly. |
+| Nginx diagnostic access log | Host operations | Writes only the redacted JSONL source configured in `default.conf.template`. |
+| PostgreSQL service, diagnostic normalization, backup scheduling, restore-target creation, retention | Host operations | PostgreSQL remains host-managed; operator controls its safe JSONL normalizer and backup policy. |
 | PostgreSQL backup and isolated restore | Repository scripts run on host | Uses host client tools and Restic; never provisions or operates the PostgreSQL service. |
 | Database migration | Shared release process | `release-with-backup.sh` runs a remote-confirmed host backup before the migration container. |
 
@@ -24,32 +24,79 @@ backup and isolated restore drill are recorded. When installed through the
 operator's normal systemd process, it invokes only `postgres-backup.sh` and has
 no Docker or PostgreSQL-service dependency.
 
-## Incident logs
+## Diagnostic bundles
 
-The incident-log export script collects only the Docker `api-gateway`, `api`,
-`worker`, and `redis` logs, then uploads the restricted bundle to the configured
-private Bunny destination. It deliberately cannot include host Nginx or
-PostgreSQL logs. The host operator must use its established access-controlled
-process for those logs.
+Every hour, the root-only systemd unit creates one compressed bundle under
+`/var/lib/shaheen-edu-diagnostics`, uploads it to the private Bunny prefix
+`operations/diagnostic-bundles/`, and keeps exactly 30 days. Pruning is scoped
+to that prefix only; the database backup retention policy is unchanged.
+
+Each archive contains `api-gateway.jsonl`, `api.jsonl`, `worker.jsonl`,
+`redis.jsonl`, and, when available, `nginx.jsonl` and `postgres.jsonl`. Its
+`manifest.json` lists coverage, unavailable sources, collection window,
+version, and per-file checksums. A missing host source is recorded without
+discarding the rest of the bundle.
+
+Set `OBSERVABILITY_HMAC_SECRET` to a distinct, at-least-32-character secret in
+every environment. Generate it with `openssl rand -base64 48`, store it in the
+environment used by both API and worker, and never reuse it across environments.
+The application uses it to produce stable opaque `*_ref` values for users and
+entities. The repository's development and production `.env.example` files
+include the required placeholder. Set `OBSERVABILITY_LOG_RETENTION_DAYS=30`;
+other values are rejected.
+Set `POSTGRES_SLOW_QUERY_THRESHOLD_MS` (default `1000`) in the host operator
+configuration when rendering the PostgreSQL include file.
+
+Host PostgreSQL must include
+[`diagnostic.conf.example`](../deploy/production/postgresql/diagnostic.conf.example)
+through the operator-managed configuration and normalize its output to
+`/var/log/postgresql/shaheen-edu-diagnostic.jsonl`. The normalizer must emit
+only timestamp, numeric UTC `timestampEpochSeconds`, severity, duration,
+fingerprint, correlation ID when available, and reason code—never SQL text or
+bind values. The numeric epoch is the collector's authoritative hourly-window
+field; timestamps with local UTC offsets are not compared as strings.
+
+Install the repository's
+[`shaheen-edu-diagnostic` logrotate policy](../deploy/production/logrotate/shaheen-edu-diagnostic)
+at `/etc/logrotate.d/shaheen-edu-diagnostic` on the host. It retains the Nginx
+diagnostic source for at most 30 days and signals Nginx to reopen the file.
+PostgreSQL's operator-managed normalizer needs a separate equivalent policy,
+including its own reopen/restart action. The collector reads the active source
+and its uncompressed `.1` predecessor, so a rotation between hourly runs does
+not create a collection gap.
 
 ```sh
 cd /opt/shaheen-edu/deploy/production
 
-# Recent API 5xx records. `jq -R` ignores non-JSON lines safely.
-docker compose logs --no-color --no-log-prefix --since 6h api \
-  | jq -R 'fromjson? | select(.event == "unhandled_exception")'
+# Install and dry-run the Nginx diagnostic-log retention policy once.
+sudo install -o root -g root -m 0644 logrotate/shaheen-edu-diagnostic /etc/logrotate.d/shaheen-edu-diagnostic
+sudo logrotate -d /etc/logrotate.d/shaheen-edu-diagnostic
 
-# Worker failures and retry exhaustion.
-docker compose logs --no-color --no-log-prefix --since 6h worker \
-  | jq -R 'fromjson? | select(.event == "queue_job_failed" or .event == "queue_retry_exhausted" or .event == "queue_connection_lost")'
+# Create an on-demand one-hour bundle (normal scheduling uses the systemd timer).
+sudo ./scripts/export-incident-logs.sh 1h
 
-# Restricted Docker-service bundle only.
-sudo ./scripts/export-incident-logs.sh 6h
+# Inspect a downloaded archive locally, then reconstruct one timeline.
+tar -xzf 20260909T120000Z-host.tar.gz
+jq -c 'select(.correlationId == "<correlation-id>")' *.jsonl
+
+# Find a known safe failure reason, database fingerprint, or opaque entity ref.
+jq -c 'select(.reasonCode == "COURSE_GRADE_FILTER_EXCLUDED_ALL")' api.jsonl
+jq -c 'select(.errorFingerprint == "<fingerprint>")' *.jsonl
+jq -c 'select(.references.subject == "subject_<hmac>")' *.jsonl
+
+# Diagnose latency, queue retry exhaustion, or the last aggregate integrity scan.
+jq -c 'select((.durationMs // 0) > 1000)' *.jsonl
+jq -c 'select(.event == "queue_retry_exhausted")' worker.jsonl
+jq -c 'select(.event == "data_integrity_scan_completed")' worker.jsonl
 ```
 
-Never put secrets, cookies, authorization headers, passwords, national IDs,
-emails, phone numbers, full request/response bodies, signed URLs, payment
-payloads, exported data, or raw job payloads into a ticket or bundle.
+The host Nginx `$request_id` is the canonical `X-Correlation-ID`, forwarded by
+the private gateway into API/CLS and returned to clients in the response
+header. Queue metadata carries that ID into workers. Never put secrets,
+cookies, authorization headers, passwords, national IDs, emails, phone
+numbers, raw identifiers, request/response bodies, signed URLs, payment
+payloads, exported data, SQL text/bind values, or raw job payloads into a
+ticket or bundle.
 
 ## Backup and restore integration points
 
@@ -80,8 +127,8 @@ Docker PostgreSQL container or volume as a substitute restore target.
 
 Before launch, retain evidence that:
 
-- Docker incident-log export works and no private data is present in the
-  bundle.
+- Hourly diagnostic-bundle export works, reports missing host sources in its
+  manifest, and contains no private data.
 - Host Nginx forwards the required headers to the loopback API and the public
   readiness URL succeeds.
 - PostgreSQL is private, allows only the intended Docker network with SCRAM,
