@@ -30002,7 +30002,9 @@
             "type": "string"
           },
           "priority": {
-            "type": "number"
+            "type": "number",
+            "default": 0,
+            "description": "Higher values take precedence; defaults to 0."
           },
           "appliesToAll": {
             "type": "boolean"
@@ -30050,7 +30052,8 @@
             "type": "string"
           },
           "priority": {
-            "type": "number"
+            "type": "number",
+            "description": "Higher values take precedence; defaults to 0."
           },
           "appliesToAll": {
             "type": "boolean"
@@ -30092,7 +30095,9 @@
             "type": "string"
           },
           "priority": {
-            "type": "number"
+            "type": "number",
+            "default": 0,
+            "description": "Higher values take precedence; defaults to 0."
           },
           "appliesToAll": {
             "type": "boolean"
@@ -30156,7 +30161,8 @@
             "type": "string"
           },
           "priority": {
-            "type": "number"
+            "type": "number",
+            "description": "Higher values take precedence; defaults to 0."
           },
           "appliesToAll": {
             "type": "boolean"

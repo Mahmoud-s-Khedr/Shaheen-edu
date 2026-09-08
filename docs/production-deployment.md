@@ -15,14 +15,47 @@ scaled API containers. That gateway is published only as
 `127.0.0.1:${API_HOST_PORT:-13000}:8080`; API containers and Redis have no
 published port.
 
+## Jibal public hostname layout
+
+The production public origins are fixed as follows:
+
+| Hostname | Owner | Purpose |
+| --- | --- | --- |
+| `jibal-platform.com` | this VPS's host Nginx | public marketing/site experience |
+| `app.jibal-platform.com` | this VPS's host Nginx | learner and parent application |
+| `admin.jibal-platform.com` | this VPS's host Nginx | administration application |
+| `api.jibal-platform.com` | this deployment's host Nginx | API, webhooks, and session cookies |
+
+Create DNS records for all four names before issuing certificates. Point all
+four names at this VPS. Host Nginx serves the three frontend static builds
+and proxies only the API hostname to the private Compose gateway. See the
+[frontend production deployment runbook](frontend-production-deployment.md)
+for the frontend Nginx sites and release procedure. Configure the API
+environment with these exact origins:
+
+```dotenv
+CORS_ORIGINS=https://jibal-platform.com,https://app.jibal-platform.com,https://admin.jibal-platform.com
+COOKIE_SECURE=true
+COOKIE_SAME_SITE=lax
+PAYMOB_NOTIFICATION_URL=https://api.jibal-platform.com/api/v1/payments/paymob/webhook
+PAYMOB_REDIRECT_URL=https://app.jibal-platform.com/payment-result
+```
+
+These hosts are same-site subdomains, so a secure, host-only refresh cookie
+issued by `api.jibal-platform.com` is sent with credentialed API requests from
+each frontend. Each frontend must use `credentials: 'include'` (or its
+equivalent) for login, refresh, logout, and other cookie-authenticated calls.
+The API origin itself is not a CORS origin.
+
 ## Host prerequisites
 
 Complete these through the operator's existing host-management automation
 before starting Compose. This repository neither provisions nor modifies them.
 
-1. Host Nginx owns the production domain, TLS certificate and renewal, and a
-   TLS virtual host on the approved external port (the example uses `3000`).
-   Permit that external TLS port in the host firewall. Do not expose Docker's
+1. Host Nginx owns `api.jibal-platform.com`, its TLS certificate and renewal,
+   and a TLS virtual host on port `443`. Permit ports `80` and `443` in the
+   host firewall (port 80 is needed when using HTTP-01 certificate renewal).
+   Do not expose Docker's
    API port, Redis, or PostgreSQL publicly.
 2. Host PostgreSQL has a dedicated database and least-privileged application
    role. It is not publicly reachable; it listens only on the necessary local
@@ -50,7 +83,7 @@ Copy [`deploy/production/.env.example`](../deploy/production/.env.example) to
 `deploy/production/.env` in the host secret manager, set mode `0600`, and
 complete every placeholder with production values. `DATABASE_URL` is the
 explicit host-PostgreSQL connection string, and `API_HOST_PORT` defaults to
-`13000` so it cannot conflict with host Nginx on `3000`.
+`13000` so it remains a private loopback port behind host Nginx on `443`.
 
 ```sh
 cd /opt/shaheen-edu/deploy/production
@@ -100,8 +133,8 @@ hop, so keep `TRUST_PROXY_HOPS=2`.
 
 ```nginx
 server {
-    listen 3000 ssl;
-    server_name <api-domain>;
+    listen 443 ssl;
+    server_name api.jibal-platform.com;
     # TLS/certificate directives are supplied by host automation.
     location / {
         proxy_pass http://127.0.0.1:13000;
@@ -118,7 +151,7 @@ Verify the public path and private worker path. Both health responses include
 the deployed `VERSION` as `version`:
 
 ```sh
-curl --fail-with-body "https://<api-domain>:3000/health/ready"
+curl --fail-with-body "https://api.jibal-platform.com/health/ready"
 docker compose ps
 docker compose exec worker node -e "fetch('http://127.0.0.1:3001/health/ready').then(r => process.exit(r.ok ? 0 : 1))"
 ```

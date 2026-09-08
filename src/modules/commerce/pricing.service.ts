@@ -149,8 +149,8 @@ export class PricingService {
         }))
         .sort(
           (a: any, b: any) =>
-            b.amount - a.amount ||
             b.campaign.priority - a.campaign.priority ||
+            b.amount - a.amount ||
             a.campaign.id.localeCompare(b.campaign.id),
         );
       return candidates[0] ?? null;
@@ -185,7 +185,17 @@ export class PricingService {
       const campaign = campaignDiscounts[index];
       const couponDiscount = couponDiscounts[index];
       const campaignDiscount = campaign?.amount ?? 0;
-      const useCoupon = couponDiscount > campaignDiscount;
+      const couponPriority = coupon?.priority ?? 0;
+      const campaignPriority = campaign?.campaign.priority ?? 0;
+      const useCoupon = Boolean(
+        couponDiscount &&
+        (!campaign ||
+          couponPriority > campaignPriority ||
+          (couponPriority === campaignPriority &&
+            (couponDiscount > campaignDiscount ||
+              (couponDiscount === campaignDiscount &&
+                coupon.id.localeCompare(campaign.campaign.id) < 0)))),
+      );
       const discountMinor = useCoupon ? couponDiscount : campaignDiscount;
       const promotionSnapshot = discountMinor
         ? useCoupon
@@ -195,6 +205,7 @@ export class PricingService {
               code: coupon.code,
               kind: coupon.kind,
               amount: coupon.amount,
+              priority: couponPriority,
             }
           : {
               source: 'CAMPAIGN',
@@ -250,6 +261,7 @@ export class PricingService {
               name: coupon.name,
               kind: coupon.kind,
               amount: coupon.amount,
+              priority: coupon.priority ?? 0,
               minimumOrderMinor: coupon.minimumOrderMinor,
               maximumDiscountMinor: coupon.maximumDiscountMinor,
             },

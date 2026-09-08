@@ -279,6 +279,84 @@ describe('CommerceService chapter product eligibility', () => {
   });
 });
 
+describe('CommerceService coupon priority', () => {
+  const admin = { id: 'admin-1', role: Role.ADMIN } as any;
+  const startsAt = new Date('2026-09-01T00:00:00.000Z');
+  const endsAt = new Date('2026-10-01T00:00:00.000Z');
+
+  function build() {
+    const prisma: any = {
+      coupon: {
+        create: jest.fn().mockResolvedValue({ id: 'coupon-1', targets: [] }),
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'coupon-1',
+          code: 'EXAM',
+          name: 'Exam',
+          kind: 'PERCENTAGE',
+          amount: 1000,
+          startsAt,
+          endsAt,
+          priority: 0,
+          appliesToAll: true,
+          targets: [],
+        }),
+        update: jest.fn().mockResolvedValue({ id: 'coupon-1', targets: [] }),
+      },
+    };
+    prisma.$transaction = jest.fn((callback) => callback(prisma));
+    const audit = { record: jest.fn() };
+    return {
+      prisma,
+      service: new CommerceService(prisma, {} as any, audit as any),
+    };
+  }
+
+  it('stores an explicit coupon priority and defaults an omitted priority to zero', async () => {
+    const { prisma, service } = build();
+
+    await service.createCoupon(admin, {
+      code: 'exam',
+      name: 'Exam',
+      kind: 'PERCENTAGE',
+      amount: 1000,
+      startsAt,
+      endsAt,
+      appliesToAll: true,
+      priority: 7,
+    });
+
+    expect(prisma.coupon.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ priority: 7 }),
+      }),
+    );
+
+    await service.createCoupon(admin, {
+      code: 'exam-zero',
+      name: 'Exam zero',
+      kind: 'PERCENTAGE',
+      amount: 1000,
+      startsAt,
+      endsAt,
+      appliesToAll: true,
+    });
+
+    expect(prisma.coupon.create.mock.calls[1][0].data.priority).toBe(0);
+  });
+
+  it('updates coupon priority without changing the existing targets', async () => {
+    const { prisma, service } = build();
+
+    await service.updateCoupon(admin, 'coupon-1', { priority: 12 });
+
+    expect(prisma.coupon.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ priority: 12 }),
+      }),
+    );
+  });
+});
+
 describe('CommerceService referral review rules', () => {
   const program = {
     id: 'program-1',

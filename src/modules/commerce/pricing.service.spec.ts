@@ -20,7 +20,43 @@ describe('PricingService', () => {
     return new PricingService(prisma);
   }
 
-  it('selects the larger timed campaign discount and snapshots the final item amount', async () => {
+  it('selects the higher-priority timed campaign even when its discount is smaller', async () => {
+    const quote = await service({
+      campaigns: [
+        {
+          id: 'campaign-10',
+          name: 'Ten',
+          kind: 'PERCENTAGE',
+          amount: 1000,
+          priority: 10,
+          appliesToAll: true,
+          targets: [],
+        },
+        {
+          id: 'campaign-20',
+          name: 'Twenty',
+          kind: 'PERCENTAGE',
+          amount: 2000,
+          priority: 0,
+          appliesToAll: true,
+          targets: [],
+        },
+      ],
+    }).quote([target]);
+
+    expect(quote.subtotalMinor).toBe(10_000);
+    expect(quote.discountMinor).toBe(1_000);
+    expect(quote.items[0]).toMatchObject({
+      finalPriceMinor: 9_000,
+      promotionSnapshot: {
+        source: 'CAMPAIGN',
+        campaignId: 'campaign-10',
+        priority: 10,
+      },
+    });
+  });
+
+  it('uses the larger timed campaign discount when campaign priorities are equal', async () => {
     const quote = await service({
       campaigns: [
         {
@@ -44,22 +80,21 @@ describe('PricingService', () => {
       ],
     }).quote([target]);
 
-    expect(quote.subtotalMinor).toBe(10_000);
-    expect(quote.discountMinor).toBe(2_000);
-    expect(quote.items[0]).toMatchObject({
-      finalPriceMinor: 8_000,
-      promotionSnapshot: { source: 'CAMPAIGN', campaignId: 'campaign-20' },
+    expect(quote.items[0].promotionSnapshot).toMatchObject({
+      source: 'CAMPAIGN',
+      campaignId: 'campaign-20',
     });
   });
 
-  it('uses a coupon only when it improves the best automatic campaign price', async () => {
+  it('uses a higher-priority coupon even when its discount is smaller', async () => {
     const now = new Date();
     const coupon = {
       id: 'coupon-1',
       code: 'EXAM',
       name: 'Exam',
       kind: 'PERCENTAGE',
-      amount: 3000,
+      amount: 1000,
+      priority: 10,
       startsAt: new Date(now.getTime() - 1),
       endsAt: new Date(now.getTime() + 60_000),
       isActive: true,
@@ -85,14 +120,45 @@ describe('PricingService', () => {
       coupon,
     }).quote([target], 'exam', 'student-1');
 
-    expect(quote.discountMinor).toBe(3_000);
+    expect(quote.discountMinor).toBe(1_000);
     expect(quote.coupon).toMatchObject({
       id: 'coupon-1',
-      discountMinor: 3_000,
+      discountMinor: 1_000,
     });
     expect(quote.items[0].promotionSnapshot).toMatchObject({
       source: 'COUPON',
       code: 'EXAM',
+      priority: 10,
+    });
+  });
+
+  it('uses the stable lowest ID when priorities and discounts are equal', async () => {
+    const quote = await service({
+      campaigns: [
+        {
+          id: 'campaign-z',
+          name: 'Z',
+          kind: 'PERCENTAGE',
+          amount: 2000,
+          priority: 5,
+          appliesToAll: true,
+          targets: [],
+        },
+        {
+          id: 'campaign-a',
+          name: 'A',
+          kind: 'PERCENTAGE',
+          amount: 2000,
+          priority: 5,
+          appliesToAll: true,
+          targets: [],
+        },
+      ],
+    }).quote([target]);
+
+    expect(quote.items[0].promotionSnapshot).toMatchObject({
+      source: 'CAMPAIGN',
+      campaignId: 'campaign-a',
     });
   });
 });

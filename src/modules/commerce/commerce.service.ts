@@ -1700,6 +1700,7 @@ export class CommerceService {
         amount: dto.amount,
         startsAt: dto.startsAt,
         endsAt: dto.endsAt,
+        priority: dto.priority ?? 0,
         appliesToAll: dto.appliesToAll ?? false,
         minimumOrderMinor: dto.minimumOrderMinor ?? 0,
         maximumDiscountMinor: dto.maximumDiscountMinor,
@@ -1762,6 +1763,7 @@ export class CommerceService {
           ...(dto.amount !== undefined ? { amount: dto.amount } : {}),
           ...(dto.startsAt !== undefined ? { startsAt: dto.startsAt } : {}),
           ...(dto.endsAt !== undefined ? { endsAt: dto.endsAt } : {}),
+          ...(dto.priority !== undefined ? { priority: dto.priority } : {}),
           ...(dto.appliesToAll !== undefined ? { appliesToAll } : {}),
           ...(dto.minimumOrderMinor !== undefined
             ? { minimumOrderMinor: dto.minimumOrderMinor }

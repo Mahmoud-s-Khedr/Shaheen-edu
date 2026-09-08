@@ -89,7 +89,13 @@ export class CreateDiscountCampaignDto {
   amount!: number;
   @ApiProperty() @Type(() => Date) @IsDate() startsAt!: Date;
   @ApiProperty() @Type(() => Date) @IsDate() endsAt!: Date;
-  @ApiPropertyOptional() @IsOptional() @IsInt() priority?: number;
+  @ApiPropertyOptional({
+    default: 0,
+    description: 'Higher values take precedence; defaults to 0.',
+  })
+  @IsOptional()
+  @IsInt()
+  priority?: number;
   @ApiPropertyOptional() @IsOptional() @IsBoolean() appliesToAll?: boolean;
   @ApiPropertyOptional({ type: [PromotionTargetDto] })
   @IsOptional()
@@ -124,7 +130,12 @@ export class UpdateDiscountCampaignDto {
   @Type(() => Date)
   @IsDate()
   endsAt?: Date;
-  @ApiPropertyOptional() @IsOptional() @IsInt() priority?: number;
+  @ApiPropertyOptional({
+    description: 'Higher values take precedence; defaults to 0.',
+  })
+  @IsOptional()
+  @IsInt()
+  priority?: number;
   @ApiPropertyOptional() @IsOptional() @IsBoolean() appliesToAll?: boolean;
   @ApiPropertyOptional({ type: [PromotionTargetDto] })
   @IsOptional()

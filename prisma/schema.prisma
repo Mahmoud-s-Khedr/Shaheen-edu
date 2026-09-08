@@ -2691,6 +2691,7 @@ model Coupon {
   amount               Int
   startsAt             DateTime
   endsAt               DateTime
+  priority             Int                 @default(0)
   isActive             Boolean             @default(true)
   appliesToAll         Boolean             @default(false)
   minimumOrderMinor    Int                 @default(0)
@@ -2706,7 +2707,7 @@ model Coupon {
   createdAt            DateTime            @default(now())
   updatedAt            DateTime            @updatedAt
 
-  @@index([isActive, startsAt, endsAt])
+  @@index([isActive, startsAt, endsAt, priority])
 }
 
 model CouponTarget {
