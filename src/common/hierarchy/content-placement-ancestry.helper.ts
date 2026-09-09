@@ -3,7 +3,6 @@ import type { Prisma } from '@prisma/client';
 type TransactionClient = Prisma.TransactionClient;
 
 type ResolvedAncestry = {
-  academicGradeId: string;
   subjectId: string;
   courseId: string;
   chapterId?: string;
@@ -15,17 +14,6 @@ type ResolvedAncestry = {
  * Keep that copy in sync whenever a hierarchy node changes parent.
  */
 export const contentPlacementAncestry = {
-  subjectMoved(
-    tx: TransactionClient,
-    subjectId: string,
-    academicGradeId: string,
-  ) {
-    return tx.contentPlacement.updateMany({
-      where: { subjectId },
-      data: { academicGradeId },
-    });
-  },
-
   courseMoved(
     tx: TransactionClient,
     courseId: string,
@@ -34,7 +22,6 @@ export const contentPlacementAncestry = {
     return tx.contentPlacement.updateMany({
       where: { resolvedCourseId: courseId },
       data: {
-        academicGradeId: ancestry.academicGradeId,
         subjectId: ancestry.subjectId,
       },
     });
@@ -48,7 +35,6 @@ export const contentPlacementAncestry = {
     return tx.contentPlacement.updateMany({
       where: { resolvedChapterId: chapterId },
       data: {
-        academicGradeId: ancestry.academicGradeId,
         subjectId: ancestry.subjectId,
         resolvedCourseId: ancestry.courseId,
       },
@@ -63,7 +49,6 @@ export const contentPlacementAncestry = {
     return tx.contentPlacement.updateMany({
       where: { resolvedLessonId: lessonId },
       data: {
-        academicGradeId: ancestry.academicGradeId,
         subjectId: ancestry.subjectId,
         resolvedCourseId: ancestry.courseId,
         resolvedChapterId: ancestry.chapterId,
@@ -79,7 +64,6 @@ export const contentPlacementAncestry = {
     return tx.contentPlacement.updateMany({
       where: { resolvedSectionId: sectionId },
       data: {
-        academicGradeId: ancestry.academicGradeId,
         subjectId: ancestry.subjectId,
         resolvedCourseId: ancestry.courseId,
         resolvedChapterId: ancestry.chapterId,

@@ -24,24 +24,18 @@ export class ReportExportWorker {
     this.worker = new Worker(
       REPORT_EXPORT_QUEUE,
       async (job) =>
-        this.cls.runWith(
-          { [CLS_ID]: job.data.correlationId } as any,
-          async () => {
-            this.diagnostics.emit({
-              event: 'queue_job_started',
-              operation: 'report_export_generate',
-              outcome: 'success',
-              reasonCode: 'QUEUE_PROCESSING',
-              references: {
-                job: this.diagnostics.reference(
-                  'report_export',
-                  job.data.jobId,
-                ),
-              },
-            });
-            return this.reports.generate(job.data.jobId);
-          },
-        ),
+        this.cls.runWith({ [CLS_ID]: job.data.correlationId }, async () => {
+          this.diagnostics.emit({
+            event: 'queue_job_started',
+            operation: 'report_export_generate',
+            outcome: 'success',
+            reasonCode: 'QUEUE_PROCESSING',
+            references: {
+              job: this.diagnostics.reference('report_export', job.data.jobId),
+            },
+          });
+          return this.reports.generate(job.data.jobId);
+        }),
       { connection: { url: this.config.get('redisUrl', { infer: true }) } },
     );
     this.worker.on('error', (error) => {

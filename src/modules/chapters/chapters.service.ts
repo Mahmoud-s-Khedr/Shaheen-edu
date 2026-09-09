@@ -399,8 +399,6 @@ export class ChaptersService {
         });
 
         await contentPlacementAncestry.chapterMoved(tx, id, {
-          academicGradeId:
-            newParent.academicGradeId ?? newParent.subject.academicGradeId,
           subjectId: newParent.subjectId,
           courseId: newParent.id,
         });

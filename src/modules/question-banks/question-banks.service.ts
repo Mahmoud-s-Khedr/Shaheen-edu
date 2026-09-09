@@ -143,7 +143,15 @@ export class QuestionBanksService {
       include: {
         source: { include: { publisher: { select: { displayName: true } } } },
         bank: true,
-        course: { include: { subject: true, academicGrade: true } },
+        course: {
+          include: {
+            subject: {
+              include: {
+                gradeAssignments: { include: { academicGrade: true } },
+              },
+            },
+          },
+        },
         placements: { include: this.placementInclude() },
         contentBlocks: {
           include: { asset: { include: { video: true } } },
@@ -1051,15 +1059,27 @@ export class QuestionBanksService {
       course:
         q.subjectId || q.academicGradeId
           ? {
-              ...(q.subjectId ? { subject: { id: q.subjectId } } : {}),
-              ...(q.academicGradeId
-                ? { academicGradeId: q.academicGradeId }
-                : {}),
+              subject: {
+                ...(q.subjectId ? { id: q.subjectId } : {}),
+                ...(q.academicGradeId
+                  ? {
+                      gradeAssignments: {
+                        some: { academicGradeId: q.academicGradeId },
+                      },
+                    }
+                  : {}),
+              },
             }
           : undefined,
     };
     const include: any = {
-      course: { include: { subject: true, academicGrade: true } },
+      course: {
+        include: {
+          subject: {
+            include: { gradeAssignments: { include: { academicGrade: true } } },
+          },
+        },
+      },
       placements: { include: this.placementInclude() },
       contentBlocks: {
         include: { asset: true },
@@ -1108,7 +1128,7 @@ export class QuestionBanksService {
             ? Prisma.sql`EXISTS (SELECT 1 FROM "QuestionPlacement" qp WHERE qp."questionId" = t.id AND ${Prisma.raw(`qp."${Object.keys(placementWhere)[0]}"`)} = ${Object.values(placementWhere)[0]})`
             : undefined,
           q.subjectId || q.academicGradeId
-            ? Prisma.sql`EXISTS (SELECT 1 FROM "Course" c JOIN "Subject" s ON s.id = c."subjectId" WHERE c.id = t."courseId" ${q.subjectId ? Prisma.sql`AND s.id = ${q.subjectId}` : Prisma.empty} ${q.academicGradeId ? Prisma.sql`AND c."academicGradeId" = ${q.academicGradeId}` : Prisma.empty})`
+            ? Prisma.sql`EXISTS (SELECT 1 FROM "Course" c JOIN "Subject" s ON s.id = c."subjectId" ${q.academicGradeId ? Prisma.sql`JOIN "SubjectGrade" sg ON sg."subjectId" = s.id` : Prisma.empty} WHERE c.id = t."courseId" ${q.subjectId ? Prisma.sql`AND s.id = ${q.subjectId}` : Prisma.empty} ${q.academicGradeId ? Prisma.sql`AND sg."academicGradeId" = ${q.academicGradeId}` : Prisma.empty})`
             : undefined,
         ),
       },
@@ -1427,11 +1447,9 @@ export class QuestionBanksService {
     if (!question.placements.length)
       throw new ConflictException('Question requires a placement');
     if (
-      [
-        question.course,
-        question.course.subject,
-        question.course.academicGrade,
-      ].some((node: any) => node.status !== ContentStatus.PUBLISHED)
+      [question.course, question.course.subject].some(
+        (node: any) => node.status !== ContentStatus.PUBLISHED,
+      )
     )
       throw new ConflictException('Question course ancestry must be published');
     for (const reference of question.assets)
@@ -1896,13 +1914,10 @@ export class QuestionBanksService {
         courseName: x.course?.title ?? null,
         subjectId: x.course?.subjectId,
         subjectName: x.course?.subject?.title ?? null,
-        academicGradeId: x.course?.academicGradeId,
-        academicGradeName: x.course?.academicGrade
-          ? {
-              ar: x.course.academicGrade.titleAr,
-              en: x.course.academicGrade.titleEn,
-            }
-          : null,
+        academicGradeIds:
+          x.course?.subject.gradeAssignments.map(
+            (grade: { academicGradeId: string }) => grade.academicGradeId,
+          ) ?? [],
       },
       placements: (x.placements ?? []).map((placement: any) => ({
         courseId: placement.courseId,

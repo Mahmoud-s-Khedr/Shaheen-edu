@@ -104,7 +104,9 @@ describe('Assessments (e2e)', () => {
     const now = new Date();
     const subject = await prisma.subject.create({
       data: {
-        academicGradeId: gradeId,
+        gradeAssignments: {
+          create: { academicGradeId: gradeId, sortOrder: 1 },
+        },
         title: 'Assessments Subject',
         slug: 'assessments-subject',
         sortOrder: 1,
@@ -912,11 +914,12 @@ describe('Assessments (e2e)', () => {
         where: { loginIdentifier: superAdminEmail },
       });
       const sortOrder =
-        (await prisma.subject.count({ where: { academicGradeId: gradeId } })) +
-        1;
+        (await prisma.subjectGrade.count({
+          where: { academicGradeId: gradeId },
+        })) + 1;
       const subject = await prisma.subject.create({
         data: {
-          academicGradeId: gradeId,
+          gradeAssignments: { create: { academicGradeId: gradeId, sortOrder } },
           title: 'Multi-Scope Subject',
           slug: 'multi-scope-subject',
           sortOrder,

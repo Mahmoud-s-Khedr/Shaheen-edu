@@ -257,7 +257,7 @@ describe('Parent (e2e)', () => {
     });
     const subject = await prisma.subject.create({
       data: {
-        academicGradeId,
+        gradeAssignments: { create: { academicGradeId, sortOrder: 1 } },
         title: 'Parent analytics subject',
         slug: 'parent-analytics-subject',
         sortOrder: 1,

@@ -52,7 +52,7 @@ export const leaderboardPerformanceJourney: JourneyDefinition = {
         const subject = await create('/admin/subjects', {
           title: factory.title('Performance subject'),
           slug: factory.slug('performance-subject'),
-          academicGradeId: gradeId,
+          academicGradeIds: [gradeId],
         });
         subjectId = subject.id;
         context.created.subjects.push(subjectId);

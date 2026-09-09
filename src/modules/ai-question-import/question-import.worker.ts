@@ -190,7 +190,7 @@ export class QuestionImportWorker {
     correlationId: string | undefined,
     callback: () => Promise<T>,
   ): Promise<T> {
-    return this.cls.runWith({ [CLS_ID]: correlationId } as any, async () => {
+    return this.cls.runWith({ [CLS_ID]: correlationId }, async () => {
       this.diagnostics.emit({
         event: 'queue_job_started',
         operation: 'question_import_job',

@@ -166,8 +166,8 @@ export const apiCoverageJourney: JourneyDefinition = {
     await step('Exercising hierarchy access, move, archive, restore, and delete variants', async () => {
       const g = await create('/admin/academic-grades', { title: factory.localizedTitle('Coverage grade'), slug: factory.slug('coverage-grade') });
       const targetG = await create('/admin/academic-grades', { title: factory.localizedTitle('Coverage grade target'), slug: factory.slug('coverage-grade-target') });
-      const s = await create('/admin/subjects', { title: factory.title('Coverage subject'), slug: factory.slug('coverage-subject'), academicGradeId: g.id });
-      const targetS = await create('/admin/subjects', { title: factory.title('Coverage subject target'), slug: factory.slug('coverage-subject-target'), academicGradeId: targetG.id });
+      const s = await create('/admin/subjects', { title: factory.title('Coverage subject'), slug: factory.slug('coverage-subject'), academicGradeIds: [g.id] });
+      const targetS = await create('/admin/subjects', { title: factory.title('Coverage subject target'), slug: factory.slug('coverage-subject-target'), academicGradeIds: [targetG.id] });
       const c = await create('/admin/courses', { title: factory.title('Coverage course'), slug: factory.slug('coverage-course'), subjectId: s.id, accessType: 'PUBLIC' });
       const targetC = await create('/admin/courses', { title: factory.title('Coverage course target'), slug: factory.slug('coverage-course-target'), subjectId: targetS.id, accessType: 'PUBLIC' });
       const ch = await create('/admin/chapters', { title: factory.title('Coverage chapter'), slug: factory.slug('coverage-chapter'), courseId: c.id });
@@ -189,7 +189,7 @@ export const apiCoverageJourney: JourneyDefinition = {
       }
       // Delete a separate, leaf-first draft hierarchy so the move targets stay valid above.
       const dg = await create('/admin/academic-grades', { title: factory.localizedTitle('Delete grade'), slug: factory.slug('delete-grade') });
-      const ds = await create('/admin/subjects', { title: factory.title('Delete subject'), slug: factory.slug('delete-subject'), academicGradeId: dg.id });
+      const ds = await create('/admin/subjects', { title: factory.title('Delete subject'), slug: factory.slug('delete-subject'), academicGradeIds: [dg.id] });
       const dc = await create('/admin/courses', { title: factory.title('Delete course'), slug: factory.slug('delete-course'), subjectId: ds.id, accessType: 'PUBLIC' });
       const dch = await create('/admin/chapters', { title: factory.title('Delete chapter'), slug: factory.slug('delete-chapter'), courseId: dc.id });
       const dl = await create('/admin/lessons', { title: factory.title('Delete lesson'), slug: factory.slug('delete-lesson'), chapterId: dch.id });

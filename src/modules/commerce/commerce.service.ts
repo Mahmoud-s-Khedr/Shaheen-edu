@@ -120,9 +120,15 @@ export class CommerceService {
         where: {
           id: dto.targetId,
           status: published,
-          academicGradeId: gradeId,
-          academicGrade: { status: published },
-          subject: { status: published },
+          subject: {
+            status: published,
+            gradeAssignments: {
+              some: {
+                academicGradeId: gradeId,
+                academicGrade: { status: published },
+              },
+            },
+          },
         },
       });
       if (!course) throw new NotFoundException('Purchasable course not found');
@@ -147,9 +153,15 @@ export class CommerceService {
         status: published,
         course: {
           status: published,
-          academicGradeId: gradeId,
-          academicGrade: { status: published },
-          subject: { status: published },
+          subject: {
+            status: published,
+            gradeAssignments: {
+              some: {
+                academicGradeId: gradeId,
+                academicGrade: { status: published },
+              },
+            },
+          },
         },
       },
       include: { course: true },

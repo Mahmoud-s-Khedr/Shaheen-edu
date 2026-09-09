@@ -558,21 +558,18 @@ export class AssetsService {
     if (resource === 'subjects') {
       const x = await this.prisma.subject.findUnique({
         where: { id },
-        include: { academicGrade: true },
+        include: { gradeAssignments: true },
       });
       if (!x) throw new NotFoundException('Hierarchy record not found');
       return {
         coverAssetId: x.coverAssetId,
-        nodes: [
-          { ...x, type: 'SUBJECT' },
-          { ...x.academicGrade, type: 'ACADEMIC_GRADE' },
-        ],
+        nodes: [{ ...x, type: 'SUBJECT' }],
       };
     }
     if (resource === 'courses') {
       const x = await this.prisma.course.findUnique({
         where: { id },
-        include: { subject: { include: { academicGrade: true } } },
+        include: { subject: true },
       });
       if (!x) throw new NotFoundException('Hierarchy record not found');
       return {
@@ -580,7 +577,6 @@ export class AssetsService {
         nodes: [
           { ...x, type: 'COURSE' },
           { ...x.subject, type: 'SUBJECT' },
-          { ...x.subject.academicGrade, type: 'ACADEMIC_GRADE' },
         ],
       };
     }
@@ -589,7 +585,7 @@ export class AssetsService {
         where: { id },
         include: {
           course: {
-            include: { subject: { include: { academicGrade: true } } },
+            include: { subject: true },
           },
         },
       });
@@ -600,7 +596,6 @@ export class AssetsService {
           { ...x, type: 'CHAPTER' },
           { ...x.course, type: 'COURSE' },
           { ...x.course.subject, type: 'SUBJECT' },
-          { ...x.course.subject.academicGrade, type: 'ACADEMIC_GRADE' },
         ],
       };
     }
@@ -611,7 +606,7 @@ export class AssetsService {
           chapter: {
             include: {
               course: {
-                include: { subject: { include: { academicGrade: true } } },
+                include: { subject: true },
               },
             },
           },
@@ -625,7 +620,6 @@ export class AssetsService {
           { ...x.chapter, type: 'CHAPTER' },
           { ...x.chapter.course, type: 'COURSE' },
           { ...x.chapter.course.subject, type: 'SUBJECT' },
-          { ...x.chapter.course.subject.academicGrade, type: 'ACADEMIC_GRADE' },
         ],
       };
     }
@@ -638,7 +632,7 @@ export class AssetsService {
               chapter: {
                 include: {
                   course: {
-                    include: { subject: { include: { academicGrade: true } } },
+                    include: { subject: true },
                   },
                 },
               },
@@ -655,10 +649,6 @@ export class AssetsService {
           { ...x.lesson.chapter, type: 'CHAPTER' },
           { ...x.lesson.chapter.course, type: 'COURSE' },
           { ...x.lesson.chapter.course.subject, type: 'SUBJECT' },
-          {
-            ...x.lesson.chapter.course.subject.academicGrade,
-            type: 'ACADEMIC_GRADE',
-          },
         ],
       };
     }

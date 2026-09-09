@@ -136,8 +136,12 @@ export class PerformanceService {
           status: ContentStatus.PUBLISHED,
           subject: {
             status: ContentStatus.PUBLISHED,
-            academicGradeId: student.academicGradeId ?? '__missing__',
-            academicGrade: { status: ContentStatus.PUBLISHED },
+            gradeAssignments: {
+              some: {
+                academicGradeId: student.academicGradeId ?? '__missing__',
+                academicGrade: { status: ContentStatus.PUBLISHED },
+              },
+            },
           },
         },
       },

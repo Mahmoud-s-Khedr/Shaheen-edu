@@ -371,9 +371,6 @@ export class LessonsService {
         });
 
         await contentPlacementAncestry.lessonMoved(tx, id, {
-          academicGradeId:
-            newParent.course.academicGradeId ??
-            newParent.course.subject.academicGradeId,
           subjectId: newParent.course.subjectId,
           courseId: newParent.courseId,
           chapterId: newParent.id,

@@ -66,10 +66,7 @@ describe('CatalogService hierarchy hasChildren', () => {
               _count: {
                 select: {
                   courses: {
-                    where: {
-                      academicGradeId: 'grade-1',
-                      status: ContentStatus.PUBLISHED,
-                    },
+                    where: { status: ContentStatus.PUBLISHED },
                   },
                 },
               },
@@ -106,15 +103,13 @@ describe('CatalogService hierarchy hasChildren', () => {
     expect(result.data).toHaveLength(1);
   });
 
-  it('requires a grade when listing courses for a shared subject', async () => {
+  it('lists shared-subject courses without requiring a grade', async () => {
     const { service, prisma } = buildService();
-    prisma.subject.findUnique.mockResolvedValue({
-      _count: { gradeAssignments: 2 },
-    });
-
+    prisma.course.findMany.mockResolvedValue([]);
+    prisma.course.count.mockResolvedValue(0);
     await expect(
       service.courses({ subjectId: 'shared-subject', page: 1, limit: 20 }),
-    ).rejects.toThrow('academicGradeId is required');
+    ).resolves.toMatchObject({ data: [] });
   });
 
   it('scopes public course listings by academic grade', async () => {
@@ -133,7 +128,9 @@ describe('CatalogService hierarchy hasChildren', () => {
       expect.objectContaining({
         where: expect.objectContaining({
           subjectId: 'shared-subject',
-          academicGradeId: 'grade-11',
+          subject: {
+            gradeAssignments: { some: { academicGradeId: 'grade-11' } },
+          },
         }),
       }),
     );
@@ -149,15 +146,6 @@ describe('CatalogService hierarchy hasChildren', () => {
       sortOrder: 1,
       coverAssetId: null,
       _count: { chapters: 2 },
-      academicGrade: {
-        id: 'grade',
-        title: 'Grade',
-        slug: 'grade',
-        description: null,
-        sortOrder: 1,
-        coverAssetId: null,
-        _count: { subjectAssignments: 1 },
-      },
       subject: {
         id: 'subject',
         title: 'Subject',
@@ -166,15 +154,7 @@ describe('CatalogService hierarchy hasChildren', () => {
         sortOrder: 1,
         coverAssetId: null,
         _count: { courses: 1 },
-        academicGrade: {
-          id: 'grade',
-          title: 'Grade',
-          slug: 'grade',
-          description: null,
-          sortOrder: 1,
-          coverAssetId: null,
-          _count: { subjects: 1 },
-        },
+        gradeAssignments: [{ academicGradeId: 'grade' }],
       },
     });
     prisma.$transaction.mockResolvedValue([2, 4, 7]);
@@ -184,8 +164,12 @@ describe('CatalogService hierarchy hasChildren', () => {
     expect(prisma.course.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
-          subject: { status: ContentStatus.PUBLISHED },
-          academicGrade: { status: ContentStatus.PUBLISHED },
+          subject: expect.objectContaining({
+            status: ContentStatus.PUBLISHED,
+            gradeAssignments: {
+              some: { academicGrade: { status: ContentStatus.PUBLISHED } },
+            },
+          }),
         }),
       }),
     );

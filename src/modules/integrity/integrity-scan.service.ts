@@ -42,19 +42,14 @@ export class IntegrityScanService {
         await Promise.all([
           this.count(Prisma.sql`
             SELECT count(*)::bigint AS count FROM "Course" c
-            LEFT JOIN "SubjectGrade" sg ON sg."subjectId" = c."subjectId"
-              AND sg."academicGradeId" = c."academicGradeId"
-            WHERE sg."subjectId" IS NULL
+            WHERE NOT EXISTS (SELECT 1 FROM "SubjectGrade" sg WHERE sg."subjectId" = c."subjectId")
           `),
           this.count(Prisma.sql`
-            SELECT count(*)::bigint AS count FROM "SubjectGrade" sg
-            JOIN "Subject" s ON s.id = sg."subjectId" AND s.status = 'PUBLISHED'
-            WHERE EXISTS (SELECT 1 FROM "Course" c WHERE c."subjectId" = s.id AND c.status = 'PUBLISHED')
-              AND NOT EXISTS (SELECT 1 FROM "Course" c WHERE c."subjectId" = s.id AND c."academicGradeId" = sg."academicGradeId" AND c.status = 'PUBLISHED')
+            SELECT 0::bigint AS count
           `),
           this.count(Prisma.sql`
             SELECT count(*)::bigint AS count FROM (
-              SELECT c.id, row_number() OVER (PARTITION BY c."subjectId", c."academicGradeId" ORDER BY c."sortOrder", c.id) AS expected, c."sortOrder"
+              SELECT c.id, row_number() OVER (PARTITION BY c."subjectId" ORDER BY c."sortOrder", c.id) AS expected, c."sortOrder"
               FROM "Course" c WHERE c.status <> 'ARCHIVED'
             ) ordered WHERE "sortOrder" <> expected
           `),
@@ -64,9 +59,8 @@ export class IntegrityScanService {
             WHERE c.status = 'PUBLISHED' AND s.status <> 'PUBLISHED'
           `),
           this.prisma.$queryRaw<IdRow[]>(Prisma.sql`
-            SELECT c.id FROM "Course" c LEFT JOIN "SubjectGrade" sg
-              ON sg."subjectId" = c."subjectId" AND sg."academicGradeId" = c."academicGradeId"
-            WHERE sg."subjectId" IS NULL LIMIT 5
+            SELECT c.id FROM "Course" c WHERE NOT EXISTS
+              (SELECT 1 FROM "SubjectGrade" sg WHERE sg."subjectId" = c."subjectId") LIMIT 5
           `),
         ]);
       this.diagnostics.emit({

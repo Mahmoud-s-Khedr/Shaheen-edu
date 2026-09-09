@@ -78,15 +78,37 @@ type ScopeRow = {
 };
 
 const scopeInclude = {
-  course: { include: { subject: true, academicGrade: true } },
+  course: {
+    include: {
+      subject: {
+        include: { gradeAssignments: { include: { academicGrade: true } } },
+      },
+    },
+  },
   chapter: {
-    include: { course: { include: { subject: true, academicGrade: true } } },
+    include: {
+      course: {
+        include: {
+          subject: {
+            include: { gradeAssignments: { include: { academicGrade: true } } },
+          },
+        },
+      },
+    },
   },
   lesson: {
     include: {
       chapter: {
         include: {
-          course: { include: { subject: true, academicGrade: true } },
+          course: {
+            include: {
+              subject: {
+                include: {
+                  gradeAssignments: { include: { academicGrade: true } },
+                },
+              },
+            },
+          },
         },
       },
     },
@@ -97,7 +119,15 @@ const scopeInclude = {
         include: {
           chapter: {
             include: {
-              course: { include: { subject: true, academicGrade: true } },
+              course: {
+                include: {
+                  subject: {
+                    include: {
+                      gradeAssignments: { include: { academicGrade: true } },
+                    },
+                  },
+                },
+              },
             },
           },
         },
@@ -379,9 +409,15 @@ export class AssessmentsService {
         },
         course: {
           status: ContentStatus.PUBLISHED,
-          ...(gradeId ? { academicGradeId: gradeId } : {}),
-          subject: { status: ContentStatus.PUBLISHED },
-          academicGrade: { status: ContentStatus.PUBLISHED },
+          subject: {
+            status: ContentStatus.PUBLISHED,
+            gradeAssignments: {
+              some: {
+                ...(gradeId ? { academicGradeId: gradeId } : {}),
+                academicGrade: { status: ContentStatus.PUBLISHED },
+              },
+            },
+          },
         },
       },
       include: {
@@ -1596,8 +1632,11 @@ export class AssessmentsService {
         return false;
       const course = nodes.at(-1);
       if (
-        course.academicGrade?.status !== ContentStatus.PUBLISHED ||
-        (gradeId && course.academicGradeId !== gradeId)
+        !course.subject.gradeAssignments.some(
+          (x: any) =>
+            x.academicGrade.status === ContentStatus.PUBLISHED &&
+            (!gradeId || x.academicGradeId === gradeId),
+        )
       )
         return false;
       if (!(await this.access.entitledForNodes(studentId, nodes))) return false;

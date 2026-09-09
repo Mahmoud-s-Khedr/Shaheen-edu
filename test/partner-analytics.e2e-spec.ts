@@ -91,7 +91,9 @@ describe('Content publisher partner analytics (e2e)', () => {
     });
     const subject = await prisma.subject.create({
       data: {
-        academicGradeId: grade.id,
+        gradeAssignments: {
+          create: { academicGradeId: grade.id, sortOrder: 1 },
+        },
         title: 'Analytics subject',
         slug: 'analytics-subject',
         sortOrder: 1,

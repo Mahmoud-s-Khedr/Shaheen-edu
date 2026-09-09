@@ -57,7 +57,7 @@ export const studentLearningJourney: JourneyDefinition = {
         const subject = await create('/admin/subjects', {
           title: factory.title('Learning subject'),
           slug: factory.slug('learning-subject'),
-          academicGradeId: gradeId,
+          academicGradeIds: [gradeId],
         });
         subjectId = subject.id;
         context.created.subjects.push(subject.id);

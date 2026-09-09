@@ -24,12 +24,6 @@ export class ReorderCourseDto {
   @IsString()
   subjectId!: string;
 
-  @ApiProperty({
-    description: 'The grade scope whose courses are being reordered',
-  })
-  @IsString()
-  academicGradeId!: string;
-
   @ApiProperty({ type: [ReorderCourseItemDto] })
   @ValidateNested({ each: true })
   @Type(() => ReorderCourseItemDto)

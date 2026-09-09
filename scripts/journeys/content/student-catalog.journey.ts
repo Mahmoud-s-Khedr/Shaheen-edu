@@ -59,7 +59,7 @@ export const studentCatalogJourney: JourneyDefinition = {
       const subject = await create('/admin/subjects', {
         title: factory.title('Student catalog subject'),
         slug: factory.slug('student-catalog-subject'),
-        academicGradeId: gradeId,
+        academicGradeIds: [gradeId],
       });
       subjectId = subject.id;
       context.created.subjects.push(subjectId);

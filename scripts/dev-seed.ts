@@ -334,7 +334,7 @@ class Seed {
       {
         title: `${MARK} Mathematics`,
         slug: fixture.slugs.subject,
-        academicGradeId: grade.id,
+        academicGradeIds: [grade.id],
       },
     );
     const course = await this.findOrCreate(

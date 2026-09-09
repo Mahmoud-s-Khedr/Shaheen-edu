@@ -159,7 +159,7 @@ describe('Academic hierarchy (e2e)', () => {
       expect(response.statusCode).toBe(201);
       const body = await json(response);
       expect(body.status).toBe('DRAFT');
-      expect(body.academicGradeId).toBe(gradeId);
+      expect(body.academicGradeId).toBeUndefined();
       expect(body.academicGradeIds).toEqual([gradeId]);
       subjectId = body.id;
     });
@@ -214,7 +214,6 @@ describe('Academic hierarchy (e2e)', () => {
         payload: {
           title: 'Grade 11 Algebra',
           subjectId,
-          academicGradeId: secondGradeId,
           accessType: 'PUBLIC',
         },
       });
@@ -225,7 +224,10 @@ describe('Academic hierarchy (e2e)', () => {
         method: 'POST',
         url: '/api/v1/admin/subjects',
         headers: authHeader(adminToken),
-        payload: { title: 'Grade 11 Geometry', academicGradeId: secondGradeId },
+        payload: {
+          title: 'Grade 11 Geometry',
+          academicGradeIds: [secondGradeId],
+        },
       });
       expect(otherSubject.statusCode).toBe(201);
       const otherSubjectId = (await json(otherSubject)).id;
@@ -262,7 +264,6 @@ describe('Academic hierarchy (e2e)', () => {
         payload: {
           title: 'Grade 11 Algebra II',
           subjectId,
-          academicGradeId: secondGradeId,
           accessType: 'PUBLIC',
         },
       });
@@ -275,17 +276,17 @@ describe('Academic hierarchy (e2e)', () => {
         headers: authHeader(adminToken),
         payload: {
           subjectId,
-          academicGradeId: secondGradeId,
           items: [
             { id: otherCourseId, sortOrder: 1 },
             { id: secondGradeCourseId, sortOrder: 2 },
+            { id: courseId, sortOrder: 3 },
           ],
         },
       });
       expect(reorderedCourses.statusCode).toBe(201);
       const coursesInSecondGrade = await app.inject({
         method: 'GET',
-        url: `/api/v1/admin/courses?subjectId=${subjectId}&academicGradeId=${secondGradeId}`,
+        url: `/api/v1/admin/courses?subjectId=${subjectId}`,
         headers: authHeader(adminToken),
       });
       expect((await json(coursesInSecondGrade)).data).toEqual(
@@ -409,12 +410,12 @@ describe('Academic hierarchy (e2e)', () => {
         method: 'POST',
         url: '/api/v1/admin/subjects',
         headers: authHeader(adminToken),
-        payload: { title: 'Physics', academicGradeId: 'does-not-exist' },
+        payload: { title: 'Physics', academicGradeIds: ['does-not-exist'] },
       });
       expect(response.statusCode).toBe(404);
     });
 
-    it('rejects a duplicate slug within the same parent, allows it under a different parent (409 / 201)', async () => {
+    it('rejects a duplicate subject slug globally', async () => {
       const first = await app.inject({
         method: 'POST',
         url: '/api/v1/admin/subjects',
@@ -422,7 +423,7 @@ describe('Academic hierarchy (e2e)', () => {
         payload: {
           title: 'Physics',
           slug: 'physics',
-          academicGradeId: gradeId,
+          academicGradeIds: [gradeId],
         },
       });
       expect(first.statusCode).toBe(201);
@@ -434,7 +435,7 @@ describe('Academic hierarchy (e2e)', () => {
         payload: {
           title: 'Physics Again',
           slug: 'physics',
-          academicGradeId: gradeId,
+          academicGradeIds: [gradeId],
         },
       });
       expect(duplicate.statusCode).toBe(409);
@@ -454,10 +455,10 @@ describe('Academic hierarchy (e2e)', () => {
         payload: {
           title: 'Physics',
           slug: 'physics',
-          academicGradeId: otherGradeId,
+          academicGradeIds: [otherGradeId],
         },
       });
-      expect(sameSlugDifferentParent.statusCode).toBe(201);
+      expect(sameSlugDifferentParent.statusCode).toBe(409);
     });
 
     it('applies sequential PATCH updates without a concurrency token', async () => {
@@ -465,7 +466,7 @@ describe('Academic hierarchy (e2e)', () => {
         method: 'POST',
         url: '/api/v1/admin/subjects',
         headers: authHeader(adminToken),
-        payload: { title: 'Chemistry', academicGradeId: gradeId },
+        payload: { title: 'Chemistry', academicGradeIds: [gradeId] },
       });
       const subjectId = (await json(created)).id;
 
@@ -514,6 +515,158 @@ describe('Academic hierarchy (e2e)', () => {
     });
   });
 
+  describe('published subject grade assignments', () => {
+    it('rejects replacing every published-grade assignment with draft grades, but permits adding a draft-grade assignment', async () => {
+      const publishedGrade = await app.inject({
+        method: 'POST',
+        url: '/api/v1/admin/academic-grades',
+        headers: authHeader(adminToken),
+        payload: {
+          title: {
+            ar: 'Published Subject Source Grade',
+            en: 'Published Subject Source Grade',
+          },
+        },
+      });
+      expect(publishedGrade.statusCode).toBe(201);
+      const publishedGradeId = (await json(publishedGrade)).id;
+
+      const publishGrade = await app.inject({
+        method: 'POST',
+        url: `/api/v1/admin/academic-grades/${publishedGradeId}/publish`,
+        headers: authHeader(adminToken),
+      });
+      expect(publishGrade.statusCode).toBe(201);
+
+      const draftGrade = await app.inject({
+        method: 'POST',
+        url: '/api/v1/admin/academic-grades',
+        headers: authHeader(adminToken),
+        payload: {
+          title: {
+            ar: 'Draft Subject Target Grade',
+            en: 'Draft Subject Target Grade',
+          },
+        },
+      });
+      expect(draftGrade.statusCode).toBe(201);
+      const draftGradeId = (await json(draftGrade)).id;
+
+      const subject = await app.inject({
+        method: 'POST',
+        url: '/api/v1/admin/subjects',
+        headers: authHeader(adminToken),
+        payload: {
+          title: 'Published Subject Without Courses',
+          academicGradeIds: [publishedGradeId],
+        },
+      });
+      expect(subject.statusCode).toBe(201);
+      const subjectId = (await json(subject)).id;
+
+      const publishSubject = await app.inject({
+        method: 'POST',
+        url: `/api/v1/admin/subjects/${subjectId}/publish`,
+        headers: authHeader(adminToken),
+      });
+      expect(publishSubject.statusCode).toBe(201);
+
+      const onlyDraftGrades = await app.inject({
+        method: 'PATCH',
+        url: `/api/v1/admin/subjects/${subjectId}`,
+        headers: authHeader(adminToken),
+        payload: { academicGradeIds: [draftGradeId] },
+      });
+      expect(onlyDraftGrades.statusCode).toBe(409);
+      expect((await json(onlyDraftGrades)).message.en).toBe(
+        'A published subject must remain under a published academic grade',
+      );
+
+      const unchanged = await app.inject({
+        method: 'GET',
+        url: `/api/v1/admin/subjects/${subjectId}`,
+        headers: authHeader(adminToken),
+      });
+      expect(unchanged.statusCode).toBe(200);
+      expect(await json(unchanged)).toMatchObject({
+        status: 'PUBLISHED',
+        academicGradeIds: [publishedGradeId],
+      });
+
+      const retainPublishedGrade = await app.inject({
+        method: 'PATCH',
+        url: `/api/v1/admin/subjects/${subjectId}`,
+        headers: authHeader(adminToken),
+        payload: { academicGradeIds: [publishedGradeId, draftGradeId] },
+      });
+      expect(retainPublishedGrade.statusCode).toBe(200);
+      expect(await json(retainPublishedGrade)).toMatchObject({
+        status: 'PUBLISHED',
+        academicGradeIds: expect.arrayContaining([
+          publishedGradeId,
+          draftGradeId,
+        ]),
+      });
+    });
+
+    it('allows a draft subject to be assigned solely to a draft grade', async () => {
+      const publishedGrade = await app.inject({
+        method: 'POST',
+        url: '/api/v1/admin/academic-grades',
+        headers: authHeader(adminToken),
+        payload: {
+          title: {
+            ar: 'Draft Subject Published Source Grade',
+            en: 'Draft Subject Published Source Grade',
+          },
+        },
+      });
+      const publishedGradeId = (await json(publishedGrade)).id;
+      const publishGrade = await app.inject({
+        method: 'POST',
+        url: `/api/v1/admin/academic-grades/${publishedGradeId}/publish`,
+        headers: authHeader(adminToken),
+      });
+      expect(publishGrade.statusCode).toBe(201);
+
+      const draftGrade = await app.inject({
+        method: 'POST',
+        url: '/api/v1/admin/academic-grades',
+        headers: authHeader(adminToken),
+        payload: {
+          title: {
+            ar: 'Draft Subject Only Target Grade',
+            en: 'Draft Subject Only Target Grade',
+          },
+        },
+      });
+      const draftGradeId = (await json(draftGrade)).id;
+
+      const subject = await app.inject({
+        method: 'POST',
+        url: '/api/v1/admin/subjects',
+        headers: authHeader(adminToken),
+        payload: {
+          title: 'Draft Subject Reassignment',
+          academicGradeIds: [publishedGradeId],
+        },
+      });
+      const subjectId = (await json(subject)).id;
+
+      const reassigned = await app.inject({
+        method: 'PATCH',
+        url: `/api/v1/admin/subjects/${subjectId}`,
+        headers: authHeader(adminToken),
+        payload: { academicGradeIds: [draftGradeId] },
+      });
+      expect(reassigned.statusCode).toBe(200);
+      expect(await json(reassigned)).toMatchObject({
+        status: 'DRAFT',
+        academicGradeIds: [draftGradeId],
+      });
+    });
+  });
+
   describe('atomic reorder and move', () => {
     let gradeId: string;
     let subjectA: { id: string };
@@ -538,7 +691,7 @@ describe('Academic hierarchy (e2e)', () => {
           method: 'POST',
           url: '/api/v1/admin/subjects',
           headers: authHeader(adminToken),
-          payload: { title, academicGradeId: gradeId },
+          payload: { title, academicGradeIds: [gradeId] },
         });
         const body = await json(created);
         if (key === 'subjectA') subjectA = { id: body.id };
@@ -636,7 +789,7 @@ describe('Academic hierarchy (e2e)', () => {
         },
       });
       expect(move.statusCode).toBe(201);
-      expect((await json(move)).academicGradeId).toBe(targetGradeId);
+      expect((await json(move)).academicGradeIds).toEqual([targetGradeId]);
 
       const oldGradeList = await app.inject({
         method: 'GET',
@@ -681,7 +834,7 @@ describe('Academic hierarchy (e2e)', () => {
         method: 'POST',
         url: '/api/v1/admin/subjects',
         headers: authHeader(adminToken),
-        payload: { title: 'Archive Subject', academicGradeId: gradeId },
+        payload: { title: 'Archive Subject', academicGradeIds: [gradeId] },
       });
       const body = await json(subject);
       subjectId = body.id;

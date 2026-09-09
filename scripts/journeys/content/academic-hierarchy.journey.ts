@@ -8,18 +8,18 @@ export const hierarchyJourney: JourneyDefinition = {
     let grade: any; let subject: any; let course: any; let chapter: any; let lesson: any; let section: any;
     await step('Creating complete academic hierarchy', async () => {
       grade = await create('/admin/academic-grades', { title: factory.localizedTitle('Grade'), slug: factory.slug('grade') });
-      subject = await create('/admin/subjects', { title: factory.title('Subject'), slug: factory.slug('subject'), academicGradeId: grade.id });
+      subject = await create('/admin/subjects', { title: factory.title('Subject'), slug: factory.slug('subject'), academicGradeIds: [grade.id] });
       course = await create('/admin/courses', { title: factory.title('Course'), slug: factory.slug('course'), subjectId: subject.id, accessType: 'PUBLIC' });
       chapter = await create('/admin/chapters', { title: factory.title('Chapter'), slug: factory.slug('chapter'), courseId: course.id });
       lesson = await create('/admin/lessons', { title: factory.title('Lesson'), slug: factory.slug('lesson'), chapterId: chapter.id });
       section = await create('/admin/sections', { title: factory.title('Section'), slug: factory.slug('section'), lessonId: lesson.id });
-      assert(subject.academicGradeId === grade.id && course.subjectId === subject.id && chapter.courseId === course.id && lesson.chapterId === chapter.id && section.lessonId === lesson.id, 'Hierarchy parent IDs must match');
+      assert(subject.academicGradeIds.includes(grade.id) && course.subjectId === subject.id && chapter.courseId === course.id && lesson.chapterId === chapter.id && section.lessonId === lesson.id, 'Hierarchy parent IDs must match');
       Object.assign(context.academic, { gradeId: grade.id, subjectId: subject.id, courseId: course.id, chapterId: chapter.id, lessonId: lesson.id, sectionId: section.id }); for (const [kind, item] of Object.entries({ grades: grade, subjects: subject, courses: course, chapters: chapter, lessons: lesson, sections: section })) context.created[kind].push((item as any).id);
     });
     await step('Searching hierarchy lists with normalized Arabic text and pagination metadata', async () => {
       const searchGrade = await create('/admin/academic-grades', { title: factory.localizedTitle('Search grade'), slug: factory.slug('search-grade') });
       context.created.grades.push(searchGrade.id);
-      const searchable = await create('/admin/subjects', { title: `إسلاميات-${factory.runId}`, slug: factory.slug('arabic-subject'), academicGradeId: searchGrade.id });
+      const searchable = await create('/admin/subjects', { title: `إسلاميات-${factory.runId}`, slug: factory.slug('arabic-subject'), academicGradeIds: [searchGrade.id] });
       context.created.subjects.push(searchable.id);
       const subjects = await admin.request<any>('GET', `/admin/subjects?academicGradeId=${searchGrade.id}&q=${encodeURIComponent(`اسلاميات-${factory.runId}`)}&page=1&limit=1`);
       expectStatus(subjects, 200);
@@ -32,7 +32,7 @@ export const hierarchyJourney: JourneyDefinition = {
       const read = await admin.request<any>('GET', `/admin/sections/${section.id}`); expectStatus(read, 200); assert(read.body.lessonId === lesson.id, 'Section read must retain parent');
       const newTitle = factory.title('Updated lesson');
       const update = await admin.request<any>('PATCH', `/admin/lessons/${lesson.id}`, { title: newTitle }); expectStatus(update, 200); lesson = update.body; assert(lesson.title === newTitle, 'Update must persist the new title');
-      const invalid = await admin.request<any>('POST', '/admin/subjects', { title: factory.title('Invalid subject'), academicGradeId: 'missing-parent-id' }); expectStatus(invalid, 404);
+      const invalid = await admin.request<any>('POST', '/admin/subjects', { title: factory.title('Invalid subject'), academicGradeIds: ['missing-parent-id'] }); expectStatus(invalid, 404);
       const denied = await clients.student.request<any>('POST', '/admin/academic-grades', { title: factory.localizedTitle('Denied') }); expectStatus(denied, 403);
     });
     await step('Enforcing publish parent ordering', async () => {
@@ -40,10 +40,10 @@ export const hierarchyJourney: JourneyDefinition = {
       for (const [path, item] of [['academic-grades', grade], ['subjects', subject], ['courses', course], ['chapters', chapter], ['lessons', lesson], ['sections', section]] as const) { const published = await admin.request<any>('POST', `/admin/${path}/${item.id}/publish`); expectStatus(published, 201); assert(published.body.status === 'PUBLISHED', `${path} must publish`); }
     });
     await step('Exercising sibling reorder and move', async () => {
-      const secondSubject = await create('/admin/subjects', { title: factory.title('Second subject'), slug: factory.slug('second-subject'), academicGradeId: grade.id }); context.created.subjects.push(secondSubject.id);
+      const secondSubject = await create('/admin/subjects', { title: factory.title('Second subject'), slug: factory.slug('second-subject'), academicGradeIds: [grade.id] }); context.created.subjects.push(secondSubject.id);
       const reordered = await admin.request<any>('POST', '/admin/subjects/reorder', { academicGradeId: grade.id, items: [{ id: subject.id, sortOrder: 2 }, { id: secondSubject.id, sortOrder: 1 }] }); expectStatus(reordered, 201);
       const targetGrade = await create('/admin/academic-grades', { title: factory.localizedTitle('Move target grade'), slug: factory.slug('target-grade') }); context.created.grades.push(targetGrade.id);
-      const moved = await admin.request<any>('POST', `/admin/subjects/${secondSubject.id}/move`, { newAcademicGradeId: targetGrade.id }); expectStatus(moved, 201); assert(moved.body.academicGradeId === targetGrade.id, 'Moved subject must point to target grade');
+      const moved = await admin.request<any>('POST', `/admin/subjects/${secondSubject.id}/move`, { newAcademicGradeId: targetGrade.id }); expectStatus(moved, 201); assert(moved.body.academicGradeIds.includes(targetGrade.id), 'Moved subject must point to target grade');
     });
     await step('Archiving and restoring hierarchy record', async () => {
       const draft = await create('/admin/academic-grades', { title: factory.localizedTitle('Archive grade'), slug: factory.slug('archive-grade') }); context.created.grades.push(draft.id);

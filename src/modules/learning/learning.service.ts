@@ -140,12 +140,12 @@ export class LearningService {
         placement: {
           include: {
             course: {
-              include: { subject: { include: { academicGrade: true } } },
+              include: { subject: { include: { gradeAssignments: true } } },
             },
             chapter: {
               include: {
                 course: {
-                  include: { subject: { include: { academicGrade: true } } },
+                  include: { subject: { include: { gradeAssignments: true } } },
                 },
               },
             },
@@ -155,7 +155,7 @@ export class LearningService {
                   include: {
                     course: {
                       include: {
-                        subject: { include: { academicGrade: true } },
+                        subject: { include: { gradeAssignments: true } },
                       },
                     },
                   },
@@ -170,7 +170,7 @@ export class LearningService {
                       include: {
                         course: {
                           include: {
-                            subject: { include: { academicGrade: true } },
+                            subject: { include: { gradeAssignments: true } },
                           },
                         },
                       },
@@ -186,8 +186,13 @@ export class LearningService {
     const eligible: any[] = [];
     for (const item of items) {
       const course = this.itemPath(item).course;
-      const gradeId = course.academicGradeId ?? course.subject.academicGradeId;
-      if (currentGradeOnly && gradeId !== student.academicGradeId) continue;
+      if (
+        currentGradeOnly &&
+        !course.subject.gradeAssignments.some(
+          (x: any) => x.academicGradeId === student.academicGradeId,
+        )
+      )
+        continue;
       if (await this.access.canAccessContentItem(item.id, studentId))
         eligible.push(item);
     }
@@ -533,8 +538,12 @@ export class LearningService {
           status: ContentStatus.PUBLISHED,
           subject: {
             status: ContentStatus.PUBLISHED,
-            academicGradeId: student?.academicGradeId ?? '__missing__',
-            academicGrade: { status: ContentStatus.PUBLISHED },
+            gradeAssignments: {
+              some: {
+                academicGradeId: student?.academicGradeId ?? '__missing__',
+                academicGrade: { status: ContentStatus.PUBLISHED },
+              },
+            },
           },
         },
       },
@@ -894,8 +903,12 @@ export class LearningService {
           status: ContentStatus.PUBLISHED,
           subject: {
             status: ContentStatus.PUBLISHED,
-            academicGradeId: student?.academicGradeId ?? '__missing__',
-            academicGrade: { status: ContentStatus.PUBLISHED },
+            gradeAssignments: {
+              some: {
+                academicGradeId: student?.academicGradeId ?? '__missing__',
+                academicGrade: { status: ContentStatus.PUBLISHED },
+              },
+            },
           },
         },
       },

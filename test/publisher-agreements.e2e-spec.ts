@@ -63,7 +63,9 @@ describe('Publisher agreements and pricing (e2e)', () => {
     });
     const subject = await prisma.subject.create({
       data: {
-        academicGradeId: grade.id,
+        gradeAssignments: {
+          create: { academicGradeId: grade.id, sortOrder: 1 },
+        },
         title: 'Subject',
         slug: 'subject',
         sortOrder: 1,

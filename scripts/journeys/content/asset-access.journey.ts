@@ -27,7 +27,7 @@ export const assetAccessJourney: JourneyDefinition = {
 
     await step('Creating a leaf published course with a real Bunny cover', async () => {
       const grade = await create('/admin/academic-grades', { title: factory.localizedTitle('Archived cover grade'), slug: factory.slug('archived-cover-grade') });
-      const subject = await create('/admin/subjects', { title: factory.title('Archived cover subject'), slug: factory.slug('archived-cover-subject'), academicGradeId: grade.id });
+      const subject = await create('/admin/subjects', { title: factory.title('Archived cover subject'), slug: factory.slug('archived-cover-subject'), academicGradeIds: [grade.id] });
       const course = await create('/admin/courses', { title: factory.title('Archived cover course'), slug: factory.slug('archived-cover-course'), subjectId: subject.id, accessType: 'PUBLIC' });
       courseId = course.id;
       Object.assign(context.created, { grades: [...context.created.grades, grade.id], subjects: [...context.created.subjects, subject.id], courses: [...context.created.courses, courseId] });

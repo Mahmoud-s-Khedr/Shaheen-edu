@@ -47,7 +47,9 @@ describe('Catalog search (e2e)', () => {
     });
     const subject = await prisma.subject.create({
       data: {
-        academicGradeId: grade.id,
+        gradeAssignments: {
+          create: { academicGradeId: grade.id, sortOrder: 1 },
+        },
         title: 'إسلاميات',
         slug: 'islamic',
         sortOrder: 1,

@@ -9,11 +9,6 @@ export class QueryCourseDto extends SearchPaginationQueryDto {
   @IsString()
   subjectId?: string;
 
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsString()
-  academicGradeId?: string;
-
   @ApiPropertyOptional({
     enum: ContentStatus,
     description: 'Defaults to excluding ARCHIVED when omitted.',

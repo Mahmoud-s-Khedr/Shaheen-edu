@@ -110,7 +110,9 @@ export class QuestionAiExplanationsService {
   }
   private validAnswer(type: QuestionType, value: any) {
     if (!value || typeof value !== 'object' || Array.isArray(value))
-      throw new BadRequestException('Provide an answer object for this question');
+      throw new BadRequestException(
+        'Provide an answer object for this question',
+      );
     if (
       type === QuestionType.SINGLE_CHOICE ||
       type === QuestionType.MULTIPLE_CHOICE

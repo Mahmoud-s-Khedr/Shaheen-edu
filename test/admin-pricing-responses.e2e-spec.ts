@@ -47,7 +47,9 @@ describe('Admin course and chapter pricing responses (e2e)', () => {
     });
     const subject = await prisma.subject.create({
       data: {
-        academicGradeId: grade.id,
+        gradeAssignments: {
+          create: { academicGradeId: grade.id, sortOrder: 1 },
+        },
         title: 'Pricing subject',
         slug: 'pricing-subject',
         sortOrder: 1,

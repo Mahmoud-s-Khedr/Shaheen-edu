@@ -44,12 +44,24 @@ export class ContentAccessPolicyService {
         placement: {
           include: {
             course: {
-              include: { subject: { include: { academicGrade: true } } },
+              include: {
+                subject: {
+                  include: {
+                    gradeAssignments: { include: { academicGrade: true } },
+                  },
+                },
+              },
             },
             chapter: {
               include: {
                 course: {
-                  include: { subject: { include: { academicGrade: true } } },
+                  include: {
+                    subject: {
+                      include: {
+                        gradeAssignments: { include: { academicGrade: true } },
+                      },
+                    },
+                  },
                 },
               },
             },
@@ -59,7 +71,13 @@ export class ContentAccessPolicyService {
                   include: {
                     course: {
                       include: {
-                        subject: { include: { academicGrade: true } },
+                        subject: {
+                          include: {
+                            gradeAssignments: {
+                              include: { academicGrade: true },
+                            },
+                          },
+                        },
                       },
                     },
                   },
@@ -74,7 +92,13 @@ export class ContentAccessPolicyService {
                       include: {
                         course: {
                           include: {
-                            subject: { include: { academicGrade: true } },
+                            subject: {
+                              include: {
+                                gradeAssignments: {
+                                  include: { academicGrade: true },
+                                },
+                              },
+                            },
                           },
                         },
                       },
@@ -98,7 +122,6 @@ export class ContentAccessPolicyService {
         placement.section.lesson.chapter,
         placement.section.lesson.chapter.course,
         placement.section.lesson.chapter.course.subject,
-        placement.section.lesson.chapter.course.subject.academicGrade,
       );
       hierarchyNodes.push(
         { ...placement.section, type: 'SECTION' },
@@ -106,10 +129,6 @@ export class ContentAccessPolicyService {
         { ...placement.section.lesson.chapter, type: 'CHAPTER' },
         { ...placement.section.lesson.chapter.course, type: 'COURSE' },
         { ...placement.section.lesson.chapter.course.subject, type: 'SUBJECT' },
-        {
-          ...placement.section.lesson.chapter.course.subject.academicGrade,
-          type: 'ACADEMIC_GRADE',
-        },
       );
     } else if (placement.lesson) {
       nodes.push(
@@ -117,48 +136,55 @@ export class ContentAccessPolicyService {
         placement.lesson.chapter,
         placement.lesson.chapter.course,
         placement.lesson.chapter.course.subject,
-        placement.lesson.chapter.course.subject.academicGrade,
       );
       hierarchyNodes.push(
         { ...placement.lesson, type: 'LESSON' },
         { ...placement.lesson.chapter, type: 'CHAPTER' },
         { ...placement.lesson.chapter.course, type: 'COURSE' },
         { ...placement.lesson.chapter.course.subject, type: 'SUBJECT' },
-        {
-          ...placement.lesson.chapter.course.subject.academicGrade,
-          type: 'ACADEMIC_GRADE',
-        },
       );
     } else if (placement.chapter) {
       nodes.push(
         placement.chapter,
         placement.chapter.course,
         placement.chapter.course.subject,
-        placement.chapter.course.subject.academicGrade,
       );
       hierarchyNodes.push(
         { ...placement.chapter, type: 'CHAPTER' },
         { ...placement.chapter.course, type: 'COURSE' },
         { ...placement.chapter.course.subject, type: 'SUBJECT' },
-        {
-          ...placement.chapter.course.subject.academicGrade,
-          type: 'ACADEMIC_GRADE',
-        },
       );
     } else if (placement.course) {
-      nodes.push(
-        placement.course,
-        placement.course.subject,
-        placement.course.subject.academicGrade,
-      );
+      nodes.push(placement.course, placement.course.subject);
       hierarchyNodes.push(
         { ...placement.course, type: 'COURSE' },
         { ...placement.course.subject, type: 'SUBJECT' },
-        { ...placement.course.subject.academicGrade, type: 'ACADEMIC_GRADE' },
       );
     }
     if (nodes.some((node) => node?.status === ContentStatus.DRAFT))
       throw new ForbiddenException('Content is not published');
+    if (studentUserId) {
+      const student = await this.prisma.studentProfile.findUnique({
+        where: { userId: studentUserId },
+        select: { academicGradeId: true },
+      });
+      const course =
+        placement.course ??
+        placement.chapter?.course ??
+        placement.lesson?.chapter?.course ??
+        placement.section?.lesson?.chapter?.course;
+      if (
+        !student?.academicGradeId ||
+        !course?.subject.gradeAssignments.some(
+          (assignment: any) =>
+            assignment.academicGradeId === student.academicGradeId &&
+            assignment.academicGrade.status === ContentStatus.PUBLISHED,
+        )
+      )
+        throw new ForbiddenException(
+          'Content is not available for this academic grade',
+        );
+    }
     const archived = hierarchyNodes.find(
       (node) => node.status === ContentStatus.ARCHIVED,
     );

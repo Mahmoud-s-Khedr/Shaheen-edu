@@ -98,7 +98,7 @@ export class CatalogService {
           coverAsset: { select: { filename: true } },
           _count: {
             select: {
-              courses: { where: { academicGradeId, status: published } },
+              courses: { where: { status: published } },
             },
           },
         },
@@ -161,20 +161,18 @@ export class CatalogService {
   }
 
   async courses(query: CatalogCoursesQueryDto) {
-    if (query.subjectId && !query.academicGradeId) {
-      const subject = await this.prisma.subject.findUnique({
-        where: { id: query.subjectId },
-        select: { _count: { select: { gradeAssignments: true } } },
-      });
-      if (subject && subject._count.gradeAssignments > 1)
-        throw new BadRequestException(
-          'academicGradeId is required when listing courses for a shared subject',
-        );
-    }
     const where = {
       status: published,
       subjectId: query.subjectId,
-      academicGradeId: query.academicGradeId,
+      ...(query.academicGradeId
+        ? {
+            subject: {
+              gradeAssignments: {
+                some: { academicGradeId: query.academicGradeId },
+              },
+            },
+          }
+        : {}),
     };
     const { data, total } = await paginateArabicSearch({
       prisma: this.prisma,
@@ -188,7 +186,7 @@ export class CatalogService {
             ? Prisma.sql`t."subjectId" = ${query.subjectId}`
             : undefined,
           query.academicGradeId
-            ? Prisma.sql`t."academicGradeId" = ${query.academicGradeId}`
+            ? Prisma.sql`EXISTS (SELECT 1 FROM "SubjectGrade" sg WHERE sg."subjectId" = t."subjectId" AND sg."academicGradeId" = ${query.academicGradeId})`
             : undefined,
         ),
       },
@@ -215,28 +213,19 @@ export class CatalogService {
       where: {
         id,
         status: published,
-        subject: { status: published },
-        academicGrade: { status: published },
+        subject: {
+          status: published,
+          gradeAssignments: { some: { academicGrade: { status: published } } },
+        },
       },
       include: {
         coverAsset: { select: { filename: true } },
         _count: { select: { chapters: { where: { status: published } } } },
         subject: {
           include: {
+            gradeAssignments: { select: { academicGradeId: true } },
             coverAsset: { select: { filename: true } },
             _count: { select: { courses: { where: { status: published } } } },
-          },
-        },
-        academicGrade: {
-          include: {
-            coverAsset: { select: { filename: true } },
-            _count: {
-              select: {
-                subjectAssignments: {
-                  where: { subject: { status: published } },
-                },
-              },
-            },
           },
         },
       },
@@ -265,7 +254,9 @@ export class CatalogService {
     return {
       ...publicNode(record),
       subject: publicNode(record.subject),
-      academicGrade: publicNode(record.academicGrade),
+      academicGradeIds: record.subject.gradeAssignments.map(
+        (x) => x.academicGradeId,
+      ),
       contentCounts: { chapters, lessons, sections },
     };
   }
@@ -343,8 +334,10 @@ export class CatalogService {
       where: {
         id: courseId,
         status: published,
-        subject: { status: published },
-        academicGrade: { status: published },
+        subject: {
+          status: published,
+          gradeAssignments: { some: { academicGrade: { status: published } } },
+        },
       },
       include: {
         coverAsset: { select: { filename: true } },
@@ -381,8 +374,12 @@ export class CatalogService {
         status: published,
         course: {
           status: published,
-          subject: { status: published },
-          academicGrade: { status: published },
+          subject: {
+            status: published,
+            gradeAssignments: {
+              some: { academicGrade: { status: published } },
+            },
+          },
         },
       },
       include: {
@@ -422,8 +419,12 @@ export class CatalogService {
           status: published,
           course: {
             status: published,
-            subject: { status: published },
-            academicGrade: { status: published },
+            subject: {
+              status: published,
+              gradeAssignments: {
+                some: { academicGrade: { status: published } },
+              },
+            },
           },
         },
       },
@@ -470,14 +471,20 @@ export class CatalogService {
     };
     const ancestry: Record<string, any> = {
       courses: {
-        subject: { status: published },
-        academicGrade: { status: published },
+        subject: {
+          status: published,
+          gradeAssignments: { some: { academicGrade: { status: published } } },
+        },
       },
       chapters: {
         course: {
           status: published,
-          subject: { status: published },
-          academicGrade: { status: published },
+          subject: {
+            status: published,
+            gradeAssignments: {
+              some: { academicGrade: { status: published } },
+            },
+          },
         },
       },
       lessons: {
@@ -485,8 +492,12 @@ export class CatalogService {
           status: published,
           course: {
             status: published,
-            subject: { status: published },
-            academicGrade: { status: published },
+            subject: {
+              status: published,
+              gradeAssignments: {
+                some: { academicGrade: { status: published } },
+              },
+            },
           },
         },
       },
@@ -497,8 +508,12 @@ export class CatalogService {
             status: published,
             course: {
               status: published,
-              subject: { status: published },
-              academicGrade: { status: published },
+              subject: {
+                status: published,
+                gradeAssignments: {
+                  some: { academicGrade: { status: published } },
+                },
+              },
             },
           },
         },

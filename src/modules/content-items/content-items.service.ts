@@ -39,7 +39,6 @@ import { PublicationService } from '../publication/publication.service';
 type PlacementField = 'courseId' | 'chapterId' | 'lessonId' | 'sectionId';
 type PlacementTarget = { field: PlacementField; id: string };
 type ResolvedPlacement = {
-  academicGradeId: string;
   subjectId: string;
   resolvedCourseId: string;
   resolvedChapterId: string | null;
@@ -154,7 +153,6 @@ export class ContentItemsService {
             ? record.chapter.course
             : record.lesson.chapter.course;
     return {
-      academicGradeId: course.academicGradeId ?? course.subject.academicGradeId,
       subjectId: course.subjectId,
       resolvedCourseId: course.id,
       resolvedChapterId:

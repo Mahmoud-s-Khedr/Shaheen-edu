@@ -400,12 +400,6 @@ export class AcademicGradeSummaryDto {
 }
 
 export class SubjectSummaryDto extends HierarchySummaryDto {
-  @ApiProperty()
-  academicGradeId!: string;
-
-  @ApiProperty({ type: LocalizedResponseTextDto })
-  academicGradeName!: LocalizedResponseTextDto;
-
   @ApiProperty({ type: [String] })
   academicGradeIds!: string[];
 
@@ -443,9 +437,6 @@ export class CourseSummaryDto extends HierarchySummaryDto {
 
   @ApiProperty()
   subjectName!: string;
-
-  @ApiProperty({ type: String, nullable: true })
-  academicGradeId!: string | null;
 
   @ApiProperty({
     example: true,

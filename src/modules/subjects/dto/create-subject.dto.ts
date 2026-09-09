@@ -34,14 +34,6 @@ export class CreateSubjectDto {
   description?: string;
 
   @ApiPropertyOptional({
-    description:
-      'Deprecated single-grade form. Use academicGradeIds for a reusable subject.',
-  })
-  @IsOptional()
-  @IsString()
-  academicGradeId?: string;
-
-  @ApiPropertyOptional({
     type: [String],
     description: 'Grades in which this subject is available.',
   })

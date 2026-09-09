@@ -189,7 +189,9 @@ export class PublicationService {
       };
     }
     const courses = await this.prisma.course.findMany({
-      where: { academicGradeId: id },
+      where: {
+        subject: { gradeAssignments: { some: { academicGradeId: id } } },
+      },
       include: { chapters: { select: { id: true } } },
     });
     return {
@@ -207,20 +209,31 @@ export class PublicationService {
     const chapter = await client.chapter.findUnique({
       where: { id: chapterId },
       include: {
-        course: { include: { subject: { include: { academicGrade: true } } } },
+        course: {
+          include: {
+            subject: {
+              include: {
+                gradeAssignments: { include: { academicGrade: true } },
+              },
+            },
+          },
+        },
       },
     });
     if (!chapter) throw new NotFoundException('Chapter not found');
     if (
-      [
-        chapter,
-        chapter.course,
-        chapter.course.subject,
-        chapter.course.subject.academicGrade,
-      ].some((node: any) => node.status !== ContentStatus.PUBLISHED)
+      [chapter, chapter.course, chapter.course.subject].some(
+        (node: any) => node.status !== ContentStatus.PUBLISHED,
+      )
     ) {
       throw new ConflictException('Every chapter ancestor must be published');
     }
+    if (
+      !chapter.course.subject.gradeAssignments.some(
+        (x: any) => x.academicGrade.status === ContentStatus.PUBLISHED,
+      )
+    )
+      throw new ConflictException('Every chapter ancestor must be published');
   }
 
   private async assertContentItem(item: any, tx: any) {
@@ -305,18 +318,27 @@ export class PublicationService {
   ) {
     const parent =
       resource === 'subject'
-        ? await tx.academicGrade.findUnique({
-            where: { id: record.academicGradeId },
+        ? await tx.subjectGrade.findMany({
+            where: { subjectId: record.id },
+            include: { academicGrade: true },
           })
         : resource === 'course'
           ? await tx.subject.findUnique({
               where: { id: record.subjectId },
-              include: { academicGrade: true },
+              include: {
+                gradeAssignments: { include: { academicGrade: true } },
+              },
             })
           : resource === 'chapter'
             ? await tx.course.findUnique({
                 where: { id: record.courseId },
-                include: { subject: { include: { academicGrade: true } } },
+                include: {
+                  subject: {
+                    include: {
+                      gradeAssignments: { include: { academicGrade: true } },
+                    },
+                  },
+                },
               })
             : resource === 'lesson'
               ? await tx.chapter.findUnique({
@@ -324,7 +346,13 @@ export class PublicationService {
                   include: {
                     course: {
                       include: {
-                        subject: { include: { academicGrade: true } },
+                        subject: {
+                          include: {
+                            gradeAssignments: {
+                              include: { academicGrade: true },
+                            },
+                          },
+                        },
                       },
                     },
                   },
@@ -337,7 +365,13 @@ export class PublicationService {
                         include: {
                           course: {
                             include: {
-                              subject: { include: { academicGrade: true } },
+                              subject: {
+                                include: {
+                                  gradeAssignments: {
+                                    include: { academicGrade: true },
+                                  },
+                                },
+                              },
                             },
                           },
                         },
@@ -348,45 +382,57 @@ export class PublicationService {
                   ? await this.placementParent(record.placement, tx)
                   : null;
     if (!parent) return;
-    const nodes = this.flattenParent(parent);
-    if (nodes.some((node: any) => node?.status !== ContentStatus.PUBLISHED)) {
+    const nodes = Array.isArray(parent)
+      ? parent.map((x) => x.academicGrade)
+      : this.flattenParent(parent);
+    if (
+      !Array.isArray(parent) &&
+      nodes.some((node: any) => node?.status !== ContentStatus.PUBLISHED)
+    ) {
       throw new ConflictException(
         'Every parent in the ancestry must be published',
       );
     }
-    // Courses are grade-scoped even when their Subject is shared. The legacy
-    // Subject.academicGrade relation may point at a different grade, so always
-    // validate the grade carried by the course itself.
-    const course =
+    const subject =
       resource === 'course'
-        ? record
-        : nodes.find(
-            (node: any) => node?.subjectId && 'academicGradeId' in node,
-          );
-    if (course?.academicGradeId) {
-      const grade = await tx.academicGrade.findUnique({
-        where: { id: course.academicGradeId },
-        select: { status: true },
-      });
-      if (!grade || grade.status !== ContentStatus.PUBLISHED)
-        throw new ConflictException(
-          'Every parent in the ancestry must be published',
-        );
-    }
+        ? parent
+        : nodes.find((node: any) => node?.gradeAssignments);
+    const assignments = Array.isArray(parent)
+      ? parent
+      : (subject?.gradeAssignments ?? []);
+    if (
+      !assignments.length ||
+      !assignments.some(
+        (x: any) => x.academicGrade.status === ContentStatus.PUBLISHED,
+      )
+    )
+      throw new ConflictException(
+        'Every parent in the ancestry must be published',
+      );
   }
 
   private async placementParent(placement: any, tx: any) {
     if (placement.courseId)
       return tx.course.findUnique({
         where: { id: placement.courseId },
-        include: { subject: { include: { academicGrade: true } } },
+        include: {
+          subject: {
+            include: { gradeAssignments: { include: { academicGrade: true } } },
+          },
+        },
       });
     if (placement.chapterId)
       return tx.chapter.findUnique({
         where: { id: placement.chapterId },
         include: {
           course: {
-            include: { subject: { include: { academicGrade: true } } },
+            include: {
+              subject: {
+                include: {
+                  gradeAssignments: { include: { academicGrade: true } },
+                },
+              },
+            },
           },
         },
       });
@@ -397,7 +443,13 @@ export class PublicationService {
           chapter: {
             include: {
               course: {
-                include: { subject: { include: { academicGrade: true } } },
+                include: {
+                  subject: {
+                    include: {
+                      gradeAssignments: { include: { academicGrade: true } },
+                    },
+                  },
+                },
               },
             },
           },
@@ -411,7 +463,13 @@ export class PublicationService {
             chapter: {
               include: {
                 course: {
-                  include: { subject: { include: { academicGrade: true } } },
+                  include: {
+                    subject: {
+                      include: {
+                        gradeAssignments: { include: { academicGrade: true } },
+                      },
+                    },
+                  },
                 },
               },
             },
@@ -427,11 +485,7 @@ export class PublicationService {
     while (current) {
       nodes.push(current);
       current =
-        current.academicGrade ??
-        current.subject ??
-        current.course ??
-        current.chapter ??
-        current.lesson;
+        current.subject ?? current.course ?? current.chapter ?? current.lesson;
     }
     return nodes;
   }
@@ -462,9 +516,39 @@ export class PublicationService {
         throw new ConflictException('Content placement ordering is invalid');
       return;
     }
+    if (resource === 'subject') {
+      const assignments = await tx.subjectGrade.findMany({
+        where: { subjectId: record.id },
+        select: { academicGradeId: true },
+      });
+      const gradeIds = [
+        ...new Set(assignments.map((x: any) => x.academicGradeId)),
+      ];
+      const siblings = await tx.subjectGrade.findMany({
+        where: { academicGradeId: { in: gradeIds } },
+        orderBy: [
+          { academicGradeId: 'asc' },
+          { sortOrder: 'asc' },
+          { id: 'asc' },
+        ],
+      });
+      const siblingsByGrade = new Map<string, any[]>();
+      for (const sibling of siblings) {
+        const group = siblingsByGrade.get(sibling.academicGradeId) ?? [];
+        group.push(sibling);
+        siblingsByGrade.set(sibling.academicGradeId, group);
+      }
+      if (
+        [...siblingsByGrade.values()].some((group) =>
+          group.some((item, index) => item.sortOrder !== index + 1),
+        )
+      )
+        throw new ConflictException('Sibling ordering is invalid');
+      return;
+    }
     const field: Record<string, string | null> = {
       academicGrade: null,
-      subject: 'academicGradeId',
+      subject: null,
       course: 'subjectId',
       chapter: 'courseId',
       lesson: 'chapterId',
@@ -473,10 +557,7 @@ export class PublicationService {
     const parentField = field[resource];
     const where =
       resource === 'course'
-        ? {
-            subjectId: record.subjectId,
-            academicGradeId: record.academicGradeId,
-          }
+        ? { subjectId: record.subjectId }
         : parentField
           ? { [parentField]: record[parentField] }
           : {};
@@ -549,7 +630,7 @@ export class PublicationService {
     return Boolean(
       await this.prisma
         .$queryRawUnsafe<number[]>(
-          `SELECT 1 FROM \"AcademicGrade\" g LEFT JOIN \"SubjectGrade\" sg ON sg.\"academicGradeId\" = g.id LEFT JOIN \"Subject\" s ON s.id = sg.\"subjectId\" LEFT JOIN \"Course\" c ON c.\"academicGradeId\" = g.id LEFT JOIN \"Chapter\" h ON h.\"courseId\" = c.id LEFT JOIN \"Lesson\" l ON l.\"chapterId\" = h.id LEFT JOIN \"Section\" x ON x.\"lessonId\" = l.id LEFT JOIN \"ContentPlacement\" p ON p.\"courseId\" = c.id OR p.\"chapterId\" = h.id OR p.\"lessonId\" = l.id OR p.\"sectionId\" = x.id LEFT JOIN \"ContentItem\" i ON i.id = p.\"contentItemId\" WHERE g.id = $1 AND (s.status = 'PUBLISHED' OR c.status = 'PUBLISHED' OR h.status = 'PUBLISHED' OR l.status = 'PUBLISHED' OR x.status = 'PUBLISHED' OR i.status = 'PUBLISHED') LIMIT 1`,
+          `SELECT 1 FROM \"AcademicGrade\" g LEFT JOIN \"SubjectGrade\" sg ON sg.\"academicGradeId\" = g.id LEFT JOIN \"Subject\" s ON s.id = sg.\"subjectId\" LEFT JOIN \"Course\" c ON c.\"subjectId\" = s.id LEFT JOIN \"Chapter\" h ON h.\"courseId\" = c.id LEFT JOIN \"Lesson\" l ON l.\"chapterId\" = h.id LEFT JOIN \"Section\" x ON x.\"lessonId\" = l.id LEFT JOIN \"ContentPlacement\" p ON p.\"courseId\" = c.id OR p.\"chapterId\" = h.id OR p.\"lessonId\" = l.id OR p.\"sectionId\" = x.id LEFT JOIN \"ContentItem\" i ON i.id = p.\"contentItemId\" WHERE g.id = $1 AND (s.status = 'PUBLISHED' OR c.status = 'PUBLISHED' OR h.status = 'PUBLISHED' OR l.status = 'PUBLISHED' OR x.status = 'PUBLISHED' OR i.status = 'PUBLISHED') LIMIT 1`,
           id,
         )
         .then((rows) => rows.length),
