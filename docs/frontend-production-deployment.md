@@ -54,21 +54,9 @@ git clone --depth 1 https://github.com/mohammedgameel12/academy.git ~/Jibal-fron
 git clone --depth 1 https://github.com/mohammedgameel12/ma-pro.git ~/Jibal-frontends/admin
 ```
 
-`academy` and `ma-pro` already use `https://api.jibal-platform.com`. The
-current `home-home` bundle contains the retired API hostname, so replace it in
-the deployment checkout before publishing. This is a temporary compatibility
-step; update the upstream home repository to use the Jibal API origin so the
-replacement can be removed later.
-
-```sh
-grep -rl --include='*.js' 'https://api-edu.mydevtest.website' ~/Jibal-frontends/home \
-  | xargs -r sed -i 's|https://api-edu.mydevtest.website|https://api.jibal-platform.com|g'
-
-if grep -R --include='*.js' -q 'https://api-edu.mydevtest.website' ~/Jibal-frontends/home; then
-  echo 'The retired API hostname is still present; do not publish.' >&2
-  exit 1
-fi
-```
+All frontend bundles must use `https://api.jibal-platform.com` as their API
+origin. Correct any upstream frontend configuration before publishing; do not
+apply deployment-only URL rewrites to generated assets.
 
 Create the exact document-root directories and copy the static files. The
 paths are explicit so the command cannot affect the API deployment or other
@@ -153,10 +141,10 @@ certificates; that is expected.
 ## Routine frontend update
 
 Use this deployment-only procedure whenever one or more frontend repositories
-change. It resets the three checkout directories to upstream `main`, reapplies
-the temporary home API-origin replacement, and synchronizes only the three
-explicit document roots. `rsync --delete` removes obsolete hashed assets from
-those roots; it does not touch the backend deployment.
+change. It resets the three checkout directories to upstream `main` and
+synchronizes only the three explicit document roots. `rsync --delete` removes
+obsolete hashed assets from those roots; it does not touch the backend
+deployment.
 
 ```sh
 set -euo pipefail
@@ -165,14 +153,6 @@ for site in home app admin; do
   git -C "$HOME/Jibal-frontends/$site" fetch origin main --depth=1
   git -C "$HOME/Jibal-frontends/$site" reset --hard origin/main
 done
-
-grep -rl --include='*.js' 'https://api-edu.mydevtest.website' "$HOME/Jibal-frontends/home" \
-  | xargs -r sed -i 's|https://api-edu.mydevtest.website|https://api.jibal-platform.com|g'
-
-if grep -R --include='*.js' -q 'https://api-edu.mydevtest.website' "$HOME/Jibal-frontends/home"; then
-  echo 'The retired API hostname is still present; deployment stopped.' >&2
-  exit 1
-fi
 
 sudo rsync -a --delete "$HOME/Jibal-frontends/home/" /var/www/jibal/home/
 sudo rsync -a --delete "$HOME/Jibal-frontends/app/" /var/www/jibal/app/
@@ -212,8 +192,7 @@ done
 ```
 
 To roll back one site, replace `<site>` and `<commit-sha>` below with the
-recorded values, then repeat the home-origin replacement when rolling back
-`home` and synchronize only that site's document root:
+recorded values and synchronize only that site's document root:
 
 ```sh
 git -C "$HOME/Jibal-frontends/<site>" fetch origin <commit-sha> --depth=1

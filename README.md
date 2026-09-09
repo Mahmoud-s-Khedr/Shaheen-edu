@@ -168,15 +168,18 @@ No course, payment, subscription, question-bank, AI, media, or notification
 modules are implemented in this repository. Only the auth/identity system
 and empty placeholder module folders (to avoid future coupling) exist.
 
-## notes:
+## Notes
 
-test server link: https://api-edu.mydevtest.website/
+Production API: https://api.jibal-platform.com/
+
+Use a dedicated non-production environment for mutation-based acceptance
+testing; the journey runner deliberately rejects production targets.
 
 JOURNEY_REQUEST_TIMEOUT_MS=60000 \
 JOURNEY_ALLOW_MUTATIONS=true \
 JOURNEY_TARGET=staging \
 JOURNEY_CONFIRM_STAGING_MUTATIONS=true \
-JOURNEY_BASE_URL=https://api-edu.mydevtest.website \
+JOURNEY_BASE_URL=https://<staging-api-host> \
 JOURNEY_SUPER_ADMIN_EMAIL=superadmin@example.com \
 JOURNEY_SUPER_ADMIN_PASSWORD='ChangeThisPassword123!' \
 pnpm api:test:full

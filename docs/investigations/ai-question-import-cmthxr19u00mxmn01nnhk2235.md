@@ -1,6 +1,6 @@
 # AI question-import review — `cmthxr19u00mxmn01nnhk2235`
 
-Reviewed on 2026-09-02 against `https://api-edu.mydevtest.website` with the supplied `SUPER_ADMIN` account. This record intentionally excludes credentials, bearer tokens, signed URLs, and provider-encrypted reasoning data.
+Reviewed on 2026-09-02 against the then-active non-production API with the supplied `SUPER_ADMIN` account. This historical record intentionally excludes credentials, bearer tokens, signed URLs, and provider-encrypted reasoning data.
 
 ## Read-only request record
 

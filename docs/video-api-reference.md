@@ -1,6 +1,6 @@
 # Video APIs reference
 
-This guide documents the video-asset APIs exercised against `https://api-edu.mydevtest.website` in [`reports/api-tests/api-2026-08-05T17-42-52-691Z.json`](../reports/api-tests/api-2026-08-05T17-42-52-691Z.json). The IDs, titles, timestamps, and state transitions below are from that run. Bearer tokens, Bunny upload signatures, and signed playback tokens are deliberately redacted: they are short-lived credentials, not reusable example values.
+This guide documents the video-asset APIs exercised in the recorded non-production run in [`reports/api-tests/api-2026-08-05T17-42-52-691Z.json`](../reports/api-tests/api-2026-08-05T17-42-52-691Z.json). The IDs, titles, timestamps, and state transitions below are from that run. Bearer tokens, Bunny upload signatures, and signed playback tokens are deliberately redacted: they are short-lived credentials, not reusable example values.
 
 ## How the flow fits together
 

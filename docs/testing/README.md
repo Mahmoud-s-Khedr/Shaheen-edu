@@ -52,7 +52,7 @@ instead. Non-local targets require the journey safety confirmation:
 ```sh
 JOURNEY_TARGET=staging \
 JOURNEY_CONFIRM_STAGING_MUTATIONS=true \
-JOURNEY_BASE_URL=https://api-edu.mydevtest.website \
+JOURNEY_BASE_URL=https://<staging-api-host> \
 JOURNEY_SUPER_ADMIN_EMAIL=superadmin@example.com \
 JOURNEY_SUPER_ADMIN_PASSWORD='ChangeThisPassword123!' \
 pnpm api:test:full
