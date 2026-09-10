@@ -28,7 +28,7 @@ All student-only paths must return `401` with no bearer token or an expired/revo
 | Generated/admin assessments, timed attempts, review and analytics | Yes | `STUDENT-ASSESS-001`–`003` |
 | Voice-to-text for written assessment answers | Yes; no audio retained by the route | `STUDENT-ASSESS-003` |
 | Leaderboard and performance analytics | Yes | `STUDENT-ANALYTICS-001` |
-| Cart, price preview, coupons, manual payment, Paymob | Yes | `STUDENT-COMMERCE-001`–`003` |
+| Cart, price preview, coupons, manual payment, XPay | Yes | `STUDENT-COMMERCE-001`–`003` |
 | Refund request and student-visible refund status | Yes | `STUDENT-REFUND-001` |
 | Another student's data, expired/revoked access, suspension | Yes; require cross-account execution | `STUDENT-SECURITY-001` |
 | Referral entry/attribution during registration or checkout | No student-facing input is exposed in the reviewed routes | Gap |
@@ -307,19 +307,19 @@ Create isolated records; keep IDs in the run log but redact tokens, phone number
 
 **Test type:** API, storage integration, security/privacy, financial regression.
 
-### STUDENT-COMMERCE-003 — Complete or retry hosted Paymob payment safely
+### STUDENT-COMMERCE-003 — Complete or retry hosted XPay payment safely
 
 **Priority/Risk:** Critical — external payment integrity
 
-**Sources:** `POST /student/orders/:id/paymob/attempt`, `POST /payments/paymob/webhook`; `CommerceService`.
+**Sources:** `POST /student/orders/:id/xpay/attempt`, `POST /payments/xpay/webhook`; `CommerceService`.
 
 **User story:** As a student, I want to open or retry a hosted payment attempt so that a successful provider callback grants my order once.
 
 **Acceptance criteria:**
 
-- Given A owns an unpaid Paymob order and sends a unique idempotency key, when a payment attempt is created, then the response supplies the expected hosted checkout attempt/expiry for that order only. Repeating the same key does not create a second provider attempt; B, paid/cancelled/expired orders and missing keys are denied safely.
+- Given A owns an unpaid XPay order and sends a unique idempotency key, when a payment attempt is created, then the response supplies the expected hosted checkout attempt/expiry for that order only. Repeating the same key does not create a second provider attempt; B, paid/cancelled/expired orders and missing keys are denied safely.
 - Given a provider-approved callback with valid HMAC, when the webhook is delivered once or repeatedly/out of order, then the order reaches the expected final state and fulfilment/entitlements occur exactly once. Invalid HMAC, altered amount/order reference, rejected/expired payment, and duplicate callbacks must not approve or grant access.
-- Given a failed/expired attempt, when A creates a fresh permitted retry then receives a valid completion callback, then stale attempt data does not settle the order and A's order/library/entitlement status is accurate. Test this against Paymob sandbox or a verified provider mock; never place provider secrets in evidence.
+- Given a failed/expired attempt, when A creates a fresh permitted retry then receives a valid completion webhook, then stale attempt data does not settle the order and A's order/library/entitlement status is accurate. Test this against XPay sandbox or a verified provider mock; never place provider secrets in evidence.
 
 **Test type:** Integration, security, financial calculation, webhook idempotency.
 
@@ -362,7 +362,7 @@ Create isolated records; keep IDs in the run log but redact tokens, phone number
 | ID | Finding | Required decision or follow-up |
 | --- | --- | --- |
 | STUDENT-RISK-001 | Direct-practice answer submissions deliberately create immutable attempts but have no idempotency key. | Decide whether a double-click/retry is allowed to create multiple attempts; add an idempotency mechanism if not. |
-| STUDENT-RISK-002 | The backend supports Paymob and manual payment, while the checklist says “every supported payment path.” | Confirm production-enabled methods, callback sandbox, and the exact retry/expiry/charge reconciliation expectations. |
+| STUDENT-RISK-002 | The backend supports XPay and manual payment, while the checklist says “every supported payment path.” | Confirm production-enabled methods, webhook sandbox, and the exact retry/expiry/charge reconciliation expectations. |
 | STUDENT-RISK-003 | Referral code/link input is not present on student registration or reviewed checkout inputs. | Confirm that referral attribution is intentionally absent from the student flow or provide the missing route/UI contract. |
 | STUDENT-RISK-004 | The implementation distinguishes active entitlements from archived access and filters delivery at request time. | Agree retention behaviour for historical orders/progress/results after content archive, entitlement revoke/expiry, refund, and grade change. |
 | STUDENT-RISK-005 | Voice transcription forwards audio to an integration but the API report alone cannot prove vendor retention/log handling. | Obtain provider DPA/configuration and execute a privacy/log-retention check with non-production audio. |

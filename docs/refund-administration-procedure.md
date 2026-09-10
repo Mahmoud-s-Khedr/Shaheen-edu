@@ -17,7 +17,7 @@ second time.
 A request can select one or more complete approved order items. This supports
 a partial *order* refund, but never a fractional refund of one course or
 chapter item. Provider refunds/voids are intentionally not part of this flow:
-the reimbursement is manual and the Paymob transaction remains payment
+the reimbursement is manual and the XPay transaction remains payment
 evidence only.
 
 Reject requests with a clear student-facing reason and optional internal review note. After approval, verify the entitlement revocation, the negative allocation linked to every original allocation, and, when applicable, the reconciliation result. Escalate missing payment evidence, a missing reversal, a paid settlement affected by a refund, or duplicate allocation rows to finance and engineering; preserve references and audit IDs.

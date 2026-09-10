@@ -20,7 +20,7 @@ This is **approximately 88% backend feature coverage**. The rows overlap, so
 the percentage is an orientation aid rather than a delivery forecast.
 
 The prior analysis was stale in several material areas. The current code now
-includes Paymob checkout/webhooks, promotions/coupons, payment expiry,
+includes XPay checkout/webhooks, promotions/coupons, payment expiry,
 receipts, manual refunds, AI-prompt quizzes, ranked community-question
 discovery, AI question explanation review, Student 360, secure report exports,
 referral operations, visual/scanned-PDF OCR, and candidate accept/reject
@@ -30,7 +30,7 @@ controls.
 
 | Capability | Code evidence |
 | --- | --- |
-| Online and manual commerce | [`commerce.controller.ts`](../src/modules/commerce/commerce.controller.ts), [`paymob.service.ts`](../src/modules/commerce/paymob.service.ts), [`refunds.controller.ts`](../src/modules/commerce/refunds.controller.ts) expose Paymob attempts/webhooks, manual proof flows, promotions/coupons, receipt-backed fulfilment, expiry, and manual refund handling. |
+| Online and manual commerce | [`commerce.controller.ts`](../src/modules/commerce/commerce.controller.ts), [`xpay.service.ts`](../src/modules/commerce/xpay.service.ts), [`refunds.controller.ts`](../src/modules/commerce/refunds.controller.ts) expose XPay attempts/webhooks, manual proof flows, promotions/coupons, receipt-backed fulfilment, expiry, and manual refund handling. |
 | Student administration and reports | [`students.controller.ts`](../src/modules/students/students.controller.ts) exposes audited Student 360 and its paginated domains; [`reports.controller.ts`](../src/modules/reports/reports.controller.ts) exposes aggregate reports and protected CSV export jobs. |
 | Assessment intelligence | [`assessments.controller.ts`](../src/modules/assessments/assessments.controller.ts) exposes AI-prompt generation, ranked community questions, tutor quizzes, question reports, and assessment lifecycle APIs. |
 | Reviewable question imports | [`question-import.controller.ts`](../src/modules/ai-question-import/question-import.controller.ts) exposes OCR/import progress, page retries, candidate media review, and `accept`/`reject` actions. [`question-import.worker.ts`](../src/modules/ai-question-import/question-import.worker.ts) implements visual PDF OCR. |
@@ -61,7 +61,7 @@ controls.
 These items cannot be established by repository inspection alone and should not
 be counted as unimplemented features:
 
-1. Configure Paymob merchant secrets, integration IDs, callback URLs, and run
+1. Configure XPay merchant secrets, webhook URLs, and run
    sandbox then live provider acceptance, webhook, retry, and reconciliation
    checks.
 2. Configure and supervise Redis/BullMQ workers and external AI/OCR models for

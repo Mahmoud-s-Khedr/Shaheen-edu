@@ -17,8 +17,8 @@ export interface OperationManifestEntry {
 }
 
 const DEFERRED_OPERATION_REASONS: Record<string, string> = {
-  'POST /api/v1/payments/paymob/webhook':
-    'Requires a provider-signed Paymob transaction callback; covered by Paymob HMAC unit tests until sandbox callback testing is enabled.',
+  'POST /api/v1/payments/xpay/webhook':
+    'Requires a provider-signed XPay webhook; covered by XPay signature unit tests until sandbox webhook testing is enabled.',
 };
 
 /**

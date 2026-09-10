@@ -47,7 +47,7 @@ import type {
 } from './dto/commerce.dto';
 import type { AppConfig } from '../../config/configuration';
 import { PricingService, type PricedTarget } from './pricing.service';
-import { PaymobService } from './paymob.service';
+import { XPayService } from './xpay.service';
 import { FulfilmentService } from './fulfilment.service';
 
 type Target = PricedTarget & {
@@ -65,20 +65,18 @@ export class CommerceService {
     private readonly assets: AssetsService,
     private readonly audit: AuditService,
     private readonly pricing?: PricingService,
-    private readonly paymob?: PaymobService,
+    private readonly xpay?: XPayService,
     private readonly fulfilment?: FulfilmentService,
     config?: ConfigService<AppConfig, true>,
   ) {
     this.commerceConfig = config?.get('commerce', { infer: true }) ?? {
-      paymobBaseUrl: '',
-      paymobSecretKey: '',
-      paymobPublicKey: '',
-      paymobHmacSecret: '',
-      paymobIntegrationIds: [],
-      paymobNotificationUrl: '',
-      paymobRedirectUrl: '',
-      paymobTimeoutMs: 15000,
-      paymobOrderExpirySeconds: 1800,
+      xpayApiBaseUrl: '',
+      xpaySecretKey: '',
+      xpayWebhookSecret: '',
+      xpayRedirectUrl: '',
+      xpayCancelUrl: '',
+      xpayTimeoutMs: 15000,
+      xpayOrderExpirySeconds: 1800,
       manualOrderExpirySeconds: 86400,
     };
     this.features = config?.get('features', { infer: true }) ?? {
@@ -589,8 +587,8 @@ export class CommerceService {
             : null;
           const paymentExpiresAt = new Date(
             Date.now() +
-              (paymentChannel === PaymentChannel.PAYMOB
-                ? this.commerceConfig.paymobOrderExpirySeconds
+              (paymentChannel === PaymentChannel.XPAY
+                ? this.commerceConfig.xpayOrderExpirySeconds
                 : this.commerceConfig.manualOrderExpirySeconds) *
                 1000,
           );
@@ -601,7 +599,7 @@ export class CommerceService {
               paymentChannel,
               paymentMethodSnapshot: method
                 ? this.snapshot(method)
-                : { provider: 'PAYMOB', checkout: 'HOSTED_REDIRECT' },
+                : { provider: 'XPAY', checkout: 'HOSTED_REDIRECT' },
               subtotalMinor: quote.subtotalMinor,
               discountMinor: quote.discountMinor,
               totalMinor: quote.totalMinor,
@@ -690,13 +688,13 @@ export class CommerceService {
         });
       }
       const response = await this.order(studentUserId, order.id);
-      if (paymentChannel === PaymentChannel.PAYMOB)
+      if (paymentChannel === PaymentChannel.XPAY)
         return {
           ...response,
-          paymob: await this.createPaymobAttempt(
+          xpay: await this.createXPayAttempt(
             studentUserId,
             order.id,
-            `${key}:paymob`,
+            `${key}:xpay`,
           ),
         };
       return response;
@@ -1290,13 +1288,9 @@ export class CommerceService {
     return { id: submission.id, status: submission.status };
   }
 
-  async createPaymobAttempt(
-    studentUserId: string,
-    orderId: string,
-    key: string,
-  ) {
+  async createXPayAttempt(studentUserId: string, orderId: string, key: string) {
     this.assertIdempotencyKey(key);
-    const operation = `PAYMOB_ATTEMPT:${orderId}`;
+    const operation = `XPAY_ATTEMPT:${orderId}`;
     const saved = await this.prisma.commerceIdempotencyKey.findUnique({
       where: { studentUserId_operation_key: { studentUserId, operation, key } },
     });
@@ -1316,7 +1310,7 @@ export class CommerceService {
       where: {
         id: orderId,
         studentUserId,
-        paymentChannel: PaymentChannel.PAYMOB,
+        paymentChannel: PaymentChannel.XPAY,
       },
       include: {
         items: true,
@@ -1329,12 +1323,12 @@ export class CommerceService {
         },
       },
     });
-    if (!order) throw new NotFoundException('Paymob order not found');
+    if (!order) throw new NotFoundException('XPay order not found');
     if (
       order.status !== OrderStatus.AWAITING_PAYMENT ||
       (order.paymentExpiresAt && order.paymentExpiresAt <= new Date())
     )
-      throw new ConflictException('Order cannot start a Paymob payment');
+      throw new ConflictException('Order cannot start an XPay payment');
     const attempt = await this.prisma.$transaction(
       async (tx) => {
         const previous = await tx.paymentAttempt.aggregate({
@@ -1346,7 +1340,7 @@ export class CommerceService {
         const created = await tx.paymentAttempt.create({
           data: {
             orderId,
-            channel: PaymentChannel.PAYMOB,
+            channel: PaymentChannel.XPAY,
             status: PaymentAttemptStatus.INITIATED,
             attemptNumber,
             merchantReference,
@@ -1361,8 +1355,10 @@ export class CommerceService {
       { isolationLevel: 'Serializable' },
     );
     try {
-      const intent = await this.paymob!.createIntention({
+      const session = await this.xpay!.createCheckoutSession({
         merchantReference: attempt.merchantReference,
+        orderId,
+        paymentAttemptId: attempt.id,
         amountMinor: order.totalMinor,
         items: order.items.map((item) => ({
           title: item.titleSnapshot,
@@ -1373,19 +1369,24 @@ export class CommerceService {
           phone: order.student.parentPhoneNormalized,
           email: order.student.user.loginIdentifier,
         },
+        expiresAfterSeconds: this.commerceConfig.xpayOrderExpirySeconds,
       });
       const updated = await this.prisma.paymentAttempt.update({
         where: { id: attempt.id },
         data: {
           status: PaymentAttemptStatus.PENDING,
-          providerOrderId: intent.providerOrderId,
-          checkoutUrl: intent.checkoutUrl,
-          providerPayload: { intentionId: intent.providerOrderId },
+          providerOrderId: session.checkoutSessionId,
+          providerTransactionId: session.paymentIntentId,
+          checkoutUrl: session.checkoutUrl,
+          providerPayload: {
+            checkoutSessionId: session.checkoutSessionId,
+            paymentIntentId: session.paymentIntentId,
+          },
         },
       });
       await this.audit.record({
         actorUserId: studentUserId,
-        action: 'PAYMOB_ATTEMPT_CREATED',
+        action: 'XPAY_ATTEMPT_CREATED',
         targetType: 'PaymentAttempt',
         targetId: attempt.id,
         metadata: { orderId },
@@ -1405,43 +1406,45 @@ export class CommerceService {
           failureMessage:
             error instanceof Error
               ? error.message
-              : 'Paymob intention creation failed',
+              : 'XPay checkout-session creation failed',
         },
       });
       throw error;
     }
   }
 
-  async paymobWebhook(payload: any, hmac: string) {
-    const transaction = payload?.obj;
-    const providerTransactionId = transaction?.id
-      ? String(transaction.id)
-      : 'missing';
-    const merchantReference =
-      transaction?.order?.merchant_order_id ??
-      transaction?.order?.special_reference ??
-      null;
-    const verified = this.paymob!.verifyTransactionHmac(transaction, hmac);
-    const payloadHash = createHash('sha256')
-      .update(JSON.stringify(payload ?? {}))
-      .digest('hex');
-    const externalTransactionId = verified
-      ? providerTransactionId
-      : `invalid:${providerTransactionId}:${payloadHash}`;
+  async xpayWebhook(rawBody: Buffer, signature: string) {
+    const verified = this.xpay!.verifyWebhookSignature(rawBody, signature);
+    const payloadHash = createHash('sha256').update(rawBody).digest('hex');
+    let payload: any = null;
+    if (verified) {
+      try {
+        payload = JSON.parse(rawBody.toString('utf8'));
+      } catch {
+        return { accepted: false, duplicate: false };
+      }
+    }
+    const session = payload?.data?.object;
+    const externalEventId =
+      verified && payload?.id ? String(payload.id) : `invalid:${payloadHash}`;
+    const checkoutSessionId = session?.id ? String(session.id) : null;
+    const paymentIntentId =
+      session?.paymentIntent?.id ?? session?.paymentIntentId;
     try {
-      await this.prisma.paymobWebhookEvent.create({
+      await this.prisma.xPayWebhookEvent.create({
         data: {
-          externalTransactionId,
-          merchantReference,
+          externalEventId,
+          checkoutSessionId,
+          paymentIntentId: paymentIntentId ? String(paymentIntentId) : null,
           verified,
           payloadHash,
-          payload: transaction ?? null,
+          payload,
         },
       });
     } catch (error: any) {
       if (error.code === 'P2002') {
-        const existing = await this.prisma.paymobWebhookEvent.findUnique({
-          where: { externalTransactionId },
+        const existing = await this.prisma.xPayWebhookEvent.findUnique({
+          where: { externalEventId },
           select: { verified: true },
         });
         return { accepted: existing?.verified ?? false, duplicate: true };
@@ -1452,34 +1455,53 @@ export class CommerceService {
     try {
       const result = await this.prisma.$transaction(
         async (tx) => {
-          const event = await tx.paymobWebhookEvent.findUnique({
-            where: { externalTransactionId },
+          const event = await tx.xPayWebhookEvent.findUnique({
+            where: { externalEventId },
           });
-          const attempt = merchantReference
-            ? await tx.paymentAttempt.findUnique({
-                where: { merchantReference },
+          if (
+            payload.type !== 'checkout.session.completed' &&
+            payload.type !== 'checkout.session.async_payment_succeeded'
+          ) {
+            await tx.xPayWebhookEvent.update({
+              where: { id: event!.id },
+              data: { processedAt: new Date() },
+            });
+            return { success: false, orderId: undefined };
+          }
+          const attempt = checkoutSessionId
+            ? await tx.paymentAttempt.findFirst({
+                where: { providerOrderId: checkoutSessionId },
+                include: { order: true },
               })
             : null;
           if (!attempt)
-            throw new NotFoundException('Paymob payment attempt not found');
-          const success =
-            transaction.success === true && transaction.pending === false;
+            throw new NotFoundException('XPay payment attempt not found');
+          const success = session?.paymentStatus === 'paid';
           const status = success
             ? PaymentAttemptStatus.PAID
-            : transaction.pending
-              ? PaymentAttemptStatus.PENDING
-              : PaymentAttemptStatus.DECLINED;
+            : PaymentAttemptStatus.PENDING;
+          if (
+            success &&
+            (Number(session?.amountTotal) !==
+              Number(attempt.order.totalMinor) ||
+              session?.currency !== attempt.order.currency)
+          )
+            throw new ConflictException(
+              'XPay payment amount does not match order',
+            );
           await tx.paymentAttempt.update({
             where: { id: attempt.id },
             data: {
               status,
-              providerTransactionId: String(transaction.id),
-              completedAt: success || !transaction.pending ? new Date() : null,
+              providerTransactionId: paymentIntentId
+                ? String(paymentIntentId)
+                : attempt.providerTransactionId,
+              completedAt: success ? new Date() : null,
               providerPayload: {
-                transactionId: transaction.id,
-                success: transaction.success,
-                pending: transaction.pending,
-                errorOccurred: transaction.error_occured,
+                checkoutSessionId,
+                paymentIntentId: paymentIntentId ?? null,
+                paymentStatus: session?.paymentStatus ?? null,
+                eventType: payload.type,
               },
             },
           });
@@ -1488,7 +1510,7 @@ export class CommerceService {
               orderId: attempt.orderId,
               paymentAttemptId: attempt.id,
             });
-          await tx.paymobWebhookEvent.update({
+          await tx.xPayWebhookEvent.update({
             where: { id: event!.id },
             data: { processedAt: new Date() },
           });
@@ -1498,8 +1520,8 @@ export class CommerceService {
       );
       return { accepted: true, duplicate: false, ...result };
     } catch (error) {
-      await this.prisma.paymobWebhookEvent.update({
-        where: { externalTransactionId },
+      await this.prisma.xPayWebhookEvent.update({
+        where: { externalEventId },
         data: {
           processingError:
             error instanceof Error

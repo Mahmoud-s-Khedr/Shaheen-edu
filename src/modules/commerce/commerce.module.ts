@@ -4,11 +4,11 @@ import { AuditModule } from '../audit/audit.module';
 import {
   CommerceController,
   ManualPaymentAdminController,
-  PaymobWebhookController,
+  XPayWebhookController,
 } from './commerce.controller';
 import { CommerceService } from './commerce.service';
 import { PricingService } from './pricing.service';
-import { PaymobService } from './paymob.service';
+import { XPayService } from './xpay.service';
 import { FulfilmentService } from './fulfilment.service';
 import { CommerceExpiryService } from './commerce-expiry.service';
 import {
@@ -22,14 +22,14 @@ import { RefundsService } from './refunds.service';
   controllers: [
     CommerceController,
     ManualPaymentAdminController,
-    PaymobWebhookController,
+    XPayWebhookController,
     StudentRefundsController,
     AdminRefundsController,
   ],
   providers: [
     CommerceService,
     PricingService,
-    PaymobService,
+    XPayService,
     FulfilmentService,
     CommerceExpiryService,
     RefundsService,

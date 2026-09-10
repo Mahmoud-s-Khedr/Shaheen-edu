@@ -125,22 +125,21 @@ export class CommerceController {
   ) {
     return this.commerce.checkout(user.id, dto, key);
   }
-  @Post('orders/:id/paymob/attempt')
+  @Post('orders/:id/xpay/attempt')
   @ApiOperation({
-    summary:
-      'Create a fresh hosted Paymob checkout attempt for an unpaid order',
+    summary: 'Create a fresh hosted XPay checkout attempt for an unpaid order',
   })
   @ApiHeader({
     name: 'idempotency-key',
     required: true,
     schema: { type: 'string' },
   })
-  retryPaymob(
+  retryXPay(
     @CurrentUser() user: RequestUser,
     @Param('id') id: string,
     @Headers('idempotency-key') key: string,
   ) {
-    return this.commerce.createPaymobAttempt(user.id, id, key);
+    return this.commerce.createXPayAttempt(user.id, id, key);
   }
   @Get('orders')
   @ApiOperation({ summary: 'List the student orders' })
@@ -462,21 +461,24 @@ export class ManualPaymentAdminController {
   }
 }
 
-@ApiTags('payments/paymob')
+@ApiTags('payments/xpay')
 @Public()
-@Controller({ path: 'payments/paymob', version: '1' })
-export class PaymobWebhookController {
+@Controller({ path: 'payments/xpay', version: '1' })
+export class XPayWebhookController {
   constructor(private readonly commerce: CommerceService) {}
   @Post('webhook')
-  @ApiOperation({ summary: 'Receive a signed Paymob payment callback' })
+  @ApiOperation({ summary: 'Receive a signed XPay payment callback' })
   @HttpCode(HttpStatus.OK)
   async webhook(@Req() req: any) {
-    const result = await this.commerce.paymobWebhook(
-      req.body,
-      String(req.query?.hmac ?? ''),
+    const rawBody = req.rawBody as Buffer | undefined;
+    if (!rawBody)
+      throw new UnauthorizedException('Raw XPay webhook body is unavailable');
+    const result = await this.commerce.xpayWebhook(
+      rawBody,
+      String(req.headers['xpay-signature'] ?? ''),
     );
     if (!result.accepted)
-      throw new UnauthorizedException('Invalid Paymob HMAC');
+      throw new UnauthorizedException('Invalid XPay signature');
     return { received: true, duplicate: result.duplicate };
   }
 }

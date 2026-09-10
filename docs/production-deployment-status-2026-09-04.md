@@ -25,7 +25,7 @@
 - A restore drill to the disposable `edu_restore` database completed successfully.
 - Backup retention is configured for 14 days. At a four-hour schedule, this is
   approximately 84 recovery points.
-- Paymob remains intentionally unconfigured; manual orders remain available.
+- XPay remains intentionally unconfigured; manual orders remain available.
 
 ## Remaining work
 
@@ -54,10 +54,10 @@ rollback procedure is documented in the
 
    Review the first scheduled backup result and perform periodic restore drills.
 
-3. Configure Paymob production access.
+3. Configure XPay production access.
 
-   When access is received, add the production credentials, integration IDs,
-   webhook URL, and redirect URL. Test the complete payment, webhook, and
+   When access is received, add the production credentials, webhook URL, and
+   redirect URL. Test the complete payment, webhook, and
    refund flow before enabling online payments for users.
 
 4. Perform production smoke tests through the public API.

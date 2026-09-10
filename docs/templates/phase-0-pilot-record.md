@@ -45,7 +45,7 @@ bank data to this repository.
 | Reconciliation summary / discrepancy count | _Required_ |
 | Every discrepancy resolution reference | _Required; no open, assigned, or accepted error remains_ |
 
-## Paymob acceptance evidence
+## XPay acceptance evidence
 
 | Scenario | Sandbox evidence | Live evidence | Result |
 | --- | --- | --- | --- |

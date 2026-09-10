@@ -277,13 +277,13 @@ export const manualCommerceJourney: JourneyDefinition = {
           'Price preview must apply the better active coupon price',
         );
 
-        // Covers the retry route without creating an external Paymob intention.
+        // Covers the retry route without creating an external XPay session.
         expectStatus(
           await student<any>(
             'POST',
-            '/student/orders/missing-paymob-order/paymob/attempt',
+            '/student/orders/missing-xpay-order/xpay/attempt',
             undefined,
-            { 'idempotency-key': factory.slug('missing-paymob-attempt') },
+            { 'idempotency-key': factory.slug('missing-xpay-attempt') },
           ),
           404,
         );

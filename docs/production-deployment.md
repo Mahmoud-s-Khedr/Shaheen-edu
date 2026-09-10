@@ -37,8 +37,11 @@ environment with these exact origins:
 CORS_ORIGINS=https://jibal-platform.com,https://app.jibal-platform.com,https://admin.jibal-platform.com
 COOKIE_SECURE=true
 COOKIE_SAME_SITE=lax
-PAYMOB_NOTIFICATION_URL=https://api.jibal-platform.com/api/v1/payments/paymob/webhook
-PAYMOB_REDIRECT_URL=https://app.jibal-platform.com/payment-result
+XPAY_API_BASE_URL=https://api.xpay.app
+XPAY_SECRET_KEY=<server-only-secret>
+XPAY_WEBHOOK_SECRET=<server-only-webhook-secret>
+XPAY_REDIRECT_URL=https://app.jibal-platform.com/payment-result
+XPAY_CANCEL_URL=https://app.jibal-platform.com/payment-result
 ```
 
 These hosts are same-site subdomains, so a secure, host-only refresh cookie

@@ -32,7 +32,7 @@ For a compact endpoint-family read/write matrix, see
 - EntitlementStatus: ACTIVE, REVOKED.
 - CommerceTargetType: COURSE, CHAPTER.
 - OrderStatus: AWAITING_PAYMENT, SUBMITTED, APPROVED, REJECTED, CANCELLED, EXPIRED.
-- PaymentChannel: MANUAL, PAYMOB.
+- PaymentChannel: MANUAL, XPAY.
 - PaymentAttemptStatus: INITIATED, PENDING, PAID, DECLINED, FAILED, EXPIRED.
 - PromotionKind: PERCENTAGE, FIXED.
 - CouponReservationStatus: RESERVED, REDEEMED, RELEASED.
@@ -2717,10 +2717,10 @@ For a compact endpoint-family read/write matrix, see
 | updatedAt | DateTime | Last-update timestamp. |
 | receipt | PaymentReceipt? | Relation to PaymentReceipt. Optional. |
 
-### PaymobWebhookEvent
+### XPayWebhookEvent
 
 **Domain:** platform operations  
-**Why this table exists:** A durable paymob webhook event record for the platform operations domain, separate so relationships, history, and queryability remain explicit.
+**Why this table exists:** A durable XPay webhook event record for the platform operations domain, separate so relationships, history, and queryability remain explicit.
 
 **Direct API use (static trace)**
 
@@ -2732,8 +2732,9 @@ For a compact endpoint-family read/write matrix, see
 | Attribute | Prisma type | Meaning |
 | --- | --- | --- |
 | id | String | Primary identifier. |
-| externalTransactionId | String | Reference ID for external transaction. |
-| merchantReference | String? | Stored string value for merchant reference. Optional. |
+| externalEventId | String | XPay's top-level event identifier, used for webhook deduplication. |
+| checkoutSessionId | String? | XPay Checkout Session ID. Optional. |
+| paymentIntentId | String? | XPay Payment Intent ID. Optional. |
 | verified | Boolean | Flag indicating whether verified applies. |
 | payloadHash | String | Stored string value for payload hash. |
 | payload | Json? | Structured JSON for payload. Optional. |

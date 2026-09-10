@@ -78,15 +78,13 @@ export interface AppConfig {
     referralPartnerMinimumCohort: number;
   };
   commerce: {
-    paymobBaseUrl: string;
-    paymobSecretKey: string;
-    paymobPublicKey: string;
-    paymobHmacSecret: string;
-    paymobIntegrationIds: number[];
-    paymobNotificationUrl: string;
-    paymobRedirectUrl: string;
-    paymobTimeoutMs: number;
-    paymobOrderExpirySeconds: number;
+    xpayApiBaseUrl: string;
+    xpaySecretKey: string;
+    xpayWebhookSecret: string;
+    xpayRedirectUrl: string;
+    xpayCancelUrl: string;
+    xpayTimeoutMs: number;
+    xpayOrderExpirySeconds: number;
     manualOrderExpirySeconds: number;
   };
   ai: {
@@ -289,18 +287,13 @@ export default (): AppConfig => ({
     ),
   },
   commerce: {
-    paymobBaseUrl: process.env.PAYMOB_BASE_URL ?? 'https://accept.paymob.com',
-    paymobSecretKey: process.env.PAYMOB_SECRET_KEY ?? '',
-    paymobPublicKey: process.env.PAYMOB_PUBLIC_KEY ?? '',
-    paymobHmacSecret: process.env.PAYMOB_HMAC_SECRET ?? '',
-    paymobIntegrationIds: (process.env.PAYMOB_INTEGRATION_IDS ?? '')
-      .split(',')
-      .map((value) => Number.parseInt(value.trim(), 10))
-      .filter(Number.isInteger),
-    paymobNotificationUrl: process.env.PAYMOB_NOTIFICATION_URL ?? '',
-    paymobRedirectUrl: process.env.PAYMOB_REDIRECT_URL ?? '',
-    paymobTimeoutMs: envInteger('PAYMOB_TIMEOUT_MS', 15_000),
-    paymobOrderExpirySeconds: envInteger('PAYMOB_ORDER_EXPIRY_SECONDS', 1800),
+    xpayApiBaseUrl: process.env.XPAY_API_BASE_URL ?? 'https://api.xpay.app',
+    xpaySecretKey: process.env.XPAY_SECRET_KEY ?? '',
+    xpayWebhookSecret: process.env.XPAY_WEBHOOK_SECRET ?? '',
+    xpayRedirectUrl: process.env.XPAY_REDIRECT_URL ?? '',
+    xpayCancelUrl: process.env.XPAY_CANCEL_URL ?? '',
+    xpayTimeoutMs: envInteger('XPAY_TIMEOUT_MS', 15_000),
+    xpayOrderExpirySeconds: envInteger('XPAY_ORDER_EXPIRY_SECONDS', 1800),
     manualOrderExpirySeconds: envInteger('MANUAL_ORDER_EXPIRY_SECONDS', 86_400),
   },
   ai: {

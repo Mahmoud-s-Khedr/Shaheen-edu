@@ -14,12 +14,17 @@
                   "type": "object",
                   "required": [
                     "status",
+                    "version",
                     "timestamp"
                   ],
                   "properties": {
                     "status": {
                       "type": "string",
                       "example": "ok"
+                    },
+                    "version": {
+                      "type": "string",
+                      "example": "2026.09.04"
                     },
                     "timestamp": {
                       "type": "string",
@@ -10035,6 +10040,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "academicGradeId",
+            "required": false,
+            "in": "query",
+            "description": "Restrict results to one academic grade. Required for a shared subject.",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -13565,9 +13579,9 @@
         ]
       }
     },
-    "/api/v1/student/orders/{id}/paymob/attempt": {
+    "/api/v1/student/orders/{id}/xpay/attempt": {
       "post": {
-        "operationId": "CommerceController_retryPaymob_v1",
+        "operationId": "CommerceController_retryXPay_v1",
         "parameters": [
           {
             "name": "id",
@@ -13596,7 +13610,7 @@
             "bearer": []
           }
         ],
-        "summary": "Create a fresh hosted Paymob checkout attempt for an unpaid order",
+        "summary": "Create a fresh hosted XPay checkout attempt for an unpaid order",
         "tags": [
           "student/commerce"
         ]
@@ -15279,18 +15293,18 @@
         ]
       }
     },
-    "/api/v1/payments/paymob/webhook": {
+    "/api/v1/payments/xpay/webhook": {
       "post": {
-        "operationId": "PaymobWebhookController_webhook_v1",
+        "operationId": "XPayWebhookController_webhook_v1",
         "parameters": [],
         "responses": {
           "200": {
             "description": ""
           }
         },
-        "summary": "Receive a signed Paymob payment callback",
+        "summary": "Receive a signed XPay payment callback",
         "tags": [
-          "payments/paymob"
+          "payments/xpay"
         ]
       }
     },
@@ -21619,7 +21633,7 @@
               "type": "string",
               "enum": [
                 "MANUAL",
-                "PAYMOB"
+                "XPAY"
               ]
             }
           },
@@ -21785,7 +21799,7 @@
               "type": "string",
               "enum": [
                 "MANUAL",
-                "PAYMOB"
+                "XPAY"
               ]
             }
           },
@@ -21951,7 +21965,7 @@
               "type": "string",
               "enum": [
                 "MANUAL",
-                "PAYMOB"
+                "XPAY"
               ]
             }
           },
@@ -22117,7 +22131,7 @@
               "type": "string",
               "enum": [
                 "MANUAL",
-                "PAYMOB"
+                "XPAY"
               ]
             }
           },
@@ -22283,7 +22297,7 @@
               "type": "string",
               "enum": [
                 "MANUAL",
-                "PAYMOB"
+                "XPAY"
               ]
             }
           },
@@ -22449,7 +22463,7 @@
               "type": "string",
               "enum": [
                 "MANUAL",
-                "PAYMOB"
+                "XPAY"
               ]
             }
           },
@@ -22615,7 +22629,7 @@
               "type": "string",
               "enum": [
                 "MANUAL",
-                "PAYMOB"
+                "XPAY"
               ]
             }
           },
@@ -22781,7 +22795,7 @@
               "type": "string",
               "enum": [
                 "MANUAL",
-                "PAYMOB"
+                "XPAY"
               ]
             }
           },
@@ -24214,6 +24228,568 @@
           "student/notebook"
         ]
       }
+    },
+    "/api/v1/admin/testimonials": {
+      "post": {
+        "operationId": "TestimonialsController_create_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTestimonialDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create a testimonial draft",
+        "tags": [
+          "admin/testimonials"
+        ]
+      },
+      "get": {
+        "operationId": "TestimonialsController_list_v1",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "One-based page number.",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Maximum records to return per page.",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "description": "Defaults to excluding archived testimonials.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "DRAFT",
+                "PUBLISHED",
+                "ARCHIVED"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List testimonials for administration",
+        "tags": [
+          "admin/testimonials"
+        ]
+      }
+    },
+    "/api/v1/admin/testimonials/{id}": {
+      "get": {
+        "operationId": "TestimonialsController_get_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get a testimonial for administration",
+        "tags": [
+          "admin/testimonials"
+        ]
+      },
+      "patch": {
+        "operationId": "TestimonialsController_update_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateTestimonialDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Edit a testimonial",
+        "tags": [
+          "admin/testimonials"
+        ]
+      },
+      "delete": {
+        "operationId": "TestimonialsController_delete_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Delete a testimonial draft",
+        "tags": [
+          "admin/testimonials"
+        ]
+      }
+    },
+    "/api/v1/admin/testimonials/reorder": {
+      "post": {
+        "operationId": "TestimonialsController_reorder_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReorderTestimonialDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Atomically reorder non-archived testimonials",
+        "tags": [
+          "admin/testimonials"
+        ]
+      }
+    },
+    "/api/v1/admin/testimonials/{id}/publish": {
+      "post": {
+        "operationId": "TestimonialsController_publish_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Publish a testimonial",
+        "tags": [
+          "admin/testimonials"
+        ]
+      }
+    },
+    "/api/v1/admin/testimonials/{id}/unpublish": {
+      "post": {
+        "operationId": "TestimonialsController_unpublish_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Return a published testimonial to draft",
+        "tags": [
+          "admin/testimonials"
+        ]
+      }
+    },
+    "/api/v1/admin/testimonials/{id}/archive": {
+      "post": {
+        "operationId": "TestimonialsController_archive_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Archive a testimonial",
+        "tags": [
+          "admin/testimonials"
+        ]
+      }
+    },
+    "/api/v1/admin/testimonials/{id}/restore": {
+      "post": {
+        "operationId": "TestimonialsController_restore_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Restore an archived testimonial as a draft",
+        "tags": [
+          "admin/testimonials"
+        ]
+      }
+    },
+    "/api/v1/testimonials": {
+      "get": {
+        "operationId": "PublicTestimonialsController_list_v1",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "One-based page number.",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Maximum records to return per page.",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "List published testimonials",
+        "tags": [
+          "testimonials"
+        ]
+      }
+    },
+    "/api/v1/testimonials/{id}/screenshot/access": {
+      "get": {
+        "operationId": "PublicTestimonialsController_screenshotAccess_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Get a short-lived URL for a published testimonial screenshot",
+        "tags": [
+          "testimonials"
+        ]
+      }
     }
   },
   "info": {
@@ -24330,6 +24906,32 @@
           "user"
         ]
       },
+      "ApiValidationDetailDto": {
+        "type": "object",
+        "properties": {
+          "field": {
+            "type": "string",
+            "example": "items.0.title.en",
+            "description": "Dotted field path, including array indexes. Empty for request-level errors."
+          },
+          "code": {
+            "type": "string",
+            "example": "VALIDATION.MINLENGTH"
+          },
+          "message": {
+            "type": "object",
+            "example": {
+              "ar": "يجب ألا يقل طول القيمة عن 8 أحرف",
+              "en": "password must be longer than or equal to 8 characters"
+            }
+          }
+        },
+        "required": [
+          "field",
+          "code",
+          "message"
+        ]
+      },
       "ApiErrorResponseDto": {
         "type": "object",
         "properties": {
@@ -24356,7 +24958,6 @@
             }
           },
           "details": {
-            "type": "array",
             "example": [
               {
                 "field": "phone",
@@ -24366,7 +24967,15 @@
                   "en": "phone must be a string"
                 }
               }
-            ]
+            ],
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ApiValidationDetailDto"
+            }
+          },
+          "meta": {
+            "type": "object",
+            "additionalProperties": true
           },
           "correlationId": {
             "type": "string",
@@ -25253,7 +25862,7 @@
           },
           "slug": {
             "type": "string",
-            "description": "Kebab-case; derived from title if omitted",
+            "description": "Letters (a-z, A-Z) and digits separated by hyphens; derived from title if omitted",
             "example": "grade-10"
           },
           "description": {
@@ -25424,19 +26033,22 @@
           },
           "slug": {
             "type": "string",
-            "description": "Kebab-case; derived from title if omitted",
+            "description": "Letters (a-z, A-Z) and digits separated by hyphens; derived from title if omitted",
             "example": "mathematics"
           },
           "description": {
             "type": "string"
           },
-          "academicGradeId": {
-            "type": "string"
+          "academicGradeIds": {
+            "description": "Grades in which this subject is available.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         },
         "required": [
-          "title",
-          "academicGradeId"
+          "title"
         ]
       },
       "SubjectSummaryDto": {
@@ -25501,11 +26113,39 @@
             "format": "date-time",
             "nullable": true
           },
-          "academicGradeId": {
-            "type": "string"
+          "academicGradeIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           },
-          "academicGradeName": {
-            "$ref": "#/components/schemas/LocalizedResponseTextDto"
+          "academicGrades": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "id",
+                "name",
+                "sortOrder"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/LocalizedResponseTextDto"
+                    }
+                  ],
+                  "nullable": true
+                },
+                "sortOrder": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            }
           },
           "hasChildren": {
             "type": "boolean",
@@ -25521,8 +26161,8 @@
           "status",
           "createdAt",
           "updatedAt",
-          "academicGradeId",
-          "academicGradeName",
+          "academicGradeIds",
+          "academicGrades",
           "hasChildren"
         ]
       },
@@ -25555,6 +26195,13 @@
           },
           "description": {
             "type": "string"
+          },
+          "academicGradeIds": {
+            "description": "Replaces the grades in which this subject is available.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         }
       },
@@ -25691,7 +26338,7 @@
           },
           "slug": {
             "type": "string",
-            "description": "Kebab-case; derived from title if omitted",
+            "description": "Letters (a-z, A-Z) and digits separated by hyphens; derived from title if omitted",
             "example": "algebra-fundamentals"
           },
           "description": {
@@ -26049,7 +26696,7 @@
           },
           "slug": {
             "type": "string",
-            "description": "Kebab-case; derived from title if omitted",
+            "description": "Letters (a-z, A-Z) and digits separated by hyphens; derived from title if omitted",
             "example": "chapter-1-linear-equations"
           },
           "description": {
@@ -26334,7 +26981,7 @@
           },
           "slug": {
             "type": "string",
-            "description": "Kebab-case; derived from title if omitted",
+            "description": "Letters (a-z, A-Z) and digits separated by hyphens; derived from title if omitted",
             "example": "lesson-1-solving-for-x"
           },
           "description": {
@@ -26528,7 +27175,7 @@
           },
           "slug": {
             "type": "string",
-            "description": "Kebab-case; derived from title if omitted",
+            "description": "Letters (a-z, A-Z) and digits separated by hyphens; derived from title if omitted",
             "example": "section-1-introduction"
           },
           "description": {
@@ -29266,7 +29913,7 @@
             "type": "string",
             "enum": [
               "MANUAL",
-              "PAYMOB"
+              "XPAY"
             ],
             "default": "MANUAL"
           },
@@ -32090,7 +32737,7 @@
         "properties": {
           "pilotLabel": {
             "type": "string",
-            "example": "staging-pilot-manual-and-paymob"
+            "example": "staging-pilot-manual-and-xpay"
           },
           "orderIds": {
             "minItems": 1,
@@ -32172,7 +32819,7 @@
             "type": "string",
             "enum": [
               "MANUAL",
-              "PAYMOB"
+              "XPAY"
             ]
           },
           "orderStatus": {
@@ -32711,6 +33358,84 @@
             "type": "string"
           }
         }
+      },
+      "CreateTestimonialDto": {
+        "type": "object",
+        "properties": {
+          "reviewText": {
+            "type": "object",
+            "description": "Written review text. Required when no screenshot is supplied.",
+            "maxLength": 5000
+          },
+          "reviewerName": {
+            "type": "object",
+            "description": "Optional name or attribution supplied with the review.",
+            "maxLength": 160
+          },
+          "screenshotAssetId": {
+            "type": "object",
+            "description": "ID of a ready IMAGE asset containing a review screenshot."
+          },
+          "screenshotAltText": {
+            "type": "object",
+            "description": "Required for screenshot testimonials. Describes the image for visitors who cannot view it.",
+            "maxLength": 2000
+          }
+        }
+      },
+      "UpdateTestimonialDto": {
+        "type": "object",
+        "properties": {
+          "reviewText": {
+            "type": "object",
+            "description": "Written review text. Required when no screenshot is supplied.",
+            "maxLength": 5000
+          },
+          "reviewerName": {
+            "type": "object",
+            "description": "Optional name or attribution supplied with the review.",
+            "maxLength": 160
+          },
+          "screenshotAssetId": {
+            "type": "object",
+            "description": "ID of a ready IMAGE asset containing a review screenshot."
+          },
+          "screenshotAltText": {
+            "type": "object",
+            "description": "Required for screenshot testimonials. Describes the image for visitors who cannot view it.",
+            "maxLength": 2000
+          }
+        }
+      },
+      "ReorderTestimonialItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "sortOrder": {
+            "type": "number",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "id",
+          "sortOrder"
+        ]
+      },
+      "ReorderTestimonialDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReorderTestimonialItemDto"
+            }
+          }
+        },
+        "required": [
+          "items"
+        ]
       }
     }
   }

@@ -305,7 +305,7 @@ For every approved order item, the fulfilment transaction does the following:
    price does not create an allocation.
 5. It writes one `PUBLISHER_SALE` allocation for the publisher with the order
    item, agreement ID, agreement version/terms snapshot, basis, amount, and a
-   retry-safe `publisher-sale:<orderItemId>` idempotency key. Duplicate Paymob
+   retry-safe `publisher-sale:<orderItemId>` idempotency key. Duplicate XPay
    webhooks or approval retries cannot create a second row.
 6. The row begins as `PAYABLE`. Later, an administrator makes an external
    payment, groups eligible rows into a settlement, and marks the settlement

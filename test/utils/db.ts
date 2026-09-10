@@ -33,7 +33,7 @@ export async function cleanDatabase(
   await prisma.orderReferralAttribution.deleteMany();
   await prisma.studentEntitlement.deleteMany();
   await prisma.paymentReceipt.deleteMany();
-  await prisma.paymobWebhookEvent.deleteMany();
+  await prisma.xPayWebhookEvent.deleteMany();
   await prisma.paymentAttempt.deleteMany();
   await prisma.couponReservation.deleteMany();
   await prisma.couponTarget.deleteMany();

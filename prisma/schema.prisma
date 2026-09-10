@@ -76,7 +76,7 @@ enum OrderStatus {
 
 enum PaymentChannel {
   MANUAL
-  PAYMOB
+  XPAY
 }
 
 enum PaymentAttemptStatus {
@@ -2617,18 +2617,20 @@ model PaymentAttempt {
   @@index([status, expiresAt])
 }
 
-model PaymobWebhookEvent {
-  id                    String    @id @default(cuid())
-  externalTransactionId String    @unique
-  merchantReference     String?
-  verified              Boolean
-  payloadHash           String
-  payload               Json?
-  processingError       String?
-  processedAt           DateTime?
-  createdAt             DateTime  @default(now())
+model XPayWebhookEvent {
+  id                String    @id @default(cuid())
+  externalEventId   String    @unique
+  checkoutSessionId String?
+  paymentIntentId   String?
+  verified          Boolean
+  payloadHash       String
+  payload           Json?
+  processingError   String?
+  processedAt       DateTime?
+  createdAt         DateTime  @default(now())
 
-  @@index([merchantReference])
+  @@index([checkoutSessionId])
+  @@index([paymentIntentId])
   @@index([verified, processedAt])
 }
 

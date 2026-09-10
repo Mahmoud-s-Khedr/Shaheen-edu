@@ -395,19 +395,19 @@ export class PartnerFinanceService {
       },
     });
     const orderIds = run.orders.map((row) => row.orderId);
-    const paymobTransactionIds = run.orders.flatMap((row: any) =>
+    const xpayCheckoutSessionIds = run.orders.flatMap((row: any) =>
       row.order.paymentAttempts
-        .map((attempt: any) => attempt.providerTransactionId)
-        .filter((transactionId: string | null): transactionId is string =>
-          Boolean(transactionId),
+        .map((attempt: any) => attempt.providerOrderId)
+        .filter((sessionId: string | null): sessionId is string =>
+          Boolean(sessionId),
         ),
     );
-    const paymobEvents = paymobTransactionIds.length
-      ? await this.prisma.paymobWebhookEvent.findMany({
-          where: { externalTransactionId: { in: paymobTransactionIds } },
+    const xpayEvents = xpayCheckoutSessionIds.length
+      ? await this.prisma.xPayWebhookEvent.findMany({
+          where: { checkoutSessionId: { in: xpayCheckoutSessionIds } },
           select: {
-            externalTransactionId: true,
-            merchantReference: true,
+            checkoutSessionId: true,
+            paymentIntentId: true,
             verified: true,
             processedAt: true,
             processingError: true,
@@ -415,8 +415,8 @@ export class PartnerFinanceService {
           },
         })
       : [];
-    const paymobEventByTransactionId = new Map(
-      paymobEvents.map((event) => [event.externalTransactionId, event]),
+    const xpayEventByCheckoutSessionId = new Map(
+      xpayEvents.map((event) => [event.checkoutSessionId, event]),
     );
     const agreements = await this.prisma.publisherAgreement.findMany({
       where: {
@@ -471,7 +471,7 @@ export class PartnerFinanceService {
             this.discrepancy({ type: 'MANUAL_RECEIPT_HAS_PAYMENT_ATTEMPT' }),
           );
       }
-      if (order.paymentChannel === PaymentChannel.PAYMOB) {
+      if (order.paymentChannel === PaymentChannel.XPAY) {
         const paidAttempts = order.paymentAttempts.filter(
           (attempt: any) => attempt.status === PaymentAttemptStatus.PAID,
         );
@@ -479,29 +479,29 @@ export class PartnerFinanceService {
           findings.push(
             this.discrepancy({
               type: paidAttempts.length
-                ? 'MULTIPLE_PAID_PAYMOB_ATTEMPTS'
-                : 'MISSING_PAID_PAYMOB_ATTEMPT',
+                ? 'MULTIPLE_PAID_XPAY_ATTEMPTS'
+                : 'MISSING_PAID_XPAY_ATTEMPT',
             }),
           );
         const paidAttempt = paidAttempts[0];
         if (paidAttempt) {
           if (order.receipt?.paymentAttemptId !== paidAttempt.id)
             findings.push(
-              this.discrepancy({ type: 'PAYMOB_RECEIPT_ATTEMPT_MISMATCH' }),
+              this.discrepancy({ type: 'XPAY_RECEIPT_ATTEMPT_MISMATCH' }),
             );
-          if (!paidAttempt.providerTransactionId)
+          if (!paidAttempt.providerOrderId)
             findings.push(
               this.discrepancy({
-                type: 'MISSING_PAYMOB_PROVIDER_TRANSACTION_ID',
+                type: 'MISSING_XPAY_CHECKOUT_SESSION_ID',
               }),
             );
           else {
-            const event = paymobEventByTransactionId.get(
-              paidAttempt.providerTransactionId,
+            const event = xpayEventByCheckoutSessionId.get(
+              paidAttempt.providerOrderId,
             );
             if (!event)
               findings.push(
-                this.discrepancy({ type: 'MISSING_VERIFIED_PAYMOB_CALLBACK' }),
+                this.discrepancy({ type: 'MISSING_VERIFIED_XPAY_WEBHOOK' }),
               );
             else {
               const providerPayload = event.payload as any;
@@ -511,31 +511,28 @@ export class PartnerFinanceService {
                 event.processingError
               )
                 findings.push(
-                  this.discrepancy({ type: 'UNPROCESSED_PAYMOB_CALLBACK' }),
+                  this.discrepancy({ type: 'UNPROCESSED_XPAY_WEBHOOK' }),
                 );
-              if (event.merchantReference !== paidAttempt.merchantReference)
+              if (
+                Number(providerPayload?.data?.object?.amountTotal) !==
+                order.totalMinor
+              )
                 findings.push(
                   this.discrepancy({
-                    type: 'PAYMOB_CALLBACK_REFERENCE_MISMATCH',
-                  }),
-                );
-              if (Number(providerPayload?.amount_cents) !== order.totalMinor)
-                findings.push(
-                  this.discrepancy({
-                    type: 'PAYMOB_CALLBACK_AMOUNT_MISMATCH',
+                    type: 'XPAY_WEBHOOK_AMOUNT_MISMATCH',
                     expectedAmountMinor: order.totalMinor,
                     actualAmountMinor: Number.isFinite(
-                      Number(providerPayload?.amount_cents),
+                      Number(providerPayload?.data?.object?.amountTotal),
                     )
-                      ? Number(providerPayload.amount_cents)
+                      ? Number(providerPayload.data.object.amountTotal)
                       : null,
                     currency: order.currency,
                   }),
                 );
-              if (providerPayload?.currency !== order.currency)
+              if (providerPayload?.data?.object?.currency !== order.currency)
                 findings.push(
                   this.discrepancy({
-                    type: 'PAYMOB_CALLBACK_CURRENCY_MISMATCH',
+                    type: 'XPAY_WEBHOOK_CURRENCY_MISMATCH',
                     currency: order.currency,
                   }),
                 );

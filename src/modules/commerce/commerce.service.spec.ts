@@ -242,6 +242,101 @@ describe('CommerceService payment proofs', () => {
   });
 });
 
+describe('CommerceService XPay webhooks', () => {
+  const rawBody = Buffer.from(
+    JSON.stringify({
+      id: 'evt_test_1',
+      type: 'checkout.session.completed',
+      data: {
+        object: {
+          id: 'cs_test_1',
+          paymentIntentId: 'pi_test_1',
+          paymentStatus: 'paid',
+          amountTotal: 10_000,
+          currency: 'EGP',
+        },
+      },
+    }),
+  );
+
+  function buildWebhookService(amountTotal = 10_000) {
+    const event = { id: 'local-event-1' };
+    const tx: any = {
+      xPayWebhookEvent: {
+        findUnique: jest.fn().mockResolvedValue(event),
+        update: jest.fn().mockResolvedValue(event),
+      },
+      paymentAttempt: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: 'attempt-1',
+          orderId: 'order-1',
+          providerTransactionId: null,
+          order: { totalMinor: amountTotal, currency: 'EGP' },
+        }),
+        update: jest.fn(),
+      },
+    };
+    const prisma: any = {
+      xPayWebhookEvent: {
+        create: jest.fn().mockResolvedValue(event),
+        findUnique: jest.fn().mockResolvedValue(event),
+        update: jest.fn(),
+      },
+      $transaction: jest.fn((callback) => callback(tx)),
+    };
+    const fulfilment = { fulfil: jest.fn() };
+    const service = new CommerceService(
+      prisma,
+      {} as any,
+      {} as any,
+      undefined,
+      { verifyWebhookSignature: jest.fn().mockReturnValue(true) } as any,
+      fulfilment as any,
+    );
+    return { service, tx, prisma, fulfilment };
+  }
+
+  it('fulfils only a paid XPay session that matches the immutable order total', async () => {
+    const { service, tx, fulfilment } = buildWebhookService();
+
+    await expect(
+      service.xpayWebhook(rawBody, 't=1,v1=test'),
+    ).resolves.toMatchObject({
+      accepted: true,
+      success: true,
+      orderId: 'order-1',
+    });
+
+    expect(tx.paymentAttempt.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          status: 'PAID',
+          providerTransactionId: 'pi_test_1',
+        }),
+      }),
+    );
+    expect(fulfilment.fulfil).toHaveBeenCalledWith(tx, {
+      orderId: 'order-1',
+      paymentAttemptId: 'attempt-1',
+    });
+  });
+
+  it('rejects a signed XPay event whose amount does not match the order', async () => {
+    const { service, prisma, fulfilment } = buildWebhookService(9_999);
+
+    await expect(
+      service.xpayWebhook(rawBody, 't=1,v1=test'),
+    ).rejects.toBeInstanceOf(ConflictException);
+
+    expect(fulfilment.fulfil).not.toHaveBeenCalled();
+    expect(prisma.xPayWebhookEvent.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ processingError: expect.any(String) }),
+      }),
+    );
+  });
+});
+
 describe('CommerceService chapter product eligibility', () => {
   it('rejects an inherited chapter even when its course has a valid price', async () => {
     const prisma: any = {

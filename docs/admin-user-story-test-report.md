@@ -51,7 +51,7 @@ Unless a more specific criterion says otherwise, test list endpoints for valid s
 | `CONTENT_*` / `ASSET_*` / `VIDEO_*` | Each supported content type, attachment/primary asset/cover, a valid small file, disallowed type/oversized file, failed/incomplete upload, and a Bunny video in created/uploading/ready/failed/archived states. |
 | `SOURCE_*` / `BANK_*` / `QUESTION_*` | Draft/published/archived sources and banks; questions in draft/submitted/published/rejected/archived states; options, rich content blocks, linked assets/video, and student reports/written answers. |
 | `ASSESSMENT_*` | Draft standard/custom/published/archived assessments, sufficient eligible frozen questions, invalid selection and timer fixtures, submitted pending-written answer, and a stale/invalid state fixture. |
-| `ORDER_*` / `PAYMENT_*` / `REFUND_*` | Student cart/orders, an idempotent checkout key, pending/approved/rejected manual proofs, valid/invalid payment methods, coupon/campaign combinations, Paymob callback fixture, and eligible/ineligible refund requests. |
+| `ORDER_*` / `PAYMENT_*` / `REFUND_*` | Student cart/orders, an idempotent checkout key, pending/approved/rejected manual proofs, valid/invalid payment methods, coupon/campaign combinations, XPay webhook fixture, and eligible/ineligible refund requests. |
 | `PARTNER_*` / `AGREEMENT_*` / `ALLOCATION_*` | Referral and publisher partners; draft/current/future/ended agreements; course/chapter/lesson price overrides; payable/paid/reversed allocations; settlement and reconciliation discrepancy fixtures. |
 | `PROGRAM_*` / `CODE_*` / `RULE_*` | Draft/active/suspended/ended referral programmes; active/inactive/depleted codes; commission and review rules; open/assigned/resolved flags and notes. |
 | `EXPORT_*` / `TESTIMONIAL_*` | Aggregate report data across Cairo date boundaries, export jobs in queued/processing/completed/failed/expired states, and draft/published/unpublished/archived testimonials with screenshots. |
@@ -206,7 +206,7 @@ Unless a more specific criterion says otherwise, test list endpoints for valid s
 
 **Priority/Risk:** Critical — money, entitlement, and payment-proof privacy.
 
-**Sources:** `/admin/manual-payment-methods`, `/admin/payment-submissions`, `/admin/discount-campaigns`, `/admin/coupons`; `ManualPaymentAdminController`, `CommerceService`, fulfilment and Paymob webhook services.
+**Sources:** `/admin/manual-payment-methods`, `/admin/payment-submissions`, `/admin/discount-campaigns`, `/admin/coupons`; `ManualPaymentAdminController`, `CommerceService`, fulfilment and XPay webhook services.
 
 **User story:** As an administrator, I want to administer payment methods, review manual proofs, and manage promotions so that approved purchases yield exactly the intended learner access.
 
@@ -215,7 +215,7 @@ Unless a more specific criterion says otherwise, test list endpoints for valid s
 - Given payment methods with different active/order states, when they are created, patched, listed, and reordered, then students see only active methods in the approved order while admins see all. Invalid instructions/type, duplicate/missing reorder ID, stale target, and a method in use follow validation/dependency rules without partial reorder.
 - Given a pending manual submission, when an admin views it, then the response is limited to the authorised payment-review scope and protected proof access remains short-lived. Approval changes the submission/order exactly once, creates the intended entitlement and partner allocations, and is safe against double click/retry. Rejection requires valid reason/state, creates no entitlement, and supports the student resubmission path only as designed.
 - Given campaigns/coupons with percentages/fixed amounts, dates, audience/scope, priority, limits, active/inactive status, and a discounted target, when they are created/updated/activated/deactivated, then price preview/checkout uses the correct current eligible rule and final saved item price. Test case-insensitive duplicate code, invalid range/amount/scope, expired/depleted/inactive/ineligible code, overlapping campaign priority, and state-change retry.
-- Given a student checkout/payment callback is retried, then idempotency keys and provider event handling prevent a duplicate order, approval, entitlement, allocation, or discount consumption. An invalid/replayed Paymob HMAC must be denied without order mutation.
+- Given a student checkout/payment webhook is retried, then idempotency keys and provider event handling prevent a duplicate order, approval, entitlement, allocation, or discount consumption. An invalid/replayed XPay signature must be denied without order mutation.
 - Given any payment proof, order, coupon, referral, or partner allocation, when a student/parent/partner/anonymous token calls an admin route, then it receives no payment-review data; test direct IDs and pagination/search filters.
 
 **Test type:** API, finance calculation, payment integration, idempotency, privacy, audit.

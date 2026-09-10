@@ -70,7 +70,7 @@ describe('PartnerFinanceService settlements', () => {
 });
 
 describe('PartnerFinanceService reconciliation evidence', () => {
-  function build(run: any, paymobEvents: any[] = []) {
+  function build(run: any, xpayEvents: any[] = []) {
     const tx: any = {
       partnerFinanceDiscrepancy: {
         deleteMany: jest.fn(),
@@ -91,8 +91,8 @@ describe('PartnerFinanceService reconciliation evidence', () => {
         findUnique: jest.fn().mockResolvedValue(run),
         update: jest.fn(),
       },
-      paymobWebhookEvent: {
-        findMany: jest.fn().mockResolvedValue(paymobEvents),
+      xPayWebhookEvent: {
+        findMany: jest.fn().mockResolvedValue(xpayEvents),
       },
       publisherAgreement: { findMany: jest.fn().mockResolvedValue([]) },
       partnerSettlementLine: { findMany: jest.fn().mockResolvedValue([]) },
@@ -109,7 +109,7 @@ describe('PartnerFinanceService reconciliation evidence', () => {
     };
   }
 
-  it('records missing Paymob callback and receipt evidence as discrepancies', async () => {
+  it('records missing XPay webhook and receipt evidence as discrepancies', async () => {
     const run = {
       id: 'run-1',
       status: 'DRAFT',
@@ -122,7 +122,7 @@ describe('PartnerFinanceService reconciliation evidence', () => {
             approvedAt: new Date(),
             totalMinor: 10_000,
             currency: 'EGP',
-            paymentChannel: 'PAYMOB',
+            paymentChannel: 'XPAY',
             receipt: null,
             referralAttribution: null,
             submissions: [],
@@ -133,7 +133,7 @@ describe('PartnerFinanceService reconciliation evidence', () => {
                 id: 'attempt-1',
                 status: 'PAID',
                 merchantReference: 'order-1:1',
-                providerTransactionId: 'transaction-1',
+                providerOrderId: 'cs_test_1',
               },
             ],
           },
@@ -148,8 +148,8 @@ describe('PartnerFinanceService reconciliation evidence', () => {
       expect.objectContaining({
         data: expect.arrayContaining([
           expect.objectContaining({ type: 'MISSING_RECEIPT' }),
-          expect.objectContaining({ type: 'PAYMOB_RECEIPT_ATTEMPT_MISMATCH' }),
-          expect.objectContaining({ type: 'MISSING_VERIFIED_PAYMOB_CALLBACK' }),
+          expect.objectContaining({ type: 'XPAY_RECEIPT_ATTEMPT_MISMATCH' }),
+          expect.objectContaining({ type: 'MISSING_VERIFIED_XPAY_WEBHOOK' }),
         ]),
       }),
     );

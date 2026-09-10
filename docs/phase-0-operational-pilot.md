@@ -4,11 +4,11 @@ This is the execution runbook for Phase 0 of the
 [administration and partner expansion plan](administration-and-partner-expansion-plan.md).
 It supplements the [refund administration procedure](refund-administration-procedure.md),
 [partner-finance staging pilot runbook](partner-finance-staging-runbook.md), and
-[Paymob integration guide](paymob-integration-guide.md).
+[XPay integration guide](xpay-integration-guide.md).
 
 Phase 0 is not complete merely because the API and migrations are deployed.
 It closes only after the designated finance and engineering owners have run and
-signed the real-environment evidence described here. Do not store Paymob keys,
+signed the real-environment evidence described here. Do not store XPay keys,
 full webhook payloads, card data, student PII, or bank-account details in the
 pilot record.
 
@@ -24,7 +24,7 @@ people, not a team name or a shared inbox.
 | Engineering approver | _Unassigned_ | Approves callback reachability, HMAC evidence, reconciliation output, and rollback readiness. |
 | Incident commander | _Unassigned_ | Owns customer/finance escalation and the decision to halt the pilot. |
 | Rollback operator | _Unassigned_ | Has deployment/configuration access to disable pilot traffic immediately. |
-| Paymob merchant contact | _Unassigned_ | Can inspect merchant transactions and settlement evidence. |
+| XPay merchant contact | _Unassigned_ | Can inspect merchant transactions and settlement evidence. |
 
 Keep `FEATURE_REFERRALS_ENABLED`, `FEATURE_PARTNER_LEDGER_ENABLED`, and their
 allow-lists at their approved pilot scope. In particular, do not widen a
@@ -69,7 +69,7 @@ Train each refund administrator on this non-negotiable scope:
   case reference; never put card or bank-account details in the reference.
 - Submit that reference in `POST /api/v1/admin/refunds/{id}/approve`.
   Approval revokes only the selected items' entitlements and creates
-  compensating negative allocation rows. It does not issue a Paymob refund.
+  compensating negative allocation rows. It does not issue an XPay refund.
 - Reject a request with a student-facing reason when reimbursement has not
   occurred or the request is not approved. Escalate a refund that affects a
   paid partner settlement before taking action; the reconciliation will flag
@@ -90,11 +90,11 @@ have approved it.
 1. Record the expected pre-payment values: product/item IDs, price in minor
    EGP units, publisher agreement/version and expected allocation, referral
    rule/version and expected allocation, and the intended payment channel.
-2. Complete one approved purchase per intended channel. For Paymob, use the
+2. Complete one approved purchase per intended channel. For XPay, use the
    hosted checkout response and wait for the local order to become `APPROVED`;
    the redirect page is never proof of payment.
 3. Retain only IDs and references: order, order items, receipt, entitlement,
-   payment attempt, Paymob transaction, publisher/referral allocations, and
+   payment attempt, XPay transaction, publisher/referral allocations, and
    referral code/rule. Do not copy full provider payloads to the release
    record.
 4. Create one persistent reconciliation run with the approved pilot order IDs:
@@ -107,7 +107,7 @@ have approved it.
 
 5. The run must show the approved order, matching immutable receipt snapshot,
    entitlement, expected publisher/referral allocations, and settlement state.
-   For Paymob it additionally checks one paid local attempt, receipt linkage,
+   For XPay it additionally checks one paid local attempt, receipt linkage,
    verified/processed callback, merchant reference, callback amount, and
    callback currency. For manual payment it checks an approved payment
    submission and that the receipt is not linked to a PSP attempt.
@@ -126,7 +126,7 @@ The CLI command `pnpm partner-allocations:reconcile -- --from=YYYY-MM-DD
 evidence, but it does not replace the persistent run or its discrepancy
 workflow.
 
-## Paymob sandbox and live acceptance
+## XPay sandbox and live acceptance
 
 Perform every scenario in sandbox first, then repeat the successful payment,
 callback, and settlement-comparison path in live mode with the smallest

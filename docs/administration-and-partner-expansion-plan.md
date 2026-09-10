@@ -114,7 +114,7 @@ the backend application:
       eligibility checks, automatic rejection of ineligible requests, admin
       approval/rejection, manual reimbursement references, entitlement revocation,
       and immutable publisher/referral compensating allocations. Refunds are
-      intentionally not sent through Paymob.
+      intentionally not sent through XPay.
 - [x] Apply the migration locally, validate it on disposable PostgreSQL, and
       apply the assessment-attribution backfill (12 rows resolved, 0 unknown).
 - [x] Add focused unit coverage for referral limits/allocation idempotency,
@@ -145,7 +145,7 @@ operations broadly.
 - [ ] Record finance and engineering sign-off for the pilot, resolve every
       discrepancy, and define the rollback/incident owner before widening the
       referral and partner-ledger allow-lists.
-- [ ] Complete Paymob sandbox and live acceptance: callback reachability,
+- [ ] Complete XPay sandbox and live acceptance: webhook reachability,
       HMAC validation, retry/timeout behaviour, expiry, and a provider-settlement
       comparison. Provider refunds remain out of scope because reimbursement is
       manual.

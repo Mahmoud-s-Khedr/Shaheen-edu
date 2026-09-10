@@ -107,7 +107,7 @@ been validated.
 | [ ] | Admin parent management | There is no parent directory, parent support detail, relationship management, or parent-account revoke/suspend workflow. |
 | [-] | Partner company, assigned subjects, students, payments, and revenue share | Publisher agreements, allocations, settlements, referrals, and privacy-safe aggregate partner reporting exist. There is no per-learner partner model/view. |
 | [x] | Content management, uploads, and PDF-to-question generation | Hierarchy/content/asset/video/question CRUD and review are implemented. AI imports include raw text/PDF/TXT, visual PDF OCR, page retry/review, candidate review, and per-item accept/reject into draft questions. |
-| [x] | Pricing, discounts, coupons, and payments | Course/chapter pricing, promotions, coupons, manual proof flow, Paymob hosted checkout/webhook flow, expiry, receipts, and manual refund lifecycle are implemented. |
+| [x] | Pricing, discounts, coupons, and payments | Course/chapter pricing, promotions, coupons, manual proof flow, XPay hosted checkout/webhook flow, expiry, receipts, and manual refund lifecycle are implemented. |
 | [x] | Subscriber export and payment/revenue reporting | Audited aggregate reports and queued private CSV exports with protected download URLs are implemented. |
 | [x] | Admin access and platform control | Admin/super-admin auth, guards, audit records, and administration surfaces are implemented. |
 | [x] | Student registration and learning | Registration, protected catalogue/content, learning, practice, commerce, assessments, performance, and leaderboard APIs are implemented. |

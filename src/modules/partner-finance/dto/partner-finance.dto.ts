@@ -57,7 +57,7 @@ export class SettlementsQueryDto extends PaginationQueryDto {
 }
 
 export class CreateReconciliationRunDto {
-  @ApiProperty({ example: 'staging-pilot-manual-and-paymob' })
+  @ApiProperty({ example: 'staging-pilot-manual-and-xpay' })
   @IsString()
   @MinLength(1)
   @MaxLength(160)

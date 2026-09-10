@@ -340,13 +340,37 @@ No path, query, or header input.
 
 ### `POST /api/v1/student/orders/{id}/cancel`
 
-### `POST /api/v1/student/orders/{id}/paymob/attempt`
+### `POST /api/v1/student/orders/{id}/xpay/attempt`
 
 ### `POST /api/v1/student/orders/{id}/payment-proof`
 
 ### `POST /api/v1/student/orders/{orderId}/payment-submissions/{submissionId}/resubmit`
 
-### `POST /api/v1/payments/paymob/webhook`
+### `POST /api/v1/payments/xpay/webhook`
+
+### `GET /api/v1/testimonials`
+
+### `GET /api/v1/testimonials/{id}/screenshot/access`
+
+### `GET /api/v1/admin/testimonials`
+
+### `POST /api/v1/admin/testimonials`
+
+### `GET /api/v1/admin/testimonials/{id}`
+
+### `PATCH /api/v1/admin/testimonials/{id}`
+
+### `DELETE /api/v1/admin/testimonials/{id}`
+
+### `POST /api/v1/admin/testimonials/reorder`
+
+### `POST /api/v1/admin/testimonials/{id}/publish`
+
+### `POST /api/v1/admin/testimonials/{id}/unpublish`
+
+### `POST /api/v1/admin/testimonials/{id}/archive`
+
+### `POST /api/v1/admin/testimonials/{id}/restore`
 
 ## Assessments
 

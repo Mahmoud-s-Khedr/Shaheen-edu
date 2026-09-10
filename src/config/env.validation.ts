@@ -145,21 +145,15 @@ export const envValidationSchema = Joi.object({
     .min(1)
     .max(100)
     .default(1),
-  PAYMOB_BASE_URL: Joi.string().uri().default('https://accept.paymob.com'),
-  PAYMOB_SECRET_KEY: Joi.string().allow('').optional(),
-  PAYMOB_PUBLIC_KEY: Joi.string().allow('').optional(),
-  PAYMOB_HMAC_SECRET: Joi.string().allow('').optional(),
-  PAYMOB_INTEGRATION_IDS: Joi.string().allow('').optional(),
-  PAYMOB_NOTIFICATION_URL: Joi.string().uri().allow('').optional(),
-  PAYMOB_REDIRECT_URL: Joi.string().uri().allow('').optional(),
-  PAYMOB_TIMEOUT_MS: Joi.number()
+  XPAY_API_BASE_URL: Joi.string().uri().default('https://api.xpay.app'),
+  XPAY_SECRET_KEY: Joi.string().allow('').optional(),
+  XPAY_WEBHOOK_SECRET: Joi.string().allow('').optional(),
+  XPAY_REDIRECT_URL: Joi.string().uri().allow('').optional(),
+  XPAY_CANCEL_URL: Joi.string().uri().allow('').optional(),
+  XPAY_TIMEOUT_MS: Joi.number().integer().min(1000).max(120000).default(15000),
+  XPAY_ORDER_EXPIRY_SECONDS: Joi.number()
     .integer()
-    .min(1000)
-    .max(120000)
-    .default(15000),
-  PAYMOB_ORDER_EXPIRY_SECONDS: Joi.number()
-    .integer()
-    .min(60)
+    .min(1800)
     .max(86400)
     .default(1800),
   MANUAL_ORDER_EXPIRY_SECONDS: Joi.number()

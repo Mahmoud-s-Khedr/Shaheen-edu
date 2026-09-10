@@ -1,0 +1,401 @@
+<!doctype html>
+<!--
+  XPay Hosted Checkout test console (development only).
+
+  1. Start the Docker stack: pnpm dev:start
+  2. Serve this directory: pnpm dlx serve dev -l 5173
+  3. Expose both local services through HTTPS tunnels:
+       cloudflared tunnel --url http://localhost:3000
+       cloudflared tunnel --url http://localhost:5173
+  4. Add the frontend tunnel URL to CORS_ORIGINS, then restart the API.
+  5. Set XPAY_REDIRECT_URL to this page on the frontend tunnel and create an
+     XPay test-mode webhook endpoint at <api-tunnel>/api/v1/payments/xpay/webhook.
+
+  Open this page THROUGH the frontend tunnel, rather than localhost. That keeps
+  the test session across XPay's redirect and lets the browser call the API
+  tunnel with a permitted CORS origin. This page stores a test access token in
+  sessionStorage solely to survive that redirect. Never deploy or reuse it as a
+  production login or checkout UI.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Shaheen Edu — XPay Checkout Test</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        max-width: 880px;
+        margin: 0 auto;
+        padding: 24px;
+        font:
+          16px/1.45 system-ui,
+          -apple-system,
+          'Segoe UI',
+          sans-serif;
+      }
+      h1 {
+        margin-bottom: 4px;
+        font-size: 1.5rem;
+      }
+      .hint {
+        margin-top: 0;
+        opacity: 0.75;
+      }
+      fieldset {
+        margin: 18px 0;
+        padding: 16px;
+        border: 1px solid color-mix(in srgb, currentColor 28%, transparent);
+        border-radius: 10px;
+      }
+      legend {
+        padding: 0 6px;
+        font-weight: 700;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+      }
+      .full {
+        grid-column: 1 / -1;
+      }
+      @media (max-width: 620px) {
+        .grid {
+          grid-template-columns: 1fr;
+        }
+      }
+      label {
+        display: grid;
+        gap: 4px;
+        font-size: 0.9rem;
+      }
+      input,
+      select,
+      button {
+        min-height: 38px;
+        padding: 7px 9px;
+        border: 1px solid color-mix(in srgb, currentColor 30%, transparent);
+        border-radius: 7px;
+        background: Canvas;
+        color: CanvasText;
+        font: inherit;
+      }
+      button {
+        cursor: pointer;
+        font-weight: 650;
+      }
+      .buttons {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 14px;
+      }
+      pre {
+        margin: 12px 0 0;
+        max-height: 290px;
+        overflow: auto;
+        padding: 12px;
+        border-radius: 8px;
+        background: color-mix(in srgb, currentColor 8%, transparent);
+        font-size: 0.8rem;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+      .ok {
+        color: #19733a;
+      }
+      .error {
+        color: #ba2525;
+      }
+      .notice {
+        padding: 10px;
+        border-radius: 8px;
+        background: color-mix(in srgb, #d29922 16%, transparent);
+      }
+      code {
+        font-size: 0.9em;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>XPay Hosted Checkout test console</h1>
+    <p class="hint">
+      Development-only tool. Open it via the public frontend tunnel so the XPay
+      return lands back in this browser session.
+    </p>
+
+    <p class="notice">
+      Use a disposable student and a paid, published test course or chapter. The
+      payment provider must use <code>sk_test_...</code>; never enter live
+      credentials here.
+    </p>
+
+    <fieldset>
+      <legend>1. API connection and student session</legend>
+      <div class="grid">
+        <label class="full"
+          >API base URL
+          <input
+            id="apiBase"
+            inputmode="url"
+            placeholder="https://your-api-tunnel.trycloudflare.com/api/v1"
+          />
+        </label>
+        <label
+          >Student phone
+          <input id="phone" autocomplete="tel" placeholder="01012345678" />
+        </label>
+        <label
+          >Password
+          <input
+            id="password"
+            type="password"
+            autocomplete="current-password"
+          />
+        </label>
+      </div>
+      <div class="buttons">
+        <button id="login">Sign in as test student</button>
+        <button id="clearSession" type="button">Clear test session</button>
+        <span id="sessionState" aria-live="polite"></span>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>2. Build the local order</legend>
+      <div class="grid">
+        <label
+          >Target type
+          <select id="targetType">
+            <option value="COURSE">Course</option>
+            <option value="CHAPTER">Chapter</option>
+          </select>
+        </label>
+        <label
+          >Paid target ID
+          <input id="targetId" placeholder="Course or chapter ID" />
+        </label>
+      </div>
+      <div class="buttons">
+        <button id="viewCart" type="button">View cart</button>
+        <button id="addToCart" type="button">Add target to cart</button>
+        <button id="startCheckout" type="button">
+          Create XPay checkout and redirect
+        </button>
+      </div>
+      <pre id="cartOutput">Sign in, then add exactly one paid test target.</pre>
+    </fieldset>
+
+    <fieldset>
+      <legend>3. Return and verification</legend>
+      <p class="hint">
+        XPay’s redirect does not prove payment. Wait for the signed webhook,
+        then refresh the local order.
+      </p>
+      <div class="buttons">
+        <button id="refreshOrder" type="button">Refresh saved order</button>
+        <button id="retryAttempt" type="button">
+          Create a fresh unpaid attempt
+        </button>
+        <button id="viewEntitlements" type="button">View entitlements</button>
+      </div>
+      <pre id="orderOutput">
+No checkout has been started in this browser session.</pre>
+    </fieldset>
+
+    <script>
+      (() => {
+        const storage = window.sessionStorage;
+        const key = (name) => `shaheen-xpay-test:${name}`;
+        const $ = (id) => document.getElementById(id);
+        const apiBase = () => $('apiBase').value.trim().replace(/\/$/, '');
+        const token = () => storage.getItem(key('token'));
+        const orderId = () => storage.getItem(key('orderId'));
+        const output = (id, value) => {
+          $(id).textContent =
+            typeof value === 'string' ? value : JSON.stringify(value, null, 2);
+        };
+        const randomKey = () =>
+          crypto.randomUUID
+            ? crypto.randomUUID()
+            : `xpay-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
+        function saveConnection() {
+          storage.setItem(key('apiBase'), apiBase());
+        }
+        function updateSessionState(message) {
+          const signedIn = Boolean(token());
+          $('sessionState').textContent =
+            message ||
+            (signedIn ? 'Signed in for this browser session.' : 'Signed out.');
+          $('sessionState').className = signedIn ? 'ok' : '';
+        }
+        async function request(method, path, { body, idempotencyKey } = {}) {
+          if (!apiBase())
+            throw new Error('Enter the public API tunnel URL first.');
+          const headers = { Accept: 'application/json' };
+          if (token()) headers.Authorization = `Bearer ${token()}`;
+          if (body !== undefined) headers['Content-Type'] = 'application/json';
+          if (idempotencyKey) headers['Idempotency-Key'] = idempotencyKey;
+          const response = await fetch(`${apiBase()}${path}`, {
+            method,
+            headers,
+            body: body === undefined ? undefined : JSON.stringify(body),
+          });
+          const text = await response.text();
+          let data;
+          try {
+            data = text ? JSON.parse(text) : null;
+          } catch {
+            data = text;
+          }
+          if (!response.ok) {
+            const error = new Error(`HTTP ${response.status}`);
+            error.details = data;
+            throw error;
+          }
+          return data;
+        }
+        function showError(id, error) {
+          const details = error?.details ?? error?.message ?? String(error);
+          output(
+            id,
+            `ERROR\n${typeof details === 'string' ? details : JSON.stringify(details, null, 2)}`,
+          );
+          $(id).className = 'error';
+        }
+        function showSuccess(id, data) {
+          output(id, data);
+          $(id).className = 'ok';
+        }
+
+        $('apiBase').value = storage.getItem(key('apiBase')) || '';
+        updateSessionState();
+
+        $('login').onclick = async () => {
+          try {
+            saveConnection();
+            const data = await request('POST', '/auth/students/login', {
+              body: {
+                phone: $('phone').value.trim(),
+                password: $('password').value,
+              },
+            });
+            storage.setItem(key('token'), data.accessToken);
+            updateSessionState(
+              'Signed in. The token is kept only in this tab session to survive XPay’s redirect.',
+            );
+          } catch (error) {
+            updateSessionState('Sign-in failed.');
+            showError('cartOutput', error);
+          }
+        };
+        $('clearSession').onclick = () => {
+          ['token', 'orderId', 'apiBase'].forEach((name) =>
+            storage.removeItem(key(name)),
+          );
+          $('apiBase').value = '';
+          updateSessionState();
+          output('cartOutput', 'Test session cleared.');
+          output(
+            'orderOutput',
+            'No checkout has been started in this browser session.',
+          );
+        };
+        $('viewCart').onclick = async () => {
+          try {
+            saveConnection();
+            showSuccess('cartOutput', await request('GET', '/student/cart'));
+          } catch (error) {
+            showError('cartOutput', error);
+          }
+        };
+        $('addToCart').onclick = async () => {
+          try {
+            saveConnection();
+            const targetId = $('targetId').value.trim();
+            if (!targetId)
+              throw new Error('Enter a paid course or chapter ID.');
+            showSuccess(
+              'cartOutput',
+              await request('POST', '/student/cart/items', {
+                body: { targetType: $('targetType').value, targetId },
+              }),
+            );
+          } catch (error) {
+            showError('cartOutput', error);
+          }
+        };
+        $('startCheckout').onclick = async () => {
+          try {
+            saveConnection();
+            const data = await request('POST', '/student/checkout', {
+              body: { paymentChannel: 'XPAY' },
+              idempotencyKey: randomKey(),
+            });
+            if (!data?.id || !data?.xpay?.checkoutUrl)
+              throw new Error(
+                'Checkout response did not contain an order ID and XPay checkout URL.',
+              );
+            storage.setItem(key('orderId'), data.id);
+            showSuccess('orderOutput', data);
+            window.location.assign(data.xpay.checkoutUrl);
+          } catch (error) {
+            showError('orderOutput', error);
+          }
+        };
+        $('refreshOrder').onclick = async () => {
+          try {
+            const id = orderId();
+            if (!id)
+              throw new Error('No saved order. Create a checkout first.');
+            showSuccess(
+              'orderOutput',
+              await request('GET', `/student/orders/${encodeURIComponent(id)}`),
+            );
+          } catch (error) {
+            showError('orderOutput', error);
+          }
+        };
+        $('retryAttempt').onclick = async () => {
+          try {
+            const id = orderId();
+            if (!id)
+              throw new Error('No saved order. Create a checkout first.');
+            const data = await request(
+              'POST',
+              `/student/orders/${encodeURIComponent(id)}/xpay/attempt`,
+              {
+                idempotencyKey: randomKey(),
+              },
+            );
+            if (!data?.checkoutUrl)
+              throw new Error(
+                'Replacement attempt did not return a checkout URL.',
+              );
+            showSuccess('orderOutput', data);
+            window.location.assign(data.checkoutUrl);
+          } catch (error) {
+            showError('orderOutput', error);
+          }
+        };
+        $('viewEntitlements').onclick = async () => {
+          try {
+            showSuccess(
+              'orderOutput',
+              await request('GET', '/student/entitlements'),
+            );
+          } catch (error) {
+            showError('orderOutput', error);
+          }
+        };
+      })();
+    </script>
+  </body>
+</html>
