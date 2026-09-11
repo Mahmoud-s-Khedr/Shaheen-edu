@@ -360,7 +360,7 @@ export class PdfTranscriptionClient {
       }
       if (!response.ok)
         throw new OpenRouterQuestionImportError(
-          raw?.error?.message ?? 'OpenRouter image transcription failed',
+          'PDF transcription model request failed',
           raw,
           raw?.usage ?? null,
         );

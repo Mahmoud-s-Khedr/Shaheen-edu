@@ -1,4 +1,7 @@
 import { HttpStatus } from '@nestjs/common';
+import { readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import ts from 'typescript';
 import {
   errorCode,
   localizedError,
@@ -86,4 +89,84 @@ describe('actionable validation translations', () => {
     expect(localizedError(413).en).toBe('Payload Too Large');
     expect(localizedError(415).en).toBe('Unsupported Media Type');
   });
+
+  it('preserves unknown error detail instead of collapsing it to a status-only Arabic message', () => {
+    expect(
+      localizedMessage(
+        'Asset kind is incompatible with content type',
+        HttpStatus.BAD_REQUEST,
+      ),
+    ).toEqual({
+      en: 'Asset kind is incompatible with content type',
+      ar: 'نوع الأصل غير متوافق مع نوع المحتوى',
+    });
+  });
+
+  it('labels service-unavailable responses correctly', () => {
+    expect(localizedError(HttpStatus.SERVICE_UNAVAILABLE)).toEqual({
+      ar: 'الخدمة غير متاحة',
+      en: 'Service Unavailable',
+    });
+  });
+
+  it('has a detailed Arabic translation for every static production exception message', () => {
+    const messages = new Set<string>();
+    const sourceFiles = productionSourceFiles(join(process.cwd(), 'src'));
+    for (const file of sourceFiles) {
+      const source = ts.createSourceFile(
+        file,
+        readFileSync(file, 'utf8'),
+        ts.ScriptTarget.Latest,
+        true,
+      );
+      collectStaticExceptionMessages(source, messages);
+    }
+
+    for (const message of messages) {
+      expect(localizedMessage(message, HttpStatus.BAD_REQUEST).ar).not.toBe(
+        `طلب غير صالح: ${message}`,
+      );
+    }
+  });
+
+  it('translates dynamic error families with their runtime detail', () => {
+    expect(
+      localizedMessage('Placement sectionId not found', HttpStatus.NOT_FOUND)
+        .ar,
+    ).toBe('لم يتم العثور على موضع المحتوى');
+    expect(
+      localizedMessage('Scope chapterId not found', HttpStatus.NOT_FOUND).ar,
+    ).toBe('لم يتم العثور على نطاق الفصل');
+    expect(
+      localizedMessage(
+        'Export exceeds the 100,000 row limit; narrow the filters',
+        HttpStatus.BAD_REQUEST,
+      ).ar,
+    ).toBe('يتجاوز التصدير حد 100,000 صف. قلل عوامل التصفية ثم أعد المحاولة');
+  });
 });
+
+function productionSourceFiles(directory: string): string[] {
+  return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(directory, entry.name);
+    if (entry.isDirectory()) return productionSourceFiles(path);
+    return entry.name.endsWith('.ts') && !entry.name.endsWith('.spec.ts')
+      ? [path]
+      : [];
+  });
+}
+
+function collectStaticExceptionMessages(
+  node: ts.Node,
+  messages: Set<string>,
+): void {
+  if (
+    ts.isNewExpression(node) &&
+    ts.isIdentifier(node.expression) &&
+    /Exception$/.test(node.expression.text)
+  ) {
+    const message = node.arguments?.[0];
+    if (message && ts.isStringLiteralLike(message)) messages.add(message.text);
+  }
+  node.forEachChild((child) => collectStaticExceptionMessages(child, messages));
+}

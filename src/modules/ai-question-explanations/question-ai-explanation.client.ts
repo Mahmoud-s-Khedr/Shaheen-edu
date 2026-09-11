@@ -152,12 +152,12 @@ export class QuestionAiExplanationClient {
         raw = JSON.parse(rawText);
       } catch {
         throw new ServiceUnavailableException(
-          `AI provider returned non-JSON response (${response.status})`,
+          'AI provider returned an invalid response',
         );
       }
       if (!response.ok)
         throw new ServiceUnavailableException(
-          raw?.error?.message ?? 'AI explanation request failed',
+          'AI explanation request failed',
         );
       const contentValue = raw?.choices?.[0]?.message?.content;
       const result =

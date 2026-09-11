@@ -795,7 +795,7 @@ export class OpenRouterQuestionImportClient {
       }
       if (!response.ok)
         throw new OpenRouterQuestionImportError(
-          raw?.error?.message ?? 'OpenRouter request failed',
+          'Question import model request failed',
           raw,
           raw?.usage ?? null,
         );

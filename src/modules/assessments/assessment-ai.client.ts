@@ -64,7 +64,7 @@ export class AssessmentAiClient {
     }
     if (!response.ok)
       throw new ServiceUnavailableException(
-        raw?.error?.message ?? 'AI assessment request failed',
+        'AI assessment request failed',
       );
     try {
       return {
@@ -160,7 +160,7 @@ export class AssessmentAiClient {
     }
     if (!response.ok)
       throw new ServiceUnavailableException(
-        raw?.error?.message ?? 'Speech-to-text request failed',
+        'Speech-to-text request failed',
       );
     if (typeof raw?.text !== 'string' || !raw.text.trim())
       throw new ServiceUnavailableException(
