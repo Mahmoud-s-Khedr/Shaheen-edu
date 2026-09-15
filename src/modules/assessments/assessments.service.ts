@@ -27,6 +27,7 @@ import {
   Role,
 } from '../../common/types/roles.enum';
 import { toPaginationMeta } from '../../common/dto/pagination-query.dto';
+import { formatStudentExplanation } from '../../common/utils/student-explanation.formatter';
 import {
   orderByIds,
   paginateArabicSearch,
@@ -2659,7 +2660,9 @@ export class AssessmentsService {
           correctOptionIds: showAnswer
             ? q.options.filter((o) => o.isCorrect).map((o) => o.id)
             : null,
-          explanation: showAnswer ? q.explanation : null,
+          explanation: showAnswer
+            ? formatStudentExplanation(q.explanation, q.structuredExplanation)
+            : null,
           structuredExplanation: showAnswer ? q.structuredExplanation : null,
         };
       }),
@@ -2899,7 +2902,12 @@ export class AssessmentsService {
       correctOptionIds:
         assessment.mode === AssessmentMode.TUTOR ? correct : null,
       explanation:
-        assessment.mode === AssessmentMode.TUTOR ? question.explanation : null,
+        assessment.mode === AssessmentMode.TUTOR
+          ? formatStudentExplanation(
+              question.explanation,
+              question.structuredExplanation,
+            )
+          : null,
     };
   }
 
@@ -3289,7 +3297,10 @@ export class AssessmentsService {
             assetName: attachment.assetName,
             sortOrder: attachment.sortOrder,
           })),
-          explanation: q.explanation,
+          explanation: formatStudentExplanation(
+            q.explanation,
+            q.structuredExplanation,
+          ),
           options: q.options.map((o) => ({
             id: o.id,
             body: o.body,

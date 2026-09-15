@@ -1185,6 +1185,7 @@ describe('AssessmentsService', () => {
       );
       // EXAM mode hides correctness from the immediate autosave response.
       expect(result.isCorrect).toBeNull();
+      expect(result.explanation).toBeNull();
     });
 
     it('reveals correctness immediately in TUTOR mode', async () => {
@@ -1201,6 +1202,11 @@ describe('AssessmentsService', () => {
         id: 'q1',
         type: QuestionType.SINGLE_CHOICE,
         explanation: 'why',
+        structuredExplanation: {
+          languageCode: 'en',
+          keywords: 'keyword',
+          whyCorrect: 'because',
+        },
         options: [
           { id: 'opt-a', isCorrect: true },
           { id: 'opt-b', isCorrect: false },
@@ -1211,6 +1217,65 @@ describe('AssessmentsService', () => {
         selectedOptionIds: ['opt-b'],
       });
       expect(result.isCorrect).toBe(false);
+      expect(result.explanation).toBe(
+        'why\n\nKeywords: keyword\n\nWhy this is correct: because',
+      );
+    });
+
+    it('returns the formatted explanation in an answered TUTOR current attempt', async () => {
+      const { service, prisma } = build();
+      prisma.assessment.findUnique.mockResolvedValue(
+        readyAssessment({ mode: AssessmentMode.TUTOR }),
+      );
+      prisma.assessmentAttempt.findUnique.mockResolvedValue({
+        id: 'attempt-1',
+        studentUserId,
+        status: AssessmentAttemptStatus.SUSPENDED,
+        expiresAt: null,
+        totalQuestions: 1,
+        totalPoints: 1,
+      });
+      prisma.assessmentQuestion.findMany.mockResolvedValue([
+        {
+          id: 'q1',
+          sourceQuestionId: 'source-1',
+          sortOrder: 1,
+          type: QuestionType.SINGLE_CHOICE,
+          body: 'Question',
+          explanation: 'Flat explanation',
+          structuredExplanation: {
+            languageCode: 'en',
+            generalRule: 'Use the matching rule.',
+          },
+          contentBlocks: [],
+          attachments: [],
+          contexts: [],
+          options: [{ id: 'option-1', body: 'Option', isCorrect: true }],
+        },
+      ]);
+      prisma.assessmentAttemptAnswer.findMany.mockResolvedValue([
+        {
+          assessmentQuestionId: 'q1',
+          selectedOptionIds: ['option-1'],
+          responseText: null,
+          isCorrect: true,
+          awardedPoints: 1,
+          outcome: 'CORRECT',
+          responseVersion: 0,
+          aiGradingRuns: [],
+        },
+      ]);
+
+      await expect(
+        service.currentAttemptState(studentUserId, 'a1'),
+      ).resolves.toMatchObject({
+        questions: [
+          {
+            explanation:
+              'Flat explanation\n\nGeneral rule: Use the matching rule.',
+          },
+        ],
+      });
     });
 
     it('records every material answer change with outcome direction', async () => {
@@ -1419,6 +1484,11 @@ describe('AssessmentsService', () => {
           sortOrder: 1,
           type: QuestionType.SINGLE_CHOICE,
           body: 'Question',
+          explanation: 'Flat explanation',
+          structuredExplanation: {
+            languageCode: 'en',
+            keywords: 'key concept',
+          },
           attachments: [
             {
               assetId: 'attachment-1',
@@ -1437,6 +1507,7 @@ describe('AssessmentsService', () => {
         score: 1,
         questions: [
           {
+            explanation: 'Flat explanation\n\nKeywords: key concept',
             attachments: [
               {
                 assetId: 'attachment-1',
@@ -1450,7 +1521,12 @@ describe('AssessmentsService', () => {
       });
       await expect(
         service.currentAttemptState(studentUserId, 'a1'),
-      ).resolves.toMatchObject({ status: AssessmentAttemptStatus.COMPLETED });
+      ).resolves.toMatchObject({
+        status: AssessmentAttemptStatus.COMPLETED,
+        questions: [
+          { explanation: 'Flat explanation\n\nKeywords: key concept' },
+        ],
+      });
     });
   });
 });

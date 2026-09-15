@@ -21,6 +21,7 @@ import { PrismaService } from '../../database/prisma.service';
 import { ContentAccessPolicyService } from '../entitlements/content-access-policy.service';
 import { AssetsService } from '../assets/assets.service';
 import { VideosService } from '../videos/videos.service';
+import { formatStudentExplanation } from '../../common/utils/student-explanation.formatter';
 import { QuestionCommunityStatsService } from '../question-banks/question-community-stats.service';
 import { AssessmentsService } from '../assessments/assessments.service';
 import {
@@ -817,7 +818,10 @@ export class LearningService {
       selectedOptionIds: optionIds,
       isCorrect,
       correctOptionIds: correct,
-      explanation: question.explanation,
+      explanation: formatStudentExplanation(
+        question.explanation,
+        question.structuredExplanation,
+      ),
       structuredExplanation: question.structuredExplanation,
       submittedAt: attempt.submittedAt,
     };
