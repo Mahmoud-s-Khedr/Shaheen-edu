@@ -9,7 +9,12 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiCreatedResponse,
+  ApiOperation,
+  ApiTags,
+} from '@nestjs/swagger';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -21,6 +26,8 @@ import {
   CreateQuestionDto,
   CreateQuestionOptionDto,
   CreateQuestionSourceDto,
+  BulkPublishQuestionsDto,
+  BulkPublishQuestionsResponseDto,
   QueryQuestionBankDto,
   QueryQuestionDto,
   QueryQuestionSourceDto,
@@ -185,6 +192,18 @@ export class QuestionsController {
     @Query() q: QueryQuestionDto,
   ) {
     return this.service.listQuestions(a, q);
+  }
+  @Post('bulk-publish')
+  @ApiOperation({
+    summary:
+      'Directly publish selected draft, rejected, or in-review questions',
+  })
+  @ApiCreatedResponse({ type: BulkPublishQuestionsResponseDto })
+  bulkPublish(
+    @CurrentUser() a: RequestUser,
+    @Body() d: BulkPublishQuestionsDto,
+  ) {
+    return this.service.bulkPublishQuestions(a, d.questionIds);
   }
   @Get(':id') @ApiOperation({ summary: 'Get a question' }) get(
     @CurrentUser() a: RequestUser,

@@ -3,6 +3,7 @@ import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   ArrayMinSize,
+  ArrayUnique,
   IsArray,
   IsBoolean,
   IsDefined,
@@ -427,6 +428,30 @@ export class SetQuestionVideoLinkDto {
 }
 export class RejectQuestionDto {
   @ApiProperty() @IsString() @MinLength(1) @MaxLength(2000) reviewNote!: string;
+}
+export class BulkPublishQuestionsDto {
+  @ApiProperty({
+    type: [String],
+    minItems: 1,
+    maxItems: 300,
+    uniqueItems: true,
+    description: 'Unique question IDs to publish directly',
+  })
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(300)
+  @ArrayUnique()
+  @IsString({ each: true })
+  questionIds!: string[];
+}
+export class BulkPublishQuestionFailureDto {
+  @ApiProperty() id!: string;
+  @ApiProperty() reason!: string;
+}
+export class BulkPublishQuestionsResponseDto {
+  @ApiProperty({ type: [String] }) publishedIds!: string[];
+  @ApiProperty({ type: [BulkPublishQuestionFailureDto] })
+  failed!: BulkPublishQuestionFailureDto[];
 }
 export class QueryQuestionDto extends SearchPaginationQueryDto {
   @ApiPropertyOptional({ enum: QuestionStatus })

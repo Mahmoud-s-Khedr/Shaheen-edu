@@ -71,12 +71,12 @@ The frontend must already have valid IDs for the academic hierarchy used by ques
 
 ### Important status rules
 
-| Resource | Usable by students when |
-|---|---|
-| Question source | `PUBLISHED` |
-| Question bank | `PUBLISHED` |
-| Question | `PUBLISHED` |
-| Assessment | `READY` and visible to the student |
+| Resource            | Usable by students when                                            |
+| ------------------- | ------------------------------------------------------------------ |
+| Question source     | `PUBLISHED`                                                        |
+| Question bank       | `PUBLISHED`                                                        |
+| Question            | `PUBLISHED`                                                        |
+| Assessment          | `READY` and visible to the student                                 |
 | AI import candidate | Accepted by an admin; it then becomes a question in `DRAFT` status |
 
 An accepted AI candidate is not automatically visible to students. It still needs the normal question edit, review, and publish workflow.
@@ -168,13 +168,13 @@ The returned `asset.id` is used in question content blocks, question attachments
 
 ### 3.3 Other admin asset endpoints
 
-| Method and endpoint | Request | Response/job |
-|---|---|---|
-| `GET /admin/assets` | Query: `page`, `limit`, optional search/pagination fields | Paginated admin asset list. |
-| `GET /admin/assets/:assetId` | No body | One asset and its status/metadata. |
-| `GET /admin/assets/:assetId/access` | No body | Short-lived preview/access URL for an admin. |
-| `POST /admin/assets/:assetId/archive` | No body | Archives the asset. |
-| `DELETE /admin/assets/:assetId` | No body | Deletes an unused draft asset. |
+| Method and endpoint                   | Request                                                   | Response/job                                 |
+| ------------------------------------- | --------------------------------------------------------- | -------------------------------------------- |
+| `GET /admin/assets`                   | Query: `page`, `limit`, optional search/pagination fields | Paginated admin asset list.                  |
+| `GET /admin/assets/:assetId`          | No body                                                   | One asset and its status/metadata.           |
+| `GET /admin/assets/:assetId/access`   | No body                                                   | Short-lived preview/access URL for an admin. |
+| `POST /admin/assets/:assetId/archive` | No body                                                   | Archives the asset.                          |
+| `DELETE /admin/assets/:assetId`       | No body                                                   | Deletes an unused draft asset.               |
 
 ## 4. Question source setup
 
@@ -208,15 +208,15 @@ Response: a source object containing at least `id`, `type`, localized title/note
 
 ### 4.2 Manage sources
 
-| Method and endpoint | Request | Response/job |
-|---|---|---|
-| `GET /admin/question-banks/sources` | Query: `page`, `limit`, optional `q`, `status`, `type` | Paginated source list. |
-| `GET /admin/question-banks/sources/:sourceId` | No body | One source. |
-| `PATCH /admin/question-banks/sources/:sourceId` | Any editable subset of `type`, `title`, `note`, `publisherUserId` | Updated source. Editing is for draft sources. |
-| `DELETE /admin/question-banks/sources/:sourceId` | No body | `{ "id": "source_123", "deleted": true }` when eligible. |
-| `POST /admin/question-banks/sources/:sourceId/publish` | No body | Changes a draft source to `PUBLISHED`. |
-| `POST /admin/question-banks/sources/:sourceId/archive` | No body | Changes the source to `ARCHIVED`; published questions may prevent archiving. |
-| `POST /admin/question-banks/sources/:sourceId/restore` | No body | Restores an archived source. |
+| Method and endpoint                                    | Request                                                           | Response/job                                                                 |
+| ------------------------------------------------------ | ----------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| `GET /admin/question-banks/sources`                    | Query: `page`, `limit`, optional `q`, `status`, `type`            | Paginated source list.                                                       |
+| `GET /admin/question-banks/sources/:sourceId`          | No body                                                           | One source.                                                                  |
+| `PATCH /admin/question-banks/sources/:sourceId`        | Any editable subset of `type`, `title`, `note`, `publisherUserId` | Updated source. Editing is for draft sources.                                |
+| `DELETE /admin/question-banks/sources/:sourceId`       | No body                                                           | `{ "id": "source_123", "deleted": true }` when eligible.                     |
+| `POST /admin/question-banks/sources/:sourceId/publish` | No body                                                           | Changes a draft source to `PUBLISHED`.                                       |
+| `POST /admin/question-banks/sources/:sourceId/archive` | No body                                                           | Changes the source to `ARCHIVED`; published questions may prevent archiving. |
+| `POST /admin/question-banks/sources/:sourceId/restore` | No body                                                           | Restores an archived source.                                                 |
 
 Publish the source before expecting its questions to be eligible for student practice or generated assessments.
 
@@ -242,15 +242,15 @@ Response: a question-bank object containing `id`, `subjectId`, `title`, `descrip
 
 ### 5.2 Manage question banks
 
-| Method and endpoint | Request | Response/job |
-|---|---|---|
-| `GET /admin/question-banks` | Query: `page`, `limit`, optional `q`, `status` | Paginated bank list. |
-| `GET /admin/question-banks/:bankId` | No body | One question bank. |
-| `PATCH /admin/question-banks/:bankId` | Any editable subset of `subjectId`, `title`, `description` | Updated bank. Subject changes are restricted after questions are attached. |
-| `DELETE /admin/question-banks/:bankId` | No body | Deletes an eligible bank. |
-| `POST /admin/question-banks/:bankId/publish` | No body | Changes the bank to `PUBLISHED`. |
-| `POST /admin/question-banks/:bankId/archive` | No body | Archives the bank if it has no published questions. |
-| `POST /admin/question-banks/:bankId/restore` | No body | Restores an archived bank. |
+| Method and endpoint                          | Request                                                    | Response/job                                                               |
+| -------------------------------------------- | ---------------------------------------------------------- | -------------------------------------------------------------------------- |
+| `GET /admin/question-banks`                  | Query: `page`, `limit`, optional `q`, `status`             | Paginated bank list.                                                       |
+| `GET /admin/question-banks/:bankId`          | No body                                                    | One question bank.                                                         |
+| `PATCH /admin/question-banks/:bankId`        | Any editable subset of `subjectId`, `title`, `description` | Updated bank. Subject changes are restricted after questions are attached. |
+| `DELETE /admin/question-banks/:bankId`       | No body                                                    | Deletes an eligible bank.                                                  |
+| `POST /admin/question-banks/:bankId/publish` | No body                                                    | Changes the bank to `PUBLISHED`.                                           |
+| `POST /admin/question-banks/:bankId/archive` | No body                                                    | Archives the bank if it has no published questions.                        |
+| `POST /admin/question-banks/:bankId/restore` | No body                                                    | Restores an archived bank.                                                 |
 
 Publish the bank before student-facing question selection.
 
@@ -292,11 +292,11 @@ Response: a context object containing its `id`, content, and content blocks.
 
 ### 6.2 Manage contexts
 
-| Method and endpoint | Request | Response/job |
-|---|---|---|
-| `GET /admin/questions/contexts` | No body | List of reusable contexts. |
-| `PATCH /admin/questions/contexts/:contextId` | Any editable context fields; an empty `contentBlocks` array clears blocks | Updated context. |
-| `DELETE /admin/questions/contexts/:contextId` | No body | Deletes an unreferenced context. |
+| Method and endpoint                           | Request                                                                   | Response/job                     |
+| --------------------------------------------- | ------------------------------------------------------------------------- | -------------------------------- |
+| `GET /admin/questions/contexts`               | No body                                                                   | List of reusable contexts.       |
+| `PATCH /admin/questions/contexts/:contextId`  | Any editable context fields; an empty `contentBlocks` array clears blocks | Updated context.                 |
+| `DELETE /admin/questions/contexts/:contextId` | No body                                                                   | Deletes an unreferenced context. |
 
 ## 7. Create and edit questions
 
@@ -354,10 +354,10 @@ Response: the created question, including its `id`, status, placements, content,
 
 ### 7.2 List and retrieve questions
 
-| Method and endpoint | Request | Response/job |
-|---|---|---|
-| `GET /admin/questions` | Query: `page`, `limit`, optional `q`, `status`, `bankId`, `sourceId`, `courseId`, `chapterId`, `lessonId`, `sectionId`, `subjectId`, `academicGradeId` | Paginated question list. |
-| `GET /admin/questions/:questionId` | No body | Full question detail, including options, contexts, placements, assets, and video. |
+| Method and endpoint                | Request                                                                                                                                                | Response/job                                                                      |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------- |
+| `GET /admin/questions`             | Query: `page`, `limit`, optional `q`, `status`, `bankId`, `sourceId`, `courseId`, `chapterId`, `lessonId`, `sectionId`, `subjectId`, `academicGradeId` | Paginated question list.                                                          |
+| `GET /admin/questions/:questionId` | No body                                                                                                                                                | Full question detail, including options, contexts, placements, assets, and video. |
 
 ### 7.3 Edit a question
 
@@ -372,9 +372,7 @@ Send only the fields being changed:
   "body": "Updated question wording",
   "explanation": "Updated explanation",
   "maxPoints": 2,
-  "placements": [
-    { "courseId": "course_123", "chapterId": "chapter_123" }
-  ]
+  "placements": [{ "courseId": "course_123", "chapterId": "chapter_123" }]
 }
 ```
 
@@ -384,24 +382,24 @@ Response: the updated question.
 
 ### 7.4 Manage options
 
-| Method and endpoint | Request | Response/job |
-|---|---|---|
-| `POST /admin/questions/:questionId/options` | `{ "body": "Mitochondria", "isCorrect": true }` | Creates and returns the new option. |
-| `PATCH /admin/questions/:questionId/options/:optionId` | Any subset of `body`, `contentBlocks`, `isCorrect` | Updated option. |
-| `DELETE /admin/questions/:questionId/options/:optionId` | No body | Removes the option. |
-| `POST /admin/questions/:questionId/options/reorder` | `{ "optionIds": ["option_2", "option_1"] }` | Question/options with new order, or the updated question representation. |
+| Method and endpoint                                     | Request                                            | Response/job                                                             |
+| ------------------------------------------------------- | -------------------------------------------------- | ------------------------------------------------------------------------ |
+| `POST /admin/questions/:questionId/options`             | `{ "body": "Mitochondria", "isCorrect": true }`    | Creates and returns the new option.                                      |
+| `PATCH /admin/questions/:questionId/options/:optionId`  | Any subset of `body`, `contentBlocks`, `isCorrect` | Updated option.                                                          |
+| `DELETE /admin/questions/:questionId/options/:optionId` | No body                                            | Removes the option.                                                      |
+| `POST /admin/questions/:questionId/options/reorder`     | `{ "optionIds": ["option_2", "option_1"] }`        | Question/options with new order, or the updated question representation. |
 
 The frontend should ensure that the correct answer is set before submitting the question for review.
 
 ### 7.5 Manage question assets and video
 
-| Method and endpoint | Request | Response/job |
-|---|---|---|
-| `POST /admin/questions/:questionId/assets` | `{ "assetId": "asset_123" }` | Attaches an existing ready asset. |
-| `DELETE /admin/questions/:questionId/assets/:assetId` | No body | Removes the question attachment. |
-| `POST /admin/questions/:questionId/assets/reorder` | `{ "assetIds": ["asset_2", "asset_1"] }` | Updated question asset order. |
-| `POST /admin/questions/:questionId/video-link` | `{ "videoAssetId": "video_123", "timestampSeconds": 30 }` | Creates/updates the question video link. |
-| `DELETE /admin/questions/:questionId/video-link` | No body | Removes the question video link. |
+| Method and endpoint                                   | Request                                                   | Response/job                             |
+| ----------------------------------------------------- | --------------------------------------------------------- | ---------------------------------------- |
+| `POST /admin/questions/:questionId/assets`            | `{ "assetId": "asset_123" }`                              | Attaches an existing ready asset.        |
+| `DELETE /admin/questions/:questionId/assets/:assetId` | No body                                                   | Removes the question attachment.         |
+| `POST /admin/questions/:questionId/assets/reorder`    | `{ "assetIds": ["asset_2", "asset_1"] }`                  | Updated question asset order.            |
+| `POST /admin/questions/:questionId/video-link`        | `{ "videoAssetId": "video_123", "timestampSeconds": 30 }` | Creates/updates the question video link. |
+| `DELETE /admin/questions/:questionId/video-link`      | No body                                                   | Removes the question video link.         |
 
 The asset must be ready and compatible with the content block or attachment being created.
 
@@ -437,7 +435,36 @@ Response: the question with status `PUBLISHED`.
 
 Only published questions can normally be selected for student practice or generated assessments.
 
-### 8.3 Reject
+### 8.3 Bulk direct publish
+
+```http
+POST /api/v1/admin/questions/bulk-publish
+```
+
+Administrators can publish up to 300 unique `DRAFT`, `REJECTED`, or `IN_REVIEW`
+questions without submitting them first. Every question is checked against the
+same publication requirements as the normal publish endpoint. Items are handled
+independently, so one invalid item does not prevent valid items from publishing.
+
+```json
+{
+  "questionIds": ["question_123", "question_456"]
+}
+```
+
+```json
+{
+  "publishedIds": ["question_123"],
+  "failed": [
+    {
+      "id": "question_456",
+      "reason": "Question options do not satisfy its answer type"
+    }
+  ]
+}
+```
+
+### 8.4 Reject
 
 ```http
 POST /admin/questions/:questionId/reject
@@ -451,12 +478,12 @@ POST /admin/questions/:questionId/reject
 
 The question changes to `REJECTED`. The frontend should display the review note so the author can fix the question and submit it again.
 
-### 8.4 Archive or delete
+### 8.5 Archive or delete
 
-| Method and endpoint | Request | Response/job |
-|---|---|---|
+| Method and endpoint                         | Request | Response/job                                                                            |
+| ------------------------------------------- | ------- | --------------------------------------------------------------------------------------- |
 | `POST /admin/questions/:questionId/archive` | No body | Moves the question to `ARCHIVED`; it is no longer selected for future student activity. |
-| `DELETE /admin/questions/:questionId` | No body | Permanently deletes only an unreferenced draft question. |
+| `DELETE /admin/questions/:questionId`       | No body | Permanently deletes only an unreferenced draft question.                                |
 
 ## 9. AI question import
 
@@ -496,13 +523,13 @@ For a file import, the asset must be a ready PDF or TXT asset. The response cont
 
 ### 9.2 Monitor and inspect an import
 
-| Method and endpoint | Request | Response/job |
-|---|---|---|
-| `GET /admin/ai/question-imports` | Query: `page`, `limit`, optional `status` | Paginated import jobs. |
-| `GET /admin/ai/question-imports/:importId` | No body | Import progress, status, diagnostics, warnings, and counters. |
-| `GET /admin/ai/question-imports/:importId/source-text` | No body | Normalized source text, pages, extraction metadata, and warnings. |
-| `GET /admin/ai/question-imports/:importId/items` | Query: `page`, `limit`, optional candidate `status` | Extracted question candidates with options, evidence, warnings, and visual requirements. |
-| `GET /admin/ai/question-imports/:importId/media` | No body | Detected PDF visual regions and protected previews. |
+| Method and endpoint                                    | Request                                             | Response/job                                                                             |
+| ------------------------------------------------------ | --------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `GET /admin/ai/question-imports`                       | Query: `page`, `limit`, optional `status`           | Paginated import jobs.                                                                   |
+| `GET /admin/ai/question-imports/:importId`             | No body                                             | Import progress, status, diagnostics, warnings, and counters.                            |
+| `GET /admin/ai/question-imports/:importId/source-text` | No body                                             | Normalized source text, pages, extraction metadata, and warnings.                        |
+| `GET /admin/ai/question-imports/:importId/items`       | Query: `page`, `limit`, optional candidate `status` | Extracted question candidates with options, evidence, warnings, and visual requirements. |
+| `GET /admin/ai/question-imports/:importId/media`       | No body                                             | Detected PDF visual regions and protected previews.                                      |
 
 An AI candidate is not yet a question in the question bank.
 
@@ -522,12 +549,12 @@ The import is queued again and question boundary detection is rerun. This is ava
 
 ### 9.4 Correct extracted media
 
-| Method and endpoint | Request | Response/job |
-|---|---|---|
-| `POST /admin/ai/question-imports/:importId/media` | `{ "pageNumber": 3, "type": "QUESTION_FIGURE", "bounds": { "left": 100, "top": 100, "right": 800, "bottom": 600 }, "description": "Question diagram" }` | Creates a manually selected visual region and preview asset. |
-| `PATCH /admin/ai/question-imports/:importId/media/:mediaKey` | Any subset of `status`, `type`, `bounds`, `description`, `note` | Updates/re-crops/reclassifies the visual region. |
-| `POST /admin/ai/question-imports/:importId/media/:mediaKey/retry` | No body | Reprocesses a failed visual crop. |
-| `PATCH /admin/ai/question-imports/:importId/items/:itemId/media` | `{ "assignments": [...] }` | Approves which visual belongs to the question, option, or context. |
+| Method and endpoint                                               | Request                                                                                                                                                 | Response/job                                                       |
+| ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| `POST /admin/ai/question-imports/:importId/media`                 | `{ "pageNumber": 3, "type": "QUESTION_FIGURE", "bounds": { "left": 100, "top": 100, "right": 800, "bottom": 600 }, "description": "Question diagram" }` | Creates a manually selected visual region and preview asset.       |
+| `PATCH /admin/ai/question-imports/:importId/media/:mediaKey`      | Any subset of `status`, `type`, `bounds`, `description`, `note`                                                                                         | Updates/re-crops/reclassifies the visual region.                   |
+| `POST /admin/ai/question-imports/:importId/media/:mediaKey/retry` | No body                                                                                                                                                 | Reprocesses a failed visual crop.                                  |
+| `PATCH /admin/ai/question-imports/:importId/items/:itemId/media`  | `{ "assignments": [...] }`                                                                                                                              | Approves which visual belongs to the question, option, or context. |
 
 Example media assignment:
 
@@ -558,13 +585,13 @@ never prevent an administrator from accepting the reviewed question.
 
 ### 9.5 Retry failed import work
 
-| Method and endpoint | Request | Response/job |
-|---|---|---|
-| `POST /admin/ai/question-imports/:importId/retry` | No body | Retries all failed import chunks. |
-| `POST /admin/ai/question-imports/:importId/chunks/:chunkId/retry` | No body | Retries one failed AI-processing chunk. |
+| Method and endpoint                                                 | Request | Response/job                                |
+| ------------------------------------------------------------------- | ------- | ------------------------------------------- |
+| `POST /admin/ai/question-imports/:importId/retry`                   | No body | Retries all failed import chunks.           |
+| `POST /admin/ai/question-imports/:importId/chunks/:chunkId/retry`   | No body | Retries one failed AI-processing chunk.     |
 | `POST /admin/ai/question-imports/:importId/pages/:pageNumber/retry` | No body | Retries transcription/OCR for one PDF page. |
-| `POST /admin/ai/question-imports/:importId/children/:childId/retry` | No body | Retries one page-range child import. |
-| `POST /admin/ai/question-imports/:importId/items/:itemId/retry` | No body | Retries one failed question candidate. |
+| `POST /admin/ai/question-imports/:importId/children/:childId/retry` | No body | Retries one page-range child import.        |
+| `POST /admin/ai/question-imports/:importId/items/:itemId/retry`     | No body | Retries one failed question candidate.      |
 
 Use the smallest retry endpoint that matches the failure. Use the batch retry only when multiple chunks failed.
 
@@ -643,10 +670,10 @@ Response: the attempt result, including whether it was correct and the relevant 
 
 ### 10.3 Read practice history and assets
 
-| Method and endpoint | Request | Response/job |
-|---|---|---|
-| `GET /student/practice/questions/:questionId/attempts` | Query: optional scope and pagination fields | The student’s attempt history for that question. |
-| `GET /student/practice/questions/:questionId/assets/:assetId/access` | No body | Short-lived protected access URL for the question asset. |
+| Method and endpoint                                                  | Request                                     | Response/job                                             |
+| -------------------------------------------------------------------- | ------------------------------------------- | -------------------------------------------------------- |
+| `GET /student/practice/questions/:questionId/attempts`               | Query: optional scope and pagination fields | The student’s attempt history for that question.         |
+| `GET /student/practice/questions/:questionId/assets/:assetId/access` | No body                                     | Short-lived protected access URL for the question asset. |
 
 ## 11. Student assessment creation
 
@@ -679,24 +706,24 @@ The backend selects only eligible published questions. Response: an assessment w
 
 ### 11.2 Student assessment management
 
-| Method and endpoint | Request | Response/job |
-|---|---|---|
-| `GET /student/assessments` | Query: pagination, optional `status=ALL\|SUSPENDED\|COMPLETED`, search | Student assessment list. |
-| `GET /student/assessments/:assessmentId` | No body | Assessment details and its question snapshot. |
-| `PATCH /student/assessments/:assessmentId` | `{ "title": "New title" }` | Renamed assessment. |
-| `DELETE /student/assessments/:assessmentId` | No body | Deletes an assessment owned by the student. |
-| `GET /student/assessments/question-banks` | Optional `subjectId` query | Question banks accessible to the student, with available counts. |
-| `GET /student/assessments/question-sources` | Required `questionBankId` query | Sources available in the selected question bank. |
+| Method and endpoint                         | Request                                                                | Response/job                                                     |
+| ------------------------------------------- | ---------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| `GET /student/assessments`                  | Query: pagination, optional `status=ALL\|SUSPENDED\|COMPLETED`, search | Student assessment list.                                         |
+| `GET /student/assessments/:assessmentId`    | No body                                                                | Assessment details and its question snapshot.                    |
+| `PATCH /student/assessments/:assessmentId`  | `{ "title": "New title" }`                                             | Renamed assessment.                                              |
+| `DELETE /student/assessments/:assessmentId` | No body                                                                | Deletes an assessment owned by the student.                      |
+| `GET /student/assessments/question-banks`   | Optional `subjectId` query                                             | Question banks accessible to the student, with available counts. |
+| `GET /student/assessments/question-sources` | Required `questionBankId` query                                        | Sources available in the selected question bank.                 |
 
 ### 11.3 Student marks and notes
 
-| Method and endpoint | Request | Response/job |
-|---|---|---|
-| `POST /student/assessments/question-marks/:questionId` | No body | Marks an accessible question for later review. |
-| `GET /student/assessments/question-marks` | No body | Lists the student’s marked questions. |
-| `DELETE /student/assessments/question-marks/:questionId` | No body | Removes a mark. |
-| `PUT /student/assessments/question-notes/:questionId` | `{ "body": "Review this formula" }` | Creates or updates the student’s private note. |
-| `DELETE /student/assessments/question-notes/:questionId` | No body | Deletes the private note. |
+| Method and endpoint                                      | Request                             | Response/job                                   |
+| -------------------------------------------------------- | ----------------------------------- | ---------------------------------------------- |
+| `POST /student/assessments/question-marks/:questionId`   | No body                             | Marks an accessible question for later review. |
+| `GET /student/assessments/question-marks`                | No body                             | Lists the student’s marked questions.          |
+| `DELETE /student/assessments/question-marks/:questionId` | No body                             | Removes a mark.                                |
+| `PUT /student/assessments/question-notes/:questionId`    | `{ "body": "Review this formula" }` | Creates or updates the student’s private note. |
+| `DELETE /student/assessments/question-notes/:questionId` | No body                             | Deletes the private note.                      |
 
 ### 11.4 Community question discovery and issue reporting
 
@@ -705,11 +732,11 @@ for a "students often miss these" screen, but it must not reveal the answer in
 the card UI. A student chooses cards and creates a tutor assessment to answer
 them normally.
 
-| Method and endpoint | Request | Response/job |
-|---|---|---|
-| `GET /student/questions/community-most-incorrect` | Optional hierarchy filters: `subjectId`, `courseId`, `chapterId`, `lessonId`, `sectionId`, plus pagination | Entitled ranked question cards without answers. |
-| `POST /student/assessments/community-tutor` | `{ "questionIds": ["..."], "scopes": [{ "courseId": "..." }], "title": "..." }` | Creates a private tutor assessment from selected accessible cards. |
-| `POST /student/questions/:questionId/reports` | `{ "type": "...", "note": "optional detail" }` | Creates a report for an accessible canonical or snapshot question. |
+| Method and endpoint                               | Request                                                                                                    | Response/job                                                       |
+| ------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| `GET /student/questions/community-most-incorrect` | Optional hierarchy filters: `subjectId`, `courseId`, `chapterId`, `lessonId`, `sectionId`, plus pagination | Entitled ranked question cards without answers.                    |
+| `POST /student/assessments/community-tutor`       | `{ "questionIds": ["..."], "scopes": [{ "courseId": "..." }], "title": "..." }`                            | Creates a private tutor assessment from selected accessible cards. |
+| `POST /student/questions/:questionId/reports`     | `{ "type": "...", "note": "optional detail" }`                                                             | Creates a report for an accessible canonical or snapshot question. |
 
 Legacy-compatible routes also exist under `/student/assessments` for the first
 and third operations: `GET /community-most-incorrect` and
@@ -778,14 +805,14 @@ Every question ID must refer to a published question with a published placement 
 
 ### 12.3 Manage admin assessments
 
-| Method and endpoint | Request | Response/job |
-|---|---|---|
-| `GET /admin/assessments` | Query: pagination, optional `status`, `search` | Paginated admin assessment list. |
-| `GET /admin/assessments/:assessmentId` | No body | Assessment details including questions and correct answers for admin use. |
-| `PATCH /admin/assessments/:assessmentId` | Any subset of `title`, `mode`, `isTimed`, `durationSeconds` | Updated draft assessment. |
-| `POST /admin/assessments/:assessmentId/publish` | No body | Publishes the assessment and makes it available according to its visibility rules. |
-| `POST /admin/assessments/:assessmentId/archive` | No body | Archives the assessment. |
-| `DELETE /admin/assessments/:assessmentId` | No body | Deletes a never-published draft assessment. |
+| Method and endpoint                             | Request                                                     | Response/job                                                                       |
+| ----------------------------------------------- | ----------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `GET /admin/assessments`                        | Query: pagination, optional `status`, `search`              | Paginated admin assessment list.                                                   |
+| `GET /admin/assessments/:assessmentId`          | No body                                                     | Assessment details including questions and correct answers for admin use.          |
+| `PATCH /admin/assessments/:assessmentId`        | Any subset of `title`, `mode`, `isTimed`, `durationSeconds` | Updated draft assessment.                                                          |
+| `POST /admin/assessments/:assessmentId/publish` | No body                                                     | Publishes the assessment and makes it available according to its visibility rules. |
+| `POST /admin/assessments/:assessmentId/archive` | No body                                                     | Archives the assessment.                                                           |
+| `DELETE /admin/assessments/:assessmentId`       | No body                                                     | Deletes a never-published draft assessment.                                        |
 
 ## 13. Student assessment attempt
 
@@ -961,13 +988,13 @@ This is an admin-only assistive workflow. It never silently changes a question:
 the generated proposal is retained as a review run and must be explicitly
 applied or rejected by an authorized administrator.
 
-| Method and endpoint | Request | Response/job |
-|---|---|---|
-| `POST /admin/questions/:questionId/ai/re-answer` | `mode`, optional `suppliedAnswer`, optional `additionalContext` | Starts one answer/explanation review run. |
-| `GET /admin/questions/:questionId/ai/re-answer` | No body | Lists retained runs for the question. |
-| `GET /admin/questions/:questionId/ai/re-answer/:runId` | No body | Returns one proposal and its review state. |
-| `POST /admin/questions/:questionId/ai/re-answer/:runId/apply` | `{ "applyAnswer": true, "applyExplanation": true, "note": "optional" }` | Applies only the selected reviewed fields. |
-| `POST /admin/questions/:questionId/ai/re-answer/:runId/reject` | `{ "note": "Reason for rejecting the proposal" }` | Marks the proposal rejected without changing the question. |
+| Method and endpoint                                            | Request                                                                 | Response/job                                               |
+| -------------------------------------------------------------- | ----------------------------------------------------------------------- | ---------------------------------------------------------- |
+| `POST /admin/questions/:questionId/ai/re-answer`               | `mode`, optional `suppliedAnswer`, optional `additionalContext`         | Starts one answer/explanation review run.                  |
+| `GET /admin/questions/:questionId/ai/re-answer`                | No body                                                                 | Lists retained runs for the question.                      |
+| `GET /admin/questions/:questionId/ai/re-answer/:runId`         | No body                                                                 | Returns one proposal and its review state.                 |
+| `POST /admin/questions/:questionId/ai/re-answer/:runId/apply`  | `{ "applyAnswer": true, "applyExplanation": true, "note": "optional" }` | Applies only the selected reviewed fields.                 |
+| `POST /admin/questions/:questionId/ai/re-answer/:runId/reject` | `{ "note": "Reason for rejecting the proposal" }`                       | Marks the proposal rejected without changing the question. |
 
 For a choice question, `suppliedAnswer.selectedOptionIndexes` uses zero-based
 option indexes. For written questions use `acceptedAnswers`; for long-answer
@@ -978,9 +1005,9 @@ question and show that response rather than assuming the local draft is current.
 
 ### 16.1 Admin question-report queue
 
-| Method and endpoint | Request | Response/job |
-|---|---|---|
-| `GET /admin/question-reports` | Pagination and optional `status` | Moderation queue of student-reported questions. |
+| Method and endpoint                             | Request                                   | Response/job                                             |
+| ----------------------------------------------- | ----------------------------------------- | -------------------------------------------------------- |
+| `GET /admin/question-reports`                   | Pagination and optional `status`          | Moderation queue of student-reported questions.          |
 | `POST /admin/question-reports/:reportId/review` | `{ "status": "...", "note": "optional" }` | Assigns/transitions a report and adds a moderation note. |
 
 The same APIs are available under `/admin/assessments/question-reports` for
@@ -1023,22 +1050,22 @@ All query parameters are optional. The response contains paginated performance r
 
 These endpoints use the parent session and selected-child context. They do not create or modify questions.
 
-| Method and endpoint | Request | Response/job |
-|---|---|---|
-| `GET /parent/selected-child/analytics/scopes` | Query: `page`, `limit` | Current active entitlement scopes available for analytics. |
-| `GET /parent/selected-child/analytics/assessments` | Exactly one: `subjectId`, `entitlementId`, or legacy `orderItemId` | Selected child’s assessment performance for current access. |
-| `GET /parent/selected-child/analytics/practice` | Exactly one: `subjectId`, `entitlementId`, or legacy `orderItemId` | Selected child’s direct-practice performance for current access. |
+| Method and endpoint                                | Request                                                            | Response/job                                                     |
+| -------------------------------------------------- | ------------------------------------------------------------------ | ---------------------------------------------------------------- |
+| `GET /parent/selected-child/analytics/scopes`      | Query: `page`, `limit`                                             | Current active entitlement scopes available for analytics.       |
+| `GET /parent/selected-child/analytics/assessments` | Exactly one: `subjectId`, `entitlementId`, or legacy `orderItemId` | Selected child’s assessment performance for current access.      |
+| `GET /parent/selected-child/analytics/practice`    | Exactly one: `subjectId`, `entitlementId`, or legacy `orderItemId` | Selected child’s direct-practice performance for current access. |
 
 ### 17.4 Partner question-usage analytics
 
 These `PARTNER`-only routes expose aggregate usage only; they intentionally do
 not return student identity or answer text.
 
-| Method and endpoint | Request | Response/job |
-|---|---|---|
-| `GET /partners/analytics/question-usage` | Optional date, hierarchy, source, pagination, and `granularity=day\|month` filters | Aggregate usage and correctness metrics. |
-| `GET /partners/analytics/question-usage/sources` | Same filters | Usage grouped by source. |
-| `GET /partners/analytics/question-usage/questions` | Same filters | Paginated frozen-question usage breakdown. |
+| Method and endpoint                                | Request                                                                            | Response/job                               |
+| -------------------------------------------------- | ---------------------------------------------------------------------------------- | ------------------------------------------ |
+| `GET /partners/analytics/question-usage`           | Optional date, hierarchy, source, pagination, and `granularity=day\|month` filters | Aggregate usage and correctness metrics.   |
+| `GET /partners/analytics/question-usage/sources`   | Same filters                                                                       | Usage grouped by source.                   |
+| `GET /partners/analytics/question-usage/questions` | Same filters                                                                       | Paginated frozen-question usage breakdown. |
 
 ## 18. Recommended frontend implementation
 

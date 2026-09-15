@@ -12367,6 +12367,43 @@
         ]
       }
     },
+    "/api/v1/admin/questions/bulk-publish": {
+      "post": {
+        "operationId": "QuestionsController_bulkPublish_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkPublishQuestionsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkPublishQuestionsResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Directly publish selected draft, rejected, or in-review questions",
+        "tags": [
+          "admin/questions"
+        ]
+      }
+    },
     "/api/v1/admin/questions/{id}": {
       "get": {
         "operationId": "QuestionsController_get_v1",
@@ -29435,6 +29472,60 @@
           "sourceId",
           "courseId",
           "placements"
+        ]
+      },
+      "BulkPublishQuestionsDto": {
+        "type": "object",
+        "properties": {
+          "questionIds": {
+            "minItems": 1,
+            "maxItems": 300,
+            "uniqueItems": true,
+            "description": "Unique question IDs to publish directly",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "questionIds"
+        ]
+      },
+      "BulkPublishQuestionFailureDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "reason"
+        ]
+      },
+      "BulkPublishQuestionsResponseDto": {
+        "type": "object",
+        "properties": {
+          "publishedIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "failed": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BulkPublishQuestionFailureDto"
+            }
+          }
+        },
+        "required": [
+          "publishedIds",
+          "failed"
         ]
       },
       "UpdateQuestionDto": {

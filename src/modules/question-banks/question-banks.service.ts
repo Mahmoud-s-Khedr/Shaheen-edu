@@ -2,7 +2,9 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  HttpException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
@@ -35,6 +37,7 @@ import {
   CreateQuestionDto,
   CreateQuestionOptionDto,
   CreateQuestionSourceDto,
+  BulkPublishQuestionsDto,
   QueryQuestionBankDto,
   QueryQuestionDto,
   QueryQuestionSourceDto,
@@ -49,6 +52,7 @@ import {
 
 @Injectable()
 export class QuestionBanksService {
+  private readonly logger = new Logger(QuestionBanksService.name);
   private static readonly LEGACY_ATTACHMENT_KINDS: AssetKind[] = [
     AssetKind.IMAGE,
     AssetKind.PDF,
@@ -137,8 +141,11 @@ export class QuestionBanksService {
       section: { select: { title: true } },
     };
   }
-  private async question(id: string) {
-    const x = await this.prisma.question.findUnique({
+  private async questionWithClient(
+    client: Pick<PrismaService, 'question'> | Prisma.TransactionClient,
+    id: string,
+  ) {
+    const x = await client.question.findUnique({
       where: { id },
       include: {
         source: { include: { publisher: { select: { displayName: true } } } },
@@ -186,6 +193,9 @@ export class QuestionBanksService {
     });
     if (!x) throw new NotFoundException('Question not found');
     return x;
+  }
+  private async question(id: string) {
+    return this.questionWithClient(this.prisma, id);
   }
   private editable(status: QuestionStatus) {
     if (
@@ -1529,36 +1539,108 @@ export class QuestionBanksService {
     await this.log(actor, 'QUESTION_SUBMITTED_FOR_REVIEW', 'Question', id);
     return this.getQuestion(actor, id);
   }
+  private async publishQuestionItem(
+    actor: RequestUser,
+    id: string,
+    acceptedStatuses: QuestionStatus[],
+    invalidStatusMessage: string,
+  ) {
+    try {
+      await this.prisma.$transaction(
+        async (tx) => {
+          // A question remains editable until it is published. Loading and
+          // validating it in this serializable transaction prevents a concurrent
+          // edit from publishing content that was not validated.
+          const item = await this.questionWithClient(tx, id);
+          if (!acceptedStatuses.includes(item.status))
+            throw new ConflictException(invalidStatusMessage);
+          await this.validate(item);
+          await tx.question.update({
+            where: { id: item.id },
+            data: {
+              status: QuestionStatus.PUBLISHED,
+              publishedAt: new Date(),
+              archivedAt: null,
+              reviewedAt: new Date(),
+              reviewedById: actor.id,
+              updatedById: actor.id,
+            },
+          });
+          if (item.replacesQuestionId)
+            await tx.question.update({
+              where: { id: item.replacesQuestionId },
+              data: {
+                status: QuestionStatus.ARCHIVED,
+                archivedAt: new Date(),
+                updatedById: actor.id,
+              },
+            });
+          await this.audit.recordWithClient(tx, {
+            actorUserId: actor.id,
+            action: 'QUESTION_PUBLISHED',
+            targetType: 'Question',
+            targetId: item.id,
+          });
+        },
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      );
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2034'
+      )
+        throw new ConflictException(
+          'Question changed while it was being published; refresh and retry',
+        );
+      throw error;
+    }
+  }
   async publishQuestion(actor: RequestUser, id: string) {
     this.admin(actor);
-    const item = await this.question(id);
-    if (item.status !== QuestionStatus.IN_REVIEW)
-      throw new ConflictException('Only questions in review can be published');
-    await this.validate(item);
-    await this.prisma.$transaction(async (tx) => {
-      await tx.question.update({
-        where: { id },
-        data: {
-          status: QuestionStatus.PUBLISHED,
-          publishedAt: new Date(),
-          archivedAt: null,
-          reviewedAt: new Date(),
-          reviewedById: actor.id,
-          updatedById: actor.id,
-        },
-      });
-      if (item.replacesQuestionId)
-        await tx.question.update({
-          where: { id: item.replacesQuestionId },
-          data: {
-            status: QuestionStatus.ARCHIVED,
-            archivedAt: new Date(),
-            updatedById: actor.id,
-          },
-        });
-    });
-    await this.log(actor, 'QUESTION_PUBLISHED', 'Question', id);
+    await this.publishQuestionItem(
+      actor,
+      id,
+      [QuestionStatus.IN_REVIEW],
+      'Only questions in review can be published',
+    );
     return this.getQuestion(actor, id);
+  }
+  async bulkPublishQuestions(
+    actor: RequestUser,
+    questionIds: BulkPublishQuestionsDto['questionIds'],
+  ) {
+    this.admin(actor);
+    const publishedIds: string[] = [];
+    const failed: { id: string; reason: string }[] = [];
+    for (const id of questionIds) {
+      try {
+        await this.publishQuestionItem(
+          actor,
+          id,
+          [
+            QuestionStatus.DRAFT,
+            QuestionStatus.REJECTED,
+            QuestionStatus.IN_REVIEW,
+          ],
+          'Only draft, rejected, or in-review questions can be bulk published',
+        );
+        publishedIds.push(id);
+      } catch (error) {
+        if (!(error instanceof HttpException))
+          this.logger.error(
+            `Bulk publication failed for question ${id}`,
+            error instanceof Error ? error.stack : undefined,
+          );
+        failed.push({
+          id,
+          reason:
+            error instanceof HttpException
+              ? error.message
+              : 'Unable to publish question',
+        });
+      }
+    }
+    return { publishedIds, failed };
   }
   async rejectQuestion(actor: RequestUser, id: string, reviewNote: string) {
     this.admin(actor);
