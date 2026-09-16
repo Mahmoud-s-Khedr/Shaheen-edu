@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   ArrayMinSize,
@@ -17,7 +17,10 @@ import {
   MinLength,
   ValidateNested,
 } from 'class-validator';
-import { SearchPaginationQueryDto } from '../../../common/dto/pagination-query.dto';
+import {
+  PaginationQueryDto,
+  SearchPaginationQueryDto,
+} from '../../../common/dto/pagination-query.dto';
 import {
   ContentStatus,
   QuestionAnswerProvenance,
@@ -466,6 +469,21 @@ export class QueryQuestionDto extends SearchPaginationQueryDto {
   @ApiPropertyOptional() @IsOptional() @IsString() courseId?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() subjectId?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() academicGradeId?: string;
+}
+export class QueryQuestionContextDto extends PaginationQueryDto {
+  @ApiPropertyOptional({
+    description:
+      'Include contexts whose linked questions are all archived. The parameter name is kept for API compatibility.',
+    default: false,
+  })
+  @IsOptional()
+  @Transform(({ value }: { value: unknown }) => {
+    if (value === true || value === 'true' || value === '1') return true;
+    if (value === false || value === 'false' || value === '0') return false;
+    return value;
+  })
+  @IsBoolean()
+  arcived?: boolean;
 }
 export class QueryQuestionSourceDto extends SearchPaginationQueryDto {
   @ApiPropertyOptional({ enum: ContentStatus })

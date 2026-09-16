@@ -292,11 +292,11 @@ Response: a context object containing its `id`, content, and content blocks.
 
 ### 6.2 Manage contexts
 
-| Method and endpoint                           | Request                                                                   | Response/job                     |
-| --------------------------------------------- | ------------------------------------------------------------------------- | -------------------------------- |
-| `GET /admin/questions/contexts`               | No body                                                                   | List of reusable contexts.       |
-| `PATCH /admin/questions/contexts/:contextId`  | Any editable context fields; an empty `contentBlocks` array clears blocks | Updated context.                 |
-| `DELETE /admin/questions/contexts/:contextId` | No body                                                                   | Deletes an unreferenced context. |
+| Method and endpoint                           | Request                                                                   | Response/job                                                                                                                |
+| --------------------------------------------- | ------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `GET /admin/questions/contexts`               | Query: optional `arcived=true`                                            | List of reusable contexts. By default, contexts linked only to archived questions are hidden; `arcived=true` includes them. |
+| `PATCH /admin/questions/contexts/:contextId`  | Any editable context fields; an empty `contentBlocks` array clears blocks | Updated context.                                                                                                            |
+| `DELETE /admin/questions/contexts/:contextId` | No body                                                                   | Deletes an unreferenced context.                                                                                            |
 
 ## 7. Create and edit questions
 

@@ -29,6 +29,7 @@ import {
   BulkPublishQuestionsDto,
   BulkPublishQuestionsResponseDto,
   QueryQuestionBankDto,
+  QueryQuestionContextDto,
   QueryQuestionDto,
   QueryQuestionSourceDto,
   RejectQuestionDto,
@@ -164,8 +165,11 @@ export class QuestionsController {
   }
   @Get('contexts')
   @ApiOperation({ summary: 'List reusable question contexts' })
-  listContexts(@CurrentUser() a: RequestUser) {
-    return this.service.listContexts(a);
+  listContexts(
+    @CurrentUser() a: RequestUser,
+    @Query() q: QueryQuestionContextDto,
+  ) {
+    return this.service.listContexts(a, q);
   }
   @Patch('contexts/:contextId')
   @ApiOperation({ summary: 'Update reusable question context' })

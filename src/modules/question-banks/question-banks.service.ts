@@ -39,6 +39,7 @@ import {
   CreateQuestionSourceDto,
   BulkPublishQuestionsDto,
   QueryQuestionBankDto,
+  QueryQuestionContextDto,
   QueryQuestionDto,
   QueryQuestionSourceDto,
   QuestionPlacementDto,
@@ -1319,9 +1320,25 @@ export class QuestionBanksService {
       },
     });
   }
-  async listContexts(actor: RequestUser) {
+  async listContexts(actor: RequestUser, q: QueryQuestionContextDto) {
     this.admin(actor);
     return this.prisma.questionContext.findMany({
+      // Contexts with no questions remain available for future use. A linked
+      // context is hidden only when none of its questions are still active.
+      where: q.arcived
+        ? undefined
+        : {
+            OR: [
+              { questions: { none: {} } },
+              {
+                questions: {
+                  some: {
+                    question: { status: { not: QuestionStatus.ARCHIVED } },
+                  },
+                },
+              },
+            ],
+          },
       include: {
         contentBlocks: {
           include: { asset: true },
