@@ -254,3 +254,26 @@ empty database. Do not deploy it to a database that already records superseded
 migrations in `_prisma_migrations`; use an operator-approved backup and a
 rehearsed fresh-database/data-restore cutover. Do not edit migration history
 on a live database merely to make the baseline appear applied.
+
+---
+
+# Optional: update the release identifier in .env to the Git commit
+git -C ../.. rev-parse --short HEAD
+nano .env
+
+# Validate production configuration and build the new release
+docker compose --env-file .env config --quiet
+docker compose build migrate api worker
+
+# Creates a verified off-host PostgreSQL backup, then applies both migrations.
+# PROJECT_DIR is necessary because your checkout is ~/Shaheen-edu, not /opt/shaheen-edu.
+sudo env PROJECT_DIR="$PWD" ./scripts/release-with-backup.sh
+
+# Replace the running API and worker with the new images.
+# This preserves your current single API replica.
+docker compose up -d --wait --force-recreate --scale api=1 api worker
+
+# Verify
+docker compose ps
+docker compose logs --tail=100 api worker
+curl --fail-with-body http://127.0.0.1:13000/health/ready
