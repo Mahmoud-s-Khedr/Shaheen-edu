@@ -3,6 +3,7 @@
 Implementation-backed API contract. Every endpoint below is self-contained: its authorization, parameter/body fields, and success response fields appear in the same section. Base URL is `/api/v1`; `/health` and `/health/ready` are unversioned. Unknown JSON fields are rejected. Errors use `{ statusCode, code, message: { ar, en }, error: { ar, en }, details?, correlationId }`; `details` contains field-level bilingual validation feedback.
 
 DTO validation failures return HTTP 400 with code `BAD_REQUEST.VALIDATION_FAILED`. The top-level `message` contains the first validation issue in Arabic and English; render every entry in `details` for full form feedback. Each detail has `{ field, code, message: { ar, en } }`. Field paths use dots and array indexes (for example, `items.0.title.en`); an empty field denotes a request-level issue. Unknown fields are rejected with `VALIDATION.WHITELISTVALIDATION`. Use codes and field paths for client logic, rather than matching message text. Malformed JSON, oversized bodies, and unsupported content types return actionable HTTP 400, 413, and 415 errors respectively.
+
 ## Generated operations inventory
 
 The OpenAPI document in `docs-json.json` is the authoritative schema. The
@@ -169,6 +170,10 @@ operation inventory aligned with that document.
 
 ### `POST /api/v1/student/questions/{questionId}/highlights`
 
+### `POST /api/v1/admin/questions/bulk-publish`
+
+### `POST /api/v1/admin/students/{id}/reset-session`
+
 ## Health
 
 ## Student learning
@@ -186,6 +191,41 @@ operation inventory aligned with that document.
 Lists the selected child’s current active access grants, grouped by subject.
 Each `accessGrants` entry has `entitlementId`, `source`, target, and nullable
 `orderId`/`orderItemId`; it excludes revoked, expired, and future access.
+
+### `GET /api/v1/parent/selected-child/analytics/daily-activity`
+
+**Authorization:** Parent selected-child bearer token
+
+**Request**
+
+- query `from` (required; inclusive `Africa/Cairo` calendar date, exact
+  `YYYY-MM-DD`)
+- query `to` (required; inclusive `Africa/Cairo` calendar date, exact
+  `YYYY-MM-DD`; must be on or after `from`)
+
+The child is derived solely from the selected-child parent session; no student
+ID is accepted. Requests without a selected child return `400`; invalid parent
+credentials return `401`; an unavailable or unlinked selected child returns
+`403`. Malformed or reversed dates return `400`.
+
+**Success response — HTTP 200 (DailyActivityResponseDto)**
+
+```json
+{
+  "days": [
+    {
+      "date": "2026-09-01",
+      "solvedQuestions": 4,
+      "contentDurationSeconds": 1500
+    }
+  ]
+}
+```
+
+`days` is ordered from `from` through `to` and includes zero-activity dates.
+`solvedQuestions` counts distinct correctly answered questions per Cairo day;
+`contentDurationSeconds` sums the estimated durations of content completed on
+that day.
 
 ### `GET /api/v1/parent/selected-child/analytics/content`
 
@@ -245,6 +285,58 @@ Authorized parent equivalents are `GET /api/v1/parent/selected-child/performance
 ### `POST /api/v1/student/practice/questions/{questionId}/attempts`
 
 ### `GET /api/v1/student/progress`
+
+## Video feedback moderation
+
+### `POST /api/v1/student/video-assets/{videoAssetId}/feedback`
+
+**Authorization:** Bearer token; role must be `STUDENT`
+
+**Request**
+
+- path `videoAssetId` (required)
+- body `comment` (optional non-empty string, maximum 4000 characters)
+- body `rating` (optional integer from `1` through `5`)
+- provide at least one of `comment` or `rating`
+
+**Success response — HTTP 201**
+
+Returns the created or updated feedback row, including its ID, video and
+student IDs, comment, rating, timestamps, and `contentItemId`.
+
+### `GET /api/v1/admin/video-feedback`
+
+**Authorization:** Bearer token; role must be `ADMIN` or `SUPER_ADMIN`
+
+**Request**
+
+- query `page`, `limit`, `videoAssetId`, `contentItemId`, `studentId`, and
+  `rating` (optional)
+- query `from` and `to` (optional inclusive `Africa/Cairo` creation dates in
+  `YYYY-MM-DD`; `from` must not be after `to`)
+
+**Success response — HTTP 200**
+
+Returns paginated feedback rows with feedback fields, student identity, video
+metadata, and the current primary content item when available.
+
+### `DELETE /api/v1/admin/video-feedback/{id}`
+
+**Authorization:** Bearer token; role must be `ADMIN` or `SUPER_ADMIN`
+
+**Request**
+
+- path `id` (required video-feedback ID)
+
+**Success response — HTTP 200**
+
+```json
+{ "id": "feedback_123", "deleted": true }
+```
+
+This permanently removes the exact feedback row. There is no soft delete or
+audit event. A missing or already-deleted ID returns `404`; unauthenticated or
+unauthorized callers receive `401` or `403`.
 
 ### `GET /health`
 

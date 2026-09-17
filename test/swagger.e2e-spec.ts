@@ -119,6 +119,39 @@ describe('Swagger (e2e)', () => {
       document.paths['/api/v1/parent/selected-child/analytics/scopes'].get
         .responses['200'].content['application/json'].schema.$ref,
     ).toBe('#/components/schemas/ParentAnalyticsScopesResponseDto');
+    const parentDailyActivity =
+      document.paths['/api/v1/parent/selected-child/analytics/daily-activity']
+        .get;
+    expect(parentDailyActivity.summary).toBe(
+      'Get selected child daily solved-question and completed-content activity in Africa/Cairo dates',
+    );
+    expect(parentDailyActivity.parameters).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: 'from', in: 'query', required: true }),
+        expect.objectContaining({ name: 'to', in: 'query', required: true }),
+      ]),
+    );
+    expect(
+      parentDailyActivity.responses['200'].content['application/json'].schema
+        .$ref,
+    ).toBe('#/components/schemas/DailyActivityResponseDto');
+    expect(
+      document.paths['/api/v1/student/learning/daily-activity'],
+    ).toBeUndefined();
+
+    const deleteVideoFeedback =
+      document.paths['/api/v1/admin/video-feedback/{id}'].delete;
+    expect(deleteVideoFeedback.summary).toBe(
+      'Permanently delete student video feedback',
+    );
+    expect(deleteVideoFeedback.responses).toEqual(
+      expect.objectContaining({
+        200: expect.any(Object),
+        401: expect.any(Object),
+        403: expect.any(Object),
+        404: expect.any(Object),
+      }),
+    );
     expect(
       document.components.schemas.ParentAnalyticsAccessGrantDto.properties,
     ).toEqual(

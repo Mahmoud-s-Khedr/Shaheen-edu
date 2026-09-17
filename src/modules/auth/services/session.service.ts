@@ -1,9 +1,10 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { HttpStatus, Injectable, UnauthorizedException } from '@nestjs/common';
 import * as crypto from 'crypto';
 import { PrismaService } from '../../../database/prisma.service';
 import { TokenService } from './token.service';
-import { AccountStatus } from '../../../common/types/roles.enum';
-import type { AuthSession, Role, User } from '@prisma/client';
+import { AccountStatus, Role } from '../../../common/types/roles.enum';
+import { AppException } from '../../../common/exceptions/app.exception';
+import type { AuthSession, User } from '@prisma/client';
 
 export interface CreatedSession {
   accessToken: string;
@@ -38,16 +39,47 @@ export class SessionService {
       Date.now() + this.tokenService.refreshTtlSeconds * 1000,
     );
 
-    const session = await this.prisma.authSession.create({
-      data: {
-        userId: params.userId,
-        refreshTokenHash,
-        familyId,
-        expiresAt,
-        ipAddress: params.ipAddress,
-        userAgent: params.userAgent,
-      },
-    });
+    const create = (client: Pick<PrismaService, 'authSession'>) =>
+      client.authSession.create({
+        data: {
+          userId: params.userId,
+          refreshTokenHash,
+          familyId,
+          expiresAt,
+          ipAddress: params.ipAddress,
+          userAgent: params.userAgent,
+        },
+      });
+
+    let session: AuthSession;
+    if (params.role === Role.STUDENT) {
+      session = await this.prisma.$transaction(async (tx) => {
+        // This transaction-scoped lock serializes logins for the same student.
+        // A partial index cannot express "unexpired at the current instant";
+        // the lock makes the check-and-create sequence atomic instead.
+        await tx.$executeRaw`
+          SELECT pg_advisory_xact_lock(hashtextextended(${params.userId}, 0))
+        `;
+        const active = await tx.authSession.findFirst({
+          where: {
+            userId: params.userId,
+            revoked: false,
+            expiresAt: { gt: new Date() },
+          },
+          select: { id: true },
+        });
+        if (active) {
+          throw new AppException(
+            'A student device session is already active',
+            HttpStatus.CONFLICT,
+            'STUDENT_DEVICE_ALREADY_ACTIVE',
+          );
+        }
+        return create(tx);
+      });
+    } else {
+      session = await create(this.prisma);
+    }
 
     const accessToken = this.tokenService.signUserAccessToken({
       userId: params.userId,

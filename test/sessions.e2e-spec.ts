@@ -6,6 +6,7 @@ import {
   flushTestRedis,
   seedGovernorate,
   seedPublishedAcademicGrade,
+  seedSuperAdmin,
 } from './utils/db';
 import { PrismaService } from '../src/database/prisma.service';
 
@@ -158,38 +159,90 @@ describe('Sessions (e2e)', () => {
     expect(meResponse.statusCode).toBe(401);
   });
 
+  it('allows only one of two simultaneous logins after a student device slot is freed', async () => {
+    const first = await registerFreshStudent('1008');
+    await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/logout',
+      headers: { authorization: `Bearer ${first.accessToken}` },
+      cookies: { refresh_token: first.refreshToken },
+    });
+
+    const responses = await Promise.all(
+      [1, 2].map(() =>
+        app.inject({
+          method: 'POST',
+          url: '/api/v1/auth/students/login',
+          payload: { phone: first.phone, password: first.password },
+        }),
+      ),
+    );
+    expect(responses.map((response) => response.statusCode).sort()).toEqual([
+      201, 409,
+    ]);
+    const conflict = responses.find((response) => response.statusCode === 409);
+    expect(JSON.parse(conflict!.body)).toMatchObject({
+      code: 'STUDENT_DEVICE_ALREADY_ACTIVE',
+    });
+  });
+
   it('logout-all revokes all sessions for the user', async () => {
     const first = await registerFreshStudent('1004');
-    const loginResponse = await app.inject({
-      method: 'POST',
-      url: '/api/v1/auth/students/login',
-      payload: { phone: first.phone, password: first.password },
-    });
-    const second = JSON.parse(loginResponse.body);
 
-    await app.inject({
+    const logoutAllResponse = await app.inject({
       method: 'POST',
       url: '/api/v1/auth/logout-all',
       headers: { authorization: `Bearer ${first.accessToken}` },
     });
+    expect(logoutAllResponse.statusCode).toBe(201);
 
-    const secondMeResponse = await app.inject({
-      method: 'GET',
-      url: '/api/v1/auth/me',
-      headers: { authorization: `Bearer ${second.accessToken}` },
-    });
-    expect(secondMeResponse.statusCode).toBe(401);
-  });
-
-  it('password change invalidates existing sessions', async () => {
-    const first = await registerFreshStudent('1005');
     const loginResponse = await app.inject({
       method: 'POST',
       url: '/api/v1/auth/students/login',
       payload: { phone: first.phone, password: first.password },
     });
-    const second = JSON.parse(loginResponse.body);
+    expect(loginResponse.statusCode).toBe(201);
+  });
 
+  it('an admin reset revokes the student session and frees the login slot', async () => {
+    const first = await registerFreshStudent('1009');
+    const student = await app.get(PrismaService).user.findUniqueOrThrow({
+      where: { loginIdentifier: first.phone },
+      select: { id: true },
+    });
+    await seedSuperAdmin(
+      app,
+      'sessions-reset-super-admin@example.com',
+      'SuperAdminP@ss1!',
+    );
+    const adminLogin = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/admins/login',
+      payload: {
+        email: 'sessions-reset-super-admin@example.com',
+        password: 'SuperAdminP@ss1!',
+      },
+    });
+    const reset = await app.inject({
+      method: 'POST',
+      url: `/api/v1/admin/students/${student.id}/reset-session`,
+      headers: {
+        authorization: `Bearer ${JSON.parse(adminLogin.body).accessToken}`,
+      },
+    });
+    expect(reset.statusCode).toBe(200);
+    expect(JSON.parse(reset.body)).toMatchObject({ revokedSessionCount: 1 });
+
+    const login = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/students/login',
+      payload: { phone: first.phone, password: first.password },
+    });
+    expect(login.statusCode).toBe(201);
+  });
+
+  it('password change invalidates existing sessions', async () => {
+    const first = await registerFreshStudent('1005');
     const changeResponse = await app.inject({
       method: 'POST',
       url: '/api/v1/auth/change-password',
@@ -198,12 +251,12 @@ describe('Sessions (e2e)', () => {
     });
     expect(changeResponse.statusCode).toBe(201);
 
-    const secondMeResponse = await app.inject({
-      method: 'GET',
-      url: '/api/v1/auth/me',
-      headers: { authorization: `Bearer ${second.accessToken}` },
+    const loginResponse = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/students/login',
+      payload: { phone: first.phone, password: 'NewSessionP@ss1!' },
     });
-    expect(secondMeResponse.statusCode).toBe(401);
+    expect(loginResponse.statusCode).toBe(201);
   });
 
   it('suspended account cannot refresh', async () => {

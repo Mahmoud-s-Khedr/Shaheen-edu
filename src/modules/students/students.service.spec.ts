@@ -10,6 +10,7 @@ const actor = { id: 'admin-1', role: Role.ADMIN, sessionId: 'session-1' };
 
 describe('StudentsService administration', () => {
   const tx = {
+    $executeRaw: jest.fn(),
     user: { updateMany: jest.fn(), findUniqueOrThrow: jest.fn() },
     authSession: { updateMany: jest.fn() },
     parentAccessSession: { updateMany: jest.fn() },
@@ -90,6 +91,36 @@ describe('StudentsService administration', () => {
       service.resetPassword(actor, 'student-1'),
     ).rejects.toBeInstanceOf(ConflictException);
     expect(tx.authSession.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('admin session reset revokes active refresh sessions and audits the device-slot release', async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      id: 'student-1',
+      role: Role.STUDENT,
+      status: AccountStatus.ACTIVE,
+    });
+    tx.authSession.updateMany.mockResolvedValue({ count: 1 });
+
+    await expect(service.resetSession(actor, 'student-1')).resolves.toEqual(
+      expect.objectContaining({
+        studentId: 'student-1',
+        revokedSessionCount: 1,
+      }),
+    );
+    expect(tx.authSession.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ userId: 'student-1', revoked: false }),
+        data: expect.objectContaining({ revoked: true }),
+      }),
+    );
+    expect(tx.$executeRaw).toHaveBeenCalled();
+    expect(auditService.recordWithClient).toHaveBeenCalledWith(
+      tx,
+      expect.objectContaining({
+        action: 'STUDENT_SESSIONS_RESET',
+        targetId: 'student-1',
+      }),
+    );
   });
 
   it('requires a nonblank deletion reason before mutating the account', async () => {

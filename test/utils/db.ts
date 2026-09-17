@@ -20,6 +20,7 @@ export async function cleanDatabase(
   await prisma.adminAuditLog.deleteMany();
   await prisma.authSession.deleteMany();
   await prisma.parentAccessSession.deleteMany();
+  await prisma.videoFeedback.deleteMany();
   await prisma.contentPlacement.deleteMany();
   await prisma.contentItem.deleteMany();
   // Snapshots hold restrictive FKs to StudentProfile and StudentEntitlement, so

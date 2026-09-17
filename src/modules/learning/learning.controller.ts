@@ -23,6 +23,7 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { ParentAuthGuard } from '../../common/guards/parent-auth.guard';
 import { ParentSelectedChildGuard } from '../../common/guards/parent-selected-child.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
+import { ApiStandardErrors } from '../../common/decorators/api-standard-errors.decorator';
 import { Role } from '../../common/types/roles.enum';
 import type {
   RequestParentSession,
@@ -35,6 +36,8 @@ import {
   ParentAnalyticsScopesQueryDto,
   ParentAnalyticsScopeQueryDto,
   SubmitQuestionAttemptDto,
+  DailyActivityQueryDto,
+  DailyActivityResponseDto,
   UpdateContentStudyStateDto,
 } from './dto/learning.dto';
 
@@ -159,6 +162,19 @@ export class ParentLearningController {
     @Query() query: ParentAnalyticsScopesQueryDto,
   ) {
     return this.learning.parentAnalyticsScopes(parent, query);
+  }
+  @Get('analytics/daily-activity')
+  @ApiOperation({
+    summary:
+      'Get selected child daily solved-question and completed-content activity in Africa/Cairo dates',
+  })
+  @ApiOkResponse({ type: DailyActivityResponseDto })
+  @ApiStandardErrors(400, 401, 403)
+  dailyActivity(
+    @CurrentParentSession() parent: RequestParentSession,
+    @Query() query: DailyActivityQueryDto,
+  ) {
+    return this.learning.parentDailyActivity(parent, query.from, query.to);
   }
   @Get('analytics/content')
   @ApiOperation({ summary: 'Get active-entitlement content progress' })

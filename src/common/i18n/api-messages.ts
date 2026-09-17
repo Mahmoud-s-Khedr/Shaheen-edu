@@ -148,6 +148,8 @@ const translations: Record<string, string> = {
   'A testimonial needs review text or a screenshot':
     'تحتاج الشهادة إلى نص مراجعة أو لقطة شاشة',
   'A valid entitlement is required': 'مطلوب استحقاق صالح',
+  'A student device session is already active':
+    'لدى الطالب جلسة جهاز نشطة بالفعل',
   'AI assessment request failed': 'فشل طلب تقييم الذكاء الاصطناعي',
   'AI assessment returned invalid JSON':
     'أعاد تقييم الذكاء الاصطناعي JSON غير صالح',
@@ -850,6 +852,10 @@ const translations: Record<string, string> = {
   'Video cannot be uploaded in its current state':
     'لا يمكن تحميل الفيديو في حالته الحالية',
   'Video is not ready': 'الفيديو غير جاهز',
+  'Video is already assigned to a content item':
+    'الفيديو مرتبط بالفعل بعنصر محتوى آخر',
+  'Published video content item not found':
+    'لم يتم العثور على عنصر محتوى منشور للفيديو',
   'Video must be ready': 'يجب أن يكون الفيديو جاهزا',
   'Video outline concept titles cannot be blank':
     'لا يمكن أن تكون عناوين مفهوم المخطط التفصيلي للفيديو فارغة',

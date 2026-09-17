@@ -46,6 +46,7 @@ import { QuestionImportModule } from './modules/ai-question-import/question-impo
 import { QuestionAiExplanationsModule } from './modules/ai-question-explanations/question-ai-explanations.module';
 import { StudentWorkspaceModule } from './modules/student-workspace/student-workspace.module';
 import { TestimonialsModule } from './modules/testimonials/testimonials.module';
+import { VideoFeedbackModule } from './modules/video-feedback/video-feedback.module';
 import { ReferralsModule } from './modules/referrals/referrals.module';
 import { PartnerFinanceModule } from './modules/partner-finance/partner-finance.module';
 import { ReportsModule } from './modules/reports/reports.module';
@@ -124,6 +125,7 @@ import { normalizeCorrelationId } from './common/logging/correlation-id';
     QuestionAiExplanationsModule,
     StudentWorkspaceModule,
     TestimonialsModule,
+    VideoFeedbackModule,
     IntegrityModule,
   ],
   providers: [

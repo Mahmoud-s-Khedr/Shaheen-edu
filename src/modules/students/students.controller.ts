@@ -200,4 +200,12 @@ export class AdminStudentsController {
   resetPassword(@CurrentUser() actor: RequestUser, @Param('id') id: string) {
     return this.studentsService.resetPassword(actor, id);
   }
+
+  @Post(':id/reset-session')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Revoke all active refresh sessions for a student' })
+  @ApiStandardErrors(401, 403, 404)
+  resetSession(@CurrentUser() actor: RequestUser, @Param('id') id: string) {
+    return this.studentsService.resetSession(actor, id);
+  }
 }

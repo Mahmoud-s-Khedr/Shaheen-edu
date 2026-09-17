@@ -4,6 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { DateTime } from 'luxon';
 import {
   AssessmentAttemptStatus,
   AssessmentQuestionOutcome,
@@ -84,6 +85,92 @@ export class LearningService {
       completed: Boolean(progress),
       completedAt: progress?.completedAt ?? null,
     };
+  }
+
+  async dailyActivity(studentId: string, from: string, to: string) {
+    const firstDay = this.cairoCalendarDay(from, 'from');
+    const lastDay = this.cairoCalendarDay(to, 'to');
+    if (lastDay < firstDay)
+      throw new BadRequestException('from must be on or before to');
+    const endExclusive = lastDay.plus({ days: 1 });
+    const range = {
+      gte: firstDay.toUTC().toJSDate(),
+      lt: endExclusive.toUTC().toJSDate(),
+    };
+    const [attempts, completions] = await this.prisma.$transaction([
+      this.prisma.studentQuestionAttempt.findMany({
+        where: {
+          studentUserId: studentId,
+          isCorrect: true,
+          submittedAt: range,
+        },
+        select: { questionId: true, submittedAt: true },
+      }),
+      this.prisma.studentContentProgress.findMany({
+        where: { studentUserId: studentId, completedAt: range },
+        select: {
+          completedAt: true,
+          contentItem: { select: { estimatedDuration: true } },
+        },
+      }),
+    ]);
+
+    const solvedByDay = new Map<string, Set<string>>();
+    for (const attempt of attempts) {
+      const date = this.toCairoDate(attempt.submittedAt);
+      const questions = solvedByDay.get(date) ?? new Set<string>();
+      questions.add(attempt.questionId);
+      solvedByDay.set(date, questions);
+    }
+    const durationByDay = new Map<string, number>();
+    for (const completion of completions) {
+      const date = this.toCairoDate(completion.completedAt);
+      durationByDay.set(
+        date,
+        (durationByDay.get(date) ?? 0) +
+          (completion.contentItem.estimatedDuration ?? 0),
+      );
+    }
+
+    const days: Array<{
+      date: string;
+      solvedQuestions: number;
+      contentDurationSeconds: number;
+    }> = [];
+    for (let day = firstDay; day <= lastDay; day = day.plus({ days: 1 })) {
+      const date = day.toISODate()!;
+      days.push({
+        date,
+        solvedQuestions: solvedByDay.get(date)?.size ?? 0,
+        contentDurationSeconds: durationByDay.get(date) ?? 0,
+      });
+    }
+    return { days };
+  }
+
+  /** Activity is always derived from the child selected in the parent session. */
+  async parentDailyActivity(
+    parent: RequestParentSession,
+    from: string,
+    to: string,
+  ) {
+    const child = await this.parentAnalyticsChild(parent);
+    return this.dailyActivity(child.userId, from, to);
+  }
+
+  private cairoCalendarDay(value: string, field: string) {
+    const day = DateTime.fromISO(value, { zone: 'Africa/Cairo' }).startOf(
+      'day',
+    );
+    if (!day.isValid || day.toISODate() !== value)
+      throw new BadRequestException(`${field} must be YYYY-MM-DD`);
+    return day;
+  }
+
+  private toCairoDate(value: Date) {
+    return DateTime.fromJSDate(value, { zone: 'utc' })
+      .setZone('Africa/Cairo')
+      .toISODate()!;
   }
 
   async updateStudyState(

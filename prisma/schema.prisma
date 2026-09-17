@@ -642,6 +642,7 @@ model StudentProfile {
   parentAccessSessions    ParentAccessSession[]
   contentProgress         StudentContentProgress[]
   questionAttempts        StudentQuestionAttempt[]
+  videoFeedback           VideoFeedback[]
   assessments             Assessment[]
   assessmentAttempts      AssessmentAttempt[]
   leaderboardEntries      LeaderboardEntry[]
@@ -994,6 +995,7 @@ model ContentItem {
   studentStudyStates StudentContentStudyState[]
 
   @@index([status, createdAt, id])
+  @@index([primaryAssetId])
 }
 
 model Asset {
@@ -1088,6 +1090,7 @@ model VideoAsset {
   failureMetadata         Json?
   attempt                 Int                   @default(1)
   questionVideoLinks      QuestionVideoLink[]
+  feedback                VideoFeedback[]
 
   @@index([processingStatus])
 }
@@ -2342,6 +2345,22 @@ model StudentContentProgress {
   @@unique([studentUserId, contentItemId])
   @@index([studentUserId, completedAt])
   @@index([contentItemId])
+}
+
+/// One student's editable feedback on one ready, primary video asset.
+model VideoFeedback {
+  id            String         @id @default(cuid())
+  videoAssetId  String
+  studentUserId String
+  comment       String?        @db.Text
+  rating        Int?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  videoAsset    VideoAsset     @relation(fields: [videoAssetId], references: [assetId], onDelete: Cascade)
+  student       StudentProfile @relation(fields: [studentUserId], references: [userId], onDelete: Cascade)
+
+  @@unique([studentUserId, videoAssetId])
+  @@index([videoAssetId, createdAt])
 }
 
 /// A private text-range annotation on an authored question. Highlights are

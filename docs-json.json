@@ -180,6 +180,16 @@
               }
             }
           },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
           "429": {
             "description": "",
             "content": {
@@ -2955,6 +2965,62 @@
           }
         ],
         "summary": "Reset a student password",
+        "tags": [
+          "admin/students"
+        ]
+      }
+    },
+    "/api/v1/admin/students/{id}/reset-session": {
+      "post": {
+        "operationId": "AdminStudentsController_resetSession_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Revoke all active refresh sessions for a student",
         "tags": [
           "admin/students"
         ]
@@ -16145,6 +16211,82 @@
         ]
       }
     },
+    "/api/v1/parent/selected-child/analytics/daily-activity": {
+      "get": {
+        "operationId": "ParentLearningController_dailyActivity_v1",
+        "parameters": [
+          {
+            "name": "from",
+            "required": true,
+            "in": "query",
+            "description": "Inclusive Africa/Cairo calendar date (YYYY-MM-DD).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": true,
+            "in": "query",
+            "description": "Inclusive Africa/Cairo calendar date (YYYY-MM-DD).",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DailyActivityResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get selected child daily solved-question and completed-content activity in Africa/Cairo dates",
+        "tags": [
+          "parent/learning"
+        ]
+      }
+    },
     "/api/v1/parent/selected-child/analytics/content": {
       "get": {
         "operationId": "ParentLearningController_analyticsContent_v1",
@@ -24861,6 +25003,241 @@
           "testimonials"
         ]
       }
+    },
+    "/api/v1/student/video-assets/{videoAssetId}/feedback": {
+      "post": {
+        "operationId": "StudentVideoFeedbackController_upsert_v1",
+        "parameters": [
+          {
+            "name": "videoAssetId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpsertVideoFeedbackDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create or update personal feedback for an accessible ready video",
+        "tags": [
+          "student/video-feedback"
+        ]
+      }
+    },
+    "/api/v1/admin/video-feedback": {
+      "get": {
+        "operationId": "AdminVideoFeedbackController_list_v1",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "One-based page number.",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Maximum records to return per page.",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "videoAssetId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "contentItemId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "studentId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "rating",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 5,
+              "type": "number"
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "Inclusive Cairo calendar date.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "Inclusive Cairo calendar date.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List student video feedback",
+        "tags": [
+          "admin/video-feedback"
+        ]
+      }
+    },
+    "/api/v1/admin/video-feedback/{id}": {
+      "delete": {
+        "operationId": "AdminVideoFeedbackController_remove_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Video feedback ID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "id": "feedback_123",
+                    "deleted": true
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Permanently delete student video feedback",
+        "tags": [
+          "admin/video-feedback"
+        ]
+      }
     }
   },
   "info": {
@@ -31184,6 +31561,42 @@
           "meta"
         ]
       },
+      "DailyActivityDayDto": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "description": "Africa/Cairo calendar date (YYYY-MM-DD)."
+          },
+          "solvedQuestions": {
+            "type": "number",
+            "description": "Distinct questions answered correctly on this Cairo day."
+          },
+          "contentDurationSeconds": {
+            "type": "number",
+            "description": "Total estimated duration, in seconds, of content completed on this Cairo day."
+          }
+        },
+        "required": [
+          "date",
+          "solvedQuestions",
+          "contentDurationSeconds"
+        ]
+      },
+      "DailyActivityResponseDto": {
+        "type": "object",
+        "properties": {
+          "days": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DailyActivityDayDto"
+            }
+          }
+        },
+        "required": [
+          "days"
+        ]
+      },
       "GenerateStudentAssessmentDto": {
         "type": "object",
         "properties": {
@@ -33561,6 +33974,20 @@
         "required": [
           "items"
         ]
+      },
+      "UpsertVideoFeedbackDto": {
+        "type": "object",
+        "properties": {
+          "comment": {
+            "type": "string",
+            "maxLength": 4000
+          },
+          "rating": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 5
+          }
+        }
       }
     }
   }

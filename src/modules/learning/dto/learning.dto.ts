@@ -3,6 +3,7 @@ import {
   ArrayMinSize,
   IsArray,
   IsInt,
+  IsDateString,
   IsOptional,
   IsString,
   Min,
@@ -37,6 +38,41 @@ export class UpdateContentStudyStateDto {
   @IsInt()
   @Min(0)
   playbackPositionSeconds?: number | null;
+}
+
+export class DailyActivityQueryDto {
+  @ApiProperty({
+    description: 'Inclusive Africa/Cairo calendar date (YYYY-MM-DD).',
+  })
+  @IsDateString()
+  from!: string;
+
+  @ApiProperty({
+    description: 'Inclusive Africa/Cairo calendar date (YYYY-MM-DD).',
+  })
+  @IsDateString()
+  to!: string;
+}
+
+export class DailyActivityDayDto {
+  @ApiProperty({ description: 'Africa/Cairo calendar date (YYYY-MM-DD).' })
+  date!: string;
+
+  @ApiProperty({
+    description: 'Distinct questions answered correctly on this Cairo day.',
+  })
+  solvedQuestions!: number;
+
+  @ApiProperty({
+    description:
+      'Total estimated duration, in seconds, of content completed on this Cairo day.',
+  })
+  contentDurationSeconds!: number;
+}
+
+export class DailyActivityResponseDto {
+  @ApiProperty({ type: [DailyActivityDayDto] })
+  days!: DailyActivityDayDto[];
 }
 
 /** Selects active analytics access by subject or one exact entitlement. */

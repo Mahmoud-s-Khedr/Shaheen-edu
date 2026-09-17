@@ -1,4 +1,5 @@
 import {
+  HttpStatus,
   BadRequestException,
   ConflictException,
   ForbiddenException,
@@ -35,6 +36,7 @@ import type { ReorderContentItemDto } from './dto/reorder-content-item.dto';
 import type { ContentPlacementTargetDto } from './dto/content-placement-target.dto';
 import { AssetsService } from '../assets/assets.service';
 import { PublicationService } from '../publication/publication.service';
+import { AppException } from '../../common/exceptions/app.exception';
 
 type PlacementField = 'courseId' | 'chapterId' | 'lessonId' | 'sectionId';
 type PlacementTarget = { field: PlacementField; id: string };
@@ -739,11 +741,25 @@ export class ContentItemsService {
     if (asset.status === AssetStatus.ARCHIVED)
       throw new ConflictException('Archived assets cannot be linked');
     this.assets.assertCompatible(asset, item.type);
+    if (asset.kind === 'VIDEO') {
+      const owner = await this.prisma.contentItem.findFirst({
+        where: { primaryAssetId: assetId, id: { not: id } },
+        select: { id: true },
+      });
+      if (owner) this.videoAlreadyAssigned();
+    }
     const previousAssetId = item.primaryAssetId;
-    await this.prisma.contentItem.update({
-      where: { id },
-      data: { primaryAssetId: assetId, updatedById: actor.id },
-    });
+    try {
+      await this.prisma.contentItem.update({
+        where: { id },
+        data: { primaryAssetId: assetId, updatedById: actor.id },
+      });
+    } catch (error: any) {
+      // The PostgreSQL trigger is the final concurrency/direct-SQL backstop.
+      if (asset.kind === 'VIDEO' && error?.code === 'P2002')
+        this.videoAlreadyAssigned();
+      throw error;
+    }
     await this.auditService.record({
       actorUserId: actor.id,
       action: 'CONTENT_PRIMARY_ASSET_SET',
@@ -754,6 +770,14 @@ export class ContentItemsService {
     if (previousAssetId && previousAssetId !== assetId)
       await this.assets.archiveIfUnreferenced(actor, previousAssetId);
     return this.toSummary(await this.getOrThrow(id));
+  }
+
+  private videoAlreadyAssigned(): never {
+    throw new AppException(
+      'Video is already assigned to a content item',
+      HttpStatus.CONFLICT,
+      'VIDEO_ALREADY_ASSIGNED_TO_CONTENT_ITEM',
+    );
   }
 
   async addAttachment(actor: RequestUser, id: string, assetId: string) {

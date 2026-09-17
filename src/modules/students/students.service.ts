@@ -726,6 +726,36 @@ export class StudentsService {
     return { temporaryPassword, passwordResetAt };
   }
 
+  async resetSession(actor: RequestUser, targetId: string) {
+    this.assertAdmin(actor);
+    await this.getStudentOrThrow(targetId);
+    const revokedAt = new Date();
+    const revoked = await this.prisma.$transaction(async (tx) => {
+      // Use the same lock as student login so a reset cannot race a newly
+      // created session between its active-session check and insert.
+      await tx.$executeRaw`
+        SELECT pg_advisory_xact_lock(hashtextextended(${targetId}, 0))
+      `;
+      const result = await tx.authSession.updateMany({
+        where: {
+          userId: targetId,
+          revoked: false,
+          expiresAt: { gt: revokedAt },
+        },
+        data: { revoked: true, revokedAt },
+      });
+      await this.auditService.recordWithClient(tx, {
+        actorUserId: actor.id,
+        action: 'STUDENT_SESSIONS_RESET',
+        targetType: 'User',
+        targetId,
+        metadata: { revokedSessionCount: result.count },
+      });
+      return result.count;
+    });
+    return { studentId: targetId, revokedSessionCount: revoked };
+  }
+
   private assertAdmin(actor: RequestUser) {
     if (actor.role !== Role.ADMIN && actor.role !== Role.SUPER_ADMIN) {
       throw new ForbiddenException('Forbidden');
