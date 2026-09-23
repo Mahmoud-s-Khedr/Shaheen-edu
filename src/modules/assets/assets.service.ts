@@ -21,6 +21,7 @@ import {
 } from '../../common/dto/pagination-query.dto';
 import type { AppConfig } from '../../config/configuration';
 import { PrismaService } from '../../database/prisma.service';
+import { isPrismaForeignKeyConstraintError } from '../../common/utils/prisma-errors';
 import { AuditService } from '../audit/audit.service';
 import { BunnyStorageProvider } from './bunny-storage.provider';
 
@@ -349,7 +350,16 @@ export class AssetsService {
     // concurrency-safe reference check: deleting the object first could leave
     // a live reference pointing at missing storage if a reference is created
     // between isReferenced() and this delete.
-    await this.prisma.asset.delete({ where: { id } });
+    try {
+      await this.prisma.asset.delete({ where: { id } });
+    } catch (error) {
+      // A new reference can be committed after isReferenced() completes.
+      // The database is authoritative in that race, including PostgreSQL's
+      // SQLSTATE 23001 RESTRICT violation surfaced by Prisma as unknown.
+      if (isPrismaForeignKeyConstraintError(error))
+        throw new ConflictException('Referenced assets cannot be deleted');
+      throw error;
+    }
     if (asset.storageKey)
       void this.storage.delete(asset.storageKey).catch(() => undefined);
     await this.audit.record({
@@ -409,6 +419,7 @@ export class AssetsService {
       snapshotContextBlocks,
       questionImportMedia,
       testimonials,
+      questionImportBatches = 0,
     ] = await this.prisma.$transaction([
       this.prisma.contentItem.count({ where: { primaryAssetId: id } }),
       this.prisma.assetReference.count({ where: { assetId: id } }),
@@ -436,6 +447,7 @@ export class AssetsService {
       }),
       this.prisma.questionImportMedia.count({ where: { assetId: id } }),
       this.prisma.testimonial.count({ where: { screenshotAssetId: id } }),
+      this.prisma.questionImportBatch.count({ where: { sourceAssetId: id } }),
     ]);
     const paymentProofs = await this.prisma.manualPaymentSubmission.count({
       where: { proofAssetId: id },
@@ -461,6 +473,7 @@ export class AssetsService {
         snapshotContextBlocks +
         questionImportMedia +
         testimonials +
+        questionImportBatches +
         paymentProofs >
       0
     );

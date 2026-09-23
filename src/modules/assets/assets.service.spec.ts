@@ -1,4 +1,9 @@
-import { BadRequestException, ForbiddenException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+} from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { AssetKind, AssetStatus, Role } from '../../common/types/roles.enum';
 import { AssetsService } from './assets.service';
 
@@ -47,6 +52,7 @@ function build() {
     assessmentQuestionOptionContentBlock: { count: jest.fn() },
     assessmentContextContentBlock: { count: jest.fn() },
     questionImportMedia: { count: jest.fn() },
+    questionImportBatch: { count: jest.fn() },
     testimonial: { count: jest.fn() },
     manualPaymentSubmission: { count: jest.fn().mockResolvedValue(0) },
     $transaction: jest.fn(),
@@ -117,6 +123,29 @@ describe('AssetsService direct uploads', () => {
     expect(prisma.questionImportMedia.count).toHaveBeenCalledWith({
       where: { assetId: 'media-asset-1' },
     });
+  });
+
+  it('rejects deletion of a question-import source asset as a conflict', async () => {
+    const { service, prisma } = build();
+    prisma.asset.findUnique.mockResolvedValue({
+      id: 'import-source-1',
+      kind: AssetKind.PDF,
+      video: null,
+    });
+    const references = new Array(21).fill(0);
+    references[20] = 1;
+    prisma.$transaction.mockResolvedValue(references);
+
+    await expect(
+      service.delete(admin, 'import-source-1'),
+    ).rejects.toMatchObject({
+      status: 409,
+      message: 'Referenced assets cannot be deleted',
+    });
+    expect(prisma.questionImportBatch.count).toHaveBeenCalledWith({
+      where: { sourceAssetId: 'import-source-1' },
+    });
+    expect(prisma.asset.delete).not.toHaveBeenCalled();
   });
 
   it('keeps an asset referenced by a testimonial screenshot', async () => {
@@ -271,6 +300,29 @@ describe('AssetsService direct uploads', () => {
     });
 
     expect(operations).toEqual(['database', 'storage']);
+  });
+
+  it('returns a conflict when a concurrent reference blocks deletion', async () => {
+    const { service, prisma, storage, audit } = build();
+    prisma.asset.findUnique.mockResolvedValue({
+      id: 'asset-1',
+      kind: AssetKind.PDF,
+      storageKey: 'assets/pdf/a.pdf',
+      video: null,
+    });
+    prisma.$transaction.mockResolvedValue(new Array(21).fill(0));
+    prisma.asset.delete.mockRejectedValue(
+      new Prisma.PrismaClientUnknownRequestError(
+        'PostgreSQL error: SQLSTATE 23001: restrict_violation',
+        { clientVersion: 'test' },
+      ),
+    );
+
+    await expect(service.delete(admin, 'asset-1')).rejects.toEqual(
+      new ConflictException('Referenced assets cannot be deleted'),
+    );
+    expect(storage.delete).not.toHaveBeenCalled();
+    expect(audit.record).not.toHaveBeenCalled();
   });
 
   it('retains an archived object for reference-safe asynchronous cleanup', async () => {

@@ -1697,14 +1697,15 @@ export class QuestionBanksService {
     this.admin(actor);
     const item = await this.question(id);
     if (
-      item.status !== QuestionStatus.DRAFT ||
-      item.options.length ||
-      item.assets.length ||
-      item.videoLink
+      item.status !== QuestionStatus.DRAFT &&
+      item.status !== QuestionStatus.ARCHIVED
     )
       throw new ConflictException(
-        'Only an unreferenced draft question can be deleted',
+        'Only a draft or archived question can be deleted',
       );
+    // Question-owned records (options, attachments, content blocks, and the
+    // video link) use database ON DELETE CASCADE relations. Their assets and
+    // video assets are deliberately retained.
     await this.prisma.question.delete({ where: { id } });
     await this.log(actor, 'QUESTION_DELETED', 'Question', id);
     return { id, deleted: true };

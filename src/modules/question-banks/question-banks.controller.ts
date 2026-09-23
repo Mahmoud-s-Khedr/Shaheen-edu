@@ -248,7 +248,7 @@ export class QuestionsController {
     return this.service.archiveQuestion(a, id);
   }
   @Delete(':id')
-  @ApiOperation({ summary: 'Delete an eligible draft question' })
+  @ApiOperation({ summary: 'Delete an eligible draft or archived question' })
   delete(@CurrentUser() a: RequestUser, @Param('id') id: string) {
     return this.service.deleteQuestion(a, id);
   }

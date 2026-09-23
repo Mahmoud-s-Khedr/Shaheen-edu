@@ -12591,7 +12591,7 @@
             "bearer": []
           }
         ],
-        "summary": "Delete an eligible draft question",
+        "summary": "Delete an eligible draft or archived question",
         "tags": [
           "admin/questions"
         ]

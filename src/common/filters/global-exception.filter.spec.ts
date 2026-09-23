@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { PinoLogger } from 'nestjs-pino';
 import { errorCodes } from 'fastify';
+import { Prisma } from '@prisma/client';
 import { GlobalExceptionFilter } from './global-exception.filter';
 import { AppException } from '../exceptions/app.exception';
 
@@ -118,6 +119,21 @@ describe('GlobalExceptionFilter', () => {
     ).toMatchObject({
       statusCode: 500,
       message: { en: 'Internal server error' },
+    });
+  });
+
+  it("maps Prisma's SQLSTATE foreign-key RESTRICT error to a conflict", () => {
+    expect(
+      respond(
+        new Prisma.PrismaClientUnknownRequestError(
+          'PostgreSQL error: SQLSTATE 23001: restrict_violation',
+          { clientVersion: 'test' },
+        ),
+      ),
+    ).toMatchObject({
+      statusCode: 409,
+      code: 'CONFLICT.FOREIGN_KEY_CONSTRAINT',
+      message: { en: 'The record is still referenced' },
     });
   });
 

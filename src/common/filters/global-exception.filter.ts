@@ -18,6 +18,7 @@ import {
 } from '../i18n/api-messages';
 import { normalizeCorrelationId } from '../logging/correlation-id';
 import { safeErrorRecord } from '../logging/error-record';
+import { isPrismaForeignKeyConstraintError } from '../utils/prisma-errors';
 
 interface ErrorResponseShape {
   statusCode: number;
@@ -58,6 +59,11 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       explicitCode = parserError.code;
     } else if (exception instanceof Prisma.PrismaClientKnownRequestError) {
       const mapped = this.mapPrismaError(exception.code);
+      statusCode = mapped.statusCode;
+      message = mapped.message;
+      explicitCode = mapped.code;
+    } else if (isPrismaForeignKeyConstraintError(exception)) {
+      const mapped = this.mapPrismaError('P2003');
       statusCode = mapped.statusCode;
       message = mapped.message;
       explicitCode = mapped.code;
