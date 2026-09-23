@@ -942,7 +942,7 @@ describe('Academic hierarchy (e2e)', () => {
       expect(nowAllowedDelete.statusCode).toBe(200);
     });
 
-    it('blocks deleting a non-draft (archived) record', async () => {
+    it('deletes an archived record', async () => {
       const grade = await app.inject({
         method: 'POST',
         url: '/api/v1/admin/academic-grades',
@@ -961,13 +961,20 @@ describe('Academic hierarchy (e2e)', () => {
       });
       const archived = await json(archive);
 
-      const deleteAttempt = await app.inject({
+      const deleteArchived = await app.inject({
         method: 'DELETE',
         url: `/api/v1/admin/academic-grades/${body.id}`,
         headers: authHeader(adminToken),
         payload: { version: archived.version },
       });
-      expect(deleteAttempt.statusCode).toBe(409);
+      expect(deleteArchived.statusCode).toBe(200);
+
+      const missing = await app.inject({
+        method: 'GET',
+        url: `/api/v1/admin/academic-grades/${body.id}`,
+        headers: authHeader(adminToken),
+      });
+      expect(missing.statusCode).toBe(404);
     });
   });
 });

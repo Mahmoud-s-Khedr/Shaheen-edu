@@ -121,7 +121,9 @@ export class AcademicGradesController {
   }
 
   @Delete(':id')
-  @ApiOperation({ summary: 'Delete an eligible draft academic grade' })
+  @ApiOperation({
+    summary: 'Delete an eligible draft or archived academic grade',
+  })
   @ApiStandardErrors(401, 403, 404, 409)
   delete(@CurrentUser() actor: RequestUser, @Param('id') id: string) {
     return this.academicGradesService.delete(actor, id);

@@ -3426,7 +3426,7 @@
             "bearer": []
           }
         ],
-        "summary": "Delete an eligible draft academic grade",
+        "summary": "Delete an eligible draft or archived academic grade",
         "tags": [
           "admin/academic-grades"
         ]
@@ -4223,7 +4223,7 @@
             "bearer": []
           }
         ],
-        "summary": "Delete an eligible draft subject",
+        "summary": "Delete an eligible draft or archived subject",
         "tags": [
           "admin/subjects"
         ]
@@ -5290,7 +5290,7 @@
             "bearer": []
           }
         ],
-        "summary": "Delete an eligible draft course",
+        "summary": "Delete an eligible draft or archived course",
         "tags": [
           "admin/courses"
         ]
@@ -6154,7 +6154,7 @@
             "bearer": []
           }
         ],
-        "summary": "Delete an eligible draft chapter",
+        "summary": "Delete an eligible draft or archived chapter",
         "tags": [
           "admin/chapters"
         ]
@@ -7018,7 +7018,7 @@
             "bearer": []
           }
         ],
-        "summary": "Delete an eligible draft lesson",
+        "summary": "Delete an eligible draft or archived lesson",
         "tags": [
           "admin/lessons"
         ]
@@ -7882,7 +7882,7 @@
             "bearer": []
           }
         ],
-        "summary": "Delete an eligible draft section",
+        "summary": "Delete an eligible draft or archived section",
         "tags": [
           "admin/sections"
         ]
@@ -8652,7 +8652,7 @@
             "bearer": []
           }
         ],
-        "summary": "Delete an eligible draft content item",
+        "summary": "Delete an eligible draft or archived content item",
         "tags": [
           "admin/content-items"
         ]
@@ -11788,7 +11788,7 @@
             "bearer": []
           }
         ],
-        "summary": "Delete an eligible draft question source",
+        "summary": "Delete an eligible draft or archived question source",
         "tags": [
           "admin/question-banks"
         ]
@@ -12064,7 +12064,7 @@
             "bearer": []
           }
         ],
-        "summary": "Delete an eligible draft question bank",
+        "summary": "Delete an eligible draft or archived question bank",
         "tags": [
           "admin/question-banks"
         ]
@@ -18790,7 +18790,7 @@
             "bearer": []
           }
         ],
-        "summary": "Delete a never-published draft assessment",
+        "summary": "Delete a draft or archived assessment",
         "tags": [
           "admin/assessments"
         ]
@@ -24742,7 +24742,7 @@
             "bearer": []
           }
         ],
-        "summary": "Delete a testimonial draft",
+        "summary": "Delete a draft or archived testimonial",
         "tags": [
           "admin/testimonials"
         ]

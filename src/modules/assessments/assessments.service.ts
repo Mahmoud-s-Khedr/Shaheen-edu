@@ -3867,9 +3867,12 @@ export class AssessmentsService {
   async deleteAdmin(actor: RequestUser, id: string) {
     this.assertAdmin(actor);
     const assessment = await this.adminAssessment(id);
-    if (assessment.status !== AssessmentStatus.DRAFT)
+    if (
+      assessment.status !== AssessmentStatus.DRAFT &&
+      assessment.status !== AssessmentStatus.ARCHIVED
+    )
       throw new ConflictException(
-        'Only a never-published draft assessment can be deleted',
+        'Only a draft or archived assessment can be deleted',
       );
     await this.prisma.assessment.delete({ where: { id } });
     await this.log(actor, 'ASSESSMENT_DELETED', id);

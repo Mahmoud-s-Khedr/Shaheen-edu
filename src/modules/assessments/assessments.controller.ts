@@ -460,7 +460,7 @@ export class AdminAssessmentsController {
   }
 
   @Delete(':id')
-  @ApiOperation({ summary: 'Delete a never-published draft assessment' })
+  @ApiOperation({ summary: 'Delete a draft or archived assessment' })
   @ApiOkResponse({ type: IdDeletedResponseDto })
   @ApiStandardErrors(401, 403, 404, 409)
   remove(@CurrentUser() user: RequestUser, @Param('id') id: string) {

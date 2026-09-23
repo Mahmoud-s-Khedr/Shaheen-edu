@@ -137,7 +137,7 @@ export class ChaptersController {
   }
 
   @Delete(':id')
-  @ApiOperation({ summary: 'Delete an eligible draft chapter' })
+  @ApiOperation({ summary: 'Delete an eligible draft or archived chapter' })
   @ApiStandardErrors(401, 403, 404, 409)
   delete(@CurrentUser() actor: RequestUser, @Param('id') id: string) {
     return this.chaptersService.delete(actor, id);

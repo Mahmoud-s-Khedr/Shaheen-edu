@@ -236,9 +236,9 @@ invalid.
 { "screenshotAssetId": null, "screenshotAltText": null }
 ```
 
-Only drafts can be deleted. Archive retains the record; restore puts it back
-into `DRAFT` and appends it to the end of the active ordering. Do not offer a
-delete button for published or archived records.
+Draft and archived testimonials can be deleted. Archive retains the record;
+restore puts it back into `DRAFT` and appends it to the end of the active
+ordering. Do not offer a delete button for published records.
 
 Use the existing direct asset flow before saving a screenshot:
 

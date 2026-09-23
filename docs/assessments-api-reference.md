@@ -123,7 +123,7 @@ collection. Both must be published before a question can pass review.
 | `POST /admin/question-banks/sources/:id/publish` | —                                                                                | Make it available for question review. |
 | `POST /admin/question-banks/sources/:id/archive` | —                                                                                | Archive an unused source.              |
 | `POST /admin/question-banks/sources/:id/restore` | —                                                                                | Restore an archived source to `DRAFT`. |
-| `DELETE /admin/question-banks/sources/:id`       | —                                                                                | Delete an unreferenced draft source.   |
+| `DELETE /admin/question-banks/sources/:id`       | —                                                                                | Delete an unreferenced draft or archived source.   |
 
 Recorded creation request and response:
 
@@ -173,7 +173,7 @@ publisher relationship was omitted.
 | `POST /admin/question-banks/:id/publish` | —                               | Publish it for question review.    |
 | `POST /admin/question-banks/:id/archive` | —                               | Archive an unused bank.            |
 | `POST /admin/question-banks/:id/restore` | —                               | Restore it to `DRAFT`.             |
-| `DELETE /admin/question-banks/:id`       | —                               | Delete an unreferenced draft bank. |
+| `DELETE /admin/question-banks/:id`       | —                               | Delete an unreferenced draft or archived bank. |
 
 ```http
 POST /api/v1/admin/question-banks
@@ -214,7 +214,7 @@ recorded journey returned `409 Conflict` for both cases.
 | `POST /admin/questions/bulk-publish` | `{ "questionIds": ["…"] }` (1–300 unique IDs)                                             | Directly publish valid draft, rejected, or in-review questions; reports per-ID failures. |
 | `POST /admin/questions/:id/reject`   | `reviewNote`                                                                              | Return an in-review question for revision.                                               |
 | `POST /admin/questions/:id/archive`  | —                                                                                         | Archive a question.                                                                      |
-| `DELETE /admin/questions/:id`        | —                                                                                         | Delete an unreferenced draft question.                                                   |
+| `DELETE /admin/questions/:id`        | —                                                                                         | Delete an unreferenced draft or archived question.                                       |
 
 Each placement must contain exactly one of `courseId`, `chapterId`, `lessonId`,
 or `sectionId`, and each placement must belong to the question's `courseId`.
@@ -612,7 +612,7 @@ autosaving after expiry causes the API to finalize the attempt.
 | `PATCH /admin/assessments/:id`        | `title?`, `mode?`, `isTimed?`, `durationSeconds?`                  | Edit a draft.                                     |
 | `POST /admin/assessments/:id/publish` | —                                                                  | Move a draft to `READY`.                          |
 | `POST /admin/assessments/:id/archive` | —                                                                  | Move a ready assessment to `ARCHIVED`.            |
-| `DELETE /admin/assessments/:id`       | —                                                                  | Delete a never-published draft.                   |
+| `DELETE /admin/assessments/:id`       | —                                                                  | Delete a draft or archived assessment.             |
 
 An admin standard assessment uses the same eligible published-question pool as
 student generation but is created as `DRAFT`. The admin detail/create response
@@ -665,8 +665,9 @@ This returned `generationType: "CUSTOM"`, `mode: "TUTOR"`, and `status:
 must be unique, published, and have a published placement inside one supplied
 scope.
 
-Only `DRAFT` assessments can be edited or deleted. Publishing changes
-`DRAFT → READY`; archiving changes `READY → ARCHIVED`.
+Only `DRAFT` assessments can be edited. `DRAFT` and `ARCHIVED` assessments can
+be deleted. Publishing changes `DRAFT → READY`; archiving changes
+`READY → ARCHIVED`.
 
 ## 4. Public-assessment visibility and frontend integration checklist
 
@@ -1136,7 +1137,7 @@ no
 - Request: `POST /api/v1/admin/assessments/cmsksbe0m00tgnw01bn7mlihq/archive` (no body)
 - Response — `201 Created`: `{ "id": "cmsksbe0m00tgnw01bn7mlihq", "status": "ARCHIVED", "archivedAt": "2026-08-08T19:46:41.504Z" }`
 
-#### Delete a draft assessment — `DELETE /admin/assessments/:id`
+#### Delete a draft or archived assessment — `DELETE /admin/assessments/:id`
 
 - Request: `DELETE /api/v1/admin/assessments/cmsksbd6h00synw01ebpt732i` (no body)
 - Response — `200 OK`: `{ "id": "cmsksbd6h00synw01ebpt732i", "deleted": true }`

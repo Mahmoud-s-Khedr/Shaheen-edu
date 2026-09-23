@@ -480,8 +480,15 @@ export class QuestionBanksService {
     id: string,
   ) {
     this.admin(actor);
-    if (kind === 'source') await this.draftSource(id);
-    else await this.draftBank(id);
+    const resource =
+      kind === 'source' ? await this.source(id) : await this.bank(id);
+    if (
+      resource.status !== ContentStatus.DRAFT &&
+      resource.status !== ContentStatus.ARCHIVED
+    )
+      throw new ConflictException(
+        'Only draft or archived source and bank records can be deleted',
+      );
     if (
       await this.prisma.question.count({
         where: { [kind === 'source' ? 'sourceId' : 'bankId']: id },

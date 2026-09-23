@@ -142,7 +142,9 @@ export class ContentItemsController {
   }
 
   @Delete(':id')
-  @ApiOperation({ summary: 'Delete an eligible draft content item' })
+  @ApiOperation({
+    summary: 'Delete an eligible draft or archived content item',
+  })
   delete(@CurrentUser() actor: RequestUser, @Param('id') id: string) {
     return this.contentItemsService.delete(actor, id);
   }

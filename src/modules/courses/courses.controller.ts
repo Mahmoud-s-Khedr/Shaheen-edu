@@ -137,7 +137,7 @@ export class CoursesController {
   }
 
   @Delete(':id')
-  @ApiOperation({ summary: 'Delete an eligible draft course' })
+  @ApiOperation({ summary: 'Delete an eligible draft or archived course' })
   @ApiStandardErrors(401, 403, 404, 409)
   delete(@CurrentUser() actor: RequestUser, @Param('id') id: string) {
     return this.coursesService.delete(actor, id);

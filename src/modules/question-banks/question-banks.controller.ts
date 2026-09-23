@@ -97,7 +97,9 @@ export class QuestionBanksController {
     return this.service.restoreResource(a, 'source', id);
   }
   @Delete('sources/:id')
-  @ApiOperation({ summary: 'Delete an eligible draft question source' })
+  @ApiOperation({
+    summary: 'Delete an eligible draft or archived question source',
+  })
   deleteSource(@CurrentUser() a: RequestUser, @Param('id') id: string) {
     return this.service.deleteResource(a, 'source', id);
   }
@@ -142,7 +144,9 @@ export class QuestionBanksController {
     return this.service.restoreResource(a, 'bank', id);
   }
   @Delete(':id')
-  @ApiOperation({ summary: 'Delete an eligible draft question bank' })
+  @ApiOperation({
+    summary: 'Delete an eligible draft or archived question bank',
+  })
   deleteBank(@CurrentUser() a: RequestUser, @Param('id') id: string) {
     return this.service.deleteResource(a, 'bank', id);
   }

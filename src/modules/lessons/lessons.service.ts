@@ -457,8 +457,13 @@ export class LessonsService {
   async delete(actor: RequestUser, id: string): Promise<void> {
     this.assertActorRole(actor);
     const record = await this.getOrThrow(id);
-    if (record.status !== ContentStatus.DRAFT) {
-      throw new ConflictException('Only a draft lesson can be deleted');
+    if (
+      record.status !== ContentStatus.DRAFT &&
+      record.status !== ContentStatus.ARCHIVED
+    ) {
+      throw new ConflictException(
+        'Only a draft or archived lesson can be deleted',
+      );
     }
 
     const childCount = await this.prisma.section.count({
@@ -468,7 +473,10 @@ export class LessonsService {
       throw new ConflictException('Cannot delete a lesson with sections');
     }
     await this.prisma.lesson.deleteMany({
-      where: { id, status: ContentStatus.DRAFT },
+      where: {
+        id,
+        status: { in: [ContentStatus.DRAFT, ContentStatus.ARCHIVED] },
+      },
     });
 
     await this.auditService.record({

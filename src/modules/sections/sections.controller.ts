@@ -136,7 +136,7 @@ export class SectionsController {
   }
 
   @Delete(':id')
-  @ApiOperation({ summary: 'Delete an eligible draft section' })
+  @ApiOperation({ summary: 'Delete an eligible draft or archived section' })
   @ApiStandardErrors(401, 403, 404, 409)
   delete(@CurrentUser() actor: RequestUser, @Param('id') id: string) {
     return this.sectionsService.delete(actor, id);

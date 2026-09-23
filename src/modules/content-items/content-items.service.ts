@@ -721,10 +721,18 @@ export class ContentItemsService {
   async delete(actor: RequestUser, id: string): Promise<void> {
     this.assertActorRole(actor);
     const item = await this.getOrThrow(id);
-    if (item.status !== ContentStatus.DRAFT)
-      throw new ConflictException('Only a draft content item can be deleted');
+    if (
+      item.status !== ContentStatus.DRAFT &&
+      item.status !== ContentStatus.ARCHIVED
+    )
+      throw new ConflictException(
+        'Only a draft or archived content item can be deleted',
+      );
     await this.prisma.contentItem.deleteMany({
-      where: { id, status: ContentStatus.DRAFT },
+      where: {
+        id,
+        status: { in: [ContentStatus.DRAFT, ContentStatus.ARCHIVED] },
+      },
     });
     await this.auditService.record({
       actorUserId: actor.id,

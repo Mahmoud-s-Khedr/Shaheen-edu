@@ -354,8 +354,13 @@ export class TestimonialsService {
   async delete(actor: RequestUser, id: string) {
     this.assertAdmin(actor);
     const existing = await this.getOrThrow(id);
-    if (existing.status !== ContentStatus.DRAFT)
-      throw new ConflictException('Only a draft testimonial can be deleted');
+    if (
+      existing.status !== ContentStatus.DRAFT &&
+      existing.status !== ContentStatus.ARCHIVED
+    )
+      throw new ConflictException(
+        'Only a draft or archived testimonial can be deleted',
+      );
     await this.prisma.testimonial.delete({ where: { id } });
     await this.audit.record({
       actorUserId: actor.id,

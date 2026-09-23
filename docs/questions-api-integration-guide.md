@@ -483,7 +483,7 @@ The question changes to `REJECTED`. The frontend should display the review note 
 | Method and endpoint                         | Request | Response/job                                                                            |
 | ------------------------------------------- | ------- | --------------------------------------------------------------------------------------- |
 | `POST /admin/questions/:questionId/archive` | No body | Moves the question to `ARCHIVED`; it is no longer selected for future student activity. |
-| `DELETE /admin/questions/:questionId`       | No body | Permanently deletes only an unreferenced draft question.                                |
+| `DELETE /admin/questions/:questionId`       | No body | Permanently deletes a draft or archived question.                                       |
 
 ## 9. AI question import
 
@@ -812,7 +812,7 @@ Every question ID must refer to a published question with a published placement 
 | `PATCH /admin/assessments/:assessmentId`        | Any subset of `title`, `mode`, `isTimed`, `durationSeconds` | Updated draft assessment.                                                          |
 | `POST /admin/assessments/:assessmentId/publish` | No body                                                     | Publishes the assessment and makes it available according to its visibility rules. |
 | `POST /admin/assessments/:assessmentId/archive` | No body                                                     | Archives the assessment.                                                           |
-| `DELETE /admin/assessments/:assessmentId`       | No body                                                     | Deletes a never-published draft assessment.                                        |
+| `DELETE /admin/assessments/:assessmentId`       | No body                                                     | Deletes a draft or archived assessment.                                            |
 
 ## 13. Student assessment attempt
 

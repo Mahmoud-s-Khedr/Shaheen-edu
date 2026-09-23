@@ -111,7 +111,7 @@ export class TestimonialsController {
   }
 
   @Delete(':id')
-  @ApiOperation({ summary: 'Delete a testimonial draft' })
+  @ApiOperation({ summary: 'Delete a draft or archived testimonial' })
   @ApiStandardErrors(401, 403, 404, 409)
   delete(@CurrentUser() actor: RequestUser, @Param('id') id: string) {
     return this.testimonials.delete(actor, id);

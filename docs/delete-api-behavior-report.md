@@ -20,21 +20,21 @@ is student-account deletion, which requires a reason.
 
 ## Curriculum and admin content
 
-All of these are hard database deletes, restricted to drafts. Published and
-archived records must be archived/restored through their respective `POST`
-endpoints instead.
+All of these are hard database deletes, allowed for drafts and archived
+records. Published records must be archived through their respective `POST`
+endpoints before they can be deleted.
 
 | Endpoint | Explicit checks and result |
 | --- | --- |
-| `DELETE /admin/academic-grades/:id` | Draft only. Refuses if any `SubjectGrade` exists. Then calls `academicGrade.deleteMany`; writes `GRADE_DELETED`. Evidence: `src/modules/academic-grades/academic-grades.service.ts:351`. |
-| `DELETE /admin/subjects/:id` | Draft only. Refuses if it has courses; logs `SUBJECT_DELETED`. It does not explicitly check grade assignments, though those are database `Restrict` relations and can still prevent deletion. Evidence: `src/modules/subjects/subjects.service.ts:618`, `prisma/schema.prisma:792`. |
-| `DELETE /admin/courses/:id` | Draft only. Refuses if it has chapters; logs `COURSE_DELETED`. Other dependent records are left to database constraints. Evidence: `src/modules/courses/courses.service.ts:484`. |
-| `DELETE /admin/chapters/:id` | Draft only. Refuses if it has lessons; logs `CHAPTER_DELETED`. Evidence: `src/modules/chapters/chapters.service.ts:484`. |
-| `DELETE /admin/lessons/:id` | Draft only. Refuses if it has sections; logs `LESSON_DELETED`. Evidence: `src/modules/lessons/lessons.service.ts:457`. |
-| `DELETE /admin/sections/:id` | Draft only, with no application-level child-count check; logs `SECTION_DELETED`. References such as placements may still block it at the database level. Evidence: `src/modules/sections/sections.service.ts:451`. |
-| `DELETE /admin/content-items/:id` | Draft only; hard-deletes the content item and logs `CONTENT_ITEM_DELETED`. Database cascades remove its placement, asset-reference rows, video-outline data, and student progress/study-state rows. Evidence: `src/modules/content-items/content-items.service.ts:719`, `prisma/schema.prisma:1063`, `prisma/schema.prisma:2301`. |
+| `DELETE /admin/academic-grades/:id` | Draft or archived. Refuses if any `SubjectGrade` exists. Then calls `academicGrade.deleteMany`; writes `GRADE_DELETED`. Evidence: `src/modules/academic-grades/academic-grades.service.ts:351`. |
+| `DELETE /admin/subjects/:id` | Draft or archived. Refuses if it has courses; logs `SUBJECT_DELETED`. It does not explicitly check grade assignments, though those are database `Restrict` relations and can still prevent deletion. Evidence: `src/modules/subjects/subjects.service.ts:618`, `prisma/schema.prisma:792`. |
+| `DELETE /admin/courses/:id` | Draft or archived. Refuses if it has chapters; logs `COURSE_DELETED`. Other dependent records are left to database constraints. Evidence: `src/modules/courses/courses.service.ts:484`. |
+| `DELETE /admin/chapters/:id` | Draft or archived. Refuses if it has lessons; logs `CHAPTER_DELETED`. Evidence: `src/modules/chapters/chapters.service.ts:484`. |
+| `DELETE /admin/lessons/:id` | Draft or archived. Refuses if it has sections; logs `LESSON_DELETED`. Evidence: `src/modules/lessons/lessons.service.ts:457`. |
+| `DELETE /admin/sections/:id` | Draft or archived, with no application-level child-count check; logs `SECTION_DELETED`. References such as placements may still block it at the database level. Evidence: `src/modules/sections/sections.service.ts:451`. |
+| `DELETE /admin/content-items/:id` | Draft or archived; hard-deletes the content item and logs `CONTENT_ITEM_DELETED`. Database cascades remove its placement, asset-reference rows, video-outline data, and student progress/study-state rows. Evidence: `src/modules/content-items/content-items.service.ts:719`, `prisma/schema.prisma:1063`, `prisma/schema.prisma:2301`. |
 | `DELETE /admin/content-items/:id/attachments/:assetId` | **Unlinks only**: deletes the `AssetReference`, compacts attachment ordering, and logs `CONTENT_ATTACHMENT_REMOVED`. It does not delete the Asset file/row. The service returns no payload. Evidence: `src/modules/content-items/content-items.service.ts:788`. |
-| `DELETE /admin/testimonials/:id` | Draft only; hard-deletes the testimonial and logs `TESTIMONIAL_DELETED`; returns `{ id, deleted: true }`. Evidence: `src/modules/testimonials/testimonials.service.ts:354`. |
+| `DELETE /admin/testimonials/:id` | Draft or archived; hard-deletes the testimonial and logs `TESTIMONIAL_DELETED`; returns `{ id, deleted: true }`. Evidence: `src/modules/testimonials/testimonials.service.ts:354`. |
 | `DELETE /admin/subjects/:subjectId/constants/:id` | Hard-deletes the constant only after confirming it belongs to the stated subject; logs `SUBJECT_CONSTANT_DELETED`; returns `{ id, deleted: true }`. Evidence: `src/modules/subjects/subject-constants.service.ts:126`. |
 
 The hierarchy/content-item handlers resolve `void`, so their successful response
@@ -47,14 +47,14 @@ is the framework’s default empty `200` response rather than `{ deleted: true }
 | `DELETE /student/assessments/question-marks/:questionId` | Removes the current student’s mark with `deleteMany` and returns `{ questionId, marked: false }`. It is effectively idempotent if no mark exists. Evidence: `src/modules/assessments/assessments.service.ts:1301`. |
 | `DELETE /student/assessments/question-notes/:questionId` | First verifies the question is accessible, then deletes only the current student’s note. It returns `{ questionId, deleted: true }`, even when no note existed. Evidence: `src/modules/assessments/assessments.service.ts:1361`. |
 | `DELETE /student/assessments/:id` | Hard-deletes an assessment only if it is student-owned by the caller; otherwise `403`. There is **no status or attempt-history guard**. Database cascades remove its scopes, snapshot questions, attempts, answers, and related assessment children. Returns `{ id, deleted: true }`. Evidence: `src/modules/assessments/assessments.service.ts:1971`, `prisma/schema.prisma:1826`, `prisma/schema.prisma:2041`. |
-| `DELETE /admin/assessments/:id` | Hard-deletes an admin assessment only if its current status is `DRAFT`; logs `ASSESSMENT_DELETED`; returns `{ id, deleted: true }`. The OpenAPI wording says “never-published,” but the implementation checks only `status === DRAFT`, not `publishedAt`. Evidence: `src/modules/assessments/assessments.service.ts:3867`. |
+| `DELETE /admin/assessments/:id` | Hard-deletes an admin assessment only if its current status is `DRAFT` or `ARCHIVED`; logs `ASSESSMENT_DELETED`; returns `{ id, deleted: true }`. Evidence: `src/modules/assessments/assessments.service.ts:3867`. |
 
 ## Question bank and question authoring
 
 | Endpoint | Actual behavior |
 | --- | --- |
-| `DELETE /admin/question-banks/sources/:id` | Draft source only; refuses if any live `Question` references it; hard-deletes and audit-logs `QUESTION_SOURCE_DELETED`. Returns `{ id, deleted: true }`. Evidence: `src/modules/question-banks/question-banks.service.ts:476`. |
-| `DELETE /admin/question-banks/:id` | Same as source deletion, but for a question bank; refuses if referenced by any `Question`; logs `QUESTION_BANK_DELETED`. Evidence: `src/modules/question-banks/question-banks.service.ts:476`. |
+| `DELETE /admin/question-banks/sources/:id` | Draft or archived source only; refuses if any live `Question` references it; hard-deletes and audit-logs `QUESTION_SOURCE_DELETED`. Returns `{ id, deleted: true }`. Evidence: `src/modules/question-banks/question-banks.service.ts:476`. |
+| `DELETE /admin/question-banks/:id` | Same as source deletion, but for a draft or archived question bank; refuses if referenced by any `Question`; logs `QUESTION_BANK_DELETED`. Evidence: `src/modules/question-banks/question-banks.service.ts:476`. |
 | `DELETE /admin/questions/contexts/:contextId` | Refuses if any question uses the reusable context. Otherwise hard-deletes it and logs `QUESTION_CONTEXT_DELETED`. Evidence: `src/modules/question-banks/question-banks.service.ts:1389`. |
 | `DELETE /admin/questions/:id` | Draft or archived only. Hard-deletes the question and logs `QUESTION_DELETED`. Database cascades delete question-owned rows, including options, attachment rows, content blocks, and the video link; referenced Asset and VideoAsset records remain. Non-cascading references, such as student attempts or question reports, still prevent deletion. |
 | `DELETE /admin/questions/:id/options/:optionId` | Deletes an option only when the question is editable—anything except `PUBLISHED` or `ARCHIVED`. It decrements later option sort orders, invalidates the structured explanation, logs the action, and returns the updated question. Evidence: `src/modules/question-banks/question-banks.service.ts:1763`, `src/modules/question-banks/question-banks.service.ts:200`. |

@@ -298,6 +298,26 @@ const translations: Record<string, string> = {
   'Cannot delete a subject with courses': 'لا يمكن حذف موضوع مع الدورات',
   'Cannot delete an academic grade with subjects':
     'لا يمكن حذف الدرجة الأكاديمية مع المواد',
+  'Only a draft or archived academic grade can be deleted':
+    'لا يمكن حذف الدرجة الأكاديمية إلا إذا كانت مسودة أو مؤرشفة',
+  'Only a draft or archived subject can be deleted':
+    'لا يمكن حذف المادة إلا إذا كانت مسودة أو مؤرشفة',
+  'Only a draft or archived course can be deleted':
+    'لا يمكن حذف المقرر إلا إذا كان مسودة أو مؤرشفاً',
+  'Only a draft or archived chapter can be deleted':
+    'لا يمكن حذف الفصل إلا إذا كان مسودة أو مؤرشفاً',
+  'Only a draft or archived lesson can be deleted':
+    'لا يمكن حذف الدرس إلا إذا كان مسودة أو مؤرشفاً',
+  'Only a draft or archived section can be deleted':
+    'لا يمكن حذف القسم إلا إذا كان مسودة أو مؤرشفاً',
+  'Only a draft or archived content item can be deleted':
+    'لا يمكن حذف عنصر المحتوى إلا إذا كان مسودة أو مؤرشفاً',
+  'Only a draft or archived testimonial can be deleted':
+    'لا يمكن حذف الشهادة إلا إذا كانت مسودة أو مؤرشفة',
+  'Only a draft or archived assessment can be deleted':
+    'لا يمكن حذف التقييم إلا إذا كان مسودة أو مؤرشفاً',
+  'Only draft or archived source and bank records can be deleted':
+    'لا يمكن حذف سجلات المصدر والبنك إلا إذا كانت مسودة أو مؤرشفة',
   'Cannot move into an archived academic grade':
     'لا يمكن الانتقال إلى الصف الأكاديمي المؤرشف',
   'Cannot move into an archived chapter': 'لا يمكن الانتقال إلى الفصل المؤرشف',
