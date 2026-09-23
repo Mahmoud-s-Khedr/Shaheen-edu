@@ -976,5 +976,45 @@ describe('Academic hierarchy (e2e)', () => {
       });
       expect(missing.statusCode).toBe(404);
     });
+
+    it('removes grade assignments when deleting a subject', async () => {
+      const grade = await app.inject({
+        method: 'POST',
+        url: '/api/v1/admin/academic-grades',
+        headers: authHeader(adminToken),
+        payload: {
+          title: {
+            ar: 'Subject deletion grade',
+            en: 'Subject deletion grade',
+          },
+        },
+      });
+      const gradeBody = await json(grade);
+
+      const subject = await app.inject({
+        method: 'POST',
+        url: '/api/v1/admin/subjects',
+        headers: authHeader(adminToken),
+        payload: {
+          title: 'Subject whose grade assignment is deleted',
+          academicGradeIds: [gradeBody.id],
+        },
+      });
+      const subjectBody = await json(subject);
+
+      const deleteSubject = await app.inject({
+        method: 'DELETE',
+        url: `/api/v1/admin/subjects/${subjectBody.id}`,
+        headers: authHeader(adminToken),
+      });
+      expect(deleteSubject.statusCode).toBe(200);
+
+      const deleteGrade = await app.inject({
+        method: 'DELETE',
+        url: `/api/v1/admin/academic-grades/${gradeBody.id}`,
+        headers: authHeader(adminToken),
+      });
+      expect(deleteGrade.statusCode).toBe(200);
+    });
   });
 });

@@ -633,11 +633,22 @@ export class SubjectsService {
     if (childCount > 0) {
       throw new ConflictException('Cannot delete a subject with courses');
     }
-    await this.prisma.subject.deleteMany({
-      where: {
-        id,
-        status: { in: [ContentStatus.DRAFT, ContentStatus.ARCHIVED] },
-      },
+    await this.prisma.$transaction(async (tx) => {
+      // A subject normally belongs to at least one grade. Remove those join
+      // records as part of the same operation so neither the subject nor its
+      // grades are left permanently undeletable by the restrictive FK.
+      await tx.subjectGrade.deleteMany({ where: { subjectId: id } });
+      const deleted = await tx.subject.deleteMany({
+        where: {
+          id,
+          status: { in: [ContentStatus.DRAFT, ContentStatus.ARCHIVED] },
+        },
+      });
+      if (deleted.count !== 1) {
+        throw new ConflictException(
+          'Only a draft or archived subject can be deleted',
+        );
+      }
     });
 
     await this.auditService.record({

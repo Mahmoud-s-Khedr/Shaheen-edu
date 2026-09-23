@@ -277,3 +277,14 @@ docker compose up -d --wait --force-recreate --scale api=1 api worker
 docker compose ps
 docker compose logs --tail=100 api worker
 curl --fail-with-body http://127.0.0.1:13000/health/ready
+
+
+# tldr
+
+  docker compose --env-file .env config --quiet
+  docker compose build migrate api worker
+  sudo env PROJECT_DIR="$PWD" ./scripts/release-with-backup.sh
+  docker compose up -d --wait --force-recreate --scale api=1 api worker
+  docker compose ps
+  docker compose logs --tail=100 api worker
+  curl --fail-with-body http://127.0.0.1:13000/health/ready
