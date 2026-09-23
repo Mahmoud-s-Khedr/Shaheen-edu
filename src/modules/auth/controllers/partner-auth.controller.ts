@@ -25,7 +25,7 @@ export class PartnerAuthController {
   @Post('login')
   @ApiOperation({
     summary: 'Log in as a partner',
-    description: 'Sets an HttpOnly refresh_token cookie on success.',
+    description: 'Sets an HttpOnly admin_refresh_token cookie on success.',
   })
   @ApiCreatedResponse({
     type: AuthTokenResponseDto,
@@ -46,7 +46,7 @@ export class PartnerAuthController {
       userAgent: req.headers['user-agent'],
       purpose: 'partner-login',
     });
-    setRefreshCookie(reply, result.refreshToken, this.configService);
+    setRefreshCookie(reply, result.refreshToken, this.configService, 'admin');
     return { accessToken: result.accessToken, user: result.user };
   }
 }

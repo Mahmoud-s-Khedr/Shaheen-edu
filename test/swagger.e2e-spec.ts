@@ -20,10 +20,19 @@ describe('Swagger (e2e)', () => {
     expect(response.statusCode).toBe(200);
     const document = JSON.parse(response.body);
 
-    expect(document.components.securitySchemes.refresh_token).toMatchObject({
+    expect(document.components.securitySchemes.app_refresh_token).toMatchObject(
+      {
+        type: 'apiKey',
+        in: 'cookie',
+        name: 'app_refresh_token',
+      },
+    );
+    expect(
+      document.components.securitySchemes.admin_refresh_token,
+    ).toMatchObject({
       type: 'apiKey',
       in: 'cookie',
-      name: 'refresh_token',
+      name: 'admin_refresh_token',
     });
     expect(document.paths['/api/v1/admin/admins'].get.parameters).toEqual(
       expect.arrayContaining([
@@ -269,7 +278,12 @@ describe('Swagger (e2e)', () => {
 
     const refresh = document.paths['/api/v1/auth/refresh'].post;
     expect(refresh.summary).toBe('Refresh user access token');
-    expect(refresh.security).toEqual([{ refresh_token: [] }]);
+    expect(refresh.security).toEqual(
+      expect.arrayContaining([
+        { app_refresh_token: [] },
+        { admin_refresh_token: [] },
+      ]),
+    );
     expect(refresh.responses).toMatchObject({
       201: expect.objectContaining({
         headers: expect.objectContaining({ 'Set-Cookie': expect.any(Object) }),

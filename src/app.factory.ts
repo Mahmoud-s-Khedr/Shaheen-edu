@@ -101,9 +101,14 @@ export async function createApp(
       .setVersion('1.0')
       .addBearerAuth()
       .addCookieAuth(
-        'refresh_token',
+        'app_refresh_token',
         { type: 'apiKey', in: 'cookie' },
-        'refresh_token',
+        'app_refresh_token',
+      )
+      .addCookieAuth(
+        'admin_refresh_token',
+        { type: 'apiKey', in: 'cookie' },
+        'admin_refresh_token',
       )
       .build();
     SwaggerModule.setup(

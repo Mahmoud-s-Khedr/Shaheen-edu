@@ -27,8 +27,12 @@ import { PasswordService } from '../services/password.service';
 import { AuthRateLimitService } from '../services/auth-rate-limit.service';
 import { ChangePasswordDto } from '../dto/change-password.dto';
 import {
-  REFRESH_COOKIE_NAME,
+  ADMIN_REFRESH_COOKIE_NAME,
+  APP_REFRESH_COOKIE_NAME,
   clearRefreshCookie,
+  refreshCookieName,
+  refreshCookieScopeForRequest,
+  refreshCookieScopeForRole,
   setRefreshCookie,
 } from '../utils/refresh-cookie.util';
 import type { RequestUser } from '../../../common/types/request-with-user.types';
@@ -56,15 +60,18 @@ export class SharedAuthController {
   @ApiOperation({
     summary: 'Refresh user access token',
     description:
-      'Rotates the HttpOnly refresh_token cookie and returns a new bearer access token.',
+      'Rotates the app or admin HttpOnly refresh cookie for its exact production frontend Origin and returns a new bearer access token.',
   })
-  @ApiCookieAuth('refresh_token')
+  @ApiCookieAuth(APP_REFRESH_COOKIE_NAME)
+  @ApiCookieAuth(ADMIN_REFRESH_COOKIE_NAME)
   @ApiCreatedResponse({
     type: AuthTokenResponseDto,
-    description: 'Access token issued and refresh_token cookie rotated.',
+    description:
+      'Access token issued and the application-specific refresh cookie rotated.',
     headers: {
       'Set-Cookie': {
-        description: 'Rotated HttpOnly refresh_token cookie.',
+        description:
+          'Rotated HttpOnly app_refresh_token or admin_refresh_token cookie.',
         schema: { type: 'string' },
       },
     },
@@ -74,8 +81,14 @@ export class SharedAuthController {
     @Req() req: FastifyRequest,
     @Res({ passthrough: true }) reply: FastifyReply,
   ) {
-    const rawToken = req.cookies?.[REFRESH_COOKIE_NAME];
-    if (!rawToken) {
+    const scope = refreshCookieScopeForRequest({
+      origin: req.headers.origin,
+      cookies: req.cookies,
+    });
+    const rawToken = scope
+      ? req.cookies?.[refreshCookieName(scope)]
+      : undefined;
+    if (!scope || !rawToken) {
       throw new UnauthorizedException('Unauthorized');
     }
 
@@ -90,7 +103,7 @@ export class SharedAuthController {
       ipAddress: req.ip,
       userAgent: req.headers['user-agent'],
     });
-    setRefreshCookie(reply, result.refreshToken, this.configService);
+    setRefreshCookie(reply, result.refreshToken, this.configService, scope);
     return {
       accessToken: result.accessToken,
       user: {
@@ -107,14 +120,14 @@ export class SharedAuthController {
   @ApiOperation({
     summary: 'Log out of the current browser session',
     description:
-      'Requires a bearer access token. When a refresh_token cookie is present, its session is revoked; the cookie is always cleared.',
+      'Requires a bearer access token. Its application refresh cookie is revoked when present and then cleared.',
   })
   @ApiBearerAuth()
   @ApiCreatedResponse({
     type: SuccessResponseDto,
     headers: {
       'Set-Cookie': {
-        description: 'Clears the refresh_token cookie.',
+        description: 'Clears the application-specific refresh cookie.',
         schema: { type: 'string' },
       },
     },
@@ -129,11 +142,12 @@ export class SharedAuthController {
     // cookie can be absent, stale, or belong to another rotation generation,
     // so it must not be the only revocation mechanism.
     await this.sessionService.revokeById(user.sessionId, user.id);
-    const rawToken = req.cookies?.[REFRESH_COOKIE_NAME];
+    const scope = refreshCookieScopeForRole(user.role);
+    const rawToken = req.cookies?.[refreshCookieName(scope)];
     if (rawToken) {
       await this.sessionService.revokeByRawToken(rawToken);
     }
-    clearRefreshCookie(reply, this.configService);
+    clearRefreshCookie(reply, this.configService, scope);
     return { success: true };
   }
 
@@ -142,14 +156,14 @@ export class SharedAuthController {
   @ApiOperation({
     summary: 'Log out of all user sessions',
     description:
-      'Revokes every refresh session for the authenticated user and clears the browser refresh_token cookie.',
+      'Revokes every refresh session for the authenticated user and clears that application refresh cookie.',
   })
   @ApiBearerAuth()
   @ApiCreatedResponse({
     type: SuccessResponseDto,
     headers: {
       'Set-Cookie': {
-        description: 'Clears the refresh_token cookie.',
+        description: 'Clears the application-specific refresh cookie.',
         schema: { type: 'string' },
       },
     },
@@ -160,7 +174,11 @@ export class SharedAuthController {
     @Res({ passthrough: true }) reply: FastifyReply,
   ) {
     await this.sessionService.revokeAllForUser(user.id);
-    clearRefreshCookie(reply, this.configService);
+    clearRefreshCookie(
+      reply,
+      this.configService,
+      refreshCookieScopeForRole(user.role),
+    );
     return { success: true };
   }
 
@@ -234,7 +252,11 @@ export class SharedAuthController {
         data: { revoked: true, revokedAt: new Date() },
       }),
     ]);
-    clearRefreshCookie(reply, this.configService);
+    clearRefreshCookie(
+      reply,
+      this.configService,
+      refreshCookieScopeForRole(user.role),
+    );
 
     return { success: true };
   }

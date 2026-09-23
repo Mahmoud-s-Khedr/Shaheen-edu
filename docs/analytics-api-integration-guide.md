@@ -39,9 +39,9 @@ analytics reads in this guide are `GET` requests and have no request body.
 
 ### User token refresh
 
-Student, partner, and admin logins return a bearer access token and set an
-HttpOnly `refresh_token` cookie. Browser clients must call the API with
-credentials enabled so the cookie is sent on refresh:
+Student logins set an HttpOnly `app_refresh_token` cookie; admin and partner
+logins set `admin_refresh_token`. Browser clients must call the API with
+credentials enabled so their application-specific cookie is sent on refresh:
 
 ```ts
 const api = axios.create({
@@ -51,9 +51,12 @@ const api = axios.create({
 ```
 
 On one `401`, call `POST /auth/refresh`, replace the in-memory access token
-with the returned `accessToken`, and retry the original request once. If the
-refresh fails, clear the session and return to login. Do not retry a failed
-refresh request or enter a refresh loop.
+with the returned `accessToken`, and retry the original request once. The API
+uses the exact `https://app.jibal-platform.com` or
+`https://admin.jibal-platform.com` browser request `Origin` to select the app
+or admin cookie, so no frontend cookie handling is required. If the refresh fails, clear the session
+and return to login. Do not retry a failed refresh request or enter a refresh
+loop.
 
 Parent sessions are different: `POST /auth/parents/login` returns a parent
 access token and does not use the user refresh-cookie flow. Store it only as

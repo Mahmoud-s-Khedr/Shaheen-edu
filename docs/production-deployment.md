@@ -34,7 +34,7 @@ for the frontend Nginx sites and release procedure. Configure the API
 environment with these exact origins:
 
 ```dotenv
-CORS_ORIGINS=https://jibal-platform.com,https://app.jibal-platform.com,https://admin.jibal-platform.com
+CORS_ORIGINS=https://app.jibal-platform.com,https://admin.jibal-platform.com
 COOKIE_SECURE=true
 COOKIE_SAME_SITE=lax
 XPAY_API_BASE_URL=https://api.xpay.app
@@ -44,11 +44,19 @@ XPAY_REDIRECT_URL=https://app.jibal-platform.com/payment-result
 XPAY_CANCEL_URL=https://app.jibal-platform.com/payment-result
 ```
 
-These hosts are same-site subdomains, so a secure, host-only refresh cookie
-issued by `api.jibal-platform.com` is sent with credentialed API requests from
-each frontend. Each frontend must use `credentials: 'include'` (or its
-equivalent) for login, refresh, logout, and other cookie-authenticated calls.
-The API origin itself is not a CORS origin.
+These hosts are same-site subdomains, so secure, host-only refresh cookies
+issued by `api.jibal-platform.com` are sent with credentialed API requests from
+each frontend. The API stores student sessions as `app_refresh_token` and
+administrator and partner sessions as `admin_refresh_token`. On
+`/auth/refresh`, the API accepts only the exact `https://app.jibal-platform.com`
+or `https://admin.jibal-platform.com` Origin and selects that namespace, so the
+two applications can remain signed in simultaneously in one browser. The
+landing-page (`jibal-platform.com`) and `www` origins are deliberately not
+allowed to send credentialed API requests. Each frontend must use
+`credentials: 'include'` (or its equivalent) for login, refresh, logout, and
+other cookie-authenticated calls. The API origin itself is not a CORS origin.
+The legacy shared `refresh_token` cookie is not accepted; users with a legacy
+session must sign in once after this release.
 
 ## Host prerequisites
 

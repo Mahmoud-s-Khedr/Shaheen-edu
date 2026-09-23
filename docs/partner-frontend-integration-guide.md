@@ -18,7 +18,7 @@ The generated OpenAPI document in [`../docs-json.json`](../docs-json.json) is th
    Authorization: Bearer <accessToken>
    ```
 
-4. The login response also sets an HTTP-only `refresh_token` cookie. Use the existing refresh/logout endpoints from the shared auth client; do not attempt to read this cookie from JavaScript.
+4. The login response also sets an HTTP-only `admin_refresh_token` cookie. Partners use `admin.jibal-platform.com`; use the existing refresh/logout endpoints from the shared auth client and do not attempt to read this cookie from JavaScript.
 
 ### Roles and partner types
 

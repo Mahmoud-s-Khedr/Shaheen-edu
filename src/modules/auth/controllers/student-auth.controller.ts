@@ -37,7 +37,7 @@ export class StudentAuthController {
   @ApiOperation({
     summary: 'Register a student',
     description:
-      'Creates a student account and sets an HttpOnly refresh_token cookie.',
+      'Creates a student account and sets an HttpOnly app_refresh_token cookie.',
   })
   @ApiCreatedResponse({
     type: AuthTokenResponseDto,
@@ -54,7 +54,7 @@ export class StudentAuthController {
       req.ip,
       req.headers['user-agent'],
     );
-    setRefreshCookie(reply, result.refreshToken, this.configService);
+    setRefreshCookie(reply, result.refreshToken, this.configService, 'app');
     return { accessToken: result.accessToken, user: result.user };
   }
 
@@ -63,7 +63,7 @@ export class StudentAuthController {
   @Post('login')
   @ApiOperation({
     summary: 'Log in as a student',
-    description: 'Sets an HttpOnly refresh_token cookie on success.',
+    description: 'Sets an HttpOnly app_refresh_token cookie on success.',
   })
   @ApiCreatedResponse({
     type: AuthTokenResponseDto,
@@ -87,7 +87,7 @@ export class StudentAuthController {
       userAgent: req.headers['user-agent'],
       purpose: 'student-login',
     });
-    setRefreshCookie(reply, result.refreshToken, this.configService);
+    setRefreshCookie(reply, result.refreshToken, this.configService, 'app');
     return { accessToken: result.accessToken, user: result.user };
   }
 }

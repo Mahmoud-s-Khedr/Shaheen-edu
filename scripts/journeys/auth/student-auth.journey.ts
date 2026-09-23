@@ -94,7 +94,7 @@ export const studentJourney: JourneyDefinition = {
       );
       expectAbsent(JSON.stringify(r.body), nationalId, 'national ID');
       assert(
-        clients.student.jar.has('refresh_token'),
+        clients.student.jar.has('app_refresh_token'),
         'Registration must set refresh cookie',
       );
       clients.student.accessToken = r.body.accessToken;

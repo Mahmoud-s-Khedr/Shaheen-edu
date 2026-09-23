@@ -63,7 +63,7 @@ Create isolated records; keep IDs in the run log but redact tokens, phone number
 
 **Acceptance criteria:**
 
-- Given `STUDENT_A`'s normalized Egyptian phone and correct password, when logging in, then the API returns `201`, an access token identifying role `STUDENT`, and an HttpOnly `refresh_token` cookie; no password hash or national ID occurs in body or cookie values.
+- Given `STUDENT_A`'s normalized Egyptian phone and correct password, when logging in, then the API returns `201`, an access token identifying role `STUDENT`, and an HttpOnly `app_refresh_token` cookie; no password hash or national ID occurs in body or cookie values.
 - Given whitespace or a supported alternate phone representation, when login is submitted, then normalization has the same valid outcome. Given malformed phone, wrong password, a non-student account, or repeated failures beyond the route throttle, then it returns the documented safe `400`/`401`/`429` outcome without confirming account existence.
 - Given a valid refresh cookie, when `POST /auth/refresh` is called, then it returns a new access token and rotates the refresh cookie. Reuse of the rotated cookie, a missing cookie, and a revoked session must return `401`; a successful retry must not create an additional usable session unexpectedly.
 - Given a signed-in student, when `GET /auth/me` is called, then it returns only that user's safe identity/session fields. When `logout` is called, the current bearer session and cookie are revoked/cleared; when `logout-all` is called from another active session, every session becomes unusable.

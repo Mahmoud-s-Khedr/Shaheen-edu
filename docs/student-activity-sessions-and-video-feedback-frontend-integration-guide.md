@@ -26,7 +26,7 @@ const api = axios.create({
 });
 ```
 
-Browser clients must enable credentials so the HttpOnly `refresh_token` cookie
+Browser clients must enable credentials so the HttpOnly `app_refresh_token` cookie
 is sent to the existing refresh endpoint. Keep the access token in memory.
 On one `401`, run the normal one-time refresh-and-retry flow; if refresh fails,
 clear the local session and take the user to login. Do not retry a failed
@@ -131,7 +131,7 @@ async function getDailyActivity(from: string, to: string) {
 
 `POST /api/v1/auth/students/login` now allows one active session per student.
 The successful response remains unchanged: it returns `201 Created`, an
-`accessToken`, and an HttpOnly `refresh_token` cookie.
+`accessToken`, and an HttpOnly `app_refresh_token` cookie.
 
 If another unexpired student session is active, login returns `409 Conflict`:
 

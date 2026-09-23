@@ -24,7 +24,7 @@ Nginx to the private Compose gateway at `127.0.0.1:13000`.
    is tested:
 
    ```dotenv
-   CORS_ORIGINS=https://jibal-platform.com,https://app.jibal-platform.com,https://admin.jibal-platform.com
+   CORS_ORIGINS=https://app.jibal-platform.com,https://admin.jibal-platform.com
    COOKIE_SECURE=true
    COOKIE_SAME_SITE=lax
    ```

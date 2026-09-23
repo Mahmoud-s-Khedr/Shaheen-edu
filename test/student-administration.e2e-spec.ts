@@ -141,13 +141,14 @@ describe('Student administration (e2e)', () => {
     });
     expect(blocked.statusCode).toBe(403);
     const forcedRefreshToken = login.cookies.find(
-      (cookie) => cookie.name === 'refresh_token',
+      (cookie) => cookie.name === 'app_refresh_token',
     )?.value;
-    if (!forcedRefreshToken) throw new Error('refresh_token cookie not set');
+    if (!forcedRefreshToken)
+      throw new Error('app_refresh_token cookie not set');
     const refresh = await app.inject({
       method: 'POST',
       url: '/api/v1/auth/refresh',
-      cookies: { refresh_token: forcedRefreshToken },
+      cookies: { app_refresh_token: forcedRefreshToken },
     });
     expect(refresh.statusCode).toBe(401);
     const change = await app.inject({

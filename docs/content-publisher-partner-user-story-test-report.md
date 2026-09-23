@@ -60,7 +60,7 @@ Partner-ledger reporting is controlled at process start. Run the enabled and dis
 
 **Acceptance criteria:**
 
-- Given active `PUBLISHER_A` and valid credentials, when email whitespace/case variations are submitted to `POST /auth/partners/login`, then it returns `201`, a `PARTNER` access token, normalized login identifier, and HttpOnly `refresh_token` cookie; it returns no password hash or another partner's data.
+- Given active `PUBLISHER_A` and valid credentials, when email whitespace/case variations are submitted to `POST /auth/partners/login`, then it returns `201`, a `PARTNER` access token, normalized login identifier, and HttpOnly `admin_refresh_token` cookie; it returns no password hash or another partner's data.
 - Given an unknown email, wrong password, non-partner account, suspended publisher, or missing/malformed credentials, when login is attempted, then it returns the same safe `401` credentials outcome. Repeated failures reach configured `429` throttling; a permitted later login clears the applicable failure state.
 - Given a valid refresh cookie, when `POST /auth/refresh` is called, then it returns `201`, rotates the cookie, and provides a usable replacement token. Missing, expired, replayed, revoked, or wrong cookies return safe `401`/configured `429` without creating a session.
 - Given the access token and cookie, when `POST /auth/logout` is called, then it clears the cookie and invalidates that session; the same bearer token cannot subsequently read `/partners/me` or publisher reports. Given two sessions, when either calls `/auth/logout-all`, then both are unusable.

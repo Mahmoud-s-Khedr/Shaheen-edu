@@ -128,7 +128,8 @@ resources; read [the testing guide](docs/testing/README.md) first.
 ## API and operational notes
 
 - Authenticated routes are deny-by-default. The API uses bearer access tokens
-  and a `refresh_token` cookie; Swagger documents both schemes.
+  plus isolated `app_refresh_token` and `admin_refresh_token` cookies; Swagger
+  documents both schemes.
 - Refresh sessions use opaque, hashed tokens with rotation-family reuse
   detection. National IDs are protected with an HMAC lookup hash and
   AES-256-GCM encryption.

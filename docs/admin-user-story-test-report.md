@@ -68,7 +68,7 @@ Unless a more specific criterion says otherwise, test list endpoints for valid s
 
 **Acceptance criteria:**
 
-- Given active `ADMIN_A` and correct credentials with email case/whitespace variations, when `POST /auth/admins/login` is called, then it returns `201`, an `ADMIN` access token, normalized login identifier, and an HttpOnly `refresh_token` cookie—not a hash, other-admin data, or private profile data.
+- Given active `ADMIN_A` and correct credentials with email case/whitespace variations, when `POST /auth/admins/login` is called, then it returns `201`, an `ADMIN` access token, normalized login identifier, and an HttpOnly `admin_refresh_token` cookie—not a hash, other-admin data, or private profile data.
 - Given an unknown email, wrong password, student/partner credentials, a suspended account, or malformed fields, when login is attempted, then the outcome is the same safe `401 Invalid credentials`. Repeated failures reach configured `429` throttling; a later successful permitted login clears the applicable failure state.
 - Given a valid refresh cookie, when refresh is called, then it rotates the cookie and returns a usable replacement token. Missing, expired, replayed, revoked, or wrong-session cookies fail safely without minting a session.
 - Given a current bearer and cookie, when logout is called, then that session/cookie is unusable. Given two sessions, when logout-all or a successful password change occurs, then both sessions are revoked and only the new 8–128-character password works. Wrong old password and invalid new-password input do not change credentials.

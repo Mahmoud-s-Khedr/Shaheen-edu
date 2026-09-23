@@ -59,7 +59,7 @@
     },
     "/api/v1/auth/students/register": {
       "post": {
-        "description": "Creates a student account and sets an HttpOnly refresh_token cookie.",
+        "description": "Creates a student account and sets an HttpOnly app_refresh_token cookie.",
         "operationId": "StudentAuthController_register_v1",
         "parameters": [],
         "requestBody": {
@@ -129,7 +129,7 @@
     },
     "/api/v1/auth/students/login": {
       "post": {
-        "description": "Sets an HttpOnly refresh_token cookie on success.",
+        "description": "Sets an HttpOnly app_refresh_token cookie on success.",
         "operationId": "StudentAuthController_login_v1",
         "parameters": [],
         "requestBody": {
@@ -209,7 +209,7 @@
     },
     "/api/v1/auth/admins/login": {
       "post": {
-        "description": "Sets an HttpOnly refresh_token cookie on success.",
+        "description": "Sets an HttpOnly admin_refresh_token cookie on success.",
         "operationId": "AdminAuthController_login_v1",
         "parameters": [],
         "requestBody": {
@@ -269,7 +269,7 @@
     },
     "/api/v1/auth/partners/login": {
       "post": {
-        "description": "Sets an HttpOnly refresh_token cookie on success.",
+        "description": "Sets an HttpOnly admin_refresh_token cookie on success.",
         "operationId": "PartnerAuthController_login_v1",
         "parameters": [],
         "requestBody": {
@@ -577,15 +577,15 @@
     },
     "/api/v1/auth/refresh": {
       "post": {
-        "description": "Rotates the HttpOnly refresh_token cookie and returns a new bearer access token.",
+        "description": "Rotates the app or admin HttpOnly refresh cookie for its exact production frontend Origin and returns a new bearer access token.",
         "operationId": "SharedAuthController_refresh_v1",
         "parameters": [],
         "responses": {
           "201": {
-            "description": "Access token issued and refresh_token cookie rotated.",
+            "description": "Access token issued and the application-specific refresh cookie rotated.",
             "headers": {
               "Set-Cookie": {
-                "description": "Rotated HttpOnly refresh_token cookie.",
+                "description": "Rotated HttpOnly app_refresh_token or admin_refresh_token cookie.",
                 "schema": {
                   "type": "string"
                 }
@@ -622,7 +622,10 @@
         },
         "security": [
           {
-            "refresh_token": []
+            "admin_refresh_token": []
+          },
+          {
+            "app_refresh_token": []
           }
         ],
         "summary": "Refresh user access token",
@@ -633,14 +636,14 @@
     },
     "/api/v1/auth/logout": {
       "post": {
-        "description": "Requires a bearer access token. When a refresh_token cookie is present, its session is revoked; the cookie is always cleared.",
+        "description": "Requires a bearer access token. Its application refresh cookie is revoked when present and then cleared.",
         "operationId": "SharedAuthController_logout_v1",
         "parameters": [],
         "responses": {
           "201": {
             "headers": {
               "Set-Cookie": {
-                "description": "Clears the refresh_token cookie.",
+                "description": "Clears the application-specific refresh cookie.",
                 "schema": {
                   "type": "string"
                 }
@@ -679,14 +682,14 @@
     },
     "/api/v1/auth/logout-all": {
       "post": {
-        "description": "Revokes every refresh session for the authenticated user and clears the browser refresh_token cookie.",
+        "description": "Revokes every refresh session for the authenticated user and clears that application refresh cookie.",
         "operationId": "SharedAuthController_logoutAll_v1",
         "parameters": [],
         "responses": {
           "201": {
             "headers": {
               "Set-Cookie": {
-                "description": "Clears the refresh_token cookie.",
+                "description": "Clears the application-specific refresh cookie.",
                 "schema": {
                   "type": "string"
                 }
@@ -25255,10 +25258,15 @@
         "bearerFormat": "JWT",
         "type": "http"
       },
-      "refresh_token": {
+      "app_refresh_token": {
         "type": "apiKey",
         "in": "cookie",
-        "name": "refresh_token"
+        "name": "app_refresh_token"
+      },
+      "admin_refresh_token": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "admin_refresh_token"
       }
     },
     "schemas": {

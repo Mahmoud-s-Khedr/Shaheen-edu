@@ -24,7 +24,10 @@ export const superAdminJourney: JourneyDefinition = {
         response.body.user?.role === 'SUPER_ADMIN',
         'Seeded user must be SUPER_ADMIN',
       );
-      assert(client.jar.has('refresh_token'), 'Login must set refresh cookie');
+      assert(
+        client.jar.has('admin_refresh_token'),
+        'Login must set refresh cookie',
+      );
       client.accessToken = response.body.accessToken;
       context.superAdmin.id = response.body.user.id;
       context.superAdmin.accessToken = response.body.accessToken;
@@ -46,7 +49,7 @@ export const superAdminJourney: JourneyDefinition = {
       expectStatus(response, 201);
       expectString(response.body.accessToken, 'refreshed accessToken');
       assert(
-        client.jar.has('refresh_token'),
+        client.jar.has('admin_refresh_token'),
         'Refresh must retain rotated cookie',
       );
       client.accessToken = response.body.accessToken;
