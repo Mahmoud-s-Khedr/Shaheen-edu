@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/require-await -- e2e tests parse raw JSON response bodies */
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import { createTestApp } from './utils/create-test-app';
+import { PrismaService } from '../src/database/prisma.service';
 import {
   cleanDatabase,
   flushTestRedis,
@@ -813,6 +814,184 @@ describe('Academic hierarchy (e2e)', () => {
       expect(moved).toHaveLength(1);
       expect(moved[0].id).toBe(subjectB.id);
       expect(moved[0].sortOrder).toBe(1);
+    });
+  });
+
+  describe('subject grade ordering maintenance', () => {
+    async function createGrade(title: string) {
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/v1/admin/academic-grades',
+        headers: authHeader(adminToken),
+        payload: { title: { ar: title, en: title } },
+      });
+      expect(response.statusCode).toBe(201);
+      return (await json(response)).id as string;
+    }
+
+    async function createSubject(title: string, academicGradeIds: string[]) {
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/v1/admin/subjects',
+        headers: authHeader(adminToken),
+        payload: { title, academicGradeIds },
+      });
+      expect(response.statusCode).toBe(201);
+      return (await json(response)) as { id: string };
+    }
+
+    async function subjectsInGrade(academicGradeId: string) {
+      const response = await app.inject({
+        method: 'GET',
+        url: `/api/v1/admin/subjects?academicGradeId=${academicGradeId}`,
+        headers: authHeader(adminToken),
+      });
+      expect(response.statusCode).toBe(200);
+      return (await json(response)).data as Array<{
+        id: string;
+        sortOrder: number;
+      }>;
+    }
+
+    it('renumbers a grade after removing one assignment from a shared subject', async () => {
+      const sourceGradeId = await createGrade('Shared assignment source');
+      const targetGradeId = await createGrade('Shared assignment target');
+      const shared = await createSubject('Shared assignment', [
+        sourceGradeId,
+        targetGradeId,
+      ]);
+      const middle = await createSubject('Source middle', [sourceGradeId]);
+      const last = await createSubject('Source last', [sourceGradeId]);
+
+      const response = await app.inject({
+        method: 'PATCH',
+        url: `/api/v1/admin/subjects/${shared.id}`,
+        headers: authHeader(adminToken),
+        payload: { academicGradeIds: [targetGradeId] },
+      });
+      expect(response.statusCode).toBe(200);
+
+      expect(await subjectsInGrade(sourceGradeId)).toEqual([
+        expect.objectContaining({ id: middle.id, sortOrder: 1 }),
+        expect.objectContaining({ id: last.id, sortOrder: 2 }),
+      ]);
+    });
+
+    it('renumbers after deleting a middle subject and allows a remaining subject to publish', async () => {
+      const gradeId = await createGrade('Deletion ordering grade');
+      const publishGrade = await app.inject({
+        method: 'POST',
+        url: `/api/v1/admin/academic-grades/${gradeId}/publish`,
+        headers: authHeader(adminToken),
+      });
+      expect(publishGrade.statusCode).toBe(201);
+
+      const first = await createSubject('Deletion first', [gradeId]);
+      const middle = await createSubject('Deletion middle', [gradeId]);
+      const last = await createSubject('Deletion last', [gradeId]);
+      const deleted = await app.inject({
+        method: 'DELETE',
+        url: `/api/v1/admin/subjects/${middle.id}`,
+        headers: authHeader(adminToken),
+      });
+      expect(deleted.statusCode).toBe(200);
+
+      expect(await subjectsInGrade(gradeId)).toEqual([
+        expect.objectContaining({ id: first.id, sortOrder: 1 }),
+        expect.objectContaining({ id: last.id, sortOrder: 2 }),
+      ]);
+
+      const published = await app.inject({
+        method: 'POST',
+        url: `/api/v1/admin/subjects/${last.id}/publish`,
+        headers: authHeader(adminToken),
+      });
+      expect(published.statusCode).toBe(201);
+    });
+
+    it('normalizes both grade scopes after a move from previously gapped lists', async () => {
+      const sourceGradeId = await createGrade('Gapped move source');
+      const targetGradeId = await createGrade('Gapped move target');
+      const sourceFirst = await createSubject('Move source first', [
+        sourceGradeId,
+      ]);
+      const moving = await createSubject('Move source moving', [sourceGradeId]);
+      const sourceLast = await createSubject('Move source last', [
+        sourceGradeId,
+      ]);
+      const targetFirst = await createSubject('Move target first', [
+        targetGradeId,
+      ]);
+      const targetLast = await createSubject('Move target last', [
+        targetGradeId,
+      ]);
+      const prisma = app.get(PrismaService);
+      await prisma.subjectGrade.update({
+        where: {
+          academicGradeId_subjectId: {
+            academicGradeId: sourceGradeId,
+            subjectId: sourceLast.id,
+          },
+        },
+        data: { sortOrder: 5 },
+      });
+      await prisma.subjectGrade.update({
+        where: {
+          academicGradeId_subjectId: {
+            academicGradeId: targetGradeId,
+            subjectId: targetLast.id,
+          },
+        },
+        data: { sortOrder: 5 },
+      });
+
+      const moved = await app.inject({
+        method: 'POST',
+        url: `/api/v1/admin/subjects/${moving.id}/move`,
+        headers: authHeader(adminToken),
+        payload: { newAcademicGradeId: targetGradeId, sortOrder: 4 },
+      });
+      expect(moved.statusCode).toBe(201);
+
+      expect(await subjectsInGrade(sourceGradeId)).toEqual([
+        expect.objectContaining({ id: sourceFirst.id, sortOrder: 1 }),
+        expect.objectContaining({ id: sourceLast.id, sortOrder: 2 }),
+      ]);
+      expect(await subjectsInGrade(targetGradeId)).toEqual([
+        expect.objectContaining({ id: targetFirst.id, sortOrder: 1 }),
+        expect.objectContaining({ id: moving.id, sortOrder: 2 }),
+        expect.objectContaining({ id: targetLast.id, sortOrder: 3 }),
+      ]);
+    });
+
+    it('publishes a subject even when its grade placements are non-contiguous', async () => {
+      const gradeId = await createGrade('Publish ignores ordering grade');
+      const publishGrade = await app.inject({
+        method: 'POST',
+        url: `/api/v1/admin/academic-grades/${gradeId}/publish`,
+        headers: authHeader(adminToken),
+      });
+      expect(publishGrade.statusCode).toBe(201);
+      await createSubject('Publish ordering first', [gradeId]);
+      const candidate = await createSubject('Publish ordering candidate', [
+        gradeId,
+      ]);
+      await app.get(PrismaService).subjectGrade.update({
+        where: {
+          academicGradeId_subjectId: {
+            academicGradeId: gradeId,
+            subjectId: candidate.id,
+          },
+        },
+        data: { sortOrder: 4 },
+      });
+
+      const published = await app.inject({
+        method: 'POST',
+        url: `/api/v1/admin/subjects/${candidate.id}/publish`,
+        headers: authHeader(adminToken),
+      });
+      expect(published.statusCode).toBe(201);
     });
   });
 

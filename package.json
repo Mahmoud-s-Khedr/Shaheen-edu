@@ -72,6 +72,9 @@
     "partner-allocations:reconcile": "tsx scripts/reconcile-partner-allocations.ts",
     "question-banks:subjects:report": "tsx scripts/remediate-question-bank-subjects.ts --report",
     "question-banks:subjects:check": "tsx scripts/remediate-question-bank-subjects.ts --check",
+    "subject-grades:ordering:report": "tsx scripts/remediate-subject-grade-ordering.ts --report",
+    "subject-grades:ordering:check": "tsx scripts/remediate-subject-grade-ordering.ts --check",
+    "subject-grades:ordering:apply": "tsx scripts/remediate-subject-grade-ordering.ts --apply",
     "docker:up": "docker compose up -d",
     "docker:down": "docker compose down"
   },

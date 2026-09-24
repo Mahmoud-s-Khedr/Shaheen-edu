@@ -360,6 +360,7 @@ export class SubjectsService {
             },
           });
         }
+        await this.normalizeGradeScopes(tx, [...removed, ...added]);
         await tx.subject.update({
           where: { id },
           data: {
@@ -541,6 +542,10 @@ export class SubjectsService {
         where: { id },
         data: { updatedById: actor.id },
       });
+      await this.normalizeGradeScopes(tx, [
+        oldAcademicGradeId,
+        dto.newAcademicGradeId,
+      ]);
     });
     await this.auditService.record({
       actorUserId: actor.id,
@@ -649,6 +654,10 @@ export class SubjectsService {
           'Only a draft or archived subject can be deleted',
         );
       }
+      await this.normalizeGradeScopes(
+        tx,
+        record.gradeAssignments.map((assignment) => assignment.academicGradeId),
+      );
     });
 
     await this.auditService.record({
@@ -657,6 +666,48 @@ export class SubjectsService {
       targetType: 'Subject',
       targetId: id,
     });
+  }
+
+  /** Restores contiguous positions after a placement leaves or enters a grade. */
+  private async normalizeGradeScopes(
+    tx: Prisma.TransactionClient,
+    gradeIds: string[],
+  ): Promise<void> {
+    for (const academicGradeId of new Set(gradeIds)) {
+      const siblings = await tx.subjectGrade.findMany({
+        where: { academicGradeId },
+        select: { subjectId: true },
+        orderBy: [{ sortOrder: 'asc' }, { subjectId: 'asc' }],
+      });
+      const plan = computeTwoPhaseRenumber(
+        siblings.map((sibling, index) => ({
+          id: sibling.subjectId,
+          sortOrder: index + 1,
+        })),
+      );
+      for (const phase1 of plan.phase1) {
+        await tx.subjectGrade.update({
+          where: {
+            academicGradeId_subjectId: {
+              academicGradeId,
+              subjectId: phase1.id,
+            },
+          },
+          data: { sortOrder: phase1.sortOrder },
+        });
+      }
+      for (const phase2 of plan.phase2) {
+        await tx.subjectGrade.update({
+          where: {
+            academicGradeId_subjectId: {
+              academicGradeId,
+              subjectId: phase2.id,
+            },
+          },
+          data: { sortOrder: phase2.sortOrder },
+        });
+      }
+    }
   }
 
   private toSummary(record: {

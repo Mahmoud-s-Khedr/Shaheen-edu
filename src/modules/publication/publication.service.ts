@@ -47,7 +47,6 @@ export class PublicationService {
         throw new ConflictException('Only a draft record can be published');
       }
       await this.assertAncestry(resource, record, tx);
-      await this.assertOrdering(resource, record, tx);
       if (resource === 'course' && record.accessType === 'INHERIT') {
         throw new ConflictException(
           'A course must have an explicit access type',
@@ -488,87 +487,6 @@ export class PublicationService {
         current.subject ?? current.course ?? current.chapter ?? current.lesson;
     }
     return nodes;
-  }
-
-  private async assertOrdering(
-    resource: PublishableResource,
-    record: any,
-    tx: any,
-  ) {
-    if (resource === 'contentItem') {
-      const placement = record.placement;
-      const where = placement.courseId
-        ? { courseId: placement.courseId }
-        : placement.chapterId
-          ? { chapterId: placement.chapterId }
-          : placement.lessonId
-            ? { lessonId: placement.lessonId }
-            : { sectionId: placement.sectionId };
-      const siblings = await tx.contentPlacement.findMany({
-        where,
-        orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
-      });
-      if (
-        siblings.some(
-          (item: any, index: number) => item.sortOrder !== index + 1,
-        )
-      )
-        throw new ConflictException('Content placement ordering is invalid');
-      return;
-    }
-    if (resource === 'subject') {
-      const assignments = await tx.subjectGrade.findMany({
-        where: { subjectId: record.id },
-        select: { academicGradeId: true },
-      });
-      const gradeIds = [
-        ...new Set(assignments.map((x: any) => x.academicGradeId)),
-      ];
-      const siblings = await tx.subjectGrade.findMany({
-        where: { academicGradeId: { in: gradeIds } },
-        orderBy: [
-          { academicGradeId: 'asc' },
-          { sortOrder: 'asc' },
-          { id: 'asc' },
-        ],
-      });
-      const siblingsByGrade = new Map<string, any[]>();
-      for (const sibling of siblings) {
-        const group = siblingsByGrade.get(sibling.academicGradeId) ?? [];
-        group.push(sibling);
-        siblingsByGrade.set(sibling.academicGradeId, group);
-      }
-      if (
-        [...siblingsByGrade.values()].some((group) =>
-          group.some((item, index) => item.sortOrder !== index + 1),
-        )
-      )
-        throw new ConflictException('Sibling ordering is invalid');
-      return;
-    }
-    const field: Record<string, string | null> = {
-      academicGrade: null,
-      subject: null,
-      course: 'subjectId',
-      chapter: 'courseId',
-      lesson: 'chapterId',
-      section: 'lessonId',
-    };
-    const parentField = field[resource];
-    const where =
-      resource === 'course'
-        ? { subjectId: record.subjectId }
-        : parentField
-          ? { [parentField]: record[parentField] }
-          : {};
-    const siblings = await tx[resource].findMany({
-      where,
-      orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
-    });
-    if (
-      siblings.some((item: any, index: number) => item.sortOrder !== index + 1)
-    )
-      throw new ConflictException('Sibling ordering is invalid');
   }
 
   private async find(resource: PublishableResource, id: string, client: any) {
