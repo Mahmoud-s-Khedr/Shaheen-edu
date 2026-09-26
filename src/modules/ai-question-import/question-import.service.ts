@@ -43,6 +43,9 @@ import { PdfPageRangeService } from './pdf-page-range.service';
 import { QuestionImportMediaService } from './question-import-media.service';
 import { QuestionImportVisualLinkerService } from './question-import-visual-linker.service';
 
+const DEFAULT_LONG_ANSWER_GRADING_RUBRIC =
+  'Assess the response for factual correctness, relevance, completeness, and clarity. Award points proportionally to the quality and accuracy of the answer; give full credit only when it fully and correctly addresses the question.';
+
 @Injectable()
 export class QuestionImportService {
   private readonly model: string;
@@ -1534,9 +1537,7 @@ export class QuestionImportService {
           ? value.gradingRubric.trim()
           : '';
       if (!output.gradingRubric)
-        throw new BadRequestException(
-          'Long-answer candidates require a grading rubric',
-        );
+        output.gradingRubric = DEFAULT_LONG_ANSWER_GRADING_RUBRIC;
     }
     return output;
   }

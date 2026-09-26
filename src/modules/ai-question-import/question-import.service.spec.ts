@@ -50,6 +50,31 @@ describe('QuestionImportService review summaries', () => {
     ]);
   });
 
+  it('defaults a missing long-answer grading rubric during review acceptance', () => {
+    const candidate = (serviceWith() as any).normalizeReviewCandidate({
+      type: 'LONG_ANSWER',
+      body: 'Explain photosynthesis.',
+      explanation: 'Students should describe how plants make food.',
+    });
+
+    expect(candidate.gradingRubric).toBe(
+      'Assess the response for factual correctness, relevance, completeness, and clarity. Award points proportionally to the quality and accuracy of the answer; give full credit only when it fully and correctly addresses the question.',
+    );
+  });
+
+  it('keeps and trims an imported long-answer grading rubric', () => {
+    const candidate = (serviceWith() as any).normalizeReviewCandidate({
+      type: 'LONG_ANSWER',
+      body: 'Explain photosynthesis.',
+      explanation: 'Students should describe how plants make food.',
+      gradingRubric: '  Include light, water, carbon dioxide, and glucose.  ',
+    });
+
+    expect(candidate.gradingRubric).toBe(
+      'Include light, water, carbon dioxide, and glucose.',
+    );
+  });
+
   it('marks a persisted queued batch retryable when Redis enqueue fails', async () => {
     const update = jest.fn().mockResolvedValue({});
     const service = new QuestionImportService(
