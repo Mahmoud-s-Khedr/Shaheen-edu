@@ -23253,7 +23253,7 @@
             "bearer": []
           }
         ],
-        "summary": "Create and queue an AI question import",
+        "summary": "Extract and queue AI question drafts",
         "tags": [
           "admin/ai/question-imports"
         ]
@@ -24009,7 +24009,7 @@
             "bearer": []
           }
         ],
-        "summary": "Generate one AI answer/explanation review run",
+        "summary": "Generate explanation from verified answer",
         "tags": [
           "admin/questions/ai"
         ]
@@ -24120,7 +24120,7 @@
             "bearer": []
           }
         ],
-        "summary": "Apply reviewed answer and/or explanation",
+        "summary": "Apply reviewed answer and/or optionally edited explanation",
         "tags": [
           "admin/questions/ai"
         ]
@@ -33658,7 +33658,7 @@
         "properties": {
           "candidate": {
             "type": "object",
-            "description": "Corrected typed candidate. The administrator is the answer authority; retained AI evidence is optional review context."
+            "description": "Corrected extracted question draft. It contains wording, type, options, contexts, and media only; answers and explanations are supplied separately through verified-answer review."
           },
           "note": {
             "type": "string"
@@ -33710,22 +33710,20 @@
       "CreateAiQuestionExplanationRunDto": {
         "type": "object",
         "properties": {
-          "mode": {
-            "type": "string",
-            "enum": [
-              "INFER",
-              "GROUNDED"
-            ]
-          },
           "suppliedAnswer": {
-            "$ref": "#/components/schemas/AiQuestionAnswerDto"
+            "description": "Verified answer supplied by an administrator. AI uses it only to generate an explanation.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AiQuestionAnswerDto"
+              }
+            ]
           },
           "additionalContext": {
             "type": "string"
           }
         },
         "required": [
-          "mode"
+          "suppliedAnswer"
         ]
       },
       "ApplyAiQuestionExplanationRunDto": {
@@ -33736,6 +33734,14 @@
           },
           "applyExplanation": {
             "type": "boolean"
+          },
+          "structuredExplanation": {
+            "description": "Complete administrator-edited explanation, with all six sections. Requires applyExplanation=true. Omit to approve the generated explanation unchanged.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/QuestionExplanationDto"
+              }
+            ]
           },
           "note": {
             "type": "string"

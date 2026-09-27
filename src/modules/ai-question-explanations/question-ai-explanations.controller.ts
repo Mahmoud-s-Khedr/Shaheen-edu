@@ -20,7 +20,7 @@ import { QuestionAiExplanationsService } from './question-ai-explanations.servic
 export class QuestionAiExplanationsController {
   constructor(private readonly service: QuestionAiExplanationsService) {}
   @Post()
-  @ApiOperation({ summary: 'Generate one AI answer/explanation review run' })
+  @ApiOperation({ summary: 'Generate explanation from verified answer' })
   create(
     @CurrentUser() actor: RequestUser,
     @Param('questionId') questionId: string,
@@ -46,7 +46,9 @@ export class QuestionAiExplanationsController {
     return this.service.get(actor, questionId, runId);
   }
   @Post(':runId/apply')
-  @ApiOperation({ summary: 'Apply reviewed answer and/or explanation' })
+  @ApiOperation({
+    summary: 'Apply reviewed answer and/or optionally edited explanation',
+  })
   apply(
     @CurrentUser() actor: RequestUser,
     @Param('questionId') questionId: string,

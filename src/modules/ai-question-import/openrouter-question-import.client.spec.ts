@@ -76,6 +76,55 @@ describe('OpenRouterQuestionImportClient', () => {
     expect(request.messages[1].content).toContain('ALLOWED EVIDENCE: E-1');
   });
 
+  it('uses the v7 extraction-only contract without answer or explanation fields', async () => {
+    const fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true,
+      text: jest
+        .fn()
+        .mockResolvedValue(
+          JSON.stringify({
+            choices: [{ message: { content: JSON.stringify({ items: [] }) } }],
+            usage: {},
+          }),
+        ),
+    } as unknown as Response);
+    const client = new OpenRouterQuestionImportClient({
+      get: jest
+        .fn()
+        .mockReturnValue({
+          openRouterApiKey: 'test-key',
+          questionImportModel: 'test-model',
+          requestTimeoutMs: 1_000,
+        }),
+    } as any);
+    await client.extractQuestionsV7(
+      {
+        contexts: [],
+        media: [],
+        questions: [
+          {
+            id: 'Q-1',
+            firstBlock: 'B00001',
+            lastBlock: 'B00001',
+            text: 'What is 2 + 2?',
+            contextIds: [],
+          },
+        ],
+      },
+      [],
+    );
+    const request = JSON.parse(
+      String((fetchSpy.mock.calls[0][1] as RequestInit).body),
+    );
+    const serialized = JSON.stringify(request.response_format.json_schema);
+    expect(serialized).not.toContain('selectedOptionIndexes');
+    expect(serialized).not.toContain('acceptedAnswers');
+    expect(serialized).not.toContain('gradingRubric');
+    expect(serialized).not.toContain('explanation');
+    expect(serialized).not.toContain('answerOrigin');
+    expect(request.messages[0].content).toContain('do not answer');
+  });
+
   it('sends V4 crops as in-request data and keeps only batch-local media keys in the prompt', async () => {
     const fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue({
       ok: true,

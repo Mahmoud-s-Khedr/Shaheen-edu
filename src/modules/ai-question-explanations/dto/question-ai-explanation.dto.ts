@@ -5,7 +5,7 @@ import {
   ArrayMinSize,
   IsArray,
   IsBoolean,
-  IsEnum,
+  IsDefined,
   IsInt,
   IsNotEmpty,
   IsObject,
@@ -13,9 +13,10 @@ import {
   IsString,
   MaxLength,
   Min,
+  ValidateIf,
   ValidateNested,
 } from 'class-validator';
-import { QuestionAiExplanationRunMode } from '../../../common/types/roles.enum';
+import { QuestionExplanationDto } from '../../question-banks/dto/question-banks.dto';
 
 export class AiQuestionAnswerDto {
   @ApiPropertyOptional({ type: [Number] })
@@ -46,16 +47,16 @@ export class AiQuestionAnswerDto {
 }
 
 export class CreateAiQuestionExplanationRunDto {
-  @ApiProperty({ enum: QuestionAiExplanationRunMode })
-  @IsEnum(QuestionAiExplanationRunMode)
-  mode!: QuestionAiExplanationRunMode;
-
-  @ApiPropertyOptional({ type: AiQuestionAnswerDto })
-  @IsOptional()
+  @ApiProperty({
+    type: AiQuestionAnswerDto,
+    description:
+      'Verified answer supplied by an administrator. AI uses it only to generate an explanation.',
+  })
+  @IsDefined()
   @IsObject()
   @ValidateNested()
   @Type(() => AiQuestionAnswerDto)
-  suppliedAnswer?: AiQuestionAnswerDto;
+  suppliedAnswer!: AiQuestionAnswerDto;
 
   @ApiPropertyOptional()
   @IsOptional()
@@ -67,6 +68,17 @@ export class CreateAiQuestionExplanationRunDto {
 export class ApplyAiQuestionExplanationRunDto {
   @ApiProperty() @IsBoolean() applyAnswer!: boolean;
   @ApiProperty() @IsBoolean() applyExplanation!: boolean;
+  @ApiPropertyOptional({
+    type: QuestionExplanationDto,
+    description:
+      'Complete administrator-edited explanation, with all six sections. Requires applyExplanation=true. Omit to approve the generated explanation unchanged.',
+  })
+  @ValidateIf((_object, value) => value !== undefined)
+  @IsObject()
+  @ValidateNested()
+  @Type(() => QuestionExplanationDto)
+  structuredExplanation?: QuestionExplanationDto;
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()

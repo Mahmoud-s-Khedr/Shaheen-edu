@@ -39,6 +39,20 @@ const statusTitles: Record<number, LocalizedMessage> = {
 };
 
 const translations: Record<string, string> = {
+  'Edited explanation requires applyExplanation to be true':
+    'لتطبيق الشرح المعدّل، يجب تفعيل تطبيق الشرح',
+  'Question changed while it was being published; refresh and retry':
+    'تغير السؤال أثناء نشره. حدّث الصفحة ثم أعد المحاولة',
+  'Only a draft or archived question can be deleted':
+    'يمكن حذف السؤال فقط إذا كان مسودة أو مؤرشفاً',
+  'Single-choice answers require one option; multiple-choice answers require at least two distinct options':
+    'إجابة سؤال الاختيار الواحد تتطلب اختياراً واحداً، وإجابة سؤال الاختيار المتعدد تتطلب اختيارين مختلفين على الأقل',
+  'Selected option does not exist on this question':
+    'الاختيار المحدد غير موجود ضمن اختيارات هذا السؤال',
+  'Candidate must contain a supported type and body':
+    'يجب أن يحتوي السؤال المستخرج على نوع مدعوم ونص السؤال',
+  'Choice drafts require at least two options':
+    'مسودات أسئلة الاختيار تتطلب اختيارين على الأقل',
   'Provide an answer object for this question':
     'أرسل كائناً يحتوي على إجابة لهذا السؤال',
   'selectedOptionIndexes must contain only non-negative whole numbers':
@@ -1007,6 +1021,12 @@ function untranslatedMessage(message: string, statusCode: number): string {
 
 /** Translates message families whose runtime detail is intentionally dynamic. */
 function dynamicArabicMessage(message: string): string | undefined {
+  const extractedDraftField = /^Extracted drafts cannot include (\w+)$/.exec(
+    message,
+  );
+  if (extractedDraftField)
+    return `لا يمكن أن تتضمن المسودة المستخرجة الحقل ${extractedDraftField[1]}. تُضاف الإجابات والشروح في خطوة منفصلة`;
+
   const placementNotFound =
     /^Placement (?:courseId|chapterId|lessonId|sectionId) not found$/.exec(
       message,

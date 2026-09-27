@@ -5,7 +5,7 @@
 The system uses AI through OpenRouter in four areas:
 
 1. Admin question import from documents and pasted source text.
-2. Admin question answer and explanation generation.
+2. Admin verified-answer explanation generation.
 3. Student AI-planned quiz selection.
 4. Student written-answer grading and voice transcription.
 
@@ -20,11 +20,11 @@ All AI calls use `OPENROUTER_API_KEY`. Model choices are configured in
 | OCR strict-output addendum | Added only on strict retry/fallback. Requires all response fields and valid 0–1000 bounds. | `src/modules/ai-question-import/pdf-transcription.client.ts:154` |
 | OCR verification | Compares a suspicious first OCR result against the image and returns a corrected complete transcript. | `src/modules/ai-question-import/pdf-transcription.client.ts:171` |
 | Question segmentation, legacy | Finds reusable contexts and single/multiple-choice questions in imported source blocks. | `src/modules/ai-question-import/openrouter-question-import.client.ts:619` |
-| Question segmentation, v3/current | Finds contexts, answer-key evidence, and supported question types; treats layout and visual metadata as non-authoritative evidence. | `src/modules/ai-question-import/openrouter-question-import.client.ts:650` |
+| Question segmentation, v7/current | Finds contexts and supported question types while treating answer-key-only ranges as non-question material. | `src/modules/ai-question-import/openrouter-question-import.client.ts` |
 | Question extraction, legacy | Converts segmented choice questions into structured candidates, inferred answers, confidence, warnings, and explanations. | `src/modules/ai-question-import/openrouter-question-import.client.ts:671` |
 | Question extraction, v3 | Extracts typed candidates, uses source-marked answer evidence when present, and does not present AI answers as official. | `src/modules/ai-question-import/openrouter-question-import.client.ts:698` |
-| Question extraction, v4/current | Adds source-block citations, structured explanations, and proposed visual assignments for questions, options, and contexts. | `src/modules/ai-question-import/openrouter-question-import.client.ts:733` |
-| AI question re-answer/explanation | Generates a reusable explanation, proposed answer, confidence, warnings, and a conflict indication. In grounded mode, the supplied admin answer is authoritative; in infer mode, the answer is not official. | `src/modules/ai-question-explanations/question-ai-explanation.client.ts:108` |
+| Question extraction, v7/current | Extracts typed answerless drafts with source-block citations and proposed visual assignments for questions, options, and contexts. | `src/modules/ai-question-import/openrouter-question-import.client.ts` |
+| Verified-answer explanation | Generates only a reusable explanation, explanation-quality confidence, and warnings from an admin-supplied verified answer. | `src/modules/ai-question-explanations/question-ai-explanation.client.ts` |
 | AI quiz planning | Chooses exactly the requested number of eligible question IDs from up to 250 candidates. It must not create IDs or reveal answers. | `src/modules/assessments/assessment-ai.client.ts:89` |
 | Written-answer grading | Grades only against stored accepted answers or the rubric; returns points, feedback, and response-offset highlights in Arabic or English. | `src/modules/assessments/assessment-ai.client.ts:108` |
 
@@ -61,7 +61,7 @@ The system records prompt-version labels for AI runs, including:
 
 - `student-ai-quiz-v1`
 - `assessment-answer-grade-v1`
-- `question-reanswer-explanation-v1`
+- `question-verified-answer-explanation-v2`
 
 The associated model, input snapshots, provider response, token/cost usage, and
 failure details are retained for the applicable AI-run records.

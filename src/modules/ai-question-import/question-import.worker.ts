@@ -33,6 +33,7 @@ import {
   type ImportedCandidate,
   type ImportedCandidateV3,
   type ImportedCandidateV4,
+  type ImportedCandidateV7,
   type SegmentationResult,
   type SegmentationResultV3,
 } from './openrouter-question-import.client';
@@ -213,14 +214,17 @@ export class QuestionImportWorker {
         'question-import-v4',
         'question-import-v5',
         'question-import-v6',
+        'question-import-v7',
       ].includes(batch.schemaVersion)
     )
       return;
     const v4 =
       batch.schemaVersion === 'question-import-v4' ||
       batch.schemaVersion === 'question-import-v5' ||
-      batch.schemaVersion === 'question-import-v6';
+      batch.schemaVersion === 'question-import-v6' ||
+      batch.schemaVersion === 'question-import-v7';
     const v3 = batch.schemaVersion === 'question-import-v3' || v4;
+    const v7 = batch.schemaVersion === 'question-import-v7';
     try {
       if (!batch.normalizedText) {
         await this.prisma.questionImportBatch.update({
@@ -324,8 +328,8 @@ export class QuestionImportWorker {
           pageNumber: b.sourceLocator?.page ?? null,
           layout: b.assignment?.layoutReferences ?? [],
         }));
-        const response = await (v3
-          ? this.client.segmentSourceV3(
+        const response = await (v7
+          ? this.client.segmentSourceV7(
               segmentationBlocks,
               scope
                 ? {
@@ -346,15 +350,37 @@ export class QuestionImportWorker {
                     : String(item.status),
               })),
             )
-          : this.client.segmentSource(
-              segmentationBlocks,
-              scope
-                ? {
-                    corePageStart: scope.corePageStart,
-                    corePageEnd: scope.corePageEnd,
-                  }
-                : undefined,
-            ));
+          : v3
+            ? this.client.segmentSourceV3(
+                segmentationBlocks,
+                scope
+                  ? {
+                      corePageStart: scope.corePageStart,
+                      corePageEnd: scope.corePageEnd,
+                    }
+                  : undefined,
+                segmentationMedia.map((item) => ({
+                  mediaKey: item.mediaKey,
+                  pageNumber: item.pageNumber,
+                  type: item.type,
+                  normalizedBounds: item.normalizedBounds,
+                  description: item.description,
+                  readiness:
+                    item.status === QuestionImportMediaStatus.ELIGIBLE &&
+                    item.asset?.status === 'READY'
+                      ? 'READY'
+                      : String(item.status),
+                })),
+              )
+            : this.client.segmentSource(
+                segmentationBlocks,
+                scope
+                  ? {
+                      corePageStart: scope.corePageStart,
+                      corePageEnd: scope.corePageEnd,
+                    }
+                  : undefined,
+              ));
         const normalized = this.normalizeContexts(blocks, response.result);
         response.result = this.limitToOwnedPages(
           blocks,
@@ -395,8 +421,9 @@ export class QuestionImportWorker {
           batchId,
           blocks,
           response,
-          v3,
+          v3 && !v7,
           v4,
+          v7,
         );
       }
       await this.reclaimStaleProcessingChunks(batchId);
@@ -1084,6 +1111,7 @@ export class QuestionImportWorker {
     const layoutPages: any[] = [
       'question-import-v5',
       'question-import-v6',
+      'question-import-v7',
     ].includes(current.schemaVersion)
       ? await this.prisma.questionImportPage.findMany({
           where: { batchId: rootBatchId },
@@ -1807,6 +1835,7 @@ export class QuestionImportWorker {
     contextIdMap: Map<string, string>,
     media: any[] = [],
     v4 = false,
+    v7 = false,
   ) {
     const keys = blocks.map((b) => b.blockKey);
     const contexts = new Map(
@@ -1884,7 +1913,7 @@ export class QuestionImportWorker {
       return complete.map((question, index) => ({
         batchId,
         sequence: index + 1,
-        text: JSON.stringify(this.extractionInput([question], media, true)),
+        text: JSON.stringify(this.extractionInput([question], media, true, v7)),
         sourceLocator: { ranges: [question.locator] },
         checksum: createHash('sha256')
           .update(JSON.stringify(question))
@@ -1894,7 +1923,7 @@ export class QuestionImportWorker {
     let current: any[] = [];
     for (const question of complete) {
       const candidate = [...current, question];
-      const input = this.extractionInput(candidate);
+      const input = this.extractionInput(candidate, media, false, v7);
       if (
         current.length &&
         (current.length === this.config.extractionMaxQuestions ||
@@ -1910,23 +1939,29 @@ export class QuestionImportWorker {
     return batches.map((questions, index) => ({
       batchId,
       sequence: index + 1,
-      text: JSON.stringify(this.extractionInput(questions, media, v4)),
+      text: JSON.stringify(this.extractionInput(questions, media, v4, v7)),
       sourceLocator: { ranges: questions.map((q: any) => q.locator) },
       checksum: createHash('sha256')
         .update(JSON.stringify(questions))
         .digest('hex'),
     }));
   }
-  private extractionInput(questions: any[], media: any[] = [], v4 = false) {
+  private extractionInput(
+    questions: any[],
+    media: any[] = [],
+    v4 = false,
+    v7 = false,
+  ) {
     const contexts = new Map<string, any>();
     for (const question of questions)
       for (const context of question.contexts ?? [])
         contexts.set(context.id, context);
     // Contexts were attached above only long enough to build a chunk; strip them from every question payload.
     const evidence = new Map<string, any>();
-    for (const question of questions)
-      for (const item of question.answerEvidence ?? [])
-        evidence.set(item.evidenceKey, item);
+    if (!v7)
+      for (const question of questions)
+        for (const item of question.answerEvidence ?? [])
+          evidence.set(item.evidenceKey, item);
     const selectedPages = new Set<number>();
     for (const question of questions) {
       for (const page of question.pageNumbers ?? []) selectedPages.add(page);
@@ -1955,7 +1990,7 @@ export class QuestionImportWorker {
       }));
     return {
       contexts: [...contexts.values()],
-      answerEvidence: [...evidence.values()],
+      ...(v7 ? {} : { answerEvidence: [...evidence.values()] }),
       ...(v4 ? { media: visibleMedia } : {}),
       questions: questions.map(
         ({
@@ -1965,9 +2000,13 @@ export class QuestionImportWorker {
           ...question
         }) => ({
           ...question,
-          allowedEvidenceKeys: answerEvidence.map(
-            (item: any) => item.evidenceKey,
-          ),
+          ...(v7
+            ? {}
+            : {
+                allowedEvidenceKeys: answerEvidence.map(
+                  (item: any) => item.evidenceKey,
+                ),
+              }),
           ...(v4 ? { media: visibleMedia } : {}),
         }),
       ),
@@ -2046,6 +2085,7 @@ export class QuestionImportWorker {
     },
     v3 = false,
     v4 = false,
+    v7 = false,
   ) {
     let rootMedia: any[] = [];
     const batchInfo: any = v4
@@ -2194,6 +2234,7 @@ export class QuestionImportWorker {
         contextIdMap,
         rootMedia,
         v4,
+        v7,
       );
       await tx.questionImportBatch.update({
         where: { id: batchId },
@@ -2296,26 +2337,36 @@ export class QuestionImportWorker {
       const questions = Array.isArray(input) ? input : input.questions;
       const v4 =
         batch.schemaVersion === 'question-import-v4' ||
-        ['question-import-v5', 'question-import-v6'].includes(
-          batch.schemaVersion,
-        );
+        [
+          'question-import-v5',
+          'question-import-v6',
+          'question-import-v7',
+        ].includes(batch.schemaVersion);
       const v3 = batch.schemaVersion === 'question-import-v3' || v4;
-      const r = await (v4
-        ? this.extractV4(
+      const v7 = batch.schemaVersion === 'question-import-v7';
+      const r = await (v7
+        ? this.extractV7(
             batch,
             Array.isArray(input)
-              ? { contexts: [], answerEvidence: [], media: [], questions }
+              ? { contexts: [], media: [], questions }
               : input,
           )
-        : v3
-          ? this.client.extractQuestionsV3(
+        : v4
+          ? this.extractV4(
+              batch,
               Array.isArray(input)
-                ? { contexts: [], answerEvidence: [], questions }
+                ? { contexts: [], answerEvidence: [], media: [], questions }
                 : input,
             )
-          : this.client.extractQuestions(
-              Array.isArray(input) ? { contexts: [], questions } : input,
-            ));
+          : v3
+            ? this.client.extractQuestionsV3(
+                Array.isArray(input)
+                  ? { contexts: [], answerEvidence: [], questions }
+                  : input,
+              )
+            : this.client.extractQuestions(
+                Array.isArray(input) ? { contexts: [], questions } : input,
+              ));
       if (r.items.length !== questions.length)
         throw new Error(
           'AI did not return exactly one structured item for each identified question',
@@ -2343,8 +2394,9 @@ export class QuestionImportWorker {
             index + 1,
             item as any,
             questions[index],
-            v3,
+            v3 && !v7,
             v4,
+            v7,
           );
         },
       );
@@ -2444,6 +2496,67 @@ export class QuestionImportWorker {
     );
     return this.client.extractQuestionsV4(input, crops);
   }
+  private async extractV7(batch: any, input: any) {
+    const rootBatchId = batch.parentId ?? batch.id;
+    const keys = (input.media ?? []).map((item: any) => item.mediaKey);
+    const proximityByKey = new Map<string, number>(
+      (input.media ?? []).map((item: any) => [
+        item.mediaKey,
+        Number.isFinite(item.proximity)
+          ? item.proximity
+          : Number.MAX_SAFE_INTEGER,
+      ]),
+    );
+    const rows: any[] = keys.length
+      ? await this.prisma.questionImportMedia.findMany({
+          where: {
+            batchId: rootBatchId,
+            mediaKey: { in: keys },
+            status: QuestionImportMediaStatus.ELIGIBLE,
+            asset: { is: { status: 'READY' } },
+          },
+          include: { asset: { select: { storageKey: true, mimeType: true } } },
+        })
+      : [];
+    const questionPages = new Set<number>(
+      (input.questions ?? []).flatMap(
+        (question: any) => question.pageNumbers ?? [],
+      ),
+    );
+    const selected = rows
+      .filter((row) => row.asset?.storageKey)
+      .sort(
+        (a, b) =>
+          proximityByKey.get(a.mediaKey)! - proximityByKey.get(b.mediaKey)! ||
+          (questionPages.has(a.pageNumber) === questionPages.has(b.pageNumber)
+            ? a.mediaKey.localeCompare(b.mediaKey)
+            : questionPages.has(a.pageNumber)
+              ? -1
+              : 1),
+      )
+      .slice(0, 12);
+    const sentKeys = new Set(selected.map((row) => row.mediaKey));
+    input.media = (input.media ?? []).filter((row: any) =>
+      sentKeys.has(row.mediaKey),
+    );
+    input.questions = (input.questions ?? []).map((question: any) => {
+      const { allowedEvidenceKeys, answerEvidence, ...draft } = question;
+      return {
+        ...draft,
+        media: (question.media ?? []).filter((row: any) =>
+          sentKeys.has(row.mediaKey),
+        ),
+      };
+    });
+    const crops = await Promise.all(
+      selected.map(async (row) => ({
+        mediaKey: row.mediaKey,
+        mimeType: row.asset.mimeType,
+        data: await this.storage.download(row.asset.storageKey),
+      })),
+    );
+    return this.client.extractQuestionsV7(input, crops);
+  }
   private async createItem(
     batch: any,
     chunk: any,
@@ -2452,7 +2565,16 @@ export class QuestionImportWorker {
     source: any,
     v3 = false,
     v4 = false,
+    v7 = false,
   ) {
+    if (v7)
+      return this.createV7Item(
+        batch,
+        chunk,
+        sequence,
+        c as unknown as ImportedCandidateV7,
+        source,
+      );
     if (v4)
       return this.createV4Item(
         batch,
@@ -2764,6 +2886,337 @@ export class QuestionImportWorker {
       value <= Number(last.slice(1))
     );
   }
+  private async persistVisualReview(
+    tx: any,
+    rootBatchId: string,
+    source: any,
+    item: { id: string },
+    assignments: ImportedCandidateV4['mediaAssignments'],
+    mediaByKey: Map<string, any>,
+    rankedMedia: any[],
+    requirementSpecs: any[],
+    trackRequirements: boolean,
+    reviewRequired: boolean,
+  ) {
+    const visualRequired = requirementSpecs.some(
+      (requirement) => requirement.kind !== 'NONE',
+    );
+    const exclusiveMediaIds = [
+      ...new Set(
+        assignments
+          .filter(
+            (assignment) =>
+              assignment.owner === 'QUESTION' || assignment.owner === 'OPTION',
+          )
+          .map((assignment) => mediaByKey.get(assignment.mediaKey).id),
+      ),
+    ];
+    // Serialize competing claims for the same crop. The nullable unique
+    // key is the final guard; these advisory locks let the losing proposal
+    // remain reviewable instead of being dropped on a P2002 race.
+    for (const mediaId of [...exclusiveMediaIds].sort())
+      await tx.$executeRaw(
+        Prisma.sql`SELECT pg_advisory_xact_lock(hashtext(${`${rootBatchId}:${mediaId}`}))`,
+      );
+    const ownershipConflicts: any[] = exclusiveMediaIds.length
+      ? await tx.questionImportMediaAssignment.findMany({
+          where: {
+            mediaId: { in: exclusiveMediaIds },
+            importItemId: { not: item.id },
+            owner: {
+              in: [
+                QuestionImportMediaAssignmentOwner.QUESTION,
+                QuestionImportMediaAssignmentOwner.OPTION,
+              ],
+            },
+            status: { not: QuestionImportMediaAssignmentStatus.REJECTED },
+            importItem: {
+              OR: [
+                { batchId: rootBatchId },
+                { batch: { parentId: rootBatchId } },
+              ],
+            },
+          },
+          select: { mediaId: true },
+        })
+      : [];
+    const conflictingMediaIds = new Set(
+      ownershipConflicts.map((conflict) => conflict.mediaId),
+    );
+    const assignmentRows = await Promise.all(
+      assignments.map((assignment) =>
+        tx.questionImportMediaAssignment.create({
+          data: {
+            importItemId: item.id,
+            mediaId: mediaByKey.get(assignment.mediaKey).id,
+            assignmentKey: `${assignment.mediaKey}:${assignment.owner}:${assignment.ownerReference}`,
+            exclusiveOwnershipKey:
+              assignment.owner === 'QUESTION' || assignment.owner === 'OPTION'
+                ? conflictingMediaIds.has(
+                    mediaByKey.get(assignment.mediaKey).id,
+                  )
+                  ? null
+                  : `${rootBatchId}:${mediaByKey.get(assignment.mediaKey).id}`
+                : null,
+            owner: assignment.owner,
+            ownerReference: assignment.ownerReference,
+            placementAnchor: assignment.placementAnchor,
+            confidence: assignment.confidence,
+            reason: assignment.reason.trim(),
+            scoreComponents: {
+              modelConfidence: assignment.confidence,
+              samePage:
+                mediaByKey.get(assignment.mediaKey).pageNumber === source.page,
+              ownershipConflict: conflictingMediaIds.has(
+                mediaByKey.get(assignment.mediaKey).id,
+              ),
+            },
+            evidenceVersion: trackRequirements
+              ? this.visualLinker.evidenceVersion([])
+              : null,
+            status: trackRequirements
+              ? QuestionImportMediaAssignmentStatus.PROPOSED
+              : reviewRequired
+                ? QuestionImportMediaAssignmentStatus.PROPOSED
+                : QuestionImportMediaAssignmentStatus.APPROVED,
+          },
+        }),
+      ),
+    );
+    if (trackRequirements) {
+      const linkedAssignments = assignments.map((assignment) => ({
+        ...assignment,
+        status: QuestionImportMediaAssignmentStatus.PROPOSED,
+        media: mediaByKey.get(assignment.mediaKey),
+        conflicting:
+          (assignment.owner === 'QUESTION' || assignment.owner === 'OPTION') &&
+          conflictingMediaIds.has(mediaByKey.get(assignment.mediaKey).id),
+      }));
+      const outcomes = requirementSpecs.map((requirement) => ({
+        requirement,
+        outcome: this.visualLinker.resolve(
+          requirement,
+          linkedAssignments,
+          rankedMedia,
+        ),
+      }));
+      await Promise.all(
+        outcomes.map(({ requirement, outcome }) =>
+          tx.questionImportVisualRequirement.create({
+            data: {
+              importItemId: item.id,
+              ...requirement,
+              sourceEnvelope: source.envelope ?? null,
+              optionIndexes: requirement.optionIndexes,
+              resolutionState: outcome.state,
+              unresolvedReason: outcome.reason,
+              candidateRankings: outcome.rankings,
+            },
+          }),
+        ),
+      );
+      const visualState = outcomes.some(
+        ({ outcome }) =>
+          outcome.state !== QuestionImportVisualResolutionState.NOT_REQUIRED,
+      )
+        ? outcomes.find(
+            ({ outcome }) =>
+              outcome.state !==
+              QuestionImportVisualResolutionState.NOT_REQUIRED,
+          )!.outcome.state
+        : QuestionImportVisualResolutionState.NOT_REQUIRED;
+      await tx.questionImportItem.update({
+        where: { id: item.id },
+        data: { visualState, answerContentValid: !visualRequired },
+      });
+    }
+    return assignmentRows;
+  }
+  private async createV7Item(
+    batch: any,
+    chunk: any,
+    sequence: number,
+    c: ImportedCandidateV7,
+    source: any,
+  ) {
+    const type = c?.type;
+    const choice = type === 'SINGLE_CHOICE' || type === 'MULTIPLE_CHOICE';
+    const options = choice
+      ? (c.options ?? []).map((option) => ({
+          body: typeof option?.body === 'string' ? option.body.trim() : '',
+        }))
+      : [];
+    const sourceCitations = [...new Set(c?.citedSourceBlockKeys ?? [])];
+    const citationsValid =
+      sourceCitations.length > 0 &&
+      sourceCitations.every(
+        (key) =>
+          this.sourceCitationInRange(
+            key,
+            source.firstBlock,
+            source.lastBlock,
+          ) || (source.contextIds ?? []).includes(key),
+      );
+    const validType = [
+      'SINGLE_CHOICE',
+      'MULTIPLE_CHOICE',
+      'SHORT_ANSWER',
+      'FILL_IN_THE_BLANK',
+      'LONG_ANSWER',
+    ].includes(type);
+    const validOptions = !choice || options.length >= 2;
+    const assignments = c?.mediaAssignments ?? [];
+    const rootBatchId = batch.parentId ?? batch.id;
+    const requirementSpecs = this.visualLinker.requirements(c, source);
+    const offeredMedia = new Set(
+      (source.media ?? []).map((media: any) => media.mediaKey),
+    );
+    try {
+      const mediaRows: any[] = assignments.length
+        ? await this.prisma.questionImportMedia.findMany({
+            where: {
+              batchId: rootBatchId,
+              mediaKey: {
+                in: assignments.map((assignment) => assignment.mediaKey),
+              },
+              status: QuestionImportMediaStatus.ELIGIBLE,
+              asset: { is: { status: 'READY' } },
+            },
+          })
+        : [];
+      const mediaByKey = new Map(mediaRows.map((row) => [row.mediaKey, row]));
+      const validAssignments = assignments.every((assignment) => {
+        if (
+          !mediaByKey.has(assignment.mediaKey) ||
+          !offeredMedia.has(assignment.mediaKey) ||
+          !Number.isFinite(assignment.confidence) ||
+          assignment.confidence < 0 ||
+          assignment.confidence > 1 ||
+          typeof assignment.reason !== 'string' ||
+          !assignment.reason.trim() ||
+          !['QUESTION', 'OPTION', 'CONTEXT'].includes(assignment.owner) ||
+          !(
+            assignment.placementAnchor === null ||
+            assignment.placementAnchor === 'START' ||
+            assignment.placementAnchor === 'END' ||
+            (typeof assignment.placementAnchor === 'string' &&
+              assignment.placementAnchor.startsWith('AFTER:') &&
+              this.sourceCitationInRange(
+                assignment.placementAnchor.slice(6),
+                source.firstBlock,
+                source.lastBlock,
+              ))
+          )
+        )
+          return false;
+        if (assignment.owner === 'QUESTION')
+          return assignment.ownerReference === 'QUESTION';
+        if (assignment.owner === 'OPTION') {
+          const match = /^OPTION:(\d+)$/.exec(assignment.ownerReference);
+          return Boolean(match && Number(match[1]) < options.length);
+        }
+        return (source.contextIds ?? []).includes(assignment.ownerReference);
+      });
+      const uniqueAssignments =
+        new Set(
+          assignments.map(
+            (assignment) =>
+              `${assignment.mediaKey}:${assignment.owner}:${assignment.ownerReference}`,
+          ),
+        ).size === assignments.length;
+      const rankedMedia = await this.prisma.questionImportMedia.findMany({
+        where: {
+          batchId: rootBatchId,
+          status: QuestionImportMediaStatus.ELIGIBLE,
+          asset: { is: { status: 'READY' } },
+        },
+      });
+      return await this.prisma.$transaction(async (tx: any) => {
+        const item = await tx.questionImportItem.create({
+          data: {
+            batchId: batch.id,
+            chunkId: chunk.id,
+            sequence,
+            status: QuestionImportItemStatus.PROCESSING,
+            rawOutput: c as any,
+            normalizedOutput: { ...c, options } as any,
+            warnings: (c.warnings ?? []) as any,
+            sourceLocator: {
+              firstBlock: source.firstBlock,
+              lastBlock: source.lastBlock,
+              page: source.page,
+            },
+            sourceNumber: source.sourceNumber,
+            globalOrder:
+              (batch.childSequence ?? 0) * 1_000_000 +
+              chunk.sequence * 1_000 +
+              sequence,
+            section: source.section,
+            detectedType: type,
+            answerOrigin: null,
+          },
+        });
+        if (
+          !validType ||
+          !c?.body?.trim() ||
+          !validOptions ||
+          !citationsValid ||
+          !validAssignments ||
+          !uniqueAssignments
+        )
+          return tx.questionImportItem.update({
+            where: { id: item.id },
+            data: {
+              status: QuestionImportItemStatus.INVALID,
+              errorDetail:
+                'Candidate does not satisfy extraction-only question rules',
+            },
+          });
+        await this.persistVisualReview(
+          tx,
+          rootBatchId,
+          source,
+          item,
+          assignments,
+          mediaByKey,
+          rankedMedia,
+          requirementSpecs,
+          true,
+          true,
+        );
+        return tx.questionImportItem.update({
+          where: { id: item.id },
+          data: {
+            status: QuestionImportItemStatus.REVIEW_REQUIRED,
+            errorDetail: source.contextUnresolved
+              ? `CONTEXT_UNRESOLVED: ${(source.contextDiagnostics ?? []).join('; ')}`
+              : 'Extracted draft requires admin content and visual review',
+          },
+        });
+      });
+    } catch (error: any) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      )
+        return;
+      return this.prisma.questionImportItem.create({
+        data: {
+          batchId: batch.id,
+          chunkId: chunk.id,
+          sequence,
+          status: QuestionImportItemStatus.INVALID,
+          rawOutput: c as any,
+          normalizedOutput: c as any,
+          sourceLocator: {
+            firstBlock: source.firstBlock,
+            lastBlock: source.lastBlock,
+          },
+          errorDetail: error.message.slice(0, 2000),
+        },
+      });
+    }
+  }
   /**
    * Models sometimes compact a contiguous citation into `B00010-B00014`.
    * Treat that as a citation for the bounded block range while retaining the
@@ -2788,9 +3241,11 @@ export class QuestionImportWorker {
     c: ImportedCandidateV4,
     source: any,
   ) {
-    const isV5 = ['question-import-v5', 'question-import-v6'].includes(
-      batch.schemaVersion,
-    );
+    const isV5 = [
+      'question-import-v5',
+      'question-import-v6',
+      'question-import-v7',
+    ].includes(batch.schemaVersion);
     const type = c?.type;
     const choice = type === 'SINGLE_CHOICE' || type === 'MULTIPLE_CHOICE';
     const written = type === 'SHORT_ANSWER' || type === 'FILL_IN_THE_BLANK';
@@ -2981,140 +3436,18 @@ export class QuestionImportWorker {
             answerContentValid: !visualRequired,
           },
         });
-        const exclusiveMediaIds = [
-          ...new Set(
-            assignments
-              .filter(
-                (assignment) =>
-                  assignment.owner === 'QUESTION' ||
-                  assignment.owner === 'OPTION',
-              )
-              .map((assignment) => mediaByKey.get(assignment.mediaKey).id),
-          ),
-        ];
-        // Serialize competing claims for the same crop. The nullable unique
-        // key is the final guard; these advisory locks let the losing proposal
-        // remain reviewable instead of being dropped on a P2002 race.
-        for (const mediaId of [...exclusiveMediaIds].sort())
-          await tx.$executeRaw(
-            Prisma.sql`SELECT pg_advisory_xact_lock(hashtext(${`${rootBatchId}:${mediaId}`}))`,
-          );
-        const ownershipConflicts: any[] = exclusiveMediaIds.length
-          ? await tx.questionImportMediaAssignment.findMany({
-              where: {
-                mediaId: { in: exclusiveMediaIds },
-                importItemId: { not: item.id },
-                owner: {
-                  in: [
-                    QuestionImportMediaAssignmentOwner.QUESTION,
-                    QuestionImportMediaAssignmentOwner.OPTION,
-                  ],
-                },
-                status: { not: QuestionImportMediaAssignmentStatus.REJECTED },
-                importItem: {
-                  OR: [
-                    { batchId: rootBatchId },
-                    { batch: { parentId: rootBatchId } },
-                  ],
-                },
-              },
-              select: { mediaId: true },
-            })
-          : [];
-        const conflictingMediaIds = new Set(
-          ownershipConflicts.map((conflict) => conflict.mediaId),
+        const assignmentRows = await this.persistVisualReview(
+          tx,
+          rootBatchId,
+          source,
+          item,
+          assignments,
+          mediaByKey,
+          rankedMedia,
+          requirementSpecs,
+          isV5,
+          reviewRequired,
         );
-        const assignmentRows = await Promise.all(
-          assignments.map((assignment) =>
-            tx.questionImportMediaAssignment.create({
-              data: {
-                importItemId: item.id,
-                mediaId: mediaByKey.get(assignment.mediaKey).id,
-                assignmentKey: `${assignment.mediaKey}:${assignment.owner}:${assignment.ownerReference}`,
-                exclusiveOwnershipKey:
-                  assignment.owner === 'QUESTION' ||
-                  assignment.owner === 'OPTION'
-                    ? conflictingMediaIds.has(
-                        mediaByKey.get(assignment.mediaKey).id,
-                      )
-                      ? null
-                      : `${rootBatchId}:${mediaByKey.get(assignment.mediaKey).id}`
-                    : null,
-                owner: assignment.owner,
-                ownerReference: assignment.ownerReference,
-                placementAnchor: assignment.placementAnchor,
-                confidence: assignment.confidence,
-                reason: assignment.reason.trim(),
-                scoreComponents: {
-                  modelConfidence: assignment.confidence,
-                  samePage:
-                    mediaByKey.get(assignment.mediaKey).pageNumber ===
-                    source.page,
-                  ownershipConflict: conflictingMediaIds.has(
-                    mediaByKey.get(assignment.mediaKey).id,
-                  ),
-                },
-                evidenceVersion: isV5
-                  ? this.visualLinker.evidenceVersion([])
-                  : null,
-                status: isV5
-                  ? QuestionImportMediaAssignmentStatus.PROPOSED
-                  : reviewRequired
-                    ? QuestionImportMediaAssignmentStatus.PROPOSED
-                    : QuestionImportMediaAssignmentStatus.APPROVED,
-              },
-            }),
-          ),
-        );
-        if (isV5) {
-          const linkedAssignments = assignments.map((assignment) => ({
-            ...assignment,
-            status: QuestionImportMediaAssignmentStatus.PROPOSED,
-            media: mediaByKey.get(assignment.mediaKey),
-            conflicting:
-              (assignment.owner === 'QUESTION' ||
-                assignment.owner === 'OPTION') &&
-              conflictingMediaIds.has(mediaByKey.get(assignment.mediaKey).id),
-          }));
-          const outcomes = requirementSpecs.map((requirement) => ({
-            requirement,
-            outcome: this.visualLinker.resolve(
-              requirement,
-              linkedAssignments,
-              rankedMedia,
-            ),
-          }));
-          await Promise.all(
-            outcomes.map(({ requirement, outcome }) =>
-              tx.questionImportVisualRequirement.create({
-                data: {
-                  importItemId: item.id,
-                  ...requirement,
-                  sourceEnvelope: source.envelope ?? null,
-                  optionIndexes: requirement.optionIndexes,
-                  resolutionState: outcome.state,
-                  unresolvedReason: outcome.reason,
-                  candidateRankings: outcome.rankings,
-                },
-              }),
-            ),
-          );
-          const visualState = outcomes.some(
-            ({ outcome }) =>
-              outcome.state !==
-              QuestionImportVisualResolutionState.NOT_REQUIRED,
-          )
-            ? outcomes.find(
-                ({ outcome }) =>
-                  outcome.state !==
-                  QuestionImportVisualResolutionState.NOT_REQUIRED,
-              )!.outcome.state
-            : QuestionImportVisualResolutionState.NOT_REQUIRED;
-          await tx.questionImportItem.update({
-            where: { id: item.id },
-            data: { visualState, answerContentValid: !visualRequired },
-          });
-        }
         if (!structuralValid)
           return tx.questionImportItem.update({
             where: { id: item.id },

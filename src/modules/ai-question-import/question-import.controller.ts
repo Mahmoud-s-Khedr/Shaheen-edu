@@ -34,7 +34,7 @@ import { QuestionImportService } from './question-import.service';
 export class QuestionImportController {
   constructor(private readonly service: QuestionImportService) {}
   @Post()
-  @ApiOperation({ summary: 'Create and queue an AI question import' })
+  @ApiOperation({ summary: 'Extract and queue AI question drafts' })
   create(
     @CurrentUser() actor: RequestUser,
     @Body() dto: CreateQuestionImportDto,

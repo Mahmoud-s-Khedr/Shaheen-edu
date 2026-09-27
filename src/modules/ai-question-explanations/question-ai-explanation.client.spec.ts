@@ -11,7 +11,7 @@ describe('QuestionAiExplanationClient', () => {
 
   afterEach(() => jest.restoreAllMocks());
 
-  it('requests a strict reusable six-part explanation and preserves grounded answer input', async () => {
+  it('requests a strict reusable six-part explanation from a verified answer only', async () => {
     const fetchSpy = jest.spyOn(global, 'fetch' as any).mockResolvedValue({
       ok: true,
       text: async () =>
@@ -20,14 +20,8 @@ describe('QuestionAiExplanationClient', () => {
             {
               message: {
                 content: JSON.stringify({
-                  answer: {
-                    selectedOptionIndexes: [1],
-                    acceptedAnswers: null,
-                    gradingRubric: null,
-                  },
                   confidence: 0.9,
                   warnings: [],
-                  conflictWarning: null,
                   structuredExplanation: {
                     keywords: 'k',
                     eliminationStrategy: 's',
@@ -46,7 +40,6 @@ describe('QuestionAiExplanationClient', () => {
     const client = new QuestionAiExplanationClient(config);
 
     const result = await client.generate({
-      mode: 'GROUNDED',
       languageCode: 'ar',
       question: { body: 'سؤال' },
       suppliedAnswer: { selectedOptionIndexes: [1] },
@@ -66,5 +59,9 @@ describe('QuestionAiExplanationClient', () => {
       request.response_format.json_schema.schema.properties
         .structuredExplanation,
     ).toBeDefined();
+    expect(JSON.stringify(request.response_format.json_schema)).not.toContain(
+      'selectedOptionIndexes',
+    );
+    expect(request.messages[1].content).toContain('verifiedAnswer');
   });
 });

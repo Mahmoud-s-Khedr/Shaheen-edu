@@ -43,7 +43,7 @@ import { PdfPageRangeService } from './pdf-page-range.service';
 import { QuestionImportMediaService } from './question-import-media.service';
 import { QuestionImportVisualLinkerService } from './question-import-visual-linker.service';
 
-const DEFAULT_LONG_ANSWER_GRADING_RUBRIC =
+const LEGACY_DEFAULT_LONG_ANSWER_GRADING_RUBRIC =
   'Assess the response for factual correctness, relevance, completeness, and clarity. Award points proportionally to the quality and accuracy of the answer; give full credit only when it fully and correctly addresses the question.';
 
 @Injectable()
@@ -221,8 +221,8 @@ export class QuestionImportService {
         model: this.model,
         schemaVersion:
           asset?.mimeType === 'application/pdf'
-            ? 'question-import-v6'
-            : 'question-import-v6',
+            ? 'question-import-v7'
+            : 'question-import-v7',
         createdById: actor.id,
       },
     });
@@ -350,6 +350,7 @@ export class QuestionImportService {
       this.prisma.questionImportItem.findMany({
         where,
         include: {
+          batch: { select: { schemaVersion: true } },
           visualRequirements: true,
           mediaAssignments: {
             include: { media: { include: { asset: true } } },
@@ -367,33 +368,47 @@ export class QuestionImportService {
       this.prisma.questionImportItem.count({ where }),
     ]);
     return {
-      data: data.map((item: any) => ({
-        ...item,
-        visualRequirements: item.visualRequirements.map((requirement: any) => ({
-          ...requirement,
-          coverage:
-            requirement.resolutionState ===
-              QuestionImportVisualResolutionState.RESOLVED ||
-            requirement.resolutionState ===
-              QuestionImportVisualResolutionState.NOT_REQUIRED,
-        })),
-        mediaAssignments: item.mediaAssignments.map((assignment: any) => ({
-          id: assignment.id,
-          mediaKey: assignment.media.mediaKey,
-          owner: assignment.owner,
-          ownerReference: assignment.ownerReference,
-          placementAnchor: assignment.placementAnchor,
-          confidence: assignment.confidence,
-          reason: assignment.reason,
-          status: assignment.status,
-          scoreComponents: assignment.scoreComponents,
-          evidenceVersion: assignment.evidenceVersion,
-          reviewNote: assignment.reviewNote,
-          preview: assignment.media.asset
-            ? this.assets.protectedAccess(assignment.media.asset)
-            : null,
-        })),
-      })),
+      data: data.map((item: any) => {
+        const {
+          batch: itemBatch,
+          confidence,
+          answerOrigin,
+          citedEvidenceKeys,
+          ...response
+        } = item;
+        return {
+          ...response,
+          ...(itemBatch.schemaVersion === 'question-import-v7'
+            ? {}
+            : { confidence, answerOrigin, citedEvidenceKeys }),
+          visualRequirements: item.visualRequirements.map(
+            (requirement: any) => ({
+              ...requirement,
+              coverage:
+                requirement.resolutionState ===
+                  QuestionImportVisualResolutionState.RESOLVED ||
+                requirement.resolutionState ===
+                  QuestionImportVisualResolutionState.NOT_REQUIRED,
+            }),
+          ),
+          mediaAssignments: item.mediaAssignments.map((assignment: any) => ({
+            id: assignment.id,
+            mediaKey: assignment.media.mediaKey,
+            owner: assignment.owner,
+            ownerReference: assignment.ownerReference,
+            placementAnchor: assignment.placementAnchor,
+            confidence: assignment.confidence,
+            reason: assignment.reason,
+            status: assignment.status,
+            scoreComponents: assignment.scoreComponents,
+            evidenceVersion: assignment.evidenceVersion,
+            reviewNote: assignment.reviewNote,
+            preview: assignment.media.asset
+              ? this.assets.protectedAccess(assignment.media.asset)
+              : null,
+          })),
+        };
+      }),
       meta: toPaginationMeta(query.page, query.limit, total),
     };
   }
@@ -617,6 +632,7 @@ export class QuestionImportService {
           'question-import-v4',
           'question-import-v5',
           'question-import-v6',
+          'question-import-v7',
         ].includes(item.batch.schemaVersion)
       )
         throw new ConflictException(
@@ -813,9 +829,11 @@ export class QuestionImportService {
         })),
       });
       if (
-        ['question-import-v5', 'question-import-v6'].includes(
-          item.batch.schemaVersion,
-        )
+        [
+          'question-import-v5',
+          'question-import-v6',
+          'question-import-v7',
+        ].includes(item.batch.schemaVersion)
       ) {
         const [requirements, assigned, allMedia] = await Promise.all([
           tx.questionImportVisualRequirement.findMany({
@@ -934,6 +952,7 @@ export class QuestionImportService {
         'question-import-v4',
         'question-import-v5',
         'question-import-v6',
+        'question-import-v7',
       ].includes(item.batch.schemaVersion)
         ? item.mediaAssignments.filter(
             (assignment: any) =>
@@ -948,10 +967,13 @@ export class QuestionImportService {
           .filter((assignment: any) => assignment.owner === 'OPTION')
           .map((assignment: any) => Number(assignment.ownerReference.slice(7))),
       );
-      const normalized = this.normalizeReviewCandidate(
-        dto.candidate,
-        visualOptionIndexes,
-      );
+      const extractionOnly = item.batch.schemaVersion === 'question-import-v7';
+      const normalized = extractionOnly
+        ? this.normalizeExtractedDraft(dto.candidate, visualOptionIndexes)
+        : this.normalizeLegacyReviewCandidate(
+            dto.candidate,
+            visualOptionIndexes,
+          );
       const questionBlocks = acceptedVisuals.length
         ? this.anchoredBlocks(
             normalized.body,
@@ -975,27 +997,43 @@ export class QuestionImportService {
             : undefined,
         }),
       );
-      const question = await this.questions.createImportedDraftWithClient(
-        { id: actor.id, role: actor.role, sessionId: actor.sessionId },
-        {
-          bankId: item.batch.bankId,
-          sourceId: item.batch.sourceId,
-          courseId: item.batch.courseId,
-          placements: item.batch.placements,
-          body: normalized.body,
-          contentBlocks: questionBlocks,
-          explanation: normalized.explanation,
-          aiExplanation: normalized.structuredExplanation,
-          model: item.batch.model,
-          type: normalized.type,
-          options: visualOptions,
-          acceptedAnswers: normalized.acceptedAnswers,
-          gradingRubric: normalized.gradingRubric,
-          contextIds: source.contextDbIds ?? source.contextIds ?? [],
-          answerOrigin: QuestionAnswerProvenance.HUMAN_REVIEWED,
-        },
-        tx,
-      );
+      const question = await (extractionOnly
+        ? this.questions.createExtractedDraftWithClient(
+            { id: actor.id, role: actor.role, sessionId: actor.sessionId },
+            {
+              bankId: item.batch.bankId,
+              sourceId: item.batch.sourceId,
+              courseId: item.batch.courseId,
+              placements: item.batch.placements,
+              body: normalized.body,
+              contentBlocks: questionBlocks,
+              type: normalized.type,
+              options: visualOptions,
+              contextIds: source.contextDbIds ?? source.contextIds ?? [],
+            },
+            tx,
+          )
+        : this.questions.createImportedDraftWithClient(
+            { id: actor.id, role: actor.role, sessionId: actor.sessionId },
+            {
+              bankId: item.batch.bankId,
+              sourceId: item.batch.sourceId,
+              courseId: item.batch.courseId,
+              placements: item.batch.placements,
+              body: normalized.body,
+              contentBlocks: questionBlocks,
+              explanation: normalized.explanation,
+              aiExplanation: normalized.structuredExplanation,
+              model: item.batch.model,
+              type: normalized.type,
+              options: visualOptions,
+              acceptedAnswers: normalized.acceptedAnswers,
+              gradingRubric: normalized.gradingRubric,
+              contextIds: source.contextDbIds ?? source.contextIds ?? [],
+              answerOrigin: QuestionAnswerProvenance.HUMAN_REVIEWED,
+            },
+            tx,
+          ));
       for (const assignment of acceptedVisuals.filter(
         (value: any) => value.owner === 'CONTEXT',
       )) {
@@ -1062,8 +1100,12 @@ export class QuestionImportService {
         data: {
           status: QuestionImportItemStatus.CREATED,
           questionId: question.id,
-          answerOrigin: QuestionAnswerProvenance.HUMAN_REVIEWED,
-          citedEvidenceKeys: normalized.citedEvidenceKeys,
+          answerOrigin: extractionOnly
+            ? null
+            : QuestionAnswerProvenance.HUMAN_REVIEWED,
+          citedEvidenceKeys: extractionOnly
+            ? Prisma.JsonNull
+            : (normalized.citedEvidenceKeys as any),
           reviewerCandidate: normalized,
           reviewedAt: new Date(),
           reviewedById: actor.id,
@@ -1107,7 +1149,14 @@ export class QuestionImportService {
             : {}),
         },
       });
-      return updated;
+      if (!extractionOnly) return updated;
+      const {
+        answerOrigin: _answerOrigin,
+        citedEvidenceKeys: _citedEvidenceKeys,
+        confidence: _confidence,
+        ...answerlessDraft
+      } = updated;
+      return answerlessDraft;
     });
     return created;
   }
@@ -1389,7 +1438,78 @@ export class QuestionImportService {
       throw new ConflictException('Review candidate source is unavailable');
     return source;
   }
-  private normalizeReviewCandidate(
+  private normalizeExtractedDraft(
+    candidate: Record<string, unknown>,
+    visualOptionIndexes = new Set<number>(),
+  ) {
+    const value: any = candidate;
+    const type = value?.type;
+    if (
+      ![
+        'SINGLE_CHOICE',
+        'MULTIPLE_CHOICE',
+        'SHORT_ANSWER',
+        'FILL_IN_THE_BLANK',
+        'LONG_ANSWER',
+      ].includes(type) ||
+      typeof value.body !== 'string' ||
+      !value.body.trim()
+    )
+      throw new BadRequestException(
+        'Candidate must contain a supported type and body',
+      );
+    for (const forbidden of [
+      'selectedOptionIndexes',
+      'acceptedAnswers',
+      'gradingRubric',
+      'answerOrigin',
+      'confidence',
+      'explanation',
+      'structuredExplanation',
+      'citedEvidenceKeys',
+    ])
+      if (value[forbidden] !== undefined)
+        throw new BadRequestException(
+          `Extracted drafts cannot include ${forbidden}`,
+        );
+    if (
+      value.warnings !== undefined &&
+      (!Array.isArray(value.warnings) ||
+        !value.warnings.every((warning: any) => typeof warning === 'string'))
+    )
+      throw new BadRequestException('Candidate warnings must be strings');
+    const output: any = {
+      body: value.body.trim(),
+      type,
+      warnings: value.warnings ?? [],
+      options: [],
+    };
+    if (type === 'SINGLE_CHOICE' || type === 'MULTIPLE_CHOICE') {
+      if (!Array.isArray(value.options) || value.options.length < 2)
+        throw new BadRequestException(
+          'Choice drafts require at least two options',
+        );
+      output.options = value.options.map((option: any) => ({
+        body: typeof option?.body === 'string' ? option.body.trim() : '',
+        isCorrect: false,
+      }));
+      const nonEmpty = output.options.filter((option: any) => option.body);
+      if (
+        output.options.some(
+          (option: any, index: number) =>
+            !option.body && !visualOptionIndexes.has(index),
+        ) ||
+        new Set(nonEmpty.map((option: any) => option.body)).size !==
+          nonEmpty.length
+      )
+        throw new BadRequestException(
+          'Choice candidate does not satisfy its answer type',
+        );
+    }
+    return output;
+  }
+  /** Kept only for accepting pre-v7 stored review records. New v7 records never call this. */
+  private normalizeLegacyReviewCandidate(
     candidate: Record<string, unknown>,
     visualOptionIndexes = new Set<number>(),
   ) {
@@ -1411,43 +1531,17 @@ export class QuestionImportService {
       throw new BadRequestException(
         'Candidate must contain a supported type, body, and explanation',
       );
-    if (
-      value.confidence !== undefined &&
-      (!Number.isFinite(value.confidence) ||
-        value.confidence < 0 ||
-        value.confidence > 1)
-    )
-      throw new BadRequestException(
-        'Candidate confidence must be between zero and one',
-      );
-    if (
-      value.warnings !== undefined &&
-      (!Array.isArray(value.warnings) ||
-        !value.warnings.every((warning: any) => typeof warning === 'string'))
-    )
-      throw new BadRequestException('Candidate warnings must be strings');
-    const citedEvidenceKeys = [
-      ...new Set(
-        Array.isArray(value.citedEvidenceKeys) ? value.citedEvidenceKeys : [],
-      ),
-    ];
-    if (!citedEvidenceKeys.every((key: any) => typeof key === 'string'))
-      throw new BadRequestException('Candidate evidence keys must be strings');
     const output: any = {
       body: value.body.trim(),
-      explanation: value.explanation.trim(),
       type,
-      warnings: value.warnings ?? [],
-      confidence: value.confidence ?? 1,
-      // The reviewer's decision is authoritative.  AI provenance/evidence is
-      // kept with the import item for traceability, but it must not constrain
-      // a question whose answer was verified from the physical book or its
-      // publisher.
-      answerOrigin: QuestionAnswerProvenance.HUMAN_REVIEWED,
-      citedEvidenceKeys,
+      explanation: value.explanation.trim(),
       options: [],
       acceptedAnswers: [],
       gradingRubric: undefined,
+      warnings: Array.isArray(value.warnings) ? value.warnings : [],
+      citedEvidenceKeys: Array.isArray(value.citedEvidenceKeys)
+        ? value.citedEvidenceKeys.filter((key: any) => typeof key === 'string')
+        : [],
     };
     if (value.structuredExplanation !== undefined) {
       const fields = [
@@ -1459,10 +1553,9 @@ export class QuestionImportService {
         'commonMistakes',
       ];
       if (
-        !value.structuredExplanation ||
         !fields.every(
           (field) =>
-            typeof value.structuredExplanation[field] === 'string' &&
+            typeof value.structuredExplanation?.[field] === 'string' &&
             value.structuredExplanation[field].trim(),
         )
       )
@@ -1537,7 +1630,7 @@ export class QuestionImportService {
           ? value.gradingRubric.trim()
           : '';
       if (!output.gradingRubric)
-        output.gradingRubric = DEFAULT_LONG_ANSWER_GRADING_RUBRIC;
+        output.gradingRubric = LEGACY_DEFAULT_LONG_ANSWER_GRADING_RUBRIC;
     }
     return output;
   }
@@ -1792,14 +1885,18 @@ export class QuestionImportService {
         errorDetail: page.errorDetail,
       })),
       skippedRanges: skippedRanges(batch.skippedRanges),
-      answerEvidence: batch.answerEvidence.map((item: any) => ({
-        evidenceKey: item.evidenceKey,
-        firstBlock: item.firstBlock,
-        lastBlock: item.lastBlock,
-        text: item.text,
-        sourceLocator: item.sourceLocator,
-        questionIds: item.questionIds,
-      })),
+      ...(batch.schemaVersion === 'question-import-v7'
+        ? {}
+        : {
+            answerEvidence: batch.answerEvidence.map((item: any) => ({
+              evidenceKey: item.evidenceKey,
+              firstBlock: item.firstBlock,
+              lastBlock: item.lastBlock,
+              text: item.text,
+              sourceLocator: item.sourceLocator,
+              questionIds: item.questionIds,
+            })),
+          }),
       skippedRangeCount:
         batch.skippedRanges.length +
         children.reduce(

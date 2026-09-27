@@ -62,7 +62,7 @@ export class UpdateQuestionImportSourceTextDto {
 export class AcceptQuestionImportItemDto {
   @ApiProperty({
     description:
-      'Corrected typed candidate. The administrator is the answer authority; retained AI evidence is optional review context.',
+      'Corrected extracted question draft. It contains wording, type, options, contexts, and media only; answers and explanations are supplied separately through verified-answer review.',
   })
   @IsObject()
   candidate!: Record<string, unknown>;

@@ -6,6 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { createHash } from 'node:crypto';
+import { Prisma } from '@prisma/client';
 import {
   AssetStatus,
   QuestionAiExplanationRunMode,
@@ -108,7 +109,7 @@ export class QuestionAiExplanationsService {
       gradingRubric: null,
     };
   }
-  private validAnswer(type: QuestionType, value: any) {
+  private validAnswer(type: QuestionType, value: any, optionCount?: number) {
     if (!value || typeof value !== 'object' || Array.isArray(value))
       throw new BadRequestException(
         'Provide an answer object for this question',
@@ -134,10 +135,23 @@ export class QuestionAiExplanationsService {
         throw new BadRequestException(
           'selectedOptionIndexes must contain only non-negative whole numbers',
         );
+      const indexes = [...new Set(value.selectedOptionIndexes as number[])];
+      if (
+        (type === QuestionType.SINGLE_CHOICE && indexes.length !== 1) ||
+        (type === QuestionType.MULTIPLE_CHOICE && indexes.length < 2)
+      )
+        throw new BadRequestException(
+          'Single-choice answers require one option; multiple-choice answers require at least two distinct options',
+        );
+      if (
+        optionCount !== undefined &&
+        indexes.some((index) => index >= optionCount)
+      )
+        throw new BadRequestException(
+          'Selected option does not exist on this question',
+        );
       return {
-        selectedOptionIndexes: [
-          ...new Set(value.selectedOptionIndexes as number[]),
-        ].sort((a, b) => a - b),
+        selectedOptionIndexes: indexes.sort((a, b) => a - b),
         acceptedAnswers: null,
         gradingRubric: null,
       };
@@ -296,7 +310,10 @@ export class QuestionAiExplanationsService {
       })),
     );
   }
-  private validateExplanation(value: any): StructuredExplanationOutput {
+  private validateExplanation(
+    value: any,
+    errorMessage = 'AI returned an incomplete structured explanation',
+  ): StructuredExplanationOutput {
     const fields = [
       'keywords',
       'eliminationStrategy',
@@ -314,9 +331,7 @@ export class QuestionAiExplanationsService {
           value[field].length <= 10000,
       )
     )
-      throw new BadRequestException(
-        'AI returned an incomplete structured explanation',
-      );
+      throw new BadRequestException(errorMessage);
     return Object.fromEntries(
       fields.map((field) => [field, value[field].trim()]),
     ) as StructuredExplanationOutput;
@@ -331,54 +346,41 @@ export class QuestionAiExplanationsService {
     const question = await this.question(questionId);
     if (question.status === QuestionStatus.ARCHIVED)
       throw new ConflictException('Archived questions cannot be re-answered');
-    const suppliedAnswer =
-      dto.mode === QuestionAiExplanationRunMode.GROUNDED
-        ? this.validAnswer(question.type, dto.suppliedAnswer)
-        : null;
-    if (dto.mode === QuestionAiExplanationRunMode.INFER && dto.suppliedAnswer)
-      throw new BadRequestException(
-        'INFER requests cannot include suppliedAnswer',
-      );
+    const suppliedAnswer = this.validAnswer(
+      question.type,
+      dto.suppliedAnswer,
+      question.options.length,
+    );
     const snapshot = this.snapshot(question);
     const sourceFingerprint = this.fingerprint(snapshot);
     const languageCode = this.language(snapshot);
     try {
       const response = await this.client.generate({
-        mode: dto.mode,
         languageCode,
         question: snapshot,
-        suppliedAnswer: suppliedAnswer ?? undefined,
+        suppliedAnswer,
         additionalContext: dto.additionalContext?.trim(),
         images: await this.images(question),
       });
       const explanation = this.validateExplanation(
         response.result.structuredExplanation,
       );
-      const inferred = this.validAnswer(question.type, response.result.answer);
-      const conflictWarning =
-        dto.mode === QuestionAiExplanationRunMode.GROUNDED &&
-        !this.sameAnswer(suppliedAnswer, inferred)
-          ? response.result.conflictWarning?.trim() ||
-            'The AI reasoning differs from the supplied authoritative answer.'
-          : response.result.conflictWarning?.trim() || null;
       const run = await this.prisma.questionAiExplanationRun.create({
         data: {
           questionId,
-          mode: dto.mode,
+          mode: QuestionAiExplanationRunMode.GROUNDED,
           questionSnapshot: snapshot as any,
           sourceFingerprint,
           languageCode,
           suppliedAnswer: suppliedAnswer as any,
           additionalContext: dto.additionalContext?.trim() || null,
-          proposedAnswer: (dto.mode === QuestionAiExplanationRunMode.GROUNDED
-            ? suppliedAnswer
-            : inferred) as any,
+          proposedAnswer: suppliedAnswer as any,
           structuredExplanation: explanation as any,
           confidence: response.result.confidence,
           warnings: response.result.warnings as any,
-          conflictWarning,
+          conflictWarning: null,
           model: response.model,
-          promptVersion: 'question-reanswer-explanation-v1',
+          promptVersion: 'question-verified-answer-explanation-v2',
           rawResponse: response.raw,
           usage: response.usage,
           createdById: actor.id,
@@ -389,14 +391,14 @@ export class QuestionAiExplanationsService {
         action: 'AI_QUESTION_REANSWER_CREATED',
         targetType: 'QuestionAiExplanationRun',
         targetId: run.id,
-        metadata: { questionId, mode: dto.mode },
+        metadata: { questionId, mode: QuestionAiExplanationRunMode.GROUNDED },
       });
       return run;
     } catch (error) {
       await this.prisma.questionAiExplanationRun.create({
         data: {
           questionId,
-          mode: dto.mode,
+          mode: QuestionAiExplanationRunMode.GROUNDED,
           status: QuestionAiExplanationRunStatus.FAILED,
           questionSnapshot: snapshot as any,
           sourceFingerprint,
@@ -404,7 +406,7 @@ export class QuestionAiExplanationsService {
           suppliedAnswer: suppliedAnswer as any,
           additionalContext: dto.additionalContext?.trim() || null,
           model: 'unavailable',
-          promptVersion: 'question-reanswer-explanation-v1',
+          promptVersion: 'question-verified-answer-explanation-v2',
           createdById: actor.id,
           reviewNote:
             error instanceof Error ? error.message : 'AI request failed',
@@ -468,6 +470,11 @@ export class QuestionAiExplanationsService {
       throw new BadRequestException(
         'Select an answer and/or explanation to apply',
       );
+    const editedExplanation = dto.structuredExplanation !== undefined;
+    if (editedExplanation && !dto.applyExplanation)
+      throw new BadRequestException(
+        'Edited explanation requires applyExplanation to be true',
+      );
     const [run, source] = await Promise.all([
       this.get(actor, questionId, runId),
       this.question(questionId),
@@ -487,7 +494,11 @@ export class QuestionAiExplanationsService {
       throw new ConflictException(
         'Question changed after this AI run; generate a new run',
       );
-    const answer = this.validAnswer(source.type, run.proposedAnswer);
+    const answer = this.validAnswer(
+      source.type,
+      run.proposedAnswer,
+      source.options.length,
+    );
     if (
       dto.applyExplanation &&
       !dto.applyAnswer &&
@@ -497,7 +508,14 @@ export class QuestionAiExplanationsService {
         'An explanation can be applied alone only when its answer matches the question',
       );
     const explanation = dto.applyExplanation
-      ? this.validateExplanation(run.structuredExplanation)
+      ? this.validateExplanation(
+          editedExplanation
+            ? dto.structuredExplanation
+            : run.structuredExplanation,
+          editedExplanation
+            ? 'Structured explanation must contain all six explanation sections'
+            : undefined,
+        )
       : null;
     const target = await this.prisma.$transaction(async (tx: any) => {
       let targetQuestion: any = source;
@@ -639,14 +657,18 @@ export class QuestionAiExplanationsService {
                 create: {
                   ...explanation!,
                   languageCode: run.languageCode,
-                  origin: QuestionExplanationOrigin.AI,
-                  model: run.model,
-                  confidence: run.confidence,
+                  origin: editedExplanation
+                    ? QuestionExplanationOrigin.HUMAN
+                    : QuestionExplanationOrigin.AI,
+                  model: editedExplanation ? null : run.model,
+                  confidence: editedExplanation ? null : run.confidence,
                   answerOrigin:
                     run.mode === QuestionAiExplanationRunMode.INFER
                       ? QuestionAnswerOrigin.INFERRED
                       : QuestionAnswerOrigin.EXPLICIT,
-                  warnings: run.warnings as any,
+                  warnings: editedExplanation
+                    ? Prisma.JsonNull
+                    : (run.warnings as any),
                   sourceFingerprint: dto.applyAnswer
                     ? null
                     : run.sourceFingerprint,
@@ -656,14 +678,18 @@ export class QuestionAiExplanationsService {
                 update: {
                   ...explanation!,
                   languageCode: run.languageCode,
-                  origin: QuestionExplanationOrigin.AI,
-                  model: run.model,
-                  confidence: run.confidence,
+                  origin: editedExplanation
+                    ? QuestionExplanationOrigin.HUMAN
+                    : QuestionExplanationOrigin.AI,
+                  model: editedExplanation ? null : run.model,
+                  confidence: editedExplanation ? null : run.confidence,
                   answerOrigin:
                     run.mode === QuestionAiExplanationRunMode.INFER
                       ? QuestionAnswerOrigin.INFERRED
                       : QuestionAnswerOrigin.EXPLICIT,
-                  warnings: run.warnings as any,
+                  warnings: editedExplanation
+                    ? Prisma.JsonNull
+                    : (run.warnings as any),
                   sourceFingerprint: dto.applyAnswer
                     ? null
                     : run.sourceFingerprint,
@@ -708,6 +734,9 @@ export class QuestionAiExplanationsService {
         appliedQuestionId: target.id,
         applyAnswer: dto.applyAnswer,
         applyExplanation: dto.applyExplanation,
+        ...(editedExplanation
+          ? { reviewedExplanation: { ...explanation! } }
+          : {}),
       },
     });
     return target;

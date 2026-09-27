@@ -4,7 +4,10 @@ import {
   QuestionImportStatus,
   Role,
 } from '../../common/types/roles.enum';
-import { ServiceUnavailableException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { QuestionImportService } from './question-import.service';
 
 describe('QuestionImportService review summaries', () => {
@@ -23,6 +26,39 @@ describe('QuestionImportService review summaries', () => {
       } as any,
     );
   }
+
+  it.each(
+    ['body', 'explanation'].flatMap((field) =>
+      [123, false, {}, [], null, undefined, '   '].map((value) => ({
+        field,
+        value,
+      })),
+    ),
+  )(
+    'rejects invalid legacy $field: $value with a bad request',
+    ({ field, value }) => {
+      expect(() =>
+        serviceWith()['normalizeLegacyReviewCandidate']({
+          type: 'SHORT_ANSWER',
+          body: 'Question',
+          explanation: 'Explanation',
+          acceptedAnswers: ['Answer'],
+          [field]: value,
+        }),
+      ).toThrow(BadRequestException);
+    },
+  );
+
+  it('preserves valid legacy candidate text normalization', () => {
+    expect(
+      serviceWith()['normalizeLegacyReviewCandidate']({
+        type: 'SHORT_ANSWER',
+        body: '  Question  ',
+        explanation: '  Explanation  ',
+        acceptedAnswers: ['Answer'],
+      }),
+    ).toMatchObject({ body: 'Question', explanation: 'Explanation' });
+  });
 
   it('uses a crop description, never a reviewer-assignment reason, as image alt text', () => {
     const blocks = (serviceWith() as any).anchoredBlocks(
@@ -50,29 +86,27 @@ describe('QuestionImportService review summaries', () => {
     ]);
   });
 
-  it('defaults a missing long-answer grading rubric during review acceptance', () => {
-    const candidate = (serviceWith() as any).normalizeReviewCandidate({
+  it('accepts a long-answer draft without an AI rubric or explanation', () => {
+    const candidate = (serviceWith() as any).normalizeExtractedDraft({
       type: 'LONG_ANSWER',
       body: 'Explain photosynthesis.',
-      explanation: 'Students should describe how plants make food.',
     });
 
-    expect(candidate.gradingRubric).toBe(
-      'Assess the response for factual correctness, relevance, completeness, and clarity. Award points proportionally to the quality and accuracy of the answer; give full credit only when it fully and correctly addresses the question.',
-    );
+    expect(candidate).toMatchObject({
+      type: 'LONG_ANSWER',
+      body: 'Explain photosynthesis.',
+    });
+    expect(candidate.gradingRubric).toBeUndefined();
   });
 
-  it('keeps and trims an imported long-answer grading rubric', () => {
-    const candidate = (serviceWith() as any).normalizeReviewCandidate({
-      type: 'LONG_ANSWER',
-      body: 'Explain photosynthesis.',
-      explanation: 'Students should describe how plants make food.',
-      gradingRubric: '  Include light, water, carbon dioxide, and glucose.  ',
-    });
-
-    expect(candidate.gradingRubric).toBe(
-      'Include light, water, carbon dioxide, and glucose.',
-    );
+  it('rejects answer-bearing fields in an extracted draft', () => {
+    expect(() =>
+      (serviceWith() as any).normalizeExtractedDraft({
+        type: 'LONG_ANSWER',
+        body: 'Explain photosynthesis.',
+        gradingRubric: '  Include light, water, carbon dioxide, and glucose.  ',
+      }),
+    ).toThrow('Extracted drafts cannot include gradingRubric');
   });
 
   it('marks a persisted queued batch retryable when Redis enqueue fails', async () => {
@@ -178,9 +212,11 @@ describe('QuestionImportService review summaries', () => {
     const batchUpdate = jest.fn().mockResolvedValue({});
     const prisma = {
       questionImportBatch: {
-        findUnique: jest
-          .fn()
-          .mockResolvedValue({ id: 'batch-1', children: [] }),
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'batch-1',
+          children: [],
+          schemaVersion: 'question-import-v6',
+        }),
         update: batchUpdate,
       },
       questionImportChunk: {
@@ -229,6 +265,9 @@ describe('QuestionImportService review summaries', () => {
         where: { id: 'batch-1' },
         data: expect.objectContaining({ status: QuestionImportStatus.QUEUED }),
       }),
+    );
+    expect(batchUpdate.mock.calls[0][0].data).not.toHaveProperty(
+      'schemaVersion',
     );
     expect(queue.enqueueChunk).toHaveBeenCalledWith('batch-1', 'chunk-109');
   });
@@ -472,5 +511,98 @@ describe('QuestionImportService review summaries', () => {
         }),
       }),
     );
+  });
+});
+
+describe('Import retries preserve the original schema', () => {
+  const actor = { id: 'admin', role: Role.ADMIN, sessionId: 'test' };
+  function setup(schemaVersion: string) {
+    const prisma = {
+      questionImportBatch: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'batch',
+          children: [],
+          schemaVersion,
+          inputType: 'ASSET',
+          sourceAsset: { mimeType: 'application/pdf' },
+        }),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        update: jest.fn().mockResolvedValue({}),
+      },
+      questionImportItem: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: 'item',
+          chunkId: 'chunk',
+          questionId: null,
+        }),
+        deleteMany: jest.fn(),
+      },
+      questionImportChunk: {
+        findMany: jest.fn().mockResolvedValue([{ id: 'chunk' }]),
+        update: jest.fn(),
+        updateMany: jest.fn(),
+      },
+      questionImportPage: {
+        findUnique: jest
+          .fn()
+          .mockResolvedValue({ id: 'page', status: 'FAILED' }),
+        update: jest.fn(),
+        updateMany: jest.fn(),
+      },
+      $transaction: jest.fn(async (fn): Promise<any> =>
+        typeof fn === 'function' ? fn(prisma) : Promise.all(fn),
+      ),
+    };
+    const queue = { enqueue: jest.fn(), enqueuePage: jest.fn() };
+    const service = new QuestionImportService(
+      prisma as any,
+      queue as any,
+      { record: jest.fn() } as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {
+        get: () => ({
+          questionImportModel: 'test',
+          openRouterApiKey: 'key',
+          pdfTranscriptionModel: 'ocr',
+        }),
+      } as any,
+    );
+    jest.spyOn(service, 'get').mockResolvedValue({ id: 'batch' } as any);
+    return { service, prisma };
+  }
+
+  it.each(['question-import-v6', 'question-import-v7'])(
+    'preserves %s on item, batch, and page retry',
+    async (schemaVersion) => {
+      const { service, prisma } = setup(schemaVersion);
+      await service.retry(actor, 'batch', 'item');
+      expect(prisma.questionImportItem.deleteMany).toHaveBeenCalledWith({
+        where: { batchId: 'batch', chunkId: 'chunk', questionId: null },
+      });
+      await service.retry(actor, 'batch');
+      await service.retryPage(actor, 'batch', 1);
+      for (const call of [
+        ...prisma.questionImportBatch.update.mock.calls,
+        ...prisma.questionImportBatch.updateMany.mock.calls,
+      ] as any[])
+        expect(call[0].data).not.toHaveProperty('schemaVersion');
+    },
+  );
+
+  it('requires an approved option visual before accepting empty option text', () => {
+    const { service } = setup('question-import-v7');
+    const candidate = {
+      type: 'SINGLE_CHOICE',
+      body: 'Choose a figure',
+      options: [{ body: '' }, { body: 'A' }],
+    };
+    expect(() => service['normalizeExtractedDraft'](candidate)).toThrow();
+    expect(
+      service['normalizeExtractedDraft'](candidate, new Set([0])).options[0],
+    ).toEqual({ body: '', isCorrect: false });
   });
 });

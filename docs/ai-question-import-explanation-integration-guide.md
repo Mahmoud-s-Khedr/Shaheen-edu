@@ -1,56 +1,22 @@
-# AI Question Import Explanation Integration Guide
+# AI Question Import Draft Integration Guide
 
-This guide covers the explanation fields accepted by the review endpoint:
+For new v7 imports, `POST /api/v1/admin/ai/question-imports/:importId/items/:itemId/accept` creates an **answerless draft**. Import is extraction only: accepted candidates may contain the question body, type, choice options, shared-context links, and reviewed media assignments, but never an answer, rubric, answer provenance, confidence, evidence, explanation, or structured explanation.
 
-```http
-POST /api/v1/admin/ai/question-imports/:importId/items/:itemId/accept
-```
-
-## `candidate.explanation`
-
-`candidate.explanation` is required. It is the normal, student-facing
-explanation stored with the accepted question and displayed alongside it.
+For choice questions every created option has `isCorrect: false`. Written questions have no `acceptedAnswers`, and long-answer questions have no rubric. The draft cannot be published until its answer and explanation satisfy the normal publication requirements. An administrator can enter both manually, or supply a verified answer to the separate explanation API and review/apply its output. AI explanation generation is optional.
 
 ```json
 {
   "candidate": {
-    "explanation": "The cell wall supports the cell and preserves its shape."
-  }
+    "type": "SINGLE_CHOICE",
+    "body": "Which organ pumps blood around the body?",
+    "options": [{ "body": "Heart" }, { "body": "Lung" }]
+  },
+  "note": "Wording checked against the printed source."
 }
 ```
 
-## `candidate.structuredExplanation`
+Do not include `selectedOptionIndexes`, `acceptedAnswers`, `gradingRubric`, `answerOrigin`, `confidence`, `explanation`, `structuredExplanation`, or answer-evidence fields. The API rejects those fields for extraction drafts.
 
-`candidate.structuredExplanation` is optional supplementary AI study guidance.
-It does not replace `candidate.explanation`; send both fields when the question
-needs the richer, sectioned explanation.
+Image-only options may omit text when an approved OPTION visual supplies their content. Missing or unapproved images are shown as unresolved visual requirements during review. An empty option still needs an approved image before acceptance.
 
-When included, all six fields are required and each must be a non-empty string:
-
-```json
-{
-  "candidate": {
-    "explanation": "The cell wall supports the cell and preserves its shape.",
-    "structuredExplanation": {
-      "keywords": "cell wall, support, cell shape",
-      "eliminationStrategy": "Eliminate the cell membrane because it is present in many cell types.",
-      "whyCorrect": "The cell wall gives the cell support and helps it keep its shape.",
-      "generalRule": "Cell walls provide rigidity and structural support.",
-      "whatIf": "Without a cell wall, the cell has less structural stability.",
-      "commonMistakes": "Do not confuse the cell wall with the cell membrane."
-    }
-  }
-}
-```
-
-Omit `structuredExplanation` when the normal explanation is sufficient. If it
-is supplied with any missing or blank section, the endpoint returns `400 Bad
-Request` with `Structured explanation must contain all six explanation
-sections`.
-
-## Field comparison
-
-| Field | Required | Purpose |
-| --- | --- | --- |
-| `candidate.explanation` | Yes | Standard, student-facing question explanation. |
-| `candidate.structuredExplanation` | No | Six-part AI study guidance retained with the accepted question. |
+Retries preserve the original import schema, including legacy answer-bearing candidates. To use extraction-only behavior for an older document, create a new import; retrying does not convert existing batches to v7.

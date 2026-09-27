@@ -163,3 +163,12 @@ These errors apply to the entire request, so there is no per-question result:
 Use the normal question-list refresh mechanism after a completed request rather
 than locally forcing statuses to `PUBLISHED`; the refresh also accounts for
 server-side validation, concurrent edits, and replacement-question archival.
+
+### Explanation staleness
+
+`structuredExplanation.staleAt` is advisory and does not block submission,
+single-question publication, or bulk publication. A complete question can be
+published without regenerating or re-reviewing its AI explanation. The backend
+still validates required question content, the answer requirements for its type,
+and the existing publication prerequisites. Publishing does not clear the stale
+flag or claim that the explanation was regenerated.

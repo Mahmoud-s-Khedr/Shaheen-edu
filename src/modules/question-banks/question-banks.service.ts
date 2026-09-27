@@ -925,6 +925,8 @@ export class QuestionBanksService {
       confidence?: number;
       warnings?: string[];
       model?: string;
+      /** Internal extraction-only path. Normal imported-question validation remains strict. */
+      allowAnswerlessDraft?: boolean;
     },
     client: Prisma.TransactionClient,
     placements?: Array<{
@@ -941,14 +943,16 @@ export class QuestionBanksService {
       dto.type === QuestionType.MULTIPLE_CHOICE;
     const correct = options.filter((option) => option.isCorrect).length;
     if (
-      (choice &&
-        (options.length < 2 ||
-          correct < 1 ||
+      (choice && options.length < 2) ||
+      (!dto.allowAnswerlessDraft &&
+        choice &&
+        (correct < 1 ||
           (dto.type === QuestionType.SINGLE_CHOICE && correct !== 1) ||
           (dto.type === QuestionType.MULTIPLE_CHOICE && correct < 2))) ||
       (!choice && options.length) ||
-      ((dto.type === QuestionType.SHORT_ANSWER ||
-        dto.type === QuestionType.FILL_IN_THE_BLANK) &&
+      (!dto.allowAnswerlessDraft &&
+        (dto.type === QuestionType.SHORT_ANSWER ||
+          dto.type === QuestionType.FILL_IN_THE_BLANK) &&
         !dto.acceptedAnswers?.length)
     )
       throw new BadRequestException(
@@ -1058,6 +1062,48 @@ export class QuestionBanksService {
       targetId: item.id,
     });
     return item;
+  }
+  /**
+   * Extraction-only imports must not smuggle an AI answer into a Question.
+   * This separate internal path keeps the ordinary imported-question validation
+   * strict while allowing a reviewable, answer-pending DRAFT.
+   */
+  async createExtractedDraftWithClient(
+    actor: RequestUser,
+    dto: CreateQuestionDto & {
+      options?: Array<{ body: string; contentBlocks?: any[] }>;
+      contextIds?: string[];
+      contentBlocks?: any[];
+    },
+    client: Prisma.TransactionClient,
+    placements?: Array<{
+      courseId?: string;
+      chapterId?: string;
+      lessonId?: string;
+      sectionId?: string;
+    }>,
+  ) {
+    return this.createImportedDraftWithClient(
+      actor,
+      {
+        ...dto,
+        options: dto.options?.map((option) => ({
+          ...option,
+          isCorrect: false,
+        })),
+        acceptedAnswers: undefined,
+        gradingRubric: undefined,
+        explanation: undefined,
+        answerOrigin: undefined,
+        aiExplanation: undefined,
+        aiAnswerOrigin: undefined,
+        confidence: undefined,
+        warnings: undefined,
+        allowAnswerlessDraft: true,
+      },
+      client,
+      placements,
+    );
   }
   async listQuestions(actor: RequestUser, q: QueryQuestionDto) {
     this.admin(actor);
@@ -1433,10 +1479,8 @@ export class QuestionBanksService {
       throw new ConflictException(
         'Question body, explanation, and positive maxPoints are required',
       );
-    if (question.structuredExplanation?.staleAt)
-      throw new ConflictException(
-        'Question explanation is stale and must be regenerated or reviewed',
-      );
+    // Explanation staleness is advisory; publication depends on the question's
+    // required content and answer data, not the age of its AI explanation.
     if (
       question.source.status !== ContentStatus.PUBLISHED ||
       question.bank.status !== ContentStatus.PUBLISHED
