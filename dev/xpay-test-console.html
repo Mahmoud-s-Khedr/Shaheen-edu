@@ -8,8 +8,10 @@
        cloudflared tunnel --url http://localhost:3000
        cloudflared tunnel --url http://localhost:5173
   4. Add the frontend tunnel URL to CORS_ORIGINS, then restart the API.
-  5. Set XPAY_REDIRECT_URL to this page on the frontend tunnel and create an
-     XPay test-mode webhook endpoint at <api-tunnel>/api/v1/payments/xpay/webhook.
+  5. Set XPAY_REDIRECT_URL to this page on the frontend tunnel with
+     ?xpay_session_id={CHECKOUT_SESSION_ID}; leave XPAY_CANCEL_URL as this
+     page without a query string. Create an XPay test-mode webhook endpoint at
+     <api-tunnel>/api/v1/payments/xpay/webhook.
 
   Open this page THROUGH the frontend tunnel, rather than localhost. That keeps
   the test session across XPay's redirect and lets the browser call the API
@@ -195,11 +197,11 @@
     <fieldset>
       <legend>3. Return and verification</legend>
       <p class="hint">
-        XPay’s redirect does not prove payment. Wait for the signed webhook,
-        then refresh the local order.
+        The returned session ID only finds the local order. Wait for the signed
+        webhook; this console displays and polls the API's authoritative state.
       </p>
       <div class="buttons">
-        <button id="refreshOrder" type="button">Refresh saved order</button>
+        <button id="refreshOrder" type="button">Refresh returned order</button>
         <button id="retryAttempt" type="button">
           Create a fresh unpaid attempt
         </button>
@@ -217,6 +219,9 @@ No checkout has been started in this browser session.</pre>
         const apiBase = () => $('apiBase').value.trim().replace(/\/$/, '');
         const token = () => storage.getItem(key('token'));
         const orderId = () => storage.getItem(key('orderId'));
+        const checkoutSessionId = () =>
+          new URLSearchParams(window.location.search).get('xpay_session_id');
+        let returnPoll;
         const output = (id, value) => {
           $(id).textContent =
             typeof value === 'string' ? value : JSON.stringify(value, null, 2);
@@ -274,6 +279,37 @@ No checkout has been started in this browser session.</pre>
           output(id, data);
           $(id).className = 'ok';
         }
+        function stopReturnPolling() {
+          if (returnPoll) window.clearTimeout(returnPoll);
+          returnPoll = undefined;
+        }
+        async function loadReturnedOrder() {
+          const sessionId = checkoutSessionId();
+          if (sessionId)
+            return request(
+              'GET',
+              `/student/xpay/checkout-sessions/${encodeURIComponent(sessionId)}/order`,
+            );
+          const id = orderId();
+          if (!id)
+            throw new Error(
+              'No returned XPay session or saved local order. Open your order history.',
+            );
+          return request('GET', `/student/orders/${encodeURIComponent(id)}`);
+        }
+        async function refreshReturnedOrder() {
+          stopReturnPolling();
+          const data = await loadReturnedOrder();
+          showSuccess('orderOutput', data);
+          if (data?.status === 'AWAITING_PAYMENT') {
+            returnPoll = window.setTimeout(() => {
+              refreshReturnedOrder().catch((error) =>
+                showError('orderOutput', error),
+              );
+            }, 2000);
+          }
+          return data;
+        }
 
         $('apiBase').value = storage.getItem(key('apiBase')) || '';
         updateSessionState();
@@ -297,6 +333,7 @@ No checkout has been started in this browser session.</pre>
           }
         };
         $('clearSession').onclick = () => {
+          stopReturnPolling();
           ['token', 'orderId', 'apiBase'].forEach((name) =>
             storage.removeItem(key(name)),
           );
@@ -352,13 +389,7 @@ No checkout has been started in this browser session.</pre>
         };
         $('refreshOrder').onclick = async () => {
           try {
-            const id = orderId();
-            if (!id)
-              throw new Error('No saved order. Create a checkout first.');
-            showSuccess(
-              'orderOutput',
-              await request('GET', `/student/orders/${encodeURIComponent(id)}`),
-            );
+            await refreshReturnedOrder();
           } catch (error) {
             showError('orderOutput', error);
           }
@@ -395,6 +426,12 @@ No checkout has been started in this browser session.</pre>
             showError('orderOutput', error);
           }
         };
+        window.addEventListener('pagehide', stopReturnPolling);
+        if (checkoutSessionId() || orderId()) {
+          refreshReturnedOrder().catch((error) =>
+            showError('orderOutput', error),
+          );
+        }
       })();
     </script>
   </body>

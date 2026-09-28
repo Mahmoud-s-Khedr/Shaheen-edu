@@ -15,7 +15,7 @@ the endpoint to `checkout.session.completed` and
 XPAY_API_BASE_URL=https://api.xpay.app
 XPAY_SECRET_KEY=sk_test_... # use sk_live_... in production
 XPAY_WEBHOOK_SECRET=whsec_...
-XPAY_REDIRECT_URL=https://app.example.com/payment-result
+XPAY_REDIRECT_URL=https://app.example.com/payment-result?xpay_session_id={CHECKOUT_SESSION_ID}
 XPAY_CANCEL_URL=https://app.example.com/payment-result
 XPAY_TIMEOUT_MS=15000
 XPAY_ORDER_EXPIRY_SECONDS=1800
@@ -58,10 +58,12 @@ storage so that the token survives the XPay redirect.
    cloudflared tunnel --url http://localhost:5173
    ```
 
-3. Add the frontend tunnel origin to `CORS_ORIGINS`, set both
-   `XPAY_REDIRECT_URL` and `XPAY_CANCEL_URL` to
-   `https://<frontend-tunnel>/xpay-test-console.html`, and restart the API with
-   `pnpm dev:update`.
+3. Add the frontend tunnel origin to `CORS_ORIGINS`, set
+   `XPAY_REDIRECT_URL` to
+   `https://<frontend-tunnel>/xpay-test-console.html?xpay_session_id={CHECKOUT_SESSION_ID}`
+   and `XPAY_CANCEL_URL` to the static
+   `https://<frontend-tunnel>/xpay-test-console.html`, then restart the API
+   with `pnpm dev:update`.
 
 4. In the XPay dashboard's **Test mode**, create a webhook endpoint at
    `https://<api-tunnel>/api/v1/payments/xpay/webhook`. Subscribe to
@@ -71,9 +73,10 @@ storage so that the token survives the XPay redirect.
 
 5. Open the console through `https://<frontend-tunnel>/xpay-test-console.html`
    (not `localhost`). Use a disposable student account and one paid, published
-   course or chapter. Complete the hosted page with XPay's test card, then use
-   **Refresh saved order** to confirm that the signed webhook—not the
-   redirect—changed the order to `APPROVED`.
+   course or chapter. Complete the hosted page with XPay's test card. Its
+   return URL has an XPay Checkout Session ID that the console uses to look up
+   the local order; confirm that the signed webhook—not the redirect—changed
+   the order to `APPROVED`.
 
 Use the XPay dashboard's Workbench to resend the same delivery and prove that
 the receipt, entitlements, and partner allocations remain single-instance.
@@ -109,8 +112,11 @@ fulfils only `checkout.session.completed` or
 the locally created attempt and order.
 
 Do not approve an order from a redirect, client-side result, or a webhook body
-whose signature did not validate. Check the order status through the API after
-the redirect while XPay's webhook is being processed.
+whose signature did not validate. The configured redirect URL uses XPay's
+`{CHECKOUT_SESSION_ID}` template to return `xpay_session_id`; use that value
+only to resolve the authenticated student's local order through
+`GET /api/v1/student/xpay/checkout-sessions/{checkoutSessionId}/order`, then
+check the returned order status while the webhook is being processed.
 
 ## Test and production acceptance
 

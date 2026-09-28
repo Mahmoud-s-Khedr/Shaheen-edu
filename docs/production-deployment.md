@@ -40,7 +40,7 @@ COOKIE_SAME_SITE=lax
 XPAY_API_BASE_URL=https://api.xpay.app
 XPAY_SECRET_KEY=<server-only-secret>
 XPAY_WEBHOOK_SECRET=<server-only-webhook-secret>
-XPAY_REDIRECT_URL=https://app.jibal-platform.com/payment-result
+XPAY_REDIRECT_URL=https://app.jibal-platform.com/payment-result?xpay_session_id={CHECKOUT_SESSION_ID}
 XPAY_CANCEL_URL=https://app.jibal-platform.com/payment-result
 ```
 

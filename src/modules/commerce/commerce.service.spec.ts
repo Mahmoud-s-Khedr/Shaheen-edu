@@ -242,6 +242,77 @@ describe('CommerceService payment proofs', () => {
   });
 });
 
+describe('CommerceService XPay return lookup', () => {
+  const studentUserId = 'student-1';
+  const order = {
+    id: 'order-1',
+    status: OrderStatus.AWAITING_PAYMENT,
+    paymentChannel: 'XPAY',
+    subtotalMinor: 15000,
+    discountMinor: 0,
+    totalMinor: 15000,
+    currency: 'EGP',
+    paymentMethodSnapshot: { provider: 'XPAY', checkout: 'HOSTED_REDIRECT' },
+    createdAt: new Date('2026-09-10T12:00:00.000Z'),
+    approvedAt: null,
+    cancelledAt: null,
+    paymentExpiresAt: new Date('2026-09-10T12:30:00.000Z'),
+    receipt: null,
+    items: [],
+    submissions: [],
+  };
+
+  function build() {
+    const prisma: any = {
+      paymentAttempt: { findFirst: jest.fn() },
+    };
+    return {
+      prisma,
+      service: new CommerceService(
+        prisma,
+        {} as any,
+        {
+          record: jest.fn(),
+          recordWithClient: jest.fn(),
+        } as any,
+      ),
+    };
+  }
+
+  it('returns the owner’s existing local order for an XPay Checkout Session', async () => {
+    const { prisma, service } = build();
+    prisma.paymentAttempt.findFirst.mockResolvedValue({ order });
+
+    await expect(
+      service.xpayCheckoutSessionOrder(studentUserId, 'cs_test_123'),
+    ).resolves.toMatchObject({
+      id: order.id,
+      status: OrderStatus.AWAITING_PAYMENT,
+    });
+    expect(prisma.paymentAttempt.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          providerOrderId: 'cs_test_123',
+          channel: 'XPAY',
+          order: { studentUserId },
+        }),
+      }),
+    );
+  });
+
+  it('returns the same generic not-found result for unknown or non-owned sessions', async () => {
+    const { prisma, service } = build();
+    prisma.paymentAttempt.findFirst.mockResolvedValue(null);
+
+    await expect(
+      service.xpayCheckoutSessionOrder(studentUserId, 'cs_test_unknown'),
+    ).rejects.toMatchObject({ message: 'Order not found' });
+    await expect(
+      service.xpayCheckoutSessionOrder('another-student', 'cs_test_123'),
+    ).rejects.toMatchObject({ message: 'Order not found' });
+  });
+});
+
 describe('CommerceService XPay webhooks', () => {
   const rawBody = Buffer.from(
     JSON.stringify({

@@ -141,6 +141,18 @@ export class CommerceController {
   ) {
     return this.commerce.createXPayAttempt(user.id, id, key);
   }
+  @Get('xpay/checkout-sessions/:checkoutSessionId/order')
+  @ApiOperation({
+    summary: 'Get the current student order for an XPay Checkout Session',
+  })
+  @ApiOkResponse({ type: OrderDto })
+  @ApiStandardErrors(401, 403, 404)
+  xpayCheckoutSessionOrder(
+    @CurrentUser() user: RequestUser,
+    @Param('checkoutSessionId') checkoutSessionId: string,
+  ) {
+    return this.commerce.xpayCheckoutSessionOrder(user.id, checkoutSessionId);
+  }
   @Get('orders')
   @ApiOperation({ summary: 'List the student orders' })
   @ApiOkResponse({ type: PaginatedOrdersResponseDto })

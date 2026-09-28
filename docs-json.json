@@ -13756,6 +13756,72 @@
         ]
       }
     },
+    "/api/v1/student/xpay/checkout-sessions/{checkoutSessionId}/order": {
+      "get": {
+        "operationId": "CommerceController_xpayCheckoutSessionOrder_v1",
+        "parameters": [
+          {
+            "name": "checkoutSessionId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get the current student order for an XPay Checkout Session",
+        "tags": [
+          "student/commerce"
+        ]
+      }
+    },
     "/api/v1/student/orders": {
       "get": {
         "operationId": "CommerceController_orders_v1",

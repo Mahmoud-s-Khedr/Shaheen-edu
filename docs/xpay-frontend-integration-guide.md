@@ -48,24 +48,29 @@ webhooks.
    Do not open an XPay iframe or substitute another redirect mechanism.
 
 4. XPay eventually returns the browser to the configured frontend return or
-   cancel URL. That return is informational only. It is not a payment result:
-   never approve an order or grant access from the return, its query/path
-   values, a client SDK callback, or browser state. XPay documents that the
-   success authority is the signed webhook, and its Hosted Checkout return has
-   no extra query parameters.
+   cancel URL. The return URL includes XPay's supported
+   `{CHECKOUT_SESSION_ID}` template, so a completed hosted checkout returns as
+   `/payment-result?xpay_session_id=cs_...`. That value only identifies which
+   local order to fetch; it is not a payment result. Never approve an order or
+   grant access from the return, its query/path values, a client SDK callback,
+   or browser state. The signed webhook and returned local order state are the
+   payment authority.
 
-5. On the return page, load the saved local order ID with:
+5. On the return page, read `xpay_session_id` with `URLSearchParams`. When it
+   is present, load the matching local order with:
 
    ```http
-   GET /api/v1/student/orders/{orderId}
+   GET /api/v1/student/xpay/checkout-sessions/{checkoutSessionId}/order
    Authorization: Bearer <student-access-token>
    ```
 
    Render the returned API state, and poll while it is `AWAITING_PAYMENT` so
    the UI can reflect webhook processing. Stop polling when it reaches a
-   terminal state or when the page is left. The return page must also handle a
-   missing saved order ID without claiming payment; send the student to Orders
-   or show an order lookup/history path already provided by the application.
+   terminal state or when the page is left. If the query value is absent (such
+   as a `cancelUrl` return), fall back to the saved local order ID and
+   `GET /api/v1/student/orders/{orderId}`. If neither value is available, do
+   not claim payment; send the student to Orders or show an existing order
+   lookup/history path.
 
 ## Responses and states
 
@@ -109,8 +114,11 @@ the `xpay` object is only used to perform the immediate redirect.
 }
 ```
 
-`GET /student/orders/{orderId}` returns the order object, without `xpay` or
-payment-attempt details. Use these exposed order statuses for the screen:
+`GET /student/orders/{orderId}` and
+`GET /student/xpay/checkout-sessions/{checkoutSessionId}/order` return the
+same order object, without `xpay` or payment-attempt details. The session
+lookup is authenticated and returns a generic 404 for an unknown or non-owned
+session. Use these exposed order statuses for the screen:
 
 | API `status`                            | Frontend treatment                                                                                                                                                                                                                       |
 | --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -194,7 +202,7 @@ Relevant backend outcomes are:
 | ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Add cart item | `400`, `401`, `403`, `404`, or `409`; examples include `Purchasable course not found`, `Purchasable chapter not found`, `Course is not purchasable`, `Chapter is not purchasable`, `Cart already contains overlapping content`, and `Item is already in cart`.                |
 | Checkout      | `400`, `401`, `403`, `404`, or `409`; examples include a missing/too-long idempotency key, `Active payment method not found` (manual checkout only), `Cart is empty`, and checkout conflicts. XPay session-creation failures surface as the API error rather than a redirect. |
-| Get order     | `401`, `403`, or `404`; a missing order for the current student is `Order not found`.                                                                                                                                                                                         |
+| Get order     | `401`, `403`, or `404`; a missing order or unknown/non-owned Checkout Session for the current student is `Order not found`.                                                                                                                                                   |
 | XPay retry    | A missing/too-long idempotency key is `400`; `XPay order not found` is `404`; `Order cannot start an XPay payment` is `409` when it is not eligible or is expired. It can also surface the XPay session-creation API error.                                                   |
 
 ## Framework-neutral implementation
@@ -276,6 +284,14 @@ async function retryXPayCheckout(orderId: string) {
 }
 
 async function loadReturnedOrder(): Promise<Order | null> {
+  const checkoutSessionId = new URLSearchParams(location.search).get(
+    'xpay_session_id',
+  );
+  if (checkoutSessionId) {
+    return api<Order>(
+      `/student/xpay/checkout-sessions/${encodeURIComponent(checkoutSessionId)}/order`,
+    );
+  }
   const orderId = sessionStorage.getItem('pending-xpay-order-id');
   return orderId
     ? api<Order>(`/student/orders/${encodeURIComponent(orderId)}`)
@@ -292,7 +308,9 @@ retry; redirects must follow one explicit successful checkout or retry action.
 At a high level, use only XPay test-mode keys (`sk_test_...`) and a test-mode
 webhook endpoint. Local XPay redirect and webhook testing needs publicly
 reachable HTTPS URLs for both the frontend and API (for example, separate
-tunnels). Configure the API's return/cancel URLs with the frontend tunnel URL,
+tunnels). Configure `XPAY_REDIRECT_URL` as
+`https://<frontend-tunnel>/payment-result?xpay_session_id={CHECKOUT_SESSION_ID}`
+and `XPAY_CANCEL_URL` as the static `https://<frontend-tunnel>/payment-result`,
 configure the webhook with the API tunnel URL, and add the frontend tunnel
 **origin** to `CORS_ORIGINS` before restarting the API.
 

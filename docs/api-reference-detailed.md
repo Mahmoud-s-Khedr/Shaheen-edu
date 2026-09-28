@@ -430,6 +430,8 @@ No path, query, or header input.
 
 ### `GET /api/v1/student/orders/{id}`
 
+### `GET /api/v1/student/xpay/checkout-sessions/{checkoutSessionId}/order`
+
 ### `POST /api/v1/student/orders/{id}/cancel`
 
 ### `POST /api/v1/student/orders/{id}/xpay/attempt`

@@ -517,7 +517,7 @@ export class QuestionAiExplanationsService {
             : undefined,
         )
       : null;
-    const target = await this.prisma.$transaction(async (tx: any) => {
+    const appliedQuestionId = await this.prisma.$transaction(async (tx: any) => {
       let targetQuestion: any = source;
       if (source.status === QuestionStatus.PUBLISHED)
         targetQuestion = await tx.question.create({
@@ -722,7 +722,7 @@ export class QuestionAiExplanationsService {
           reviewNote: dto.note?.trim() || null,
         },
       });
-      return targetQuestion;
+      return targetQuestion.id;
     });
     await this.audit.record({
       actorUserId: actor.id,
@@ -731,7 +731,7 @@ export class QuestionAiExplanationsService {
       targetId: run.id,
       metadata: {
         questionId,
-        appliedQuestionId: target.id,
+        appliedQuestionId,
         applyAnswer: dto.applyAnswer,
         applyExplanation: dto.applyExplanation,
         ...(editedExplanation
@@ -739,6 +739,6 @@ export class QuestionAiExplanationsService {
           : {}),
       },
     });
-    return target;
+    return this.question(appliedQuestionId);
   }
 }

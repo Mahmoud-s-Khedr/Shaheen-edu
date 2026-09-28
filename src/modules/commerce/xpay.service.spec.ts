@@ -8,7 +8,8 @@ describe('XPayService webhook verification', () => {
       xpayApiBaseUrl: 'https://api.xpay.app',
       xpaySecretKey: 'sk_test_example',
       xpayWebhookSecret: secret,
-      xpayRedirectUrl: 'https://app.example.test/payment-result',
+      xpayRedirectUrl:
+        'https://app.example.test/payment-result?xpay_session_id={CHECKOUT_SESSION_ID}',
       xpayCancelUrl: '',
       xpayTimeoutMs: 1000,
       xpayOrderExpirySeconds: 1800,
@@ -52,5 +53,37 @@ describe('XPayService webhook verification', () => {
         `t=${timestamp},v1=${signature}`,
       ),
     ).toBe(false);
+  });
+
+  it('sends the configured Checkout Session template to XPay unchanged', async () => {
+    const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true,
+      json: jest.fn().mockResolvedValue({
+        id: 'cs_test_123',
+        url: 'https://checkout.xpay.app/session/cs_test_123',
+      }),
+    } as any);
+
+    await new XPayService(config).createCheckoutSession({
+      merchantReference: 'order-1:1',
+      orderId: 'order-1',
+      paymentAttemptId: 'attempt-1',
+      amountMinor: 15000,
+      items: [{ title: 'Physics', amountMinor: 15000 }],
+      customer: { fullName: 'Student', phone: '01000000000' },
+      expiresAfterSeconds: 1800,
+    });
+
+    const requestOptions = fetchMock.mock.calls[0]?.[1];
+    const body = requestOptions?.body;
+    expect(typeof body).toBe('string');
+    if (typeof body !== 'string')
+      throw new Error('Expected a JSON request body');
+    const request = JSON.parse(body) as {
+      afterCompletion: { redirect: { url: string } };
+    };
+    expect(request.afterCompletion.redirect.url).toBe(
+      'https://app.example.test/payment-result?xpay_session_id={CHECKOUT_SESSION_ID}',
+    );
   });
 });

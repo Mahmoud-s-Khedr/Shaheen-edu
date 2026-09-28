@@ -202,8 +202,18 @@ describe('Reviewing edited explanations', () => {
       },
       questionAiExplanationRun: { update: jest.fn() },
     };
+    const applied = {
+      ...source,
+      id: status === 'PUBLISHED' ? 'replacement' : source.id,
+      status: 'DRAFT',
+    };
     const prisma = {
-      question: { findUnique: jest.fn().mockResolvedValue(source) },
+      question: {
+        findUnique: jest
+          .fn()
+          .mockResolvedValueOnce(source)
+          .mockResolvedValue(applied),
+      },
       questionAiExplanationRun: { findFirst: jest.fn().mockResolvedValue(run) },
       $transaction: jest.fn(async (fn) => fn(tx)),
     };
@@ -349,4 +359,153 @@ describe('Reviewing edited explanations', () => {
       edited.whyCorrect,
     );
   });
+});
+
+describe('Applied AI re-answer response', () => {
+  const actor = { id: 'admin', role: Role.ADMIN, sessionId: 'test' };
+  const generated = {
+    keywords: 'Keywords',
+    eliminationStrategy: 'Eliminate distractors',
+    whyCorrect: 'Original reasoning',
+    generalRule: 'General rule',
+    whatIf: 'Variation',
+    commonMistakes: 'Common mistake',
+  };
+  const reviewed = { ...generated, whyCorrect: 'Reviewed reasoning' };
+
+  function setup(status: 'DRAFT' | 'PUBLISHED') {
+    const source = {
+      id: 'question',
+      bankId: 'bank',
+      sourceId: 'source',
+      courseId: 'course',
+      type: QuestionType.SINGLE_CHOICE,
+      status,
+      body: 'Which option is correct?',
+      explanation: null,
+      maxPoints: 1,
+      acceptedAnswers: null,
+      gradingRubric: null,
+      answerOrigin: 'EXPLICIT',
+      options: [
+        {
+          id: 'option-a',
+          body: 'A',
+          isCorrect: false,
+          sortOrder: 0,
+          contentBlocks: [],
+        },
+        {
+          id: 'option-b',
+          body: 'B',
+          isCorrect: false,
+          sortOrder: 1,
+          contentBlocks: [],
+        },
+      ],
+      contentBlocks: [],
+      contexts: [],
+      placements: [],
+      assets: [],
+      videoLink: null,
+      structuredExplanation: null,
+    };
+    const appliedId = status === 'PUBLISHED' ? 'replacement' : source.id;
+    const persisted = {
+      ...source,
+      id: appliedId,
+      status: 'DRAFT',
+      answerOrigin: 'HUMAN_REVIEWED',
+      options: source.options.map((option, index) => ({
+        ...option,
+        isCorrect: index === 1,
+      })),
+      structuredExplanation: {
+        ...reviewed,
+        origin: 'HUMAN',
+        answerOrigin: 'EXPLICIT',
+      },
+    };
+    const run = {
+      id: 'run',
+      questionId: source.id,
+      status: 'PENDING_REVIEW',
+      mode: 'GROUNDED',
+      proposedAnswer: { selectedOptionIndexes: [1] },
+      structuredExplanation: generated,
+      languageCode: 'en',
+      model: 'test',
+      confidence: 0.9,
+      warnings: [],
+      sourceFingerprint: '',
+    };
+    const tx = {
+      question: {
+        create: jest
+          .fn()
+          .mockResolvedValue({ ...source, id: appliedId, status: 'DRAFT' }),
+        update: jest.fn(),
+      },
+      questionOption: {
+        findMany: jest.fn().mockResolvedValue(source.options),
+        updateMany: jest.fn(),
+      },
+      questionAiExplanationRun: { update: jest.fn() },
+    };
+    const prisma = {
+      question: {
+        findUnique: jest
+          .fn()
+          .mockResolvedValueOnce(source)
+          .mockResolvedValue(persisted),
+      },
+      questionAiExplanationRun: { findFirst: jest.fn().mockResolvedValue(run) },
+      $transaction: jest.fn(async (fn) => fn(tx)),
+    };
+    const audit = { record: jest.fn() };
+    const service = new QuestionAiExplanationsService(
+      prisma as any,
+      audit as any,
+      {} as any,
+      {} as any,
+    );
+    run.sourceFingerprint = service['fingerprint'](service['snapshot'](source));
+    jest.spyOn(service, 'get').mockResolvedValue(run as any);
+
+    return {
+      apply: () =>
+        service.apply(actor, source.id, run.id, {
+          applyAnswer: true,
+          applyExplanation: true,
+          structuredExplanation: reviewed,
+        }),
+      prisma,
+      appliedId,
+    };
+  }
+
+  it.each(['DRAFT', 'PUBLISHED'] as const)(
+    'returns the persisted %s question detail after applying a reviewed answer and explanation',
+    async (status) => {
+      const { apply, prisma, appliedId } = setup(status);
+
+      const result = await apply();
+
+      expect(result).toMatchObject({
+        id: appliedId,
+        answerOrigin: 'HUMAN_REVIEWED',
+        options: [
+          { id: 'option-a', isCorrect: false },
+          { id: 'option-b', isCorrect: true },
+        ],
+        structuredExplanation: expect.objectContaining({
+          ...reviewed,
+          origin: 'HUMAN',
+        }),
+      });
+      expect(prisma.question.findUnique).toHaveBeenLastCalledWith(
+        expect.objectContaining({ where: { id: appliedId } }),
+      );
+    },
+  );
 });

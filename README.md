@@ -152,6 +152,7 @@ resources; read [the testing guide](docs/testing/README.md) first.
   [testing guidance](docs/testing/README.md)
 - [AI usage and prompt inventory](docs/AI_USAGE_AND_PROMPTS_REPORT.md)
 - [XPay integration guide](docs/xpay-integration-guide.md)
+- [XPay return-page integration guide](docs/xpay-return-page-integration-guide.md)
 - [Production deployment guide](docs/production-deployment.md) and
   [observability and backup plan](docs/production-observability-and-backup-plan.md)
 

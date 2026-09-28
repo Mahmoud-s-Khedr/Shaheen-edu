@@ -1,5 +1,31 @@
 import * as Joi from 'joi';
 
+const xpayCheckoutSessionTemplate = '{CHECKOUT_SESSION_ID}';
+
+export const xpayRedirectUrlValidationSchema = Joi.string()
+  .allow('')
+  .custom((value: unknown, helpers: Joi.CustomHelpers) => {
+    if (typeof value !== 'string') return helpers.error('string.base');
+    if (!value || !value.includes('{')) {
+      const { error } = Joi.string().uri().validate(value);
+      return error ? helpers.error('string.uri') : value;
+    }
+    if (
+      value.split(xpayCheckoutSessionTemplate).length !== 2 ||
+      value.replaceAll(xpayCheckoutSessionTemplate, '').includes('{') ||
+      value.replaceAll(xpayCheckoutSessionTemplate, '').includes('}')
+    )
+      return helpers.error('any.invalid');
+
+    const { error } = Joi.string()
+      .uri({ scheme: ['https'] })
+      .validate(
+        value.replace(xpayCheckoutSessionTemplate, 'checkout-session-id'),
+      );
+    return error ? helpers.error('string.uri') : value;
+  }, 'XPay checkout-session redirect URL validation')
+  .optional();
+
 export const envValidationSchema = Joi.object({
   NODE_ENV: Joi.string()
     .valid('development', 'test', 'production')
@@ -148,7 +174,7 @@ export const envValidationSchema = Joi.object({
   XPAY_API_BASE_URL: Joi.string().uri().default('https://api.xpay.app'),
   XPAY_SECRET_KEY: Joi.string().allow('').optional(),
   XPAY_WEBHOOK_SECRET: Joi.string().allow('').optional(),
-  XPAY_REDIRECT_URL: Joi.string().uri().allow('').optional(),
+  XPAY_REDIRECT_URL: xpayRedirectUrlValidationSchema,
   XPAY_CANCEL_URL: Joi.string().uri().allow('').optional(),
   XPAY_TIMEOUT_MS: Joi.number().integer().min(1000).max(120000).default(15000),
   XPAY_ORDER_EXPIRY_SECONDS: Joi.number()

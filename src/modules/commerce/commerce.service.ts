@@ -861,6 +861,29 @@ export class CommerceService {
     if (!order) throw new NotFoundException('Order not found');
     return this.orderDto(order);
   }
+  async xpayCheckoutSessionOrder(
+    studentUserId: string,
+    checkoutSessionId: string,
+  ) {
+    const attempt = await this.prisma.paymentAttempt.findFirst({
+      where: {
+        providerOrderId: checkoutSessionId,
+        channel: PaymentChannel.XPAY,
+        order: { studentUserId },
+      },
+      include: {
+        order: {
+          include: {
+            items: true,
+            receipt: true,
+            submissions: { orderBy: { createdAt: 'desc' } },
+          },
+        },
+      },
+    });
+    if (!attempt) throw new NotFoundException('Order not found');
+    return this.orderDto(attempt.order);
+  }
   async cancel(studentUserId: string, id: string) {
     const order = await this.prisma.order.findFirst({
       where: { id, studentUserId },
