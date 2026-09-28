@@ -48,6 +48,21 @@ export class CoursesService {
     }
   }
 
+  private async runSerializableArchive(
+    operation: (tx: Prisma.TransactionClient) => Promise<void>,
+  ): Promise<void> {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        await this.prisma.$transaction(operation, {
+          isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+        });
+        return;
+      } catch (error: any) {
+        if (error.code !== 'P2034' || attempt === 2) throw error;
+      }
+    }
+  }
+
   private async getOrThrow(id: string) {
     const record = await this.prisma.course.findUnique({
       where: { id },
@@ -438,24 +453,33 @@ export class CoursesService {
   async archive(actor: RequestUser, id: string) {
     this.assertActorRole(actor);
 
-    await this.publicationService.assertCanArchive('course', id);
-    await this.prisma.course.updateMany({
-      where: {
-        id,
-        status: { not: ContentStatus.ARCHIVED },
+    await this.runSerializableArchive(
+      async (tx) => {
+        await this.publicationService.assertCanArchive('course', id, tx);
+        await tx.course.updateMany({
+          where: {
+            id,
+            status: { not: ContentStatus.ARCHIVED },
+          },
+          data: {
+            status: ContentStatus.ARCHIVED,
+            archivedAt: new Date(),
+          },
+        });
+        const pruned = await tx.cartItem.deleteMany({
+          where: {
+            OR: [{ courseId: id }, { chapter: { courseId: id } }],
+          },
+        });
+        await this.auditService.recordWithClient(tx, {
+          actorUserId: actor.id,
+          action: 'COURSE_ARCHIVED',
+          targetType: 'Course',
+          targetId: id,
+          metadata: { prunedCartItemCount: pruned.count },
+        });
       },
-      data: {
-        status: ContentStatus.ARCHIVED,
-        archivedAt: new Date(),
-      },
-    });
-
-    await this.auditService.record({
-      actorUserId: actor.id,
-      action: 'COURSE_ARCHIVED',
-      targetType: 'Course',
-      targetId: id,
-    });
+    );
 
     return this.toSummary(await this.getOrThrow(id));
   }

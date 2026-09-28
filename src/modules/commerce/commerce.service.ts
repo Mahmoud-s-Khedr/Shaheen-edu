@@ -99,8 +99,8 @@ export class CommerceService {
         'Idempotency-Key header must not exceed 200 characters',
       );
   }
-  private async studentGrade(studentUserId: string) {
-    const profile = await this.prisma.studentProfile.findUnique({
+  private async studentGrade(studentUserId: string, client: any = this.prisma) {
+    const profile = await client.studentProfile.findUnique({
       where: { userId: studentUserId },
       select: { academicGradeId: true },
     });
@@ -111,10 +111,11 @@ export class CommerceService {
   private async target(
     studentUserId: string,
     dto: CartTargetDto,
+    client: any = this.prisma,
   ): Promise<Target> {
-    const gradeId = await this.studentGrade(studentUserId);
+    const gradeId = await this.studentGrade(studentUserId, client);
     if (dto.targetType === CommerceTargetType.COURSE) {
-      const course = await this.prisma.course.findFirst({
+      const course = await client.course.findFirst({
         where: {
           id: dto.targetId,
           status: published,
@@ -145,7 +146,7 @@ export class CommerceService {
         courseForCoverage: course.id,
       };
     }
-    const chapter = await this.prisma.chapter.findFirst({
+    const chapter = await client.chapter.findFirst({
       where: {
         id: dto.targetId,
         status: published,
@@ -188,9 +189,13 @@ export class CommerceService {
       courseForCoverage: chapter.courseId,
     };
   }
-  private async assertNotEntitled(studentUserId: string, target: Target) {
+  private async assertNotEntitled(
+    studentUserId: string,
+    target: Target,
+    client: any = this.prisma,
+  ) {
     const now = new Date();
-    const grant = await this.prisma.studentEntitlement.findFirst({
+    const grant = await client.studentEntitlement.findFirst({
       where: {
         studentUserId,
         status: EntitlementStatus.ACTIVE,
@@ -454,20 +459,80 @@ export class CommerceService {
       reviewFlags,
     };
   }
-  async cart(studentUserId: string) {
-    const cart = await this.prisma.cart.findUnique({
+
+  /**
+   * A cart is intentionally short-lived shopping intent. If content becomes
+   * unavailable after it was added, discard that entry instead of letting it
+   * make every later cart operation fail. Errors unrelated to the target's
+   * purchasability (for example a missing student profile) must still surface.
+   */
+  private isStaleCartTargetError(error: unknown): boolean {
+    if (error instanceof NotFoundException)
+      return [
+        'Purchasable course not found',
+        'Purchasable chapter not found',
+      ].includes(error.message);
+    if (error instanceof ConflictException)
+      return [
+        'Course is not purchasable',
+        'Chapter is not purchasable',
+        'An inherited chapter is not sold separately',
+      ].includes(error.message);
+    return false;
+  }
+
+  private async resolveCart(studentUserId: string, client: any = this.prisma) {
+    const cart = await client.cart.findUnique({
       where: { studentUserId },
       include: { items: true },
     });
     const items = cart?.items ?? [];
-    const targets = await Promise.all(
-      items.map((item) =>
-        this.target(studentUserId, {
-          targetType: item.targetType,
-          targetId: item.courseId ?? item.chapterId!,
-        }),
-      ),
+    if (!items.length) return { cart, items: [], targets: [] as Target[] };
+
+    const resolved = await Promise.all(
+      items.map(async (item: any) => {
+        const targetId =
+          item.targetType === CommerceTargetType.COURSE
+            ? item.courseId
+            : item.chapterId;
+        // A valid CartItem always has the identifier that matches its target
+        // type. Treat historical malformed rows as unavailable shopping intent.
+        if (!targetId) return { item, target: null };
+        try {
+          return {
+            item,
+            target: await this.target(
+              studentUserId,
+              { targetType: item.targetType, targetId },
+              client,
+            ),
+          };
+        } catch (error) {
+          if (this.isStaleCartTargetError(error)) return { item, target: null };
+          throw error;
+        }
+      }),
     );
+    const staleIds = resolved
+      .filter((entry) => !entry.target)
+      .map((entry) => entry.item.id);
+    if (staleIds.length)
+      await client.cartItem.deleteMany({
+        where: { cartId: cart!.id, id: { in: staleIds } },
+      });
+    const valid = resolved.filter(
+      (entry): entry is { item: (typeof items)[number]; target: Target } =>
+        entry.target !== null,
+    );
+    return {
+      cart,
+      items: valid.map((entry) => entry.item),
+      targets: valid.map((entry) => entry.target),
+    };
+  }
+
+  async cart(studentUserId: string) {
+    const { items, targets } = await this.resolveCart(studentUserId);
     const quote = await this.pricing!.quote(targets);
     return {
       data: items.map((item, index) => this.cartItem(item, quote.items[index])),
@@ -477,43 +542,65 @@ export class CommerceService {
     };
   }
   async addCartItem(studentUserId: string, dto: CartTargetDto) {
-    const target = await this.target(studentUserId, dto);
-    await this.assertNotEntitled(studentUserId, target);
-    const cart = await this.prisma.cart.upsert({
-      where: { studentUserId },
-      create: { studentUserId },
-      update: {},
-    });
-    const existing = await this.prisma.cartItem.findMany({
-      where: { cartId: cart.id },
-      include: { chapter: true },
-    });
-    if (
-      existing.some(
-        (x) =>
-          x.courseId === target.courseId ||
-          x.chapterId === target.chapterId ||
-          (target.courseId && x.chapter?.courseId === target.courseId) ||
-          (target.chapterId && x.courseId === target.courseForCoverage),
-      )
-    )
-      throw new ConflictException('Cart already contains overlapping content');
-    try {
-      const item = await this.prisma.cartItem.create({
-        data: {
-          cartId: cart.id,
-          targetType: target.targetType,
-          courseId: target.courseId,
-          chapterId: target.chapterId,
-        },
-      });
-      const quote = await this.pricing!.quote([target]);
-      return this.cartItem(item, quote.items[0]);
-    } catch (error: any) {
-      if (error.code === 'P2002')
-        throw new ConflictException('Item is already in cart');
-      throw error;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        return await this.prisma.$transaction(
+          async (tx) => {
+            // Validate and insert in the same serializable transaction as an
+            // archive, so an item cannot be inserted after archive cleanup.
+            const target = await this.target(studentUserId, dto, tx);
+            await this.assertNotEntitled(studentUserId, target, tx);
+            const cart = await tx.cart.upsert({
+              where: { studentUserId },
+              create: { studentUserId },
+              update: {},
+            });
+            const { targets: existing } = await this.resolveCart(
+              studentUserId,
+              tx,
+            );
+            if (
+              existing.some(
+                (existingTarget) =>
+                  (target.courseId &&
+                    existingTarget.courseForCoverage === target.courseId) ||
+                  (target.chapterId &&
+                    (existingTarget.chapterId === target.chapterId ||
+                      existingTarget.courseId === target.courseForCoverage)),
+              )
+            )
+              throw new ConflictException(
+                'Cart already contains overlapping content',
+              );
+            try {
+              const item = await tx.cartItem.create({
+                data: {
+                  cartId: cart.id,
+                  targetType: target.targetType,
+                  courseId: target.courseId,
+                  chapterId: target.chapterId,
+                },
+              });
+              const quote = await this.pricing!.quote(
+                [target],
+                undefined,
+                undefined,
+                tx,
+              );
+              return this.cartItem(item, quote.items[0]);
+            } catch (error: any) {
+              if (error.code === 'P2002')
+                throw new ConflictException('Item is already in cart');
+              throw error;
+            }
+          },
+          { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+        );
+      } catch (error: any) {
+        if (error.code !== 'P2034' || attempt === 2) throw error;
+      }
     }
+    throw new Error('Unreachable');
   }
   async removeCartItem(studentUserId: string, id: string) {
     const item = await this.prisma.cartItem.findFirst({
@@ -552,19 +639,9 @@ export class CommerceService {
         : null;
     if (paymentChannel === PaymentChannel.MANUAL && !method)
       throw new NotFoundException('Active payment method not found');
-    const cart = await this.prisma.cart.findUnique({
-      where: { studentUserId },
-      include: { items: true },
-    });
-    if (!cart?.items.length) throw new ConflictException('Cart is empty');
-    const targets = await Promise.all(
-      cart.items.map((x) =>
-        this.target(studentUserId, {
-          targetType: x.targetType,
-          targetId: x.courseId ?? x.chapterId!,
-        }),
-      ),
-    );
+    const cart = await this.resolveCart(studentUserId);
+    if (!cart.items.length) throw new ConflictException('Cart is empty');
+    const { items: cartItems, targets } = cart;
     await Promise.all(
       targets.map((x) => this.assertNotEntitled(studentUserId, x)),
     );
@@ -657,7 +734,7 @@ export class CommerceService {
           // Remove only the snapshot that was purchased. A concurrently added
           // cart item must survive this checkout.
           await tx.cartItem.deleteMany({
-            where: { id: { in: cart.items.map((item) => item.id) } },
+            where: { id: { in: cartItems.map((item) => item.id) } },
           });
           await tx.commerceIdempotencyKey.create({
             data: {

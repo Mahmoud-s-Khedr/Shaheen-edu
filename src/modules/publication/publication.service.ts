@@ -11,6 +11,7 @@ import {
   VideoProcessingStatus,
 } from '../../common/types/roles.enum';
 import { PrismaService } from '../../database/prisma.service';
+import type { Prisma } from '@prisma/client';
 import { AppException } from '../../common/exceptions/app.exception';
 
 export type PublishableResource =
@@ -71,29 +72,32 @@ export class PublicationService {
   async assertCanArchive(
     resource: Exclude<PublishableResource, 'contentItem'>,
     id: string,
+    client: PrismaService | Prisma.TransactionClient = this.prisma,
   ): Promise<void> {
-    const record = await this.find(resource, id, this.prisma);
+    const record = await this.find(resource, id, client);
     if (!record) throw new NotFoundException(`${resource} not found`);
     const hasPublishedDescendant = await this.hasPublishedDescendant(
       resource,
       id,
+      client,
     );
     if (hasPublishedDescendant) {
       throw new ConflictException(
         'Cannot archive a record with published descendants',
       );
     }
-    await this.snapshotActiveEntitlements(resource, id);
+    await this.snapshotActiveEntitlements(resource, id, client);
   }
 
   /** Preserve the students who were entitled at the instant a hierarchy node is archived. */
   private async snapshotActiveEntitlements(
     resource: Exclude<PublishableResource, 'contentItem'>,
     id: string,
+    client: PrismaService | Prisma.TransactionClient,
   ): Promise<void> {
-    const target = await this.archiveTarget(resource, id);
+    const target = await this.archiveTarget(resource, id, client);
     const now = new Date();
-    const grants = await this.prisma.studentEntitlement.findMany({
+    const grants = await client.studentEntitlement.findMany({
       where: {
         status: 'ACTIVE',
         revokedAt: null,
@@ -118,7 +122,7 @@ export class PublicationService {
       if (!firstGrantByStudent.has(grant.studentUserId))
         firstGrantByStudent.set(grant.studentUserId, grant.id);
     if (!firstGrantByStudent.size) return;
-    await this.prisma.archivedAccessSnapshot.createMany({
+    await client.archivedAccessSnapshot.createMany({
       data: [...firstGrantByStudent].map(
         ([studentUserId, sourceEntitlementId]) => ({
           studentUserId,
@@ -135,9 +139,10 @@ export class PublicationService {
   private async archiveTarget(
     resource: Exclude<PublishableResource, 'contentItem'>,
     id: string,
+    client: PrismaService | Prisma.TransactionClient,
   ): Promise<{ type: any; courseIds: string[]; chapterIds: string[] }> {
     if (resource === 'course') {
-      const chapters = await this.prisma.chapter.findMany({
+      const chapters = await client.chapter.findMany({
         where: { courseId: id },
         select: { id: true },
       });
@@ -148,12 +153,12 @@ export class PublicationService {
       };
     }
     if (resource === 'chapter') {
-      const x = await this.prisma.chapter.findUnique({ where: { id } });
+      const x = await client.chapter.findUnique({ where: { id } });
       if (!x) throw new NotFoundException('chapter not found');
       return { type: 'CHAPTER', courseIds: [x.courseId], chapterIds: [id] };
     }
     if (resource === 'lesson') {
-      const x = await this.prisma.lesson.findUnique({
+      const x = await client.lesson.findUnique({
         where: { id },
         include: { chapter: true },
       });
@@ -165,7 +170,7 @@ export class PublicationService {
       };
     }
     if (resource === 'section') {
-      const x = await this.prisma.section.findUnique({
+      const x = await client.section.findUnique({
         where: { id },
         include: { lesson: { include: { chapter: true } } },
       });
@@ -177,7 +182,7 @@ export class PublicationService {
       };
     }
     if (resource === 'subject') {
-      const courses = await this.prisma.course.findMany({
+      const courses = await client.course.findMany({
         where: { subjectId: id },
         include: { chapters: { select: { id: true } } },
       });
@@ -187,7 +192,7 @@ export class PublicationService {
         chapterIds: courses.flatMap((x) => x.chapters.map((c) => c.id)),
       };
     }
-    const courses = await this.prisma.course.findMany({
+    const courses = await client.course.findMany({
       where: {
         subject: { gradeAssignments: { some: { academicGradeId: id } } },
       },
@@ -203,7 +208,7 @@ export class PublicationService {
   /** Reusable ancestry gate for resources scoped directly to a chapter. */
   async assertPublishedChapterAncestry(
     chapterId: string,
-    client: any = this.prisma,
+    client: PrismaService | Prisma.TransactionClient = this.prisma,
   ): Promise<void> {
     const chapter = await client.chapter.findUnique({
       where: { id: chapterId },
@@ -501,17 +506,18 @@ export class PublicationService {
   private async hasPublishedDescendant(
     resource: Exclude<PublishableResource, 'contentItem'>,
     id: string,
+    client: any = this.prisma,
   ): Promise<boolean> {
     const published = ContentStatus.PUBLISHED;
     if (resource === 'section')
       return Boolean(
-        await this.prisma.contentItem.count({
+        await client.contentItem.count({
           where: { status: published, placement: { is: { sectionId: id } } },
         }),
       );
     if (resource === 'lesson')
       return Boolean(
-        await this.prisma
+        await (client as Prisma.TransactionClient)
           .$queryRawUnsafe<number[]>(
             `SELECT 1 FROM \"Lesson\" l LEFT JOIN \"Section\" s ON s.\"lessonId\" = l.id LEFT JOIN \"ContentPlacement\" p ON p.\"lessonId\" = l.id OR p.\"sectionId\" = s.id LEFT JOIN \"ContentItem\" i ON i.id = p.\"contentItemId\" WHERE l.id = $1 AND (s.status = 'PUBLISHED' OR i.status = 'PUBLISHED') LIMIT 1`,
             id,
@@ -520,7 +526,7 @@ export class PublicationService {
       );
     if (resource === 'chapter')
       return Boolean(
-        await this.prisma
+        await (client as Prisma.TransactionClient)
           .$queryRawUnsafe<number[]>(
             `SELECT 1 FROM \"Chapter\" c LEFT JOIN \"Lesson\" l ON l.\"chapterId\" = c.id LEFT JOIN \"Section\" s ON s.\"lessonId\" = l.id LEFT JOIN \"ContentPlacement\" p ON p.\"chapterId\" = c.id OR p.\"lessonId\" = l.id OR p.\"sectionId\" = s.id LEFT JOIN \"ContentItem\" i ON i.id = p.\"contentItemId\" WHERE c.id = $1 AND (l.status = 'PUBLISHED' OR s.status = 'PUBLISHED' OR i.status = 'PUBLISHED') LIMIT 1`,
             id,
@@ -529,7 +535,7 @@ export class PublicationService {
       );
     if (resource === 'course')
       return Boolean(
-        await this.prisma
+        await (client as Prisma.TransactionClient)
           .$queryRawUnsafe<number[]>(
             `SELECT 1 FROM \"Course\" c LEFT JOIN \"Chapter\" h ON h.\"courseId\" = c.id LEFT JOIN \"Lesson\" l ON l.\"chapterId\" = h.id LEFT JOIN \"Section\" s ON s.\"lessonId\" = l.id LEFT JOIN \"ContentPlacement\" p ON p.\"courseId\" = c.id OR p.\"chapterId\" = h.id OR p.\"lessonId\" = l.id OR p.\"sectionId\" = s.id LEFT JOIN \"ContentItem\" i ON i.id = p.\"contentItemId\" WHERE c.id = $1 AND (h.status = 'PUBLISHED' OR l.status = 'PUBLISHED' OR s.status = 'PUBLISHED' OR i.status = 'PUBLISHED') LIMIT 1`,
             id,
@@ -538,7 +544,7 @@ export class PublicationService {
       );
     if (resource === 'subject')
       return Boolean(
-        await this.prisma
+        await (client as Prisma.TransactionClient)
           .$queryRawUnsafe<number[]>(
             `SELECT 1 FROM \"Subject\" s LEFT JOIN \"Course\" c ON c.\"subjectId\" = s.id LEFT JOIN \"Chapter\" h ON h.\"courseId\" = c.id LEFT JOIN \"Lesson\" l ON l.\"chapterId\" = h.id LEFT JOIN \"Section\" x ON x.\"lessonId\" = l.id LEFT JOIN \"ContentPlacement\" p ON p.\"courseId\" = c.id OR p.\"chapterId\" = h.id OR p.\"lessonId\" = l.id OR p.\"sectionId\" = x.id LEFT JOIN \"ContentItem\" i ON i.id = p.\"contentItemId\" WHERE s.id = $1 AND (c.status = 'PUBLISHED' OR h.status = 'PUBLISHED' OR l.status = 'PUBLISHED' OR x.status = 'PUBLISHED' OR i.status = 'PUBLISHED') LIMIT 1`,
             id,
@@ -546,7 +552,7 @@ export class PublicationService {
           .then((rows) => rows.length),
       );
     return Boolean(
-      await this.prisma
+      await (client as Prisma.TransactionClient)
         .$queryRawUnsafe<number[]>(
           `SELECT 1 FROM \"AcademicGrade\" g LEFT JOIN \"SubjectGrade\" sg ON sg.\"academicGradeId\" = g.id LEFT JOIN \"Subject\" s ON s.id = sg.\"subjectId\" LEFT JOIN \"Course\" c ON c.\"subjectId\" = s.id LEFT JOIN \"Chapter\" h ON h.\"courseId\" = c.id LEFT JOIN \"Lesson\" l ON l.\"chapterId\" = h.id LEFT JOIN \"Section\" x ON x.\"lessonId\" = l.id LEFT JOIN \"ContentPlacement\" p ON p.\"courseId\" = c.id OR p.\"chapterId\" = h.id OR p.\"lessonId\" = l.id OR p.\"sectionId\" = x.id LEFT JOIN \"ContentItem\" i ON i.id = p.\"contentItemId\" WHERE g.id = $1 AND (s.status = 'PUBLISHED' OR c.status = 'PUBLISHED' OR h.status = 'PUBLISHED' OR l.status = 'PUBLISHED' OR x.status = 'PUBLISHED' OR i.status = 'PUBLISHED') LIMIT 1`,
           id,

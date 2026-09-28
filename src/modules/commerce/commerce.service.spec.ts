@@ -374,6 +374,256 @@ describe('CommerceService chapter product eligibility', () => {
   });
 });
 
+describe('CommerceService stale cart cleanup', () => {
+  const studentUserId = 'student-1';
+
+  function quoteFor(targets: any[]) {
+    return {
+      items: targets.map((target) => ({
+        ...target,
+        finalPriceMinor: target.basePriceMinor,
+        discountMinor: 0,
+        promotionSnapshot: null,
+      })),
+      subtotalMinor: targets.reduce(
+        (total, target) => total + target.basePriceMinor,
+        0,
+      ),
+      discountMinor: 0,
+      totalMinor: targets.reduce(
+        (total, target) => total + target.basePriceMinor,
+        0,
+      ),
+    };
+  }
+
+  it('removes only unavailable historical entries when loading a cart', async () => {
+    const stale = {
+      id: 'cart-item-stale',
+      targetType: 'COURSE',
+      courseId: 'course-archived',
+      chapterId: null,
+    };
+    const valid = {
+      id: 'cart-item-valid',
+      targetType: 'CHAPTER',
+      courseId: null,
+      chapterId: 'chapter-valid',
+    };
+    const prisma: any = {
+      cart: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'cart-1',
+          items: [stale, valid],
+        }),
+      },
+      cartItem: { deleteMany: jest.fn().mockResolvedValue({ count: 1 }) },
+      studentProfile: {
+        findUnique: jest.fn().mockResolvedValue({ academicGradeId: 'grade-1' }),
+      },
+      course: { findFirst: jest.fn().mockResolvedValue(null) },
+      chapter: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: 'chapter-valid',
+          title: 'Available chapter',
+          courseId: 'course-1',
+          accessType: 'EXPLICIT',
+          isPurchasable: true,
+          priceMinor: 12_000,
+          currency: 'EGP',
+          course: { id: 'course-1' },
+        }),
+      },
+    };
+    const pricing = { quote: jest.fn((targets) => quoteFor(targets)) };
+    const service = new CommerceService(
+      prisma,
+      {} as any,
+      { record: jest.fn(), recordWithClient: jest.fn() } as any,
+      pricing as any,
+    );
+
+    await expect(service.cart(studentUserId)).resolves.toMatchObject({
+      data: [
+        expect.objectContaining({ id: valid.id, targetId: valid.chapterId }),
+      ],
+      total: { amountMinor: 12_000, currency: 'EGP' },
+    });
+    expect(prisma.cartItem.deleteMany).toHaveBeenCalledWith({
+      where: { cartId: 'cart-1', id: { in: [stale.id] } },
+    });
+    expect(pricing.quote).toHaveBeenCalledWith([
+      expect.objectContaining({ chapterId: valid.chapterId }),
+    ]);
+  });
+
+  it('cleans stale entries before checking a new cart item for overlap', async () => {
+    const prisma: any = {
+      $transaction: jest.fn((callback) => callback(prisma)),
+      studentProfile: {
+        findUnique: jest.fn().mockResolvedValue({ academicGradeId: 'grade-1' }),
+      },
+      course: {
+        findFirst: jest.fn(({ where }) =>
+          Promise.resolve(
+            where.id === 'course-new'
+              ? {
+                  id: 'course-new',
+                  title: 'New course',
+                  isPurchasable: true,
+                  priceMinor: 20_000,
+                  currency: 'EGP',
+                }
+              : null,
+          ),
+        ),
+      },
+      studentEntitlement: { findFirst: jest.fn().mockResolvedValue(null) },
+      cart: {
+        upsert: jest.fn().mockResolvedValue({ id: 'cart-1' }),
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'cart-1',
+          items: [
+            {
+              id: 'cart-item-stale',
+              targetType: 'COURSE',
+              courseId: 'course-archived',
+              chapterId: null,
+            },
+          ],
+        }),
+      },
+      cartItem: {
+        deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
+        create: jest.fn().mockResolvedValue({
+          id: 'cart-item-new',
+          targetType: 'COURSE',
+          courseId: 'course-new',
+          chapterId: null,
+        }),
+      },
+    };
+    const pricing = { quote: jest.fn((targets) => quoteFor(targets)) };
+    const service = new CommerceService(
+      prisma,
+      {} as any,
+      { record: jest.fn(), recordWithClient: jest.fn() } as any,
+      pricing as any,
+    );
+
+    await expect(
+      service.addCartItem(studentUserId, {
+        targetType: 'COURSE' as any,
+        targetId: 'course-new',
+      }),
+    ).resolves.toMatchObject({ targetId: 'course-new' });
+    expect(prisma.cartItem.deleteMany).toHaveBeenCalledWith({
+      where: { cartId: 'cart-1', id: { in: ['cart-item-stale'] } },
+    });
+    expect(prisma.cartItem.create).toHaveBeenCalled();
+    expect(prisma.$transaction).toHaveBeenCalledWith(expect.any(Function), {
+      isolationLevel: 'Serializable',
+    });
+  });
+
+  it('revalidates availability inside the serializable cart mutation', async () => {
+    let archived = false;
+    const tx: any = {
+      studentProfile: {
+        findUnique: jest.fn().mockResolvedValue({ academicGradeId: 'grade-1' }),
+      },
+      course: {
+        findFirst: jest.fn(() =>
+          Promise.resolve(
+            archived
+              ? null
+              : {
+                  id: 'course-1',
+                  title: 'Course',
+                  isPurchasable: true,
+                  priceMinor: 20_000,
+                  currency: 'EGP',
+                },
+          ),
+        ),
+      },
+    };
+    const prisma: any = {
+      $transaction: jest.fn((callback) => {
+        // Model an archive committing after the request begins but before its
+        // serializable mutation validates the target.
+        archived = true;
+        return callback(tx);
+      }),
+      studentProfile: { findUnique: jest.fn() },
+      course: { findFirst: jest.fn() },
+    };
+    const service = new CommerceService(
+      prisma,
+      {} as any,
+      { record: jest.fn(), recordWithClient: jest.fn() } as any,
+      { quote: jest.fn() } as any,
+    );
+
+    await expect(
+      service.addCartItem(studentUserId, {
+        targetType: 'COURSE' as any,
+        targetId: 'course-1',
+      }),
+    ).rejects.toThrow('Purchasable course not found');
+    expect(tx.course.findFirst).toHaveBeenCalled();
+    expect(prisma.course.findFirst).not.toHaveBeenCalled();
+    expect(prisma.$transaction).toHaveBeenCalledWith(expect.any(Function), {
+      isolationLevel: 'Serializable',
+    });
+  });
+
+  it('makes a cart containing only stale items empty at checkout', async () => {
+    const prisma: any = {
+      commerceIdempotencyKey: { findUnique: jest.fn().mockResolvedValue(null) },
+      manualPaymentMethod: {
+        findFirst: jest.fn().mockResolvedValue({ id: 'method-1' }),
+      },
+      cart: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'cart-1',
+          items: [
+            {
+              id: 'cart-item-stale',
+              targetType: 'COURSE',
+              courseId: 'course-archived',
+              chapterId: null,
+            },
+          ],
+        }),
+      },
+      cartItem: { deleteMany: jest.fn().mockResolvedValue({ count: 1 }) },
+      studentProfile: {
+        findUnique: jest.fn().mockResolvedValue({ academicGradeId: 'grade-1' }),
+      },
+      course: { findFirst: jest.fn().mockResolvedValue(null) },
+    };
+    const service = new CommerceService(
+      prisma,
+      {} as any,
+      { record: jest.fn(), recordWithClient: jest.fn() } as any,
+      { quote: jest.fn() } as any,
+    );
+
+    await expect(
+      service.checkout(
+        studentUserId,
+        { manualPaymentMethodId: 'method-1' },
+        'checkout-key',
+      ),
+    ).rejects.toThrow('Cart is empty');
+    expect(prisma.cartItem.deleteMany).toHaveBeenCalledWith({
+      where: { cartId: 'cart-1', id: { in: ['cart-item-stale'] } },
+    });
+    expect(prisma.$transaction).toBeUndefined();
+  });
+});
+
 describe('CommerceService coupon priority', () => {
   const admin = { id: 'admin-1', role: Role.ADMIN } as any;
   const startsAt = new Date('2026-09-01T00:00:00.000Z');
