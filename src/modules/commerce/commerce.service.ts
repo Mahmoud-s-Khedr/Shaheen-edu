@@ -131,6 +131,18 @@ export class CommerceService {
         },
       });
       if (!course) throw new NotFoundException('Purchasable course not found');
+      // FREE courses are claimed through the normal cart/checkout flow so the
+      // zero-total order can grant an entitlement.  Their legacy pricing flag
+      // must not prevent that enrolment.
+      if (course.accessType === AccessType.FREE)
+        return {
+          targetType: dto.targetType,
+          courseId: course.id,
+          title: course.title,
+          basePriceMinor: 0,
+          currency: 'EGP',
+          courseForCoverage: course.id,
+        };
       if (
         !course.isPurchasable ||
         course.currency !== 'EGP' ||

@@ -579,7 +579,44 @@ describe('CommerceService zero-total checkout', () => {
   });
 });
 
-describe('CommerceService chapter product eligibility', () => {
+describe('CommerceService product eligibility', () => {
+  it('treats a FREE course as a zero-total cart target even without legacy pricing', async () => {
+    const prisma: any = {
+      studentProfile: {
+        findUnique: jest.fn().mockResolvedValue({ academicGradeId: 'grade-1' }),
+      },
+      course: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: 'course-free',
+          title: 'Free course',
+          accessType: 'FREE',
+          isPurchasable: false,
+          priceMinor: null,
+          currency: null,
+        }),
+      },
+    };
+    const service = new CommerceService(
+      prisma,
+      {} as any,
+      { record: jest.fn(), recordWithClient: jest.fn() } as any,
+    );
+
+    await expect(
+      (service as any).target('student-1', {
+        targetType: 'COURSE',
+        targetId: 'course-free',
+      }),
+    ).resolves.toEqual({
+      targetType: 'COURSE',
+      courseId: 'course-free',
+      title: 'Free course',
+      basePriceMinor: 0,
+      currency: 'EGP',
+      courseForCoverage: 'course-free',
+    });
+  });
+
   it('rejects an inherited chapter even when its course has a valid price', async () => {
     const prisma: any = {
       studentProfile: {
