@@ -21915,7 +21915,8 @@
               "type": "string",
               "enum": [
                 "MANUAL",
-                "XPAY"
+                "XPAY",
+                "ZERO_TOTAL"
               ]
             }
           },
@@ -22081,7 +22082,8 @@
               "type": "string",
               "enum": [
                 "MANUAL",
-                "XPAY"
+                "XPAY",
+                "ZERO_TOTAL"
               ]
             }
           },
@@ -22247,7 +22249,8 @@
               "type": "string",
               "enum": [
                 "MANUAL",
-                "XPAY"
+                "XPAY",
+                "ZERO_TOTAL"
               ]
             }
           },
@@ -22413,7 +22416,8 @@
               "type": "string",
               "enum": [
                 "MANUAL",
-                "XPAY"
+                "XPAY",
+                "ZERO_TOTAL"
               ]
             }
           },
@@ -22579,7 +22583,8 @@
               "type": "string",
               "enum": [
                 "MANUAL",
-                "XPAY"
+                "XPAY",
+                "ZERO_TOTAL"
               ]
             }
           },
@@ -22745,7 +22750,8 @@
               "type": "string",
               "enum": [
                 "MANUAL",
-                "XPAY"
+                "XPAY",
+                "ZERO_TOTAL"
               ]
             }
           },
@@ -22911,7 +22917,8 @@
               "type": "string",
               "enum": [
                 "MANUAL",
-                "XPAY"
+                "XPAY",
+                "ZERO_TOTAL"
               ]
             }
           },
@@ -23077,7 +23084,8 @@
               "type": "string",
               "enum": [
                 "MANUAL",
-                "XPAY"
+                "XPAY",
+                "ZERO_TOTAL"
               ]
             }
           },
@@ -30491,7 +30499,8 @@
               "MANUAL",
               "XPAY"
             ],
-            "default": "MANUAL"
+            "default": "MANUAL",
+            "description": "Requested paid checkout channel. Zero-total orders are approved automatically and return ZERO_TOTAL."
           },
           "manualPaymentMethodId": {
             "type": "string"
@@ -30681,7 +30690,12 @@
             }
           },
           "paymentChannel": {
-            "type": "string"
+            "type": "string",
+            "enum": [
+              "MANUAL",
+              "XPAY",
+              "ZERO_TOTAL"
+            ]
           },
           "subtotal": {
             "$ref": "#/components/schemas/MoneyDto"
@@ -33431,7 +33445,8 @@
             "type": "string",
             "enum": [
               "MANUAL",
-              "XPAY"
+              "XPAY",
+              "ZERO_TOTAL"
             ]
           },
           "orderStatus": {

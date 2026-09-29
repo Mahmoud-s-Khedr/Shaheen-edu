@@ -8,6 +8,7 @@ import {
   AssetStatus,
   ManualPaymentSubmissionStatus,
   OrderStatus,
+  PaymentChannel,
   ReferralReviewAction,
   ReferralReviewRuleKind,
   Role,
@@ -405,6 +406,176 @@ describe('CommerceService XPay webhooks', () => {
         data: expect.objectContaining({ processingError: expect.any(String) }),
       }),
     );
+  });
+});
+
+describe('CommerceService zero-total checkout', () => {
+  const studentUserId = 'student-1';
+  const zeroTotalOrder = {
+    id: 'order-zero',
+    status: OrderStatus.APPROVED,
+    paymentChannel: PaymentChannel.ZERO_TOTAL,
+    subtotalMinor: 0,
+    discountMinor: 0,
+    totalMinor: 0,
+    currency: 'EGP',
+    paymentMethodSnapshot: { provider: 'ZERO_TOTAL', checkout: 'NONE' },
+    createdAt: new Date('2026-09-29T12:00:00.000Z'),
+    approvedAt: new Date('2026-09-29T12:00:00.000Z'),
+    cancelledAt: null,
+    paymentExpiresAt: null,
+    receipt: { reference: 'RCT-20260929-ZERO' },
+    items: [],
+    submissions: [],
+  };
+
+  function build() {
+    const tx: any = {
+      manualPaymentMethod: { findFirst: jest.fn() },
+      order: {
+        create: jest.fn().mockResolvedValue({
+          id: zeroTotalOrder.id,
+          paymentChannel: PaymentChannel.ZERO_TOTAL,
+          referralAttribution: null,
+        }),
+      },
+      cartItem: { deleteMany: jest.fn() },
+      commerceIdempotencyKey: { create: jest.fn() },
+    };
+    const prisma: any = {
+      commerceIdempotencyKey: { findUnique: jest.fn().mockResolvedValue(null) },
+      cart: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'cart-1',
+          items: [
+            {
+              id: 'cart-item-1',
+              targetType: 'COURSE',
+              courseId: 'course-1',
+              chapterId: null,
+            },
+          ],
+        }),
+      },
+      studentProfile: {
+        findUnique: jest.fn().mockResolvedValue({ academicGradeId: 'grade-1' }),
+      },
+      course: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: 'course-1',
+          title: 'Free course',
+          isPurchasable: true,
+          priceMinor: 0,
+          currency: 'EGP',
+        }),
+      },
+      studentEntitlement: { findFirst: jest.fn().mockResolvedValue(null) },
+      manualPaymentMethod: { findFirst: jest.fn() },
+      order: { findFirst: jest.fn().mockResolvedValue(zeroTotalOrder) },
+      $transaction: jest.fn((callback) => callback(tx)),
+    };
+    const fulfilment = { fulfil: jest.fn().mockResolvedValue(zeroTotalOrder) };
+    const pricing = {
+      quote: jest.fn().mockResolvedValue({
+        subtotalMinor: 0,
+        discountMinor: 0,
+        totalMinor: 0,
+        coupon: null,
+        items: [
+          {
+            targetType: 'COURSE',
+            courseId: 'course-1',
+            title: 'Free course',
+            basePriceMinor: 0,
+            discountMinor: 0,
+            finalPriceMinor: 0,
+            currency: 'EGP',
+            promotionSnapshot: null,
+          },
+        ],
+      }),
+    };
+    const audit = { record: jest.fn(), recordWithClient: jest.fn() };
+    return {
+      tx,
+      prisma,
+      fulfilment,
+      service: new CommerceService(
+        prisma,
+        {} as any,
+        audit as any,
+        pricing as any,
+        undefined,
+        fulfilment as any,
+      ),
+    };
+  }
+
+  it('forces a zero-price cart through atomic approval without a payment method or attempt', async () => {
+    const { service, prisma, tx, fulfilment } = build();
+
+    await expect(
+      service.checkout(
+        studentUserId,
+        { paymentChannel: PaymentChannel.XPAY },
+        'zero-total-key',
+      ),
+    ).resolves.toMatchObject({
+      id: zeroTotalOrder.id,
+      status: OrderStatus.APPROVED,
+      paymentChannel: PaymentChannel.ZERO_TOTAL,
+      paymentExpiresAt: null,
+      receiptReference: 'RCT-20260929-ZERO',
+    });
+
+    expect(tx.order.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          paymentChannel: PaymentChannel.ZERO_TOTAL,
+          paymentMethodSnapshot: { provider: 'ZERO_TOTAL', checkout: 'NONE' },
+          paymentExpiresAt: null,
+        }),
+      }),
+    );
+    expect(tx.manualPaymentMethod.findFirst).not.toHaveBeenCalled();
+    expect(prisma.manualPaymentMethod.findFirst).not.toHaveBeenCalled();
+    expect(fulfilment.fulfil).toHaveBeenCalledWith(tx, {
+      orderId: zeroTotalOrder.id,
+      actorUserId: studentUserId,
+    });
+  });
+
+  it('does not accept a manual payment method for a zero-total order', async () => {
+    const { service, tx, fulfilment } = build();
+
+    await expect(
+      service.checkout(
+        studentUserId,
+        { manualPaymentMethodId: 'method-1' },
+        'zero-total-method-key',
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    expect(tx.order.create).not.toHaveBeenCalled();
+    expect(fulfilment.fulfil).not.toHaveBeenCalled();
+  });
+
+  it('returns an approved zero-total order on an idempotent retry without fulfilling again', async () => {
+    const { service, prisma, tx, fulfilment } = build();
+    prisma.commerceIdempotencyKey.findUnique.mockResolvedValue({
+      resourceId: zeroTotalOrder.id,
+    });
+
+    await expect(
+      service.checkout(studentUserId, {}, 'zero-total-retry-key'),
+    ).resolves.toMatchObject({
+      id: zeroTotalOrder.id,
+      status: OrderStatus.APPROVED,
+      paymentChannel: PaymentChannel.ZERO_TOTAL,
+    });
+
+    expect(tx.order.create).not.toHaveBeenCalled();
+    expect(fulfilment.fulfil).not.toHaveBeenCalled();
   });
 });
 

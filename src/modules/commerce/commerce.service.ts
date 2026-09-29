@@ -630,15 +630,7 @@ export class CommerceService {
       },
     });
     if (prior) return this.order(studentUserId, prior.resourceId);
-    const paymentChannel = dto.paymentChannel ?? PaymentChannel.MANUAL;
-    const method =
-      paymentChannel === PaymentChannel.MANUAL
-        ? await this.prisma.manualPaymentMethod.findFirst({
-            where: { id: dto.manualPaymentMethodId, isActive: true },
-          })
-        : null;
-    if (paymentChannel === PaymentChannel.MANUAL && !method)
-      throw new NotFoundException('Active payment method not found');
+    const requestedPaymentChannel = dto.paymentChannel ?? PaymentChannel.MANUAL;
     const cart = await this.resolveCart(studentUserId);
     if (!cart.items.length) throw new ConflictException('Cart is empty');
     const { items: cartItems, targets } = cart;
@@ -654,6 +646,33 @@ export class CommerceService {
             studentUserId,
             tx,
           );
+          // The server-calculated total, rather than a client-selected method,
+          // determines whether this order requires payment. Keep this before
+          // all paid-channel validation so a free enrolment has no dependency
+          // on an active manual method or XPay configuration.
+          const isZeroTotal = quote.totalMinor === 0;
+          if (
+            requestedPaymentChannel !== PaymentChannel.MANUAL &&
+            requestedPaymentChannel !== PaymentChannel.XPAY
+          )
+            throw new BadRequestException(
+              'ZERO_TOTAL is assigned automatically for zero-total orders',
+            );
+          if (isZeroTotal && dto.manualPaymentMethodId)
+            throw new BadRequestException(
+              'A payment method must not be supplied for a zero-total order',
+            );
+          const paymentChannel = isZeroTotal
+            ? PaymentChannel.ZERO_TOTAL
+            : requestedPaymentChannel;
+          const method =
+            paymentChannel === PaymentChannel.MANUAL
+              ? await tx.manualPaymentMethod.findFirst({
+                  where: { id: dto.manualPaymentMethodId, isActive: true },
+                })
+              : null;
+          if (paymentChannel === PaymentChannel.MANUAL && !method)
+            throw new NotFoundException('Active payment method not found');
           const referral = dto.referralCode
             ? await this.resolveReferral(
                 dto.referralCode,
@@ -662,13 +681,15 @@ export class CommerceService {
                 tx,
               )
             : null;
-          const paymentExpiresAt = new Date(
-            Date.now() +
-              (paymentChannel === PaymentChannel.XPAY
-                ? this.commerceConfig.xpayOrderExpirySeconds
-                : this.commerceConfig.manualOrderExpirySeconds) *
-                1000,
-          );
+          const paymentExpiresAt = isZeroTotal
+            ? null
+            : new Date(
+                Date.now() +
+                  (paymentChannel === PaymentChannel.XPAY
+                    ? this.commerceConfig.xpayOrderExpirySeconds
+                    : this.commerceConfig.manualOrderExpirySeconds) *
+                    1000,
+              );
           const created = await tx.order.create({
             data: {
               studentUserId,
@@ -676,7 +697,9 @@ export class CommerceService {
               paymentChannel,
               paymentMethodSnapshot: method
                 ? this.snapshot(method)
-                : { provider: 'XPAY', checkout: 'HOSTED_REDIRECT' },
+                : isZeroTotal
+                  ? { provider: 'ZERO_TOTAL', checkout: 'NONE' }
+                  : { provider: 'XPAY', checkout: 'HOSTED_REDIRECT' },
               subtotalMinor: quote.subtotalMinor,
               discountMinor: quote.discountMinor,
               totalMinor: quote.totalMinor,
@@ -744,6 +767,11 @@ export class CommerceService {
               resourceId: created.id,
             },
           });
+          if (isZeroTotal)
+            await this.fulfilment!.fulfil(tx, {
+              orderId: created.id,
+              actorUserId: studentUserId,
+            });
           return created;
         },
         { isolationLevel: 'Serializable' },
@@ -753,7 +781,7 @@ export class CommerceService {
         action: 'ORDER_CREATED',
         targetType: 'Order',
         targetId: order.id,
-        metadata: { paymentChannel },
+        metadata: { paymentChannel: order.paymentChannel },
       });
       for (const flag of order.referralAttribution?.reviewFlags ?? []) {
         await this.audit.record({
@@ -765,7 +793,7 @@ export class CommerceService {
         });
       }
       const response = await this.order(studentUserId, order.id);
-      if (paymentChannel === PaymentChannel.XPAY)
+      if (order.paymentChannel === PaymentChannel.XPAY)
         return {
           ...response,
           xpay: await this.createXPayAttempt(

@@ -4,6 +4,7 @@ import {
   IsBoolean,
   IsDate,
   IsEnum,
+  IsIn,
   IsInt,
   IsOptional,
   IsString,
@@ -46,9 +47,14 @@ export class PricePreviewDto {
   referralCode?: string;
 }
 export class CheckoutDto {
-  @ApiPropertyOptional({ enum: PaymentChannel, default: PaymentChannel.MANUAL })
+  @ApiPropertyOptional({
+    enum: [PaymentChannel.MANUAL, PaymentChannel.XPAY],
+    default: PaymentChannel.MANUAL,
+    description:
+      'Requested paid checkout channel. Zero-total orders are approved automatically and return ZERO_TOTAL.',
+  })
   @IsOptional()
-  @IsEnum(PaymentChannel)
+  @IsIn([PaymentChannel.MANUAL, PaymentChannel.XPAY])
   paymentChannel?: PaymentChannel;
   @ApiPropertyOptional()
   @IsOptional()
@@ -417,7 +423,8 @@ export class OrderDto {
   @ApiProperty({ type: [OrderItemDto] }) items!: OrderItemDto[];
   @ApiProperty({ type: [PaymentSubmissionSummaryDto] })
   submissions!: PaymentSubmissionSummaryDto[];
-  @ApiPropertyOptional() paymentChannel?: PaymentChannel;
+  @ApiPropertyOptional({ enum: PaymentChannel })
+  paymentChannel?: PaymentChannel;
   @ApiPropertyOptional({ type: MoneyDto }) subtotal?: MoneyDto;
   @ApiPropertyOptional({ type: MoneyDto }) discount?: MoneyDto;
   @ApiPropertyOptional({ type: String, format: 'date-time', nullable: true })

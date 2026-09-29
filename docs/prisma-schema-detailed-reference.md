@@ -32,7 +32,8 @@ For a compact endpoint-family read/write matrix, see
 - EntitlementStatus: ACTIVE, REVOKED.
 - CommerceTargetType: COURSE, CHAPTER.
 - OrderStatus: AWAITING_PAYMENT, SUBMITTED, APPROVED, REJECTED, CANCELLED, EXPIRED.
-- PaymentChannel: MANUAL, XPAY.
+- PaymentChannel: MANUAL, XPAY, ZERO_TOTAL (server-assigned for auto-approved
+  zero-total orders; it is not a client payment method).
 - PaymentAttemptStatus: INITIATED, PENDING, PAID, DECLINED, FAILED, EXPIRED.
 - PromotionKind: PERCENTAGE, FIXED.
 - CouponReservationStatus: RESERVED, REDEEMED, RELEASED.

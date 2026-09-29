@@ -196,6 +196,8 @@ const translations: Record<string, string> = {
   'Active analytics entitlement not found':
     'لم يتم العثور على استحقاق التحليلات النشطة',
   'Active payment method not found': 'لم يتم العثور على طريقة الدفع النشطة',
+  'A payment method must not be supplied for a zero-total order':
+    'لا يجب إرسال طريقة دفع لطلب بإجمالي صفري',
   'Admin not found': 'لم يتم العثور على المشرف',
   'Agreement activation conflicted; retry the request':
     'تعارض تفعيل الاتفاقية؛ أعد محاولة الطلب',
@@ -596,6 +598,8 @@ const translations: Record<string, string> = {
   'Order cannot be fulfilled': 'لا يمكن تنفيذ الطلب',
   'Order cannot start an XPay payment': 'لا يمكن للطلب بدء دفعة XPay',
   'Order not found': 'لم يتم العثور على الطلب',
+  'ZERO_TOTAL is assigned automatically for zero-total orders':
+    'يتم تعيين ZERO_TOTAL تلقائياً للطلبات ذات الإجمالي الصفري',
   'PAYMENT entitlements can only be created by payment approval':
     'لا يمكن إنشاء استحقاقات الدفع إلا من خلال الموافقة على الدفع',
   'PDF transcription is not configured': 'لم يتم تكوين النسخ PDF',
