@@ -545,7 +545,7 @@ describe('CommerceService zero-total checkout', () => {
     });
   });
 
-  it('does not accept a manual payment method for a zero-total order', async () => {
+  it('ignores a manual payment method for a zero-total order', async () => {
     const { service, tx, fulfilment } = build();
 
     await expect(
@@ -554,10 +554,26 @@ describe('CommerceService zero-total checkout', () => {
         { manualPaymentMethodId: 'method-1' },
         'zero-total-method-key',
       ),
-    ).rejects.toBeInstanceOf(BadRequestException);
+    ).resolves.toMatchObject({
+      id: zeroTotalOrder.id,
+      status: OrderStatus.APPROVED,
+      paymentChannel: PaymentChannel.ZERO_TOTAL,
+    });
 
-    expect(tx.order.create).not.toHaveBeenCalled();
-    expect(fulfilment.fulfil).not.toHaveBeenCalled();
+    expect(tx.manualPaymentMethod.findFirst).not.toHaveBeenCalled();
+    expect(tx.order.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          manualPaymentMethodId: undefined,
+          paymentChannel: PaymentChannel.ZERO_TOTAL,
+          paymentMethodSnapshot: { provider: 'ZERO_TOTAL', checkout: 'NONE' },
+        }),
+      }),
+    );
+    expect(fulfilment.fulfil).toHaveBeenCalledWith(tx, {
+      orderId: zeroTotalOrder.id,
+      actorUserId: studentUserId,
+    });
   });
 
   it('returns an approved zero-total order on an idempotent retry without fulfilling again', async () => {

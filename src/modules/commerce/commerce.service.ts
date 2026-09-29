@@ -670,10 +670,10 @@ export class CommerceService {
             throw new BadRequestException(
               'ZERO_TOTAL is assigned automatically for zero-total orders',
             );
-          if (isZeroTotal && dto.manualPaymentMethodId)
-            throw new BadRequestException(
-              'A payment method must not be supplied for a zero-total order',
-            );
+          // A client can have a selected manual method while a coupon or free
+          // course reduces its server-calculated total to zero.  Payment input
+          // is irrelevant in that case, so deliberately ignore it instead of
+          // making the student change an already-valid cart selection.
           const paymentChannel = isZeroTotal
             ? PaymentChannel.ZERO_TOTAL
             : requestedPaymentChannel;
