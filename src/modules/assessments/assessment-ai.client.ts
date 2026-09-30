@@ -150,12 +150,13 @@ export class AssessmentAiClient {
             additionalProperties: false,
             required: ['rationale', 'questionIds'],
             properties: {
-              rationale: { type: 'string', maxLength: 2000 },
+              // Azure's strict structured-output subset rejects maxLength,
+              // minItems, maxItems, and uniqueItems. Keep only the portable
+              // constraints here; AssessmentsService validates the count,
+              // uniqueness, eligible IDs, and bounded rationale before use.
+              rationale: { type: 'string' },
               questionIds: {
                 type: 'array',
-                minItems: input.questionCount,
-                maxItems: input.questionCount,
-                uniqueItems: true,
                 items: { type: 'string', enum: candidateIds },
               },
             },

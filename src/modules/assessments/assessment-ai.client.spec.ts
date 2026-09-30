@@ -65,12 +65,9 @@ describe('AssessmentAiClient', () => {
             additionalProperties: false,
             required: ['rationale', 'questionIds'],
             properties: {
-              rationale: { type: 'string', maxLength: 2000 },
+              rationale: { type: 'string' },
               questionIds: {
                 type: 'array',
-                minItems: 2,
-                maxItems: 2,
-                uniqueItems: true,
                 items: { type: 'string', enum: ['q1', 'q2'] },
               },
             },
