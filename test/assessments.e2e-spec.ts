@@ -212,6 +212,21 @@ describe('Assessments (e2e)', () => {
     studentAssessmentId = body.id;
   });
 
+  it('accepts the deprecated singular question-bank compatibility field', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/v1/student/assessments',
+      headers: { authorization: `Bearer ${student1.accessToken}` },
+      payload: {
+        questionBankId,
+        courseIds: [courseId],
+        questionCount: 1,
+      },
+    });
+    expect(response.statusCode).toBe(201);
+    expect(JSON.parse(response.body).questionBankIds).toEqual([questionBankId]);
+  });
+
   it('rejects generating more questions than exist in scope', async () => {
     const response = await app.inject({
       method: 'POST',

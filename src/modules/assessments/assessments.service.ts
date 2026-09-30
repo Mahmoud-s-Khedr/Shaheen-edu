@@ -67,6 +67,7 @@ import type {
 } from './dto/assessments.dto';
 import {
   AssessmentAiClient,
+  AssessmentAiRequestException,
   type AnswerGradeOutput,
 } from './assessment-ai.client';
 
@@ -865,7 +866,12 @@ export class AssessmentsService {
       throw new BadRequestException(
         'durationSeconds is required when isTimed is true',
       );
-    const bankIds = dto.questionBankIds ?? [];
+    if (dto.questionBankId && dto.questionBankIds)
+      throw new BadRequestException(
+        'Send questionBankId or questionBankIds, not both',
+      );
+    const bankIds =
+      dto.questionBankIds ?? (dto.questionBankId ? [dto.questionBankId] : []);
     const banks = bankIds.length
       ? await this.prisma.questionBank.findMany({
           where: {
@@ -992,8 +998,10 @@ export class AssessmentsService {
         eligibleQuestionIds: eligible.map((q) => q.id),
       },
     });
+    let response:
+      Awaited<ReturnType<AssessmentAiClient['planQuiz']>> | undefined;
     try {
-      const response = await this.ai.planQuiz({
+      response = await this.ai.planQuiz({
         prompt: dto.prompt.trim(),
         candidates,
         questionCount: dto.questionCount,
@@ -1039,17 +1047,37 @@ export class AssessmentsService {
           selectedQuestionIds: ids,
           rationale: String(response.result.rationale ?? '').slice(0, 2000),
           model: response.model,
-          rawResponse: response.raw,
-          usage: response.usage,
+          rawResponse: this.boundedAiRunJson(response.raw),
+          usage: this.boundedAiRunJson(response.usage),
           completedAt: new Date(),
         },
       });
       return this.get(studentId, assessment.id);
     } catch (error) {
+      const providerEvidence =
+        error instanceof AssessmentAiRequestException
+          ? error.evidence
+          : undefined;
       await this.prisma.aiQuizGenerationRun.update({
         where: { id: run.id },
         data: {
           status: AiRunStatus.FAILED,
+          ...(response
+            ? {
+                model: response.model,
+                rawResponse: this.boundedAiRunJson(response.raw),
+                usage: this.boundedAiRunJson(response.usage),
+                normalizedPlan: this.quizPlanEvidence(response.result),
+              }
+            : providerEvidence
+              ? {
+                  model: providerEvidence.model,
+                  rawResponse: this.boundedAiRunJson(
+                    providerEvidence.rawResponse,
+                  ),
+                  usage: this.boundedAiRunJson(providerEvidence.usage),
+                }
+              : {}),
           error:
             error instanceof Error
               ? error.message.slice(0, 2000)
@@ -1059,6 +1087,41 @@ export class AssessmentsService {
       });
       throw error;
     }
+  }
+
+  /** Keep provider evidence useful while bounding database growth. */
+  private boundedAiRunJson(value: unknown): Prisma.InputJsonValue | undefined {
+    if (value === undefined) return undefined;
+    try {
+      const serialized = JSON.stringify(value);
+      if (serialized === undefined) return undefined;
+      if (serialized.length <= 20_000)
+        return JSON.parse(serialized) as Prisma.InputJsonValue;
+      return {
+        truncated: true,
+        value: serialized.slice(0, 20_000),
+      } as Prisma.InputJsonValue;
+    } catch {
+      return { unavailable: true } as Prisma.InputJsonValue;
+    }
+  }
+
+  /** Records only the fields needed to diagnose a rejected quiz plan. */
+  private quizPlanEvidence(value: unknown): Prisma.InputJsonValue | undefined {
+    if (!value || typeof value !== 'object') return undefined;
+    const plan = value as Record<string, unknown>;
+    const questionIds = Array.isArray(plan.questionIds)
+      ? plan.questionIds.slice(0, 50)
+      : undefined;
+    const rationale =
+      typeof plan.rationale === 'string'
+        ? plan.rationale.slice(0, 2_000)
+        : undefined;
+    if (!questionIds && rationale === undefined) return undefined;
+    return {
+      ...(questionIds ? { questionIds } : {}),
+      ...(rationale !== undefined ? { rationale } : {}),
+    } as Prisma.InputJsonValue;
   }
 
   async communityMostIncorrect(
@@ -2504,8 +2567,8 @@ export class AssessmentsService {
               feedback: grade.feedback,
               highlights: grade.highlights as any,
               model: response.model,
-              rawResponse: response.raw,
-              usage: response.usage,
+              rawResponse: this.boundedAiRunJson(response.raw),
+              usage: this.boundedAiRunJson(response.usage),
               completedAt: new Date(),
             },
           });

@@ -14,6 +14,12 @@ map $uri $shaheen_route_class {
     ~^/api/v[0-9]+/assets(?:/|$) assets;
 }
 
+# Enforced before a request reaches Compose, including unmatched scanner paths
+# that cannot be throttled by Nest routing. $binary_remote_addr is the direct
+# client address at this public TLS edge; do not move this to an internal proxy
+# unless its real-IP trust boundary is configured first.
+limit_req_zone $binary_remote_addr zone=shaheen_api_per_ip:10m rate=10r/s;
+
 log_format shaheen_diagnostic_json escape=json
     '{"timestamp":"$time_iso8601","timestampEpochSeconds":$msec,"service":"nginx","correlationId":"$request_id",'
     '"method":"$request_method","status":$status,"upstreamStatus":"$upstream_status",'
@@ -30,6 +36,8 @@ server {
     proxy_connect_timeout 10s;
     proxy_read_timeout 120s;
     proxy_send_timeout 120s;
+    limit_req zone=shaheen_api_per_ip burst=30 nodelay;
+    limit_req_status 429;
     access_log /var/log/nginx/shaheen-edu-diagnostic.jsonl shaheen_diagnostic_json;
 
     location / {

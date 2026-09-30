@@ -71,6 +71,10 @@ describe('AssessmentsService', () => {
         create: jest.fn().mockResolvedValue({ id: 'ai-run-1' }),
         update: jest.fn().mockResolvedValue({}),
       },
+      aiQuizGenerationRun: {
+        create: jest.fn().mockResolvedValue({ id: 'quiz-run-1' }),
+        update: jest.fn().mockResolvedValue({}),
+      },
       studentQuestionMark: {
         findMany: jest.fn().mockResolvedValue([]),
       },
@@ -656,6 +660,55 @@ describe('AssessmentsService', () => {
         2,
       );
       expect(prisma.assessmentQuestion.create).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('generateAiPrompt', () => {
+    it('retains a rejected model plan in the AI run', async () => {
+      const { service, prisma, ai } = build();
+      jest
+        .spyOn(service as any, 'resolveScopes')
+        .mockResolvedValue([
+          { courseId: 'c1', chapterId: null, lessonId: null, sectionId: null },
+        ]);
+      jest.spyOn(service as any, 'eligibleQuestions').mockResolvedValue([
+        { id: 'q1', body: 'Question one', placements: [] },
+        { id: 'q2', body: 'Question two', placements: [] },
+      ]);
+      jest
+        .spyOn(service as any, 'studentQuestionStatuses')
+        .mockResolvedValue(new Map());
+      ai.planQuiz.mockResolvedValue({
+        result: {
+          rationale: 'Duplicated selection',
+          questionIds: ['q1', 'q1'],
+        },
+        model: 'openai/gpt-5.6-luna',
+        raw: { id: 'provider-response', choices: [] },
+        usage: { total_tokens: 42 },
+      });
+
+      await expect(
+        service.generateAiPrompt(studentUserId, {
+          prompt: 'Create a quiz',
+          questionCount: 2,
+          scopes: [{ courseId: 'c1' }],
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+
+      expect(prisma.aiQuizGenerationRun.update).toHaveBeenCalledWith({
+        where: { id: 'quiz-run-1' },
+        data: expect.objectContaining({
+          status: 'FAILED',
+          model: 'openai/gpt-5.6-luna',
+          rawResponse: { id: 'provider-response', choices: [] },
+          usage: { total_tokens: 42 },
+          normalizedPlan: {
+            rationale: 'Duplicated selection',
+            questionIds: ['q1', 'q1'],
+          },
+        }),
+      });
     });
   });
 

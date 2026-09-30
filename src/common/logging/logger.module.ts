@@ -43,9 +43,11 @@ import { normalizeCorrelationId } from './correlation-id';
                 statusCode: response.statusCode ?? 0,
               }),
             },
-            customProps: (_request, response: { statusCode?: number }) => ({
+            // customProps is evaluated before Nest's exception filter writes
+            // the eventual error response. Keep status only in `res`, whose
+            // serializer runs with Fastify's final response status.
+            customProps: () => ({
               event: 'http_request_completed',
-              statusCode: response.statusCode ?? 0,
               version: process.env.VERSION ?? 'unknown',
             }),
             customLogLevel: (_request, response, error) => {

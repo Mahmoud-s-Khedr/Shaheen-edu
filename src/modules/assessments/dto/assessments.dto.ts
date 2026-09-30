@@ -87,6 +87,15 @@ class GenerateAssessmentSettingsDto {
 }
 
 export class GenerateStudentAssessmentDto extends GenerateAssessmentSettingsDto {
+  @ApiPropertyOptional({
+    type: String,
+    deprecated: true,
+    description:
+      'Compatibility alias for a single question-bank selection. Do not send together with questionBankIds.',
+  })
+  @IsOptional()
+  @IsString()
+  questionBankId?: string;
   @ApiPropertyOptional({ type: [String] })
   @IsOptional()
   @IsArray()
