@@ -52,6 +52,7 @@ import {
   RenameAssessmentDto,
   UpdateAdminAssessmentDto,
   UpdateQuestionNoteDto,
+  CreateStudentErrorReflectionDto,
 } from './dto/assessments.dto';
 
 @ApiTags('student/assessments')
@@ -296,6 +297,25 @@ export class AssessmentsController {
     @Body() dto: AutosaveAnswerDto,
   ) {
     return this.assessments.autosaveAnswer(user.id, id, questionId, dto);
+  }
+
+  @Post(':assessmentId/attempts/current/questions/:questionId/error-reflection')
+  @ApiOperation({
+    summary: 'Lock a self-reported reason for an incorrect reviewed answer',
+  })
+  @ApiStandardErrors(400, 401, 403, 404, 409)
+  errorReflection(
+    @CurrentUser() user: RequestUser,
+    @Param('assessmentId') assessmentId: string,
+    @Param('questionId') questionId: string,
+    @Body() dto: CreateStudentErrorReflectionDto,
+  ) {
+    return this.assessments.createErrorReflection(
+      user.id,
+      assessmentId,
+      questionId,
+      dto.reason,
+    );
   }
 
   @Patch(':id/attempts/current/questions/:questionId/active-time')

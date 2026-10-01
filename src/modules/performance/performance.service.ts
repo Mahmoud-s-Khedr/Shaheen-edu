@@ -11,6 +11,7 @@ import {
   ContentStatus,
   QuestionStatus,
   Role,
+  StudentErrorReason,
 } from '../../common/types/roles.enum';
 import { toPaginationMeta } from '../../common/dto/pagination-query.dto';
 import { normalizeArabic } from '../../common/search/arabic-search';
@@ -18,6 +19,10 @@ import type { RequestParentSession } from '../../common/types/request-with-user.
 import type { AppConfig } from '../../config/configuration';
 import { PrismaService } from '../../database/prisma.service';
 import { ContentAccessPolicyService } from '../entitlements/content-access-policy.service';
+import {
+  allStudentErrorReasonLabels,
+  studentErrorReasonLabel,
+} from '../../common/utils/student-error-reason';
 import type {
   PerformanceAnalysisQueryDto,
   PerformanceAnswerChangesQueryDto,
@@ -50,6 +55,7 @@ type Activity = {
   outcome: Outcome;
   submittedAt: Date;
   placements: Placement[];
+  errorReason: StudentErrorReason | null;
 };
 type Metrics = {
   total: number;
@@ -262,6 +268,7 @@ export class PerformanceService {
           isCorrect: true,
           selectedOptionIds: true,
           attempt: { select: { submittedAt: true } },
+          errorReflection: { select: { reason: true } },
           assessmentQuestion: {
             select: { sourceQuestionId: true, placements: true },
           },
@@ -278,6 +285,7 @@ export class PerformanceService {
           questionId: true,
           isCorrect: true,
           submittedAt: true,
+          errorReflection: { select: { reason: true } },
           question: {
             select: {
               placements: {
@@ -322,6 +330,7 @@ export class PerformanceService {
           .map((p) => this.snapshotPlacement(p))
           .filter((p) => this.matchesScope(p, query)),
       ),
+      errorReason: answer.errorReflection?.reason ?? null,
     }));
     const practice: Activity[] = practiceAttempts.map((attempt) => ({
       id: `PRACTICE:${attempt.id}`,
@@ -335,6 +344,7 @@ export class PerformanceService {
           .filter((p): p is Placement => Boolean(p))
           .filter((p) => this.matchesScope(p, query)),
       ),
+      errorReason: attempt.errorReflection?.reason ?? null,
     }));
     return {
       eligibleIds,
@@ -546,7 +556,40 @@ export class PerformanceService {
       ...this.metrics(row.activities),
     }));
   }
-  async insights(studentId: string, query: PerformanceInsightsQueryDto) {
+  private errorReasonInsights(activities: Activity[]) {
+    const incorrect = activities.filter((a) => a.outcome === 'INCORRECT');
+    const reviewed = incorrect.filter((a) => a.errorReason);
+    const counts = new Map<StudentErrorReason, number>();
+    for (const activity of reviewed)
+      counts.set(
+        activity.errorReason!,
+        (counts.get(activity.errorReason!) ?? 0) + 1,
+      );
+    const reasons = allStudentErrorReasonLabels().map((reason) => ({
+      reason,
+      count: counts.get(reason.code) ?? 0,
+      percentage: reviewed.length
+        ? this.round(((counts.get(reason.code) ?? 0) / reviewed.length) * 100)
+        : 0,
+    }));
+    const dominant = reasons
+      .filter((reason) => reason.count > 0)
+      .sort((a, b) => b.count - a.count)[0];
+    return {
+      reviewedIncorrectAnswerCount: reviewed.length,
+      unreviewedIncorrectAnswerCount: incorrect.length - reviewed.length,
+      reasons,
+      dominantReason: dominant
+        ? studentErrorReasonLabel(dominant.reason.code)
+        : null,
+    };
+  }
+
+  async insights(
+    studentId: string,
+    query: PerformanceInsightsQueryDto,
+    includeErrorReasons = true,
+  ) {
     const { activities } = await this.dataset(studentId, query),
       minimum = 10,
       allScopes = this.insightGroups(activities),
@@ -629,6 +672,9 @@ export class PerformanceService {
       omissions,
       repeatedErrors,
       trend,
+      ...(includeErrorReasons
+        ? { errorReasons: this.errorReasonInsights(activities) }
+        : {}),
       recommendations: [
         ...new Set([
           ...strengths.map((r) => r.recommendation),
@@ -813,6 +859,6 @@ export class PerformanceService {
     parent: RequestParentSession,
     query: PerformanceInsightsQueryDto,
   ) {
-    return this.insights(await this.parentStudentId(parent), query);
+    return this.insights(await this.parentStudentId(parent), query, false);
   }
 }

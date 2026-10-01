@@ -66,6 +66,7 @@ export {
   AssessmentStatus,
   AssessmentAttemptStatus,
   AssessmentQuestionOutcome,
+  StudentErrorReason,
   AnswerInputMethod,
   AiRunStatus,
   QuestionReportType,

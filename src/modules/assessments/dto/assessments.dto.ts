@@ -28,7 +28,14 @@ import {
   QuestionContentBlockType,
   QuestionDifficultyBand,
   QuestionSourceType,
+  StudentErrorReason,
 } from '../../../common/types/roles.enum';
+
+export class CreateStudentErrorReflectionDto {
+  @ApiProperty({ enum: StudentErrorReason })
+  @IsEnum(StudentErrorReason)
+  reason!: StudentErrorReason;
+}
 
 export class AssessmentScopeDto {
   @ApiPropertyOptional() @IsOptional() @IsString() courseId?: string;

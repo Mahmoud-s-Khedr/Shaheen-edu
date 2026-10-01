@@ -1,9 +1,11 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { DateTime } from 'luxon';
 import {
   AssessmentAttemptStatus,
@@ -12,6 +14,7 @@ import {
   EntitlementStatus,
   QuestionStatus,
   QuestionType,
+  StudentErrorReason,
 } from '../../common/types/roles.enum';
 import {
   PaginationQueryDto,
@@ -23,6 +26,7 @@ import { ContentAccessPolicyService } from '../entitlements/content-access-polic
 import { AssetsService } from '../assets/assets.service';
 import { VideosService } from '../videos/videos.service';
 import { formatStudentExplanation } from '../../common/utils/student-explanation.formatter';
+import { studentErrorReasonLabel } from '../../common/utils/student-error-reason';
 import { QuestionCommunityStatsService } from '../question-banks/question-community-stats.service';
 import { AssessmentsService } from '../assessments/assessments.service';
 import {
@@ -914,6 +918,79 @@ export class LearningService {
     };
   }
 
+  private errorReflectionDto(reflection: {
+    id: string;
+    reason: StudentErrorReason;
+    createdAt: Date;
+  }) {
+    return {
+      id: reflection.id,
+      reason: studentErrorReasonLabel(reflection.reason),
+      createdAt: reflection.createdAt,
+    };
+  }
+
+  /** Reflections deliberately sit beside immutable answer attempts, not on them. */
+  async createErrorReflection(
+    studentId: string,
+    questionId: string,
+    attemptId: string,
+    reason: StudentErrorReason,
+  ) {
+    if (
+      !(await this.practiceQuestions(studentId)).some(
+        (q) => q.id === questionId,
+      )
+    )
+      throw new NotFoundException('Eligible question not found');
+    const resolve = async () => {
+      const attempt = await this.prisma.studentQuestionAttempt.findFirst({
+        where: {
+          id: attemptId,
+          studentUserId: studentId,
+          questionId,
+          isCorrect: false,
+        },
+        include: { errorReflection: true },
+      });
+      if (!attempt)
+        throw new NotFoundException('Incorrect practice attempt not found');
+      if (attempt.errorReflection) {
+        if (attempt.errorReflection.reason !== reason)
+          throw new ConflictException('Error reflection is already locked');
+        return this.errorReflectionDto(attempt.errorReflection);
+      }
+      const reflection = await this.prisma.studentErrorReflection.create({
+        data: {
+          studentUserId: studentId,
+          practiceAttemptId: attempt.id,
+          reason,
+        },
+      });
+      return this.errorReflectionDto(reflection);
+    };
+    try {
+      return await resolve();
+    } catch (error) {
+      // A simultaneous retry can win the unique parent constraint. Re-read it
+      // so an identical retry remains idempotent and a changed reason conflicts.
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
+        const existing = await this.prisma.studentErrorReflection.findUnique({
+          where: { practiceAttemptId: attemptId },
+        });
+        if (existing?.studentUserId === studentId) {
+          if (existing.reason !== reason)
+            throw new ConflictException('Error reflection is already locked');
+          return this.errorReflectionDto(existing);
+        }
+      }
+      throw error;
+    }
+  }
+
   async questionAssetAccess(
     studentId: string,
     questionId: string,
@@ -1049,7 +1126,7 @@ export class LearningService {
     const [data, total] = await this.prisma.$transaction([
       this.prisma.studentQuestionAttempt.findMany({
         where: { studentUserId: studentId, questionId },
-        include: { answers: true },
+        include: { answers: true, errorReflection: true },
         orderBy: { attemptNumber: 'asc' },
         skip: (query.page - 1) * query.limit,
         take: query.limit,
@@ -1065,6 +1142,9 @@ export class LearningService {
         selectedOptionIds: x.answers.map((a) => a.optionId),
         isCorrect: x.isCorrect,
         submittedAt: x.submittedAt,
+        errorReflection: x.errorReflection
+          ? this.errorReflectionDto(x.errorReflection)
+          : null,
       })),
       meta: toPaginationMeta(query.page, query.limit, total),
     };

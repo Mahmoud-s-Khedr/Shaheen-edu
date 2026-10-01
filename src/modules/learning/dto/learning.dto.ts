@@ -2,6 +2,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   ArrayMinSize,
   IsArray,
+  IsEnum,
   IsInt,
   IsDateString,
   IsOptional,
@@ -10,7 +11,10 @@ import {
 } from 'class-validator';
 import { PaginationQueryDto } from '../../../common/dto/pagination-query.dto';
 import { PaginationMetaDto } from '../../../common/dto/api-response.dto';
-import { EntitlementSource } from '../../../common/types/roles.enum';
+import {
+  EntitlementSource,
+  StudentErrorReason,
+} from '../../../common/types/roles.enum';
 
 export class PracticeScopeQueryDto extends PaginationQueryDto {
   @ApiPropertyOptional() @IsOptional() @IsString() courseId?: string;
@@ -25,6 +29,12 @@ export class SubmitQuestionAttemptDto {
   @ArrayMinSize(1)
   @IsString({ each: true })
   optionIds!: string[];
+}
+
+export class CreateStudentErrorReflectionDto {
+  @ApiProperty({ enum: StudentErrorReason })
+  @IsEnum(StudentErrorReason)
+  reason!: StudentErrorReason;
 }
 
 export class UpdateContentStudyStateDto {

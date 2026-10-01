@@ -36,6 +36,7 @@ import {
   ParentAnalyticsScopesQueryDto,
   ParentAnalyticsScopeQueryDto,
   SubmitQuestionAttemptDto,
+  CreateStudentErrorReflectionDto,
   DailyActivityQueryDto,
   DailyActivityResponseDto,
   UpdateContentStudyStateDto,
@@ -105,6 +106,24 @@ export class LearningController {
     @Body() dto: SubmitQuestionAttemptDto,
   ) {
     return this.learning.attempt(user.id, questionId, dto.optionIds);
+  }
+  @Post('practice/questions/:questionId/attempts/:attemptId/error-reflection')
+  @ApiOperation({
+    summary: 'Lock a self-reported reason for an incorrect practice answer',
+  })
+  @ApiStandardErrors(400, 401, 403, 404, 409)
+  errorReflection(
+    @CurrentUser() user: RequestUser,
+    @Param('questionId') questionId: string,
+    @Param('attemptId') attemptId: string,
+    @Body() dto: CreateStudentErrorReflectionDto,
+  ) {
+    return this.learning.createErrorReflection(
+      user.id,
+      questionId,
+      attemptId,
+      dto.reason,
+    );
   }
   @Get('practice/questions/:questionId/assets/:assetId/access')
   @ApiOperation({

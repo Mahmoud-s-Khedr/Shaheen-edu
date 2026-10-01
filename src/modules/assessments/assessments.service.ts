@@ -25,9 +25,11 @@ import {
   QuestionReportStatus,
   QuestionReportType,
   Role,
+  StudentErrorReason,
 } from '../../common/types/roles.enum';
 import { toPaginationMeta } from '../../common/dto/pagination-query.dto';
 import { formatStudentExplanation } from '../../common/utils/student-explanation.formatter';
+import { studentErrorReasonLabel } from '../../common/utils/student-error-reason';
 import {
   orderByIds,
   paginateArabicSearch,
@@ -3280,7 +3282,10 @@ export class AssessmentsService {
     );
     const answers = await this.prisma.assessmentAttemptAnswer.findMany({
       where: { attemptId: attempt.id },
-      include: { aiGradingRuns: { orderBy: { createdAt: 'desc' } } },
+      include: {
+        aiGradingRuns: { orderBy: { createdAt: 'desc' } },
+        errorReflection: true,
+      },
     });
     const byQuestion = new Map(answers.map((a) => [a.assessmentQuestionId, a]));
     const outcomes = answers.map((answer) => answer.outcome);
@@ -3379,6 +3384,9 @@ export class AssessmentsService {
             (answer.selectedOptionIds.length || answer.responseText?.trim()),
           ),
           outcome: answer?.outcome ?? AssessmentQuestionOutcome.OMITTED,
+          errorReflection: answer?.errorReflection
+            ? this.errorReflectionDto(answer.errorReflection)
+            : null,
           activeSeconds: answer?.activeSeconds ?? null,
           inputMethod: answer?.inputMethod ?? null,
           responseLanguageCode: answer?.responseLanguageCode ?? null,
@@ -3408,6 +3416,83 @@ export class AssessmentsService {
         byQuestion,
       );
     return result;
+  }
+
+  private errorReflectionDto(reflection: {
+    id: string;
+    reason: StudentErrorReason;
+    createdAt: Date;
+  }) {
+    return {
+      id: reflection.id,
+      reason: studentErrorReasonLabel(reflection.reason),
+      createdAt: reflection.createdAt,
+    };
+  }
+
+  /** A completed, explicitly incorrect snapshot answer can be reflected on once. */
+  async createErrorReflection(
+    studentId: string,
+    assessmentId: string,
+    assessmentQuestionId: string,
+    reason: StudentErrorReason,
+  ) {
+    await this.assessmentOrNotFound(assessmentId);
+    const attempt = await this.ownAttempt(studentId, assessmentId);
+    if (attempt.status !== AssessmentAttemptStatus.COMPLETED)
+      throw new ConflictException('Attempt has not been submitted yet');
+
+    const resolve = async () => {
+      const answer = await this.prisma.assessmentAttemptAnswer.findFirst({
+        where: {
+          attemptId: attempt.id,
+          assessmentQuestionId,
+          outcome: AssessmentQuestionOutcome.INCORRECT,
+        },
+        include: { errorReflection: true },
+      });
+      if (!answer)
+        throw new NotFoundException('Incorrect assessment answer not found');
+      if (answer.errorReflection) {
+        if (answer.errorReflection.reason !== reason)
+          throw new ConflictException('Error reflection is already locked');
+        return this.errorReflectionDto(answer.errorReflection);
+      }
+      const reflection = await this.prisma.studentErrorReflection.create({
+        data: {
+          studentUserId: studentId,
+          assessmentAttemptAnswerId: answer.id,
+          reason,
+        },
+      });
+      return this.errorReflectionDto(reflection);
+    };
+    try {
+      return await resolve();
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
+        // The unique error only occurs after the checked answer has been read;
+        // obtain it again to avoid exposing an answer from another student.
+        const answer = await this.prisma.assessmentAttemptAnswer.findFirst({
+          where: { attemptId: attempt.id, assessmentQuestionId },
+          select: { id: true },
+        });
+        const winner = answer
+          ? await this.prisma.studentErrorReflection.findUnique({
+              where: { assessmentAttemptAnswerId: answer.id },
+            })
+          : null;
+        if (winner?.studentUserId === studentId) {
+          if (winner.reason !== reason)
+            throw new ConflictException('Error reflection is already locked');
+          return this.errorReflectionDto(winner);
+        }
+      }
+      throw error;
+    }
   }
 
   async analytics(studentId: string, query: AssessmentAnalyticsQueryDto) {
