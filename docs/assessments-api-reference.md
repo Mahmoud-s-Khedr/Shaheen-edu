@@ -438,6 +438,11 @@ the candidate set; duplicate targets are rejected.
 | `PATCH /student/assessments/:id/attempts/current/questions/:questionId/active-time` | `{ "activeSeconds": number }`                                                            | Persist the monotonic active-time total while an attempt is resumable.                            |
 | `GET /student/assessments/analytics/summary`                                        | optional `subjectId`, `chapterId`, `q`, `page`, `limit`                                  | Retrieve paginated completed-result subject/chapter/topic rollups and chapter attempt drill-down. |
 
+Each rollup row contains the hierarchy IDs and their matching display fields:
+`subjectId` / `subjectTitle`, `chapterId` / `chapterTitle`, `lessonId` /
+`lessonTitle`, and `sectionId` / `sectionTitle`. `title` remains the title of
+the row at the requested rollup level.
+
 `GET /student/assessments` combines the student's non-archived private
 assessments with accessible published admin assessments. Its `status` query is
 the student's attempt status, not the assessment lifecycle status.
@@ -483,6 +488,15 @@ Content-Type: application/json
 The student must have an academic grade and access to the selected published
 scope. The API returns `400` when there are not enough eligible questions.
 It creates the assessment only; call `/attempts/start` to receive its questions.
+
+### Private question notes
+
+`GET /student/assessments/question-notes?page=1&limit=20` returns a paginated
+list of the authenticated student's private notes for currently accessible
+authored questions, most recently updated first. Each `data[]` item contains
+`questionId`, `body`, `createdAt`, and `updatedAt`; `meta` contains `page`,
+`limit`, `total`, and `totalPages`. Notes remain available in each completed
+assessment result as `questions[].note`.
 
 `isTimed` defaults to `false`. When true, include a `durationSeconds` integer
 of at least 30. The timer starts at the first `POST /attempts/start`, not at
@@ -596,6 +610,14 @@ questions in each chapter. This works for course, lesson, section, and
 multi-scope assessments when their snapshot questions have chapter placements;
 use `includeComparison=false` to omit that calculation.
 Unanswered questions are scored incorrect.
+
+The result also contains `answerChanges`: a total plus counts for
+`correctToCorrect`, `incorrectToIncorrect`, `correctToIncorrect`,
+`incorrectToCorrect`, and `other`. Each result question has its own ordered
+`answerChanges` array with `id`, `fromOutcome`, `toOutcome`, and `changedAt`.
+`other` covers transitions involving omitted or pending outcomes. A question's
+existing private `note` is already returned in that result item; no separate
+assessment-notes read endpoint is required.
 
 For a timed attempt, compare `expiresAt` with the client clock for the UI
 countdown, but treat the server as authoritative. Accessing current state or

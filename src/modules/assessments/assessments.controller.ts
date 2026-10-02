@@ -23,6 +23,7 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 import { Role } from '../../common/types/roles.enum';
 import type { RequestUser } from '../../common/types/request-with-user.types';
 import { ApiStandardErrors } from '../../common/decorators/api-standard-errors.decorator';
+import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
 import { AssessmentsService } from './assessments.service';
 import {
   AdminAssessmentDetailDto,
@@ -163,6 +164,18 @@ export class AssessmentsController {
     @Param('questionId') questionId: string,
   ) {
     return this.assessments.unmarkQuestion(user.id, questionId);
+  }
+
+  @Get('question-notes')
+  @ApiOperation({
+    summary: 'List the current student’s accessible private question notes',
+  })
+  @ApiStandardErrors(401, 403)
+  questionNotes(
+    @CurrentUser() user: RequestUser,
+    @Query() query: PaginationQueryDto,
+  ) {
+    return this.assessments.listQuestionNotes(user.id, query);
   }
 
   @Put('question-notes/:questionId')

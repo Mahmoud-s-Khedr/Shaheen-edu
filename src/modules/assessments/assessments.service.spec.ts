@@ -9,8 +9,10 @@ import {
   AssessmentAttemptStatus,
   AssessmentMode,
   AssessmentOwnerType,
+  AssessmentQuestionOutcome,
   AssessmentStatus,
   ContentStatus,
+  QuestionStatus,
   QuestionType,
   Role,
 } from '../../common/types/roles.enum';
@@ -80,6 +82,7 @@ describe('AssessmentsService', () => {
       },
       studentQuestionNote: {
         findMany: jest.fn().mockResolvedValue([]),
+        count: jest.fn().mockResolvedValue(0),
         upsert: jest.fn(),
         deleteMany: jest.fn(),
       },
@@ -163,6 +166,51 @@ describe('AssessmentsService', () => {
         },
       ),
     ).toMatchObject({ score: 3, percentage: 75 });
+  });
+
+  it('lists only the student’s notes for currently accessible questions', async () => {
+    const { service, prisma } = build();
+    prisma.studentQuestionNote.findMany.mockResolvedValue([
+      {
+        questionId: 'question-1',
+        body: 'Review this rule',
+        createdAt: new Date('2026-10-01T10:00:00.000Z'),
+        updatedAt: new Date('2026-10-02T11:00:00.000Z'),
+      },
+    ]);
+
+    prisma.studentQuestionNote.count.mockResolvedValue(1);
+
+    await expect(
+      service.listQuestionNotes(studentUserId, { page: 1, limit: 20 }),
+    ).resolves.toEqual({
+      data: [
+        expect.objectContaining({
+          questionId: 'question-1',
+          body: 'Review this rule',
+        }),
+      ],
+      meta: { page: 1, limit: 20, total: 1, totalPages: 1 },
+    });
+    expect(prisma.studentQuestionNote.findMany).toHaveBeenCalledWith({
+      where: expect.objectContaining({
+        studentUserId,
+        question: expect.objectContaining({
+          status: QuestionStatus.PUBLISHED,
+          placements: expect.objectContaining({ some: expect.any(Object) }),
+        }),
+      }),
+      select: {
+        questionId: true,
+        body: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+      orderBy: { updatedAt: 'desc' },
+      skip: 0,
+      take: 20,
+    });
+    expect(prisma.question.findMany).not.toHaveBeenCalled();
   });
 
   it('filters visible assessments with no attempt as NOT_STARTED', async () => {
@@ -1580,6 +1628,127 @@ describe('AssessmentsService', () => {
           { explanation: 'Flat explanation\n\nKeywords: key concept' },
         ],
       });
+    });
+
+    it('returns answer-change totals and question-scoped histories in a completed result', async () => {
+      const { service, prisma } = build();
+      prisma.assessment.findUnique.mockResolvedValue(readyAssessment());
+      prisma.assessmentAttempt.findUnique.mockResolvedValue({
+        id: 'attempt-1',
+        status: AssessmentAttemptStatus.COMPLETED,
+        score: 1,
+        totalPoints: 2,
+        totalQuestions: 2,
+        submittedAt: new Date('2026-10-02T12:00:00.000Z'),
+      });
+      prisma.assessmentQuestion.findMany.mockResolvedValue([
+        {
+          id: 'q1',
+          sourceQuestionId: 'source-1',
+          sortOrder: 1,
+          type: QuestionType.SINGLE_CHOICE,
+          body: 'First',
+          explanation: null,
+          structuredExplanation: null,
+          attachments: [],
+          contexts: [],
+          options: [],
+          placements: [],
+        },
+        {
+          id: 'q2',
+          sourceQuestionId: 'source-2',
+          sortOrder: 2,
+          type: QuestionType.SINGLE_CHOICE,
+          body: 'Second',
+          explanation: null,
+          structuredExplanation: null,
+          attachments: [],
+          contexts: [],
+          options: [],
+          placements: [],
+        },
+      ]);
+      prisma.assessmentAttemptAnswer.findMany
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([
+          {
+            assessmentQuestionId: 'q1',
+            selectedOptionIds: [],
+            isCorrect: true,
+            outcome: AssessmentQuestionOutcome.CORRECT,
+            answerChanges: [
+              {
+                id: 'change-1',
+                fromOutcome: AssessmentQuestionOutcome.CORRECT,
+                toOutcome: AssessmentQuestionOutcome.CORRECT,
+                changedAt: new Date('2026-10-02T11:00:00.000Z'),
+              },
+              {
+                id: 'change-2',
+                fromOutcome: AssessmentQuestionOutcome.CORRECT,
+                toOutcome: AssessmentQuestionOutcome.INCORRECT,
+                changedAt: new Date('2026-10-02T11:01:00.000Z'),
+              },
+            ],
+          },
+          {
+            assessmentQuestionId: 'q2',
+            selectedOptionIds: [],
+            isCorrect: false,
+            outcome: AssessmentQuestionOutcome.INCORRECT,
+            answerChanges: [
+              {
+                id: 'change-3',
+                fromOutcome: AssessmentQuestionOutcome.INCORRECT,
+                toOutcome: AssessmentQuestionOutcome.INCORRECT,
+                changedAt: new Date('2026-10-02T11:02:00.000Z'),
+              },
+              {
+                id: 'change-4',
+                fromOutcome: AssessmentQuestionOutcome.INCORRECT,
+                toOutcome: AssessmentQuestionOutcome.CORRECT,
+                changedAt: new Date('2026-10-02T11:03:00.000Z'),
+              },
+              {
+                id: 'change-5',
+                fromOutcome: AssessmentQuestionOutcome.OMITTED,
+                toOutcome: AssessmentQuestionOutcome.INCORRECT,
+                changedAt: new Date('2026-10-02T11:04:00.000Z'),
+              },
+            ],
+          },
+        ]);
+
+      await expect(service.result(studentUserId, 'a1')).resolves.toMatchObject({
+        answerChanges: {
+          total: 5,
+          correctToCorrect: 1,
+          incorrectToIncorrect: 1,
+          correctToIncorrect: 1,
+          incorrectToCorrect: 1,
+          other: 1,
+        },
+        questions: [
+          { id: 'q1', answerChanges: [{ id: 'change-1' }, { id: 'change-2' }] },
+          {
+            id: 'q2',
+            answerChanges: [
+              { id: 'change-3' },
+              { id: 'change-4' },
+              { id: 'change-5' },
+            ],
+          },
+        ],
+      });
+      expect(prisma.assessmentAttemptAnswer.findMany).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          where: { attemptId: 'attempt-1' },
+          include: expect.objectContaining({
+            answerChanges: { orderBy: { changedAt: 'asc' } },
+          }),
+        }),
+      );
     });
   });
 });

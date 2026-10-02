@@ -9,6 +9,7 @@ import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'node:crypto';
 import { Prisma } from '@prisma/client';
 import {
+  AccessType,
   AssessmentAttemptStatus,
   AssessmentQuestionOutcome,
   AnswerInputMethod,
@@ -19,6 +20,7 @@ import {
   AssessmentOwnerType,
   AssessmentStatus,
   ContentStatus,
+  EntitlementStatus,
   QuestionStatus,
   QuestionDifficultyBand,
   QuestionType,
@@ -27,7 +29,10 @@ import {
   Role,
   StudentErrorReason,
 } from '../../common/types/roles.enum';
-import { toPaginationMeta } from '../../common/dto/pagination-query.dto';
+import {
+  PaginationQueryDto,
+  toPaginationMeta,
+} from '../../common/dto/pagination-query.dto';
 import { formatStudentExplanation } from '../../common/utils/student-explanation.formatter';
 import { studentErrorReasonLabel } from '../../common/utils/student-error-reason';
 import {
@@ -1420,6 +1425,202 @@ export class AssessmentsService {
       body: note.body,
       createdAt: note.createdAt,
       updatedAt: note.updatedAt,
+    };
+  }
+
+  /**
+   * Database predicate for a question that is currently visible to a student.
+   *
+   * This mirrors the published-placement and entitlement checks in
+   * `eligibleQuestions`, but is deliberately relation-only: the notes listing
+   * needs IDs and note bodies, not a fully hydrated question bank.
+   */
+  private accessibleQuestionWhere(
+    studentId: string,
+    gradeId: string,
+  ): Prisma.QuestionWhereInput {
+    const now = new Date();
+    const activeEntitlement: Prisma.StudentEntitlementWhereInput = {
+      studentUserId: studentId,
+      status: EntitlementStatus.ACTIVE,
+      revokedAt: null,
+      startsAt: { lte: now },
+      OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+    };
+    const freelyAccessible = { in: [AccessType.PUBLIC, AccessType.FREE] };
+
+    return {
+      status: QuestionStatus.PUBLISHED,
+      OR: [
+        { type: { not: QuestionType.LONG_ANSWER } },
+        { gradingRubric: { not: null } },
+      ],
+      bank: { status: ContentStatus.PUBLISHED },
+      source: { status: ContentStatus.PUBLISHED },
+      course: {
+        status: ContentStatus.PUBLISHED,
+        subject: {
+          status: ContentStatus.PUBLISHED,
+          gradeAssignments: {
+            some: {
+              academicGradeId: gradeId,
+              academicGrade: { status: ContentStatus.PUBLISHED },
+            },
+          },
+        },
+      },
+      placements: {
+        some: {
+          OR: [
+            // A placement directly on a course.
+            {
+              courseId: { not: null },
+              chapterId: null,
+              lessonId: null,
+              sectionId: null,
+              course: {
+                status: ContentStatus.PUBLISHED,
+                OR: [
+                  { accessType: freelyAccessible },
+                  { entitlements: { some: activeEntitlement } },
+                ],
+              },
+            },
+            // A placement on a chapter (rather than on one of its children).
+            {
+              chapterId: { not: null },
+              lessonId: null,
+              sectionId: null,
+              chapter: {
+                status: ContentStatus.PUBLISHED,
+                course: { status: ContentStatus.PUBLISHED },
+                OR: [
+                  { accessType: freelyAccessible },
+                  {
+                    accessType: AccessType.INHERIT,
+                    course: { accessType: freelyAccessible },
+                  },
+                  { entitlements: { some: activeEntitlement } },
+                  { course: { entitlements: { some: activeEntitlement } } },
+                ],
+              },
+            },
+            // A placement on a lesson.
+            {
+              lessonId: { not: null },
+              sectionId: null,
+              lesson: {
+                status: ContentStatus.PUBLISHED,
+                chapter: {
+                  status: ContentStatus.PUBLISHED,
+                  course: { status: ContentStatus.PUBLISHED },
+                },
+                OR: [
+                  { accessType: freelyAccessible },
+                  {
+                    accessType: AccessType.INHERIT,
+                    chapter: { accessType: freelyAccessible },
+                  },
+                  {
+                    accessType: AccessType.INHERIT,
+                    chapter: {
+                      accessType: AccessType.INHERIT,
+                      course: { accessType: freelyAccessible },
+                    },
+                  },
+                  {
+                    chapter: { entitlements: { some: activeEntitlement } },
+                  },
+                  {
+                    chapter: {
+                      course: { entitlements: { some: activeEntitlement } },
+                    },
+                  },
+                ],
+              },
+            },
+            // A placement on a section.
+            {
+              sectionId: { not: null },
+              section: {
+                status: ContentStatus.PUBLISHED,
+                lesson: {
+                  status: ContentStatus.PUBLISHED,
+                  chapter: {
+                    status: ContentStatus.PUBLISHED,
+                    course: { status: ContentStatus.PUBLISHED },
+                  },
+                },
+                OR: [
+                  { accessType: freelyAccessible },
+                  {
+                    accessType: AccessType.INHERIT,
+                    lesson: { accessType: freelyAccessible },
+                  },
+                  {
+                    accessType: AccessType.INHERIT,
+                    lesson: {
+                      accessType: AccessType.INHERIT,
+                      chapter: { accessType: freelyAccessible },
+                    },
+                  },
+                  {
+                    accessType: AccessType.INHERIT,
+                    lesson: {
+                      accessType: AccessType.INHERIT,
+                      chapter: {
+                        accessType: AccessType.INHERIT,
+                        course: { accessType: freelyAccessible },
+                      },
+                    },
+                  },
+                  {
+                    lesson: {
+                      chapter: { entitlements: { some: activeEntitlement } },
+                    },
+                  },
+                  {
+                    lesson: {
+                      chapter: {
+                        course: { entitlements: { some: activeEntitlement } },
+                      },
+                    },
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      },
+    };
+  }
+
+  async listQuestionNotes(studentId: string, query: PaginationQueryDto) {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+    const gradeId = await this.studentGrade(studentId);
+    const where = {
+      studentUserId: studentId,
+      question: this.accessibleQuestionWhere(studentId, gradeId),
+    };
+    const [notes, total] = await Promise.all([
+      this.prisma.studentQuestionNote.findMany({
+        where,
+        select: {
+          questionId: true,
+          body: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+        orderBy: { updatedAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.studentQuestionNote.count({ where }),
+    ]);
+    return {
+      data: notes,
+      meta: toPaginationMeta(page, limit, total),
     };
   }
 
@@ -3285,9 +3486,42 @@ export class AssessmentsService {
       include: {
         aiGradingRuns: { orderBy: { createdAt: 'desc' } },
         errorReflection: true,
+        answerChanges: { orderBy: { changedAt: 'asc' } },
       },
     });
     const byQuestion = new Map(answers.map((a) => [a.assessmentQuestionId, a]));
+    const answerChanges = answers.flatMap((answer) => answer.answerChanges);
+    const answerChangeSummary = {
+      total: answerChanges.length,
+      correctToCorrect: 0,
+      incorrectToIncorrect: 0,
+      correctToIncorrect: 0,
+      incorrectToCorrect: 0,
+      other: 0,
+    };
+    for (const change of answerChanges) {
+      if (
+        change.fromOutcome === AssessmentQuestionOutcome.CORRECT &&
+        change.toOutcome === AssessmentQuestionOutcome.CORRECT
+      )
+        answerChangeSummary.correctToCorrect++;
+      else if (
+        change.fromOutcome === AssessmentQuestionOutcome.INCORRECT &&
+        change.toOutcome === AssessmentQuestionOutcome.INCORRECT
+      )
+        answerChangeSummary.incorrectToIncorrect++;
+      else if (
+        change.fromOutcome === AssessmentQuestionOutcome.CORRECT &&
+        change.toOutcome === AssessmentQuestionOutcome.INCORRECT
+      )
+        answerChangeSummary.correctToIncorrect++;
+      else if (
+        change.fromOutcome === AssessmentQuestionOutcome.INCORRECT &&
+        change.toOutcome === AssessmentQuestionOutcome.CORRECT
+      )
+        answerChangeSummary.incorrectToCorrect++;
+      else answerChangeSummary.other++;
+    }
     const outcomes = answers.map((answer) => answer.outcome);
     const correctCount = outcomes.filter(
       (outcome) => outcome === AssessmentQuestionOutcome.CORRECT,
@@ -3338,6 +3572,7 @@ export class AssessmentsService {
       pendingAiGradingCount,
       answeredCount,
       submittedAt: attempt.submittedAt,
+      answerChanges: answerChangeSummary,
       questions: questions.map((q) => {
         const answer = byQuestion.get(q.id);
         const stat = statsByQuestion.get(q.sourceQuestionId);
@@ -3384,6 +3619,12 @@ export class AssessmentsService {
             (answer.selectedOptionIds.length || answer.responseText?.trim()),
           ),
           outcome: answer?.outcome ?? AssessmentQuestionOutcome.OMITTED,
+          answerChanges: (answer?.answerChanges ?? []).map((change: any) => ({
+            id: change.id,
+            fromOutcome: change.fromOutcome,
+            toOutcome: change.toOutcome,
+            changedAt: change.changedAt,
+          })),
           errorReflection: answer?.errorReflection
             ? this.errorReflectionDto(answer.errorReflection)
             : null,
@@ -3568,9 +3809,13 @@ export class AssessmentsService {
           id,
           title,
           subjectId: placement.subjectId,
+          subjectTitle: placement.subjectTitle,
           chapterId: placement.chapterId,
+          chapterTitle: placement.chapterTitle,
           lessonId: placement.lessonId,
+          lessonTitle: placement.lessonTitle,
           sectionId: placement.sectionId,
+          sectionTitle: placement.sectionTitle,
         });
       }
       for (const group of distinct.values()) {

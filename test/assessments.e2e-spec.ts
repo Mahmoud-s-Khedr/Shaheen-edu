@@ -459,6 +459,7 @@ describe('Assessments (e2e)', () => {
       data: [
         expect.objectContaining({
           id: subjectId,
+          subjectTitle: 'Assessments Subject',
           total: 2,
           correct: 1,
           omitted: 1,

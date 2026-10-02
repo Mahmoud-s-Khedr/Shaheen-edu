@@ -591,6 +591,19 @@ export class AssessmentResultDto {
   @ApiProperty() answeredCount!: number;
   @ApiPropertyOptional({ type: String, format: 'date-time', nullable: true })
   submittedAt!: Date | null;
+  @ApiProperty({
+    type: Object,
+    description:
+      'Counts of saved answer changes, grouped by correctness transition.',
+  })
+  answerChanges!: {
+    total: number;
+    correctToCorrect: number;
+    incorrectToIncorrect: number;
+    correctToIncorrect: number;
+    incorrectToCorrect: number;
+    other: number;
+  };
   @ApiProperty({ type: [Object] }) questions!: object[];
 }
 
