@@ -376,7 +376,9 @@ Send only the fields being changed:
 }
 ```
 
-The question body, type, answer settings, placements, contexts, and content blocks can be updated while the question is editable. Published or archived questions cannot be edited directly.
+The question body, type, answer settings, contexts, and content blocks can be updated on any non-archived question, including a published question. This supports corrections such as attaching a missing context without resubmitting the answer, explanation, or other unchanged fields. Archived questions cannot be edited.
+
+Changing the course or placements remains limited to `DRAFT` and `REJECTED` questions; changing a course requires replacement placements. Edits affect the authored question used in future practice and assessment generation; existing assessment questions are immutable snapshots.
 
 Response: the updated question.
 

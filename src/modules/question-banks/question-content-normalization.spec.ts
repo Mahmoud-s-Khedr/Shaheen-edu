@@ -105,6 +105,56 @@ describe('QuestionBanksService content normalization', () => {
     });
   });
 
+  it('allows a published question to receive a context without changing its answer or explanation', async () => {
+    const question = {
+      id: 'question-1',
+      status: 'PUBLISHED',
+      bankId: 'bank-1',
+      sourceId: 'source-1',
+      courseId: 'course-1',
+      contentBlocks: [],
+    };
+    const tx = { question: { update: jest.fn() } };
+    const prisma = {
+      $transaction: jest.fn((callback) => callback(tx)),
+    };
+    const updated = new QuestionBanksService(
+      prisma as never,
+      { record: jest.fn() } as never,
+    );
+    const invalidateStructuredExplanation = jest.fn();
+    Object.assign(updated as any, {
+      question: jest.fn().mockResolvedValue(question),
+      source: jest.fn(),
+      bank: jest.fn(),
+      assertBankCourseSubject: jest.fn(),
+      contextLinks: jest
+        .fn()
+        .mockResolvedValue([{ contextId: 'context-1', sortOrder: 1 }]),
+      invalidateStructuredExplanation,
+      getQuestion: jest.fn().mockResolvedValue(question),
+    });
+
+    await updated.updateQuestion(
+      { id: 'admin-1', role: Role.ADMIN, sessionId: 'session-1' },
+      question.id,
+      { contextIds: ['context-1'] },
+    );
+
+    expect(tx.question.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: question.id },
+        data: expect.objectContaining({
+          contexts: {
+            deleteMany: {},
+            create: [{ contextId: 'context-1', sortOrder: 1 }],
+          },
+        }),
+      }),
+    );
+    expect(invalidateStructuredExplanation).toHaveBeenCalledWith(question.id);
+  });
+
   it('rejects body-only edits that would replace mixed content', () => {
     expect(() =>
       (service as any).rejectUnsafeLegacyBodyUpdate('replacement', undefined, [

@@ -199,13 +199,13 @@ export class QuestionBanksService {
     return this.questionWithClient(this.prisma, id);
   }
   private editable(status: QuestionStatus) {
-    if (
-      status === QuestionStatus.PUBLISHED ||
-      status === QuestionStatus.ARCHIVED
-    )
-      throw new ConflictException(
-        'Published or archived questions cannot be edited',
-      );
+    // Published questions remain the canonical source for future practice and
+    // assessment generation, so administrators must be able to correct an
+    // omission (for example, attach a forgotten context) without changing
+    // otherwise valid answer or explanation data. Existing assessment
+    // questions are snapshots and are not changed by this edit.
+    if (status === QuestionStatus.ARCHIVED)
+      throw new ConflictException('Archived questions cannot be edited');
   }
   private async draftSource(id: string) {
     const item = await this.source(id);
