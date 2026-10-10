@@ -1813,6 +1813,37 @@ No path, query, or header input.
 }
 ```
 
+### `POST /api/v1/admin/partners/{id}/reset-password`
+
+**Authorization:** Bearer token; role must be `ADMIN` or `SUPER_ADMIN`
+
+**Request**
+
+- path `id` (required)
+- body `password` (required string, 8–128 characters, preserved without trimming)
+
+```json
+{
+  "password": "<admin-chosen password>"
+}
+```
+
+**Success response — HTTP 200 (SuccessResponseDto)**
+
+```json
+{
+  "success": true
+}
+```
+
+Sets the password for an active partner, revokes existing sessions, and clears
+any mandatory password-change requirement. The partner can change it voluntarily
+after login. Neither the password nor the internal reset timestamp is returned.
+
+**Errors:** 400 for invalid input, 401 for unauthenticated requests, 403 for
+unauthorized roles, 404 for missing/non-partner accounts, and 409 for inactive
+partners or concurrent account state changes.
+
 ### `POST /api/v1/admin/partners/{id}/suspend`
 
 **Authorization:** Bearer token; role must be `ADMIN` or `SUPER_ADMIN`

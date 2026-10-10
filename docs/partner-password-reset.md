@@ -1,29 +1,39 @@
 # Partner password reset
 
-Admins and super admins can reset an active partner's password with:
+Admins and super admins can set an active partner's password with:
 
 `POST /api/v1/admin/partners/{id}/reset-password`
 
-Send the admin's bearer token. No request body is required. Both referral partners
-and content publishers are supported.
-
-The endpoint returns HTTP 200 with:
+Send an admin bearer token and a required JSON body:
 
 ```json
-{
-  "temporaryPassword": "<generated temporary password>",
-  "passwordResetAt": "2026-10-10T12:00:00.000Z"
-}
+{ "password": "<admin-chosen password>" }
 ```
 
-The admin should give the temporary password to the partner. The reset revokes
-existing sessions and requires the partner to change their password after logging
-in. Use `POST /api/v1/auth/change-password` with the temporary password as
-`oldPassword` and the chosen password as `newPassword`.
+The password must contain 8–128 characters and is stored exactly as supplied,
+without trimming. Both referral partners and content publishers are supported.
 
-The password update, session revocation, and `PARTNER_PASSWORD_RESET` audit event
-are committed together. The audit event does not include the temporary password.
+The endpoint returns HTTP 200 with only:
 
-Errors: 401 for unauthenticated requests, 403 for unauthorized roles, 404 for a
-missing or non-partner account, and 409 for an inactive partner or a concurrent
-account state change.
+```json
+{ "success": true }
+```
+
+The reset revokes existing sessions and clears any mandatory password-change
+requirement. The partner can log in with the new password and access partner
+features immediately. They can optionally change it using
+`POST /api/v1/auth/change-password`, supplying the admin-chosen password as
+`oldPassword` and their chosen password as `newPassword`.
+
+The password hash update, internal reset timestamp, session revocation, and
+`PARTNER_PASSWORD_RESET` audit event are committed together. The password is
+never returned or included in the audit event. Existing account IDs, profiles,
+and linked records are preserved.
+
+Clients must now send `password`; requests without it return HTTP 400. The
+response no longer includes `temporaryPassword` or `passwordResetAt`. Student
+and administrator password-reset endpoints retain their existing contracts.
+
+Errors: 400 for an invalid or missing password, 401 for unauthenticated requests,
+403 for unauthorized roles, 404 for a missing or non-partner account, and 409 for
+an inactive partner or a concurrent account state change.

@@ -41,8 +41,9 @@ Do not delete or recreate accounts. If an email was entered incorrectly, use the
 same endpoint to restore its previous login.
 
 Passwords do not need to change for this operation. If a partner does not know
-their password, use the separate partner password reset endpoint, then give them
-the new login and generated temporary password through your established channel.
+their password, use the separate partner password reset endpoint with an admin-chosen password,
+then give them the new login and password through your established channel.
+They can change that password after login if they choose.
 
 These addresses work as login identifiers; this operation does not provision
 mailboxes or aliases at `jibal-platform.com`.

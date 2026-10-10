@@ -1,5 +1,4 @@
 import { Prisma } from '@prisma/client';
-import { randomBytes } from 'node:crypto';
 import {
   ConflictException,
   ForbiddenException,
@@ -24,6 +23,7 @@ import {
 import type { CreatePartnerDto } from './dto/create-partner.dto';
 import type { UpdatePartnerDto } from './dto/update-partner.dto';
 import type { UpdatePartnerEmailDto } from './dto/update-partner-email.dto';
+import type { ResetPartnerPasswordDto } from './dto/reset-partner-password.dto';
 import type { RequestUser } from '../../common/types/request-with-user.types';
 import { toPaginationMeta } from '../../common/dto/pagination-query.dto';
 import type { QueryAdminPartnersDto } from './dto/query-admin-partners.dto';
@@ -464,7 +464,11 @@ export class PartnersService {
     return this.getById(id);
   }
 
-  async resetPassword(actor: RequestUser, id: string) {
+  async resetPassword(
+    actor: RequestUser,
+    id: string,
+    dto: ResetPartnerPasswordDto,
+  ) {
     if (actor.role !== Role.ADMIN && actor.role !== Role.SUPER_ADMIN) {
       throw new ForbiddenException('Forbidden');
     }
@@ -476,13 +480,12 @@ export class PartnersService {
       throw new ConflictException('Only active partners can be reset');
     }
 
-    const temporaryPassword = randomBytes(24).toString('base64url');
-    const passwordHash = await this.passwordService.hash(temporaryPassword);
+    const passwordHash = await this.passwordService.hash(dto.password);
     const passwordResetAt = new Date();
     await this.prisma.$transaction(async (tx) => {
       const reset = await tx.user.updateMany({
         where: { id, role: Role.PARTNER, status: AccountStatus.ACTIVE },
-        data: { passwordHash, mustChangePassword: true, passwordResetAt },
+        data: { passwordHash, mustChangePassword: false, passwordResetAt },
       });
       if (reset.count !== 1) {
         throw new ConflictException('Partner state changed; try again');
@@ -498,7 +501,7 @@ export class PartnersService {
         targetId: id,
       });
     });
-    return { temporaryPassword, passwordResetAt };
+    return { success: true };
   }
 
   /** Ownership is structural: keyed off req.user.id, never an id param. */

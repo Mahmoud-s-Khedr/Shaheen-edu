@@ -149,6 +149,7 @@ describe('PartnersService login email changes', () => {
 });
 
 describe('PartnersService password resets', () => {
+  const dto = { password: ' AdminChosenPassword123! ' };
   const actor = { id: 'admin-1', role: Role.ADMIN, sessionId: 'session-1' };
   const tx = {
     user: { updateMany: jest.fn() },
@@ -175,6 +176,7 @@ describe('PartnersService password resets', () => {
       id: 'partner-1',
       role: Role.PARTNER,
       status: AccountStatus.ACTIVE,
+      mustChangePassword: true,
     });
     passwordService.hash.mockResolvedValue('new-hash');
     tx.user.updateMany.mockResolvedValue({ count: 1 });
@@ -186,13 +188,17 @@ describe('PartnersService password resets', () => {
       const result = await service.resetPassword(
         { ...actor, role },
         'partner-1',
+        dto,
       );
 
-      expect(result.temporaryPassword).toMatch(/^[A-Za-z0-9_-]{32}$/);
-      expect(result.passwordResetAt).toBeInstanceOf(Date);
-      expect(passwordService.hash).toHaveBeenCalledWith(
-        result.temporaryPassword,
-      );
+      const passwordResetAt = (
+        tx.user.updateMany.mock.calls[0][0] as {
+          data: { passwordResetAt: Date };
+        }
+      ).data.passwordResetAt;
+      expect(passwordResetAt).toBeInstanceOf(Date);
+      expect(result).toEqual({ success: true });
+      expect(passwordService.hash).toHaveBeenCalledWith(dto.password);
       expect(tx.user.updateMany).toHaveBeenCalledWith({
         where: {
           id: 'partner-1',
@@ -201,13 +207,16 @@ describe('PartnersService password resets', () => {
         },
         data: {
           passwordHash: 'new-hash',
-          mustChangePassword: true,
-          passwordResetAt: result.passwordResetAt,
+          mustChangePassword: false,
+          passwordResetAt,
         },
       });
       expect(tx.authSession.updateMany).toHaveBeenCalledWith({
         where: { userId: 'partner-1', revoked: false },
-        data: { revoked: true, revokedAt: result.passwordResetAt },
+        data: {
+          revoked: true,
+          revokedAt: passwordResetAt,
+        },
       });
       expect(auditService.recordWithClient).toHaveBeenCalledWith(tx, {
         actorUserId: actor.id,
@@ -220,7 +229,7 @@ describe('PartnersService password resets', () => {
 
   it.each([Role.PARTNER, Role.STUDENT])('rejects %s actors', async (role) => {
     await expect(
-      service.resetPassword({ ...actor, role }, 'partner-1'),
+      service.resetPassword({ ...actor, role }, 'partner-1', dto),
     ).rejects.toBeInstanceOf(ForbiddenException);
     expect(prisma.user.findUnique).not.toHaveBeenCalled();
     expect(prisma.$transaction).not.toHaveBeenCalled();
@@ -231,7 +240,7 @@ describe('PartnersService password resets', () => {
     async (target) => {
       prisma.user.findUnique.mockResolvedValue(target);
       await expect(
-        service.resetPassword(actor, 'partner-1'),
+        service.resetPassword(actor, 'partner-1', dto),
       ).rejects.toBeInstanceOf(NotFoundException);
       expect(passwordService.hash).not.toHaveBeenCalled();
       expect(prisma.$transaction).not.toHaveBeenCalled();
@@ -244,7 +253,7 @@ describe('PartnersService password resets', () => {
       status: AccountStatus.SUSPENDED,
     });
     await expect(
-      service.resetPassword(actor, 'partner-1'),
+      service.resetPassword(actor, 'partner-1', dto),
     ).rejects.toBeInstanceOf(ConflictException);
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
@@ -252,7 +261,7 @@ describe('PartnersService password resets', () => {
   it('rejects a concurrent account state change before revoking sessions or auditing', async () => {
     tx.user.updateMany.mockResolvedValue({ count: 0 });
     await expect(
-      service.resetPassword(actor, 'partner-1'),
+      service.resetPassword(actor, 'partner-1', dto),
     ).rejects.toBeInstanceOf(ConflictException);
     expect(tx.authSession.updateMany).not.toHaveBeenCalled();
     expect(auditService.recordWithClient).not.toHaveBeenCalled();

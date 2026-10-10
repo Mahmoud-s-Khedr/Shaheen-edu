@@ -25,13 +25,14 @@ import { PartnersService } from '../partners.service';
 import { CreatePartnerDto } from '../dto/create-partner.dto';
 import { UpdatePartnerDto } from '../dto/update-partner.dto';
 import { UpdatePartnerEmailDto } from '../dto/update-partner-email.dto';
+import { ResetPartnerPasswordDto } from '../dto/reset-partner-password.dto';
 import type { RequestUser } from '../../../common/types/request-with-user.types';
 import { QueryAdminPartnersDto } from '../dto/query-admin-partners.dto';
 import { ApiStandardErrors } from '../../../common/decorators/api-standard-errors.decorator';
 import {
   PaginatedPartnerResponseDto,
   PartnerSummaryDto,
-  PasswordResetResponseDto,
+  SuccessResponseDto,
 } from '../../../common/dto/api-response.dto';
 
 @ApiTags('admin/partners')
@@ -123,10 +124,16 @@ export class AdminPartnersController {
 
   @Post(':id/reset-password')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Reset a partner password' })
-  @ApiOkResponse({ type: PasswordResetResponseDto })
-  @ApiStandardErrors(401, 403, 404, 409)
-  resetPassword(@CurrentUser() actor: RequestUser, @Param('id') id: string) {
-    return this.partnersService.resetPassword(actor, id);
+  @ApiOperation({
+    summary: 'Set a partner password without requiring a password change',
+  })
+  @ApiOkResponse({ type: SuccessResponseDto })
+  @ApiStandardErrors(400, 401, 403, 404, 409)
+  resetPassword(
+    @CurrentUser() actor: RequestUser,
+    @Param('id') id: string,
+    @Body() dto: ResetPartnerPasswordDto,
+  ) {
+    return this.partnersService.resetPassword(actor, id, dto);
   }
 }
