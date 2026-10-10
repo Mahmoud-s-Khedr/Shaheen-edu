@@ -1139,13 +1139,34 @@ export class QuestionBanksService {
   }
   async listQuestions(actor: RequestUser, q: QueryQuestionDto) {
     this.admin(actor);
-    const placementWhere = q.chapterId
-      ? { chapterId: q.chapterId }
-      : q.lessonId
-        ? { lessonId: q.lessonId }
-        : q.sectionId
-          ? { sectionId: q.sectionId }
-          : undefined;
+    // Placements store exactly one target, so ancestor filters must also
+    // traverse lesson/section relations. All filters must match one placement.
+    const placementConditions: Prisma.QuestionPlacementWhereInput[] = [];
+    if (q.chapterId)
+      placementConditions.push({
+        OR: [
+          { chapterId: q.chapterId },
+          { lesson: { chapterId: q.chapterId } },
+          { section: { lesson: { chapterId: q.chapterId } } },
+        ],
+      });
+    if (q.lessonId)
+      placementConditions.push({
+        OR: [{ lessonId: q.lessonId }, { section: { lessonId: q.lessonId } }],
+      });
+    if (q.sectionId) placementConditions.push({ sectionId: q.sectionId });
+    const placementWhere = placementConditions.length
+      ? { AND: placementConditions }
+      : undefined;
+    const placementSql = sqlAnd(
+      q.chapterId
+        ? Prisma.sql`(qp."chapterId" = ${q.chapterId} OR pl."chapterId" = ${q.chapterId} OR sl."chapterId" = ${q.chapterId})`
+        : undefined,
+      q.lessonId
+        ? Prisma.sql`(qp."lessonId" = ${q.lessonId} OR ps."lessonId" = ${q.lessonId})`
+        : undefined,
+      q.sectionId ? Prisma.sql`qp."sectionId" = ${q.sectionId}` : undefined,
+    );
     const where: any = {
       status: q.status ?? { not: QuestionStatus.ARCHIVED },
       bankId: q.bankId,
@@ -1221,7 +1242,7 @@ export class QuestionBanksService {
           q.sourceId ? Prisma.sql`t."sourceId" = ${q.sourceId}` : undefined,
           q.courseId ? Prisma.sql`t."courseId" = ${q.courseId}` : undefined,
           placementWhere
-            ? Prisma.sql`EXISTS (SELECT 1 FROM "QuestionPlacement" qp WHERE qp."questionId" = t.id AND ${Prisma.raw(`qp."${Object.keys(placementWhere)[0]}"`)} = ${Object.values(placementWhere)[0]})`
+            ? Prisma.sql`EXISTS (SELECT 1 FROM "QuestionPlacement" qp LEFT JOIN "Lesson" pl ON pl.id = qp."lessonId" LEFT JOIN "Section" ps ON ps.id = qp."sectionId" LEFT JOIN "Lesson" sl ON sl.id = ps."lessonId" WHERE qp."questionId" = t.id AND (${placementSql}))`
             : undefined,
           q.subjectId || q.academicGradeId
             ? Prisma.sql`EXISTS (SELECT 1 FROM "Course" c JOIN "Subject" s ON s.id = c."subjectId" ${q.academicGradeId ? Prisma.sql`JOIN "SubjectGrade" sg ON sg."subjectId" = s.id` : Prisma.empty} WHERE c.id = t."courseId" ${q.subjectId ? Prisma.sql`AND s.id = ${q.subjectId}` : Prisma.empty} ${q.academicGradeId ? Prisma.sql`AND sg."academicGradeId" = ${q.academicGradeId}` : Prisma.empty})`

@@ -359,6 +359,15 @@ Response: the created question, including its `id`, status, placements, content,
 | `GET /admin/questions`             | Query: `page`, `limit`, optional `q`, `status`, `bankId`, `sourceId`, `courseId`, `chapterId`, `lessonId`, `sectionId`, `subjectId`, `academicGradeId` | Paginated question list.                                                          |
 | `GET /admin/questions/:questionId` | No body                                                                                                                                                | Full question detail, including options, contexts, placements, assets, and video. |
 
+All supplied hierarchy filters are combined. `courseId` matches the question's
+course; `subjectId` and `academicGradeId` match that course's subject and its
+grade assignments. A chapter filter includes direct chapter placements and
+placements in its lessons and sections. A lesson filter includes direct lesson
+placements and placements in its sections. A section filter matches that section
+exactly. When several placement filters are supplied, one placement must satisfy
+all of them; inconsistent IDs return an empty list. These rules also apply when
+`q` is supplied. Archived questions are excluded unless `status=ARCHIVED`.
+
 ### 7.3 Edit a question
 
 ```http
