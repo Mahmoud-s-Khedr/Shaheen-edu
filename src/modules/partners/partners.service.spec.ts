@@ -1,9 +1,263 @@
 import { PartnersService } from './partners.service';
+import { Prisma } from '@prisma/client';
+import {
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import {
   AccountStatus,
   PartnerAllocationState,
   Role,
 } from '../../common/types/roles.enum';
+
+describe('PartnersService login email changes', () => {
+  const actor = { id: 'admin-1', role: Role.ADMIN, sessionId: 'session-1' };
+  const partner = {
+    id: 'partner-1',
+    role: Role.PARTNER,
+    status: AccountStatus.ACTIVE,
+    loginIdentifier: 'referral@example.com',
+    createdAt: new Date(),
+    partnerProfile: null,
+  };
+  const tx = {
+    user: { updateMany: jest.fn() },
+    authSession: { updateMany: jest.fn() },
+  };
+  const prisma = {
+    user: { findUnique: jest.fn() },
+    $transaction: jest.fn(),
+  };
+  const audit = { recordWithClient: jest.fn() };
+  const service = new PartnersService(
+    prisma as any,
+    {} as any,
+    {} as any,
+    audit as any,
+  );
+  const email = 'ibraheim.tarek@jibal-platform.com';
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    prisma.user.findUnique.mockReset();
+    tx.user.updateMany.mockReset();
+    prisma.user.findUnique.mockResolvedValue(partner);
+    tx.user.updateMany.mockResolvedValue({ count: 1 });
+    prisma.$transaction.mockImplementation(
+      async (callback: (client: typeof tx) => unknown) => callback(tx),
+    );
+  });
+
+  it.each([Role.ADMIN, Role.SUPER_ADMIN])(
+    'allows %s to change only the login email on the existing user',
+    async (role) => {
+      prisma.user.findUnique
+        .mockResolvedValueOnce(partner)
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({ ...partner, loginIdentifier: email });
+      const result = await service.updateEmail({ ...actor, role }, partner.id, {
+        email: ` ${email.toUpperCase()} `,
+      });
+      expect(result).toMatchObject({ id: partner.id, loginIdentifier: email });
+      expect(tx.user.updateMany).toHaveBeenCalledWith({
+        where: {
+          id: partner.id,
+          role: Role.PARTNER,
+          loginIdentifier: partner.loginIdentifier,
+        },
+        data: { loginIdentifier: email },
+      });
+      expect(tx.authSession.updateMany).toHaveBeenCalledWith({
+        where: { userId: partner.id, revoked: false },
+        data: { revoked: true, revokedAt: expect.any(Date) },
+      });
+      expect(audit.recordWithClient).toHaveBeenCalledWith(tx, {
+        actorUserId: actor.id,
+        action: 'PARTNER_EMAIL_UPDATED',
+        targetType: 'User',
+        targetId: partner.id,
+        metadata: { previousEmail: partner.loginIdentifier, email },
+      });
+    },
+  );
+
+  it('rejects a partner actor before reading or writing data', async () => {
+    await expect(
+      service.updateEmail({ ...actor, role: Role.PARTNER }, partner.id, {
+        email,
+      }),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(prisma.user.findUnique).not.toHaveBeenCalled();
+  });
+
+  it.each([null, { ...partner, role: Role.ADMIN }])(
+    'rejects a missing or non-partner account (%j)',
+    async (target) => {
+      prisma.user.findUnique.mockResolvedValue(target);
+      await expect(
+        service.updateEmail(actor, partner.id, { email }),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    },
+  );
+
+  it('rejects an email already used by another account', async () => {
+    prisma.user.findUnique
+      .mockResolvedValueOnce(partner)
+      .mockResolvedValueOnce({ id: 'other-user' });
+    await expect(
+      service.updateEmail(actor, partner.id, { email }),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('leaves sessions unchanged when the email already matches', async () => {
+    await service.updateEmail(actor, partner.id, {
+      email: partner.loginIdentifier,
+    });
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('rejects a concurrent login change before revoking sessions or auditing', async () => {
+    prisma.user.findUnique
+      .mockResolvedValueOnce(partner)
+      .mockResolvedValueOnce(null);
+    tx.user.updateMany.mockResolvedValue({ count: 0 });
+    await expect(
+      service.updateEmail(actor, partner.id, { email }),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(tx.authSession.updateMany).not.toHaveBeenCalled();
+    expect(audit.recordWithClient).not.toHaveBeenCalled();
+  });
+
+  it('reports a duplicate email created concurrently as a conflict', async () => {
+    prisma.user.findUnique
+      .mockResolvedValueOnce(partner)
+      .mockResolvedValueOnce(null);
+    tx.user.updateMany.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError('Duplicate email', {
+        code: 'P2002',
+        clientVersion: '6.19.2',
+      }),
+    );
+    await expect(
+      service.updateEmail(actor, partner.id, { email }),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(tx.authSession.updateMany).not.toHaveBeenCalled();
+  });
+});
+
+describe('PartnersService password resets', () => {
+  const actor = { id: 'admin-1', role: Role.ADMIN, sessionId: 'session-1' };
+  const tx = {
+    user: { updateMany: jest.fn() },
+    authSession: { updateMany: jest.fn() },
+  };
+  const prisma = {
+    user: { findUnique: jest.fn() },
+    $transaction: jest.fn(async (callback: (client: typeof tx) => unknown) =>
+      callback(tx),
+    ),
+  };
+  const passwordService = { hash: jest.fn() };
+  const auditService = { recordWithClient: jest.fn() };
+  const service = new PartnersService(
+    prisma as any,
+    passwordService as any,
+    {} as any,
+    auditService as any,
+  );
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    prisma.user.findUnique.mockResolvedValue({
+      id: 'partner-1',
+      role: Role.PARTNER,
+      status: AccountStatus.ACTIVE,
+    });
+    passwordService.hash.mockResolvedValue('new-hash');
+    tx.user.updateMany.mockResolvedValue({ count: 1 });
+  });
+
+  it.each([Role.ADMIN, Role.SUPER_ADMIN])(
+    'allows %s to reset an active partner, revoke sessions, and audit atomically',
+    async (role) => {
+      const result = await service.resetPassword(
+        { ...actor, role },
+        'partner-1',
+      );
+
+      expect(result.temporaryPassword).toMatch(/^[A-Za-z0-9_-]{32}$/);
+      expect(result.passwordResetAt).toBeInstanceOf(Date);
+      expect(passwordService.hash).toHaveBeenCalledWith(
+        result.temporaryPassword,
+      );
+      expect(tx.user.updateMany).toHaveBeenCalledWith({
+        where: {
+          id: 'partner-1',
+          role: Role.PARTNER,
+          status: AccountStatus.ACTIVE,
+        },
+        data: {
+          passwordHash: 'new-hash',
+          mustChangePassword: true,
+          passwordResetAt: result.passwordResetAt,
+        },
+      });
+      expect(tx.authSession.updateMany).toHaveBeenCalledWith({
+        where: { userId: 'partner-1', revoked: false },
+        data: { revoked: true, revokedAt: result.passwordResetAt },
+      });
+      expect(auditService.recordWithClient).toHaveBeenCalledWith(tx, {
+        actorUserId: actor.id,
+        action: 'PARTNER_PASSWORD_RESET',
+        targetType: 'User',
+        targetId: 'partner-1',
+      });
+    },
+  );
+
+  it.each([Role.PARTNER, Role.STUDENT])('rejects %s actors', async (role) => {
+    await expect(
+      service.resetPassword({ ...actor, role }, 'partner-1'),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(prisma.user.findUnique).not.toHaveBeenCalled();
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it.each([null, { role: Role.ADMIN }, { role: Role.STUDENT }])(
+    'rejects missing or non-partner targets (%j)',
+    async (target) => {
+      prisma.user.findUnique.mockResolvedValue(target);
+      await expect(
+        service.resetPassword(actor, 'partner-1'),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(passwordService.hash).not.toHaveBeenCalled();
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    },
+  );
+
+  it('rejects inactive partners', async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      role: Role.PARTNER,
+      status: AccountStatus.SUSPENDED,
+    });
+    await expect(
+      service.resetPassword(actor, 'partner-1'),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('rejects a concurrent account state change before revoking sessions or auditing', async () => {
+    tx.user.updateMany.mockResolvedValue({ count: 0 });
+    await expect(
+      service.resetPassword(actor, 'partner-1'),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(tx.authSession.updateMany).not.toHaveBeenCalled();
+    expect(auditService.recordWithClient).not.toHaveBeenCalled();
+  });
+});
 
 describe('PartnersService self-service profile updates', () => {
   const prisma = {

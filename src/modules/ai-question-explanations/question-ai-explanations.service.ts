@@ -229,23 +229,39 @@ export class QuestionAiExplanationsService {
       .join('\n\n');
   }
   private language(question: any) {
+    const blocks = [
+      ...(question.contentBlocks ?? []),
+      ...(question.options ?? []).flatMap((x: any) => x.contentBlocks ?? []),
+      ...(question.contexts ?? []).flatMap((x: any) => x.contentBlocks ?? []),
+    ];
+    // Prefer question/option metadata to shared-context metadata. Resolve ties
+    // by the existing text heuristic instead of arbitrarily choosing a language.
+    const ownBlocks = [
+      ...(question.contentBlocks ?? []),
+      ...(question.options ?? []).flatMap((x: any) => x.contentBlocks ?? []),
+    ];
+    for (const codes of [
+      ownBlocks.map((x: any) => x.languageCode),
+      (question.contexts ?? []).flatMap((x: any) => [
+        x.languageCode,
+        ...(x.contentBlocks ?? []).map((b: any) => b.languageCode),
+      ]),
+    ]) {
+      const counts = new Map<string, number>();
+      for (const code of codes) {
+        if (['ar', 'en', 'de', 'fr'].includes(code))
+          counts.set(code, (counts.get(code) ?? 0) + 1);
+      }
+      const ranked = [...counts].sort((a, b) => b[1] - a[1]);
+      if (ranked.length && (!ranked[1] || ranked[0][1] > ranked[1][1]))
+        return ranked[0][0];
+      if (ranked.length) break;
+    }
     const text = [
       question.body,
       ...(question.options ?? []).map((x: any) => x.body),
-      ...(question.contentBlocks ?? []).flatMap((x: any) => [
-        x.text,
-        x.caption,
-        x.altText,
-      ]),
-      ...(question.contexts ?? []).flatMap((x: any) => [
-        x.title,
-        x.body,
-        ...(x.contentBlocks ?? []).flatMap((b: any) => [
-          b.text,
-          b.caption,
-          b.altText,
-        ]),
-      ]),
+      ...blocks.flatMap((x: any) => [x.text, x.caption, x.altText]),
+      ...(question.contexts ?? []).flatMap((x: any) => [x.title, x.body]),
     ]
       .filter(Boolean)
       .join(' ');
@@ -353,7 +369,7 @@ export class QuestionAiExplanationsService {
     );
     const snapshot = this.snapshot(question);
     const sourceFingerprint = this.fingerprint(snapshot);
-    const languageCode = this.language(snapshot);
+    const languageCode = dto.explanationLanguage ?? this.language(snapshot);
     try {
       const response = await this.client.generate({
         languageCode,
@@ -380,7 +396,7 @@ export class QuestionAiExplanationsService {
           warnings: response.result.warnings as any,
           conflictWarning: null,
           model: response.model,
-          promptVersion: 'question-verified-answer-explanation-v2',
+          promptVersion: 'question-verified-answer-explanation-v3',
           rawResponse: response.raw,
           usage: response.usage,
           createdById: actor.id,
@@ -406,7 +422,7 @@ export class QuestionAiExplanationsService {
           suppliedAnswer: suppliedAnswer as any,
           additionalContext: dto.additionalContext?.trim() || null,
           model: 'unavailable',
-          promptVersion: 'question-verified-answer-explanation-v2',
+          promptVersion: 'question-verified-answer-explanation-v3',
           createdById: actor.id,
           reviewNote:
             error instanceof Error ? error.message : 'AI request failed',
@@ -517,213 +533,215 @@ export class QuestionAiExplanationsService {
             : undefined,
         )
       : null;
-    const appliedQuestionId = await this.prisma.$transaction(async (tx: any) => {
-      let targetQuestion: any = source;
-      if (source.status === QuestionStatus.PUBLISHED)
-        targetQuestion = await tx.question.create({
-          data: {
-            bankId: source.bankId,
-            sourceId: source.sourceId,
-            courseId: source.courseId,
-            type: source.type,
-            body: source.body,
-            explanation: source.explanation,
-            maxPoints: source.maxPoints,
-            acceptedAnswers: source.acceptedAnswers,
-            gradingRubric: source.gradingRubric,
-            answerOrigin: source.answerOrigin,
-            status: QuestionStatus.DRAFT,
-            createdById: actor.id,
-            updatedById: actor.id,
-            replacesQuestionId: source.id,
-            contentBlocks: {
-              create: source.contentBlocks.map((x: any) => ({
-                type: x.type,
-                sortOrder: x.sortOrder,
-                text: x.text,
-                assetId: x.assetId,
-                tableData: x.tableData,
-                latex: x.latex,
-                mathml: x.mathml,
-                caption: x.caption,
-                altText: x.altText,
-                languageCode: x.languageCode,
-              })),
-            },
-            options: {
-              create: source.options.map((x: any) => ({
-                body: x.body,
-                isCorrect: x.isCorrect,
-                sortOrder: x.sortOrder,
-                contentBlocks: {
-                  create: x.contentBlocks.map((b: any) => ({
-                    type: b.type,
-                    sortOrder: b.sortOrder,
-                    text: b.text,
-                    assetId: b.assetId,
-                    tableData: b.tableData,
-                    latex: b.latex,
-                    mathml: b.mathml,
-                    caption: b.caption,
-                    altText: b.altText,
-                    languageCode: b.languageCode,
-                  })),
-                },
-              })),
-            },
-            placements: {
-              create: source.placements.map((x: any) => ({
-                courseId: x.courseId,
-                chapterId: x.chapterId,
-                lessonId: x.lessonId,
-                sectionId: x.sectionId,
-              })),
-            },
-            contexts: {
-              create: source.contexts.map((x: any) => ({
-                contextId: x.contextId,
-                sortOrder: x.sortOrder,
-              })),
-            },
-            assets: {
-              create: source.assets.map((x: any) => ({
-                assetId: x.assetId,
-                sortOrder: x.sortOrder,
-              })),
-            },
-            videoLink: source.videoLink
-              ? {
-                  create: {
-                    videoAssetId: source.videoLink.videoAssetId,
-                    timestampSeconds: source.videoLink.timestampSeconds,
+    const appliedQuestionId = await this.prisma.$transaction(
+      async (tx: any) => {
+        let targetQuestion: any = source;
+        if (source.status === QuestionStatus.PUBLISHED)
+          targetQuestion = await tx.question.create({
+            data: {
+              bankId: source.bankId,
+              sourceId: source.sourceId,
+              courseId: source.courseId,
+              type: source.type,
+              body: source.body,
+              explanation: source.explanation,
+              maxPoints: source.maxPoints,
+              acceptedAnswers: source.acceptedAnswers,
+              gradingRubric: source.gradingRubric,
+              answerOrigin: source.answerOrigin,
+              status: QuestionStatus.DRAFT,
+              createdById: actor.id,
+              updatedById: actor.id,
+              replacesQuestionId: source.id,
+              contentBlocks: {
+                create: source.contentBlocks.map((x: any) => ({
+                  type: x.type,
+                  sortOrder: x.sortOrder,
+                  text: x.text,
+                  assetId: x.assetId,
+                  tableData: x.tableData,
+                  latex: x.latex,
+                  mathml: x.mathml,
+                  caption: x.caption,
+                  altText: x.altText,
+                  languageCode: x.languageCode,
+                })),
+              },
+              options: {
+                create: source.options.map((x: any) => ({
+                  body: x.body,
+                  isCorrect: x.isCorrect,
+                  sortOrder: x.sortOrder,
+                  contentBlocks: {
+                    create: x.contentBlocks.map((b: any) => ({
+                      type: b.type,
+                      sortOrder: b.sortOrder,
+                      text: b.text,
+                      assetId: b.assetId,
+                      tableData: b.tableData,
+                      latex: b.latex,
+                      mathml: b.mathml,
+                      caption: b.caption,
+                      altText: b.altText,
+                      languageCode: b.languageCode,
+                    })),
                   },
-                }
-              : undefined,
-          },
-        });
-      if (dto.applyAnswer) {
-        if (
-          targetQuestion.type === QuestionType.SINGLE_CHOICE ||
-          targetQuestion.type === QuestionType.MULTIPLE_CHOICE
-        ) {
-          await tx.questionOption.updateMany({
-            where: { questionId: targetQuestion.id },
-            data: { isCorrect: false },
+                })),
+              },
+              placements: {
+                create: source.placements.map((x: any) => ({
+                  courseId: x.courseId,
+                  chapterId: x.chapterId,
+                  lessonId: x.lessonId,
+                  sectionId: x.sectionId,
+                })),
+              },
+              contexts: {
+                create: source.contexts.map((x: any) => ({
+                  contextId: x.contextId,
+                  sortOrder: x.sortOrder,
+                })),
+              },
+              assets: {
+                create: source.assets.map((x: any) => ({
+                  assetId: x.assetId,
+                  sortOrder: x.sortOrder,
+                })),
+              },
+              videoLink: source.videoLink
+                ? {
+                    create: {
+                      videoAssetId: source.videoLink.videoAssetId,
+                      timestampSeconds: source.videoLink.timestampSeconds,
+                    },
+                  }
+                : undefined,
+            },
           });
-          const options = await tx.questionOption.findMany({
-            where: { questionId: targetQuestion.id },
-            orderBy: { sortOrder: 'asc' },
-          });
-          await tx.questionOption.updateMany({
-            where: {
-              id: {
-                in: (answer.selectedOptionIndexes ?? [])
-                  .map((index: number) => options[index]?.id)
-                  .filter(Boolean),
+        if (dto.applyAnswer) {
+          if (
+            targetQuestion.type === QuestionType.SINGLE_CHOICE ||
+            targetQuestion.type === QuestionType.MULTIPLE_CHOICE
+          ) {
+            await tx.questionOption.updateMany({
+              where: { questionId: targetQuestion.id },
+              data: { isCorrect: false },
+            });
+            const options = await tx.questionOption.findMany({
+              where: { questionId: targetQuestion.id },
+              orderBy: { sortOrder: 'asc' },
+            });
+            await tx.questionOption.updateMany({
+              where: {
+                id: {
+                  in: (answer.selectedOptionIndexes ?? [])
+                    .map((index: number) => options[index]?.id)
+                    .filter(Boolean),
+                },
+              },
+              data: { isCorrect: true },
+            });
+            await tx.question.update({
+              where: { id: targetQuestion.id },
+              data: {
+                answerOrigin: 'HUMAN_REVIEWED',
+                answerReviewedAt: new Date(),
+                answerReviewedById: actor.id,
+                updatedById: actor.id,
+              },
+            });
+          } else
+            await tx.question.update({
+              where: { id: targetQuestion.id },
+              data: {
+                acceptedAnswers: answer.acceptedAnswers as any,
+                gradingRubric: answer.gradingRubric,
+                answerOrigin: 'HUMAN_REVIEWED',
+                answerReviewedAt: new Date(),
+                answerReviewedById: actor.id,
+                updatedById: actor.id,
+              },
+            });
+        }
+        if (dto.applyExplanation) {
+          await tx.question.update({
+            where: { id: targetQuestion.id },
+            data: {
+              explanation: this.render(explanation!),
+              updatedById: actor.id,
+              structuredExplanation: {
+                upsert: {
+                  create: {
+                    ...explanation!,
+                    languageCode: run.languageCode,
+                    origin: editedExplanation
+                      ? QuestionExplanationOrigin.HUMAN
+                      : QuestionExplanationOrigin.AI,
+                    model: editedExplanation ? null : run.model,
+                    confidence: editedExplanation ? null : run.confidence,
+                    answerOrigin:
+                      run.mode === QuestionAiExplanationRunMode.INFER
+                        ? QuestionAnswerOrigin.INFERRED
+                        : QuestionAnswerOrigin.EXPLICIT,
+                    warnings: editedExplanation
+                      ? Prisma.JsonNull
+                      : (run.warnings as any),
+                    sourceFingerprint: dto.applyAnswer
+                      ? null
+                      : run.sourceFingerprint,
+                    reviewedAt: new Date(),
+                    reviewedById: actor.id,
+                  },
+                  update: {
+                    ...explanation!,
+                    languageCode: run.languageCode,
+                    origin: editedExplanation
+                      ? QuestionExplanationOrigin.HUMAN
+                      : QuestionExplanationOrigin.AI,
+                    model: editedExplanation ? null : run.model,
+                    confidence: editedExplanation ? null : run.confidence,
+                    answerOrigin:
+                      run.mode === QuestionAiExplanationRunMode.INFER
+                        ? QuestionAnswerOrigin.INFERRED
+                        : QuestionAnswerOrigin.EXPLICIT,
+                    warnings: editedExplanation
+                      ? Prisma.JsonNull
+                      : (run.warnings as any),
+                    sourceFingerprint: dto.applyAnswer
+                      ? null
+                      : run.sourceFingerprint,
+                    staleAt: null,
+                    reviewedAt: new Date(),
+                    reviewedById: actor.id,
+                  },
+                },
               },
             },
-            data: { isCorrect: true },
+          });
+        } else if (dto.applyAnswer) {
+          await tx.questionExplanation.deleteMany({
+            where: { questionId: targetQuestion.id },
           });
           await tx.question.update({
             where: { id: targetQuestion.id },
-            data: {
-              answerOrigin: 'HUMAN_REVIEWED',
-              answerReviewedAt: new Date(),
-              answerReviewedById: actor.id,
-              updatedById: actor.id,
-            },
+            data: { explanation: null, updatedById: actor.id },
           });
-        } else
-          await tx.question.update({
-            where: { id: targetQuestion.id },
-            data: {
-              acceptedAnswers: answer.acceptedAnswers as any,
-              gradingRubric: answer.gradingRubric,
-              answerOrigin: 'HUMAN_REVIEWED',
-              answerReviewedAt: new Date(),
-              answerReviewedById: actor.id,
-              updatedById: actor.id,
-            },
-          });
-      }
-      if (dto.applyExplanation) {
-        await tx.question.update({
-          where: { id: targetQuestion.id },
+        }
+        await tx.questionAiExplanationRun.update({
+          where: { id: run.id },
           data: {
-            explanation: this.render(explanation!),
-            updatedById: actor.id,
-            structuredExplanation: {
-              upsert: {
-                create: {
-                  ...explanation!,
-                  languageCode: run.languageCode,
-                  origin: editedExplanation
-                    ? QuestionExplanationOrigin.HUMAN
-                    : QuestionExplanationOrigin.AI,
-                  model: editedExplanation ? null : run.model,
-                  confidence: editedExplanation ? null : run.confidence,
-                  answerOrigin:
-                    run.mode === QuestionAiExplanationRunMode.INFER
-                      ? QuestionAnswerOrigin.INFERRED
-                      : QuestionAnswerOrigin.EXPLICIT,
-                  warnings: editedExplanation
-                    ? Prisma.JsonNull
-                    : (run.warnings as any),
-                  sourceFingerprint: dto.applyAnswer
-                    ? null
-                    : run.sourceFingerprint,
-                  reviewedAt: new Date(),
-                  reviewedById: actor.id,
-                },
-                update: {
-                  ...explanation!,
-                  languageCode: run.languageCode,
-                  origin: editedExplanation
-                    ? QuestionExplanationOrigin.HUMAN
-                    : QuestionExplanationOrigin.AI,
-                  model: editedExplanation ? null : run.model,
-                  confidence: editedExplanation ? null : run.confidence,
-                  answerOrigin:
-                    run.mode === QuestionAiExplanationRunMode.INFER
-                      ? QuestionAnswerOrigin.INFERRED
-                      : QuestionAnswerOrigin.EXPLICIT,
-                  warnings: editedExplanation
-                    ? Prisma.JsonNull
-                    : (run.warnings as any),
-                  sourceFingerprint: dto.applyAnswer
-                    ? null
-                    : run.sourceFingerprint,
-                  staleAt: null,
-                  reviewedAt: new Date(),
-                  reviewedById: actor.id,
-                },
-              },
-            },
+            status: QuestionAiExplanationRunStatus.APPLIED,
+            reviewedById: actor.id,
+            reviewedAt: new Date(),
+            applyAnswer: dto.applyAnswer,
+            applyExplanation: dto.applyExplanation,
+            appliedQuestionId: targetQuestion.id,
+            reviewNote: dto.note?.trim() || null,
           },
         });
-      } else if (dto.applyAnswer) {
-        await tx.questionExplanation.deleteMany({
-          where: { questionId: targetQuestion.id },
-        });
-        await tx.question.update({
-          where: { id: targetQuestion.id },
-          data: { explanation: null, updatedById: actor.id },
-        });
-      }
-      await tx.questionAiExplanationRun.update({
-        where: { id: run.id },
-        data: {
-          status: QuestionAiExplanationRunStatus.APPLIED,
-          reviewedById: actor.id,
-          reviewedAt: new Date(),
-          applyAnswer: dto.applyAnswer,
-          applyExplanation: dto.applyExplanation,
-          appliedQuestionId: targetQuestion.id,
-          reviewNote: dto.note?.trim() || null,
-        },
-      });
-      return targetQuestion.id;
-    });
+        return targetQuestion.id;
+      },
+    );
     await this.audit.record({
       actorUserId: actor.id,
       action: 'AI_QUESTION_REANSWER_APPLIED',

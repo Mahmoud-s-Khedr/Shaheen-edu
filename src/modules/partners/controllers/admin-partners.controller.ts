@@ -2,6 +2,8 @@ import {
   Body,
   Controller,
   Get,
+  HttpCode,
+  HttpStatus,
   Param,
   Patch,
   Post,
@@ -22,12 +24,14 @@ import { Role } from '../../../common/types/roles.enum';
 import { PartnersService } from '../partners.service';
 import { CreatePartnerDto } from '../dto/create-partner.dto';
 import { UpdatePartnerDto } from '../dto/update-partner.dto';
+import { UpdatePartnerEmailDto } from '../dto/update-partner-email.dto';
 import type { RequestUser } from '../../../common/types/request-with-user.types';
 import { QueryAdminPartnersDto } from '../dto/query-admin-partners.dto';
 import { ApiStandardErrors } from '../../../common/decorators/api-standard-errors.decorator';
 import {
   PaginatedPartnerResponseDto,
   PartnerSummaryDto,
+  PasswordResetResponseDto,
 } from '../../../common/dto/api-response.dto';
 
 @ApiTags('admin/partners')
@@ -89,6 +93,18 @@ export class AdminPartnersController {
     return this.partnersService.update(actor, id, dto);
   }
 
+  @Patch(':id/email')
+  @ApiOperation({ summary: 'Change a partner login email and revoke sessions' })
+  @ApiOkResponse({ type: PartnerSummaryDto })
+  @ApiStandardErrors(400, 401, 403, 404, 409)
+  updateEmail(
+    @CurrentUser() actor: RequestUser,
+    @Param('id') id: string,
+    @Body() dto: UpdatePartnerEmailDto,
+  ) {
+    return this.partnersService.updateEmail(actor, id, dto);
+  }
+
   @Post(':id/suspend')
   @ApiOperation({ summary: 'Suspend a partner and revoke sessions' })
   @ApiCreatedResponse({ type: PartnerSummaryDto })
@@ -103,5 +119,14 @@ export class AdminPartnersController {
   @ApiStandardErrors(401, 403, 404)
   reactivate(@CurrentUser() actor: RequestUser, @Param('id') id: string) {
     return this.partnersService.reactivate(actor, id);
+  }
+
+  @Post(':id/reset-password')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Reset a partner password' })
+  @ApiOkResponse({ type: PasswordResetResponseDto })
+  @ApiStandardErrors(401, 403, 404, 409)
+  resetPassword(@CurrentUser() actor: RequestUser, @Param('id') id: string) {
+    return this.partnersService.resetPassword(actor, id);
   }
 }

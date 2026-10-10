@@ -7,6 +7,7 @@ import {
   IsBoolean,
   IsDefined,
   IsInt,
+  IsIn,
   IsNotEmpty,
   IsObject,
   IsOptional,
@@ -47,6 +48,15 @@ export class AiQuestionAnswerDto {
 }
 
 export class CreateAiQuestionExplanationRunDto {
+  @ApiPropertyOptional({
+    enum: ['ar', 'en', 'de', 'fr'],
+    description:
+      'Explanation language. Takes priority over automatic detection and additionalContext.',
+  })
+  @IsOptional()
+  @IsIn(['ar', 'en', 'de', 'fr'])
+  explanationLanguage?: 'ar' | 'en' | 'de' | 'fr';
+
   @ApiProperty({
     type: AiQuestionAnswerDto,
     description:
@@ -58,7 +68,10 @@ export class CreateAiQuestionExplanationRunDto {
   @Type(() => AiQuestionAnswerDto)
   suppliedAnswer!: AiQuestionAnswerDto;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({
+    description:
+      'Teaching preferences, such as method, level, or terminology. Cannot override the verified answer or explanationLanguage.',
+  })
   @IsOptional()
   @IsString()
   @MaxLength(20000)

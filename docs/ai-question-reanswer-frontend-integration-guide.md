@@ -16,6 +16,7 @@ type AiQuestionAnswerDto =
 
 type CreateAiQuestionExplanationRunDto = {
   suppliedAnswer: AiQuestionAnswerDto; // required, verified by the admin
+  explanationLanguage?: 'ar' | 'en' | 'de' | 'fr';
   additionalContext?: string;
 };
 ```
@@ -25,9 +26,16 @@ Use only the answer field matching the question type. Choice indexes are zero-ba
 ```json
 {
   "suppliedAnswer": { "selectedOptionIndexes": [0] },
+  "explanationLanguage": "ar",
   "additionalContext": "Use the terminology taught in Unit 4."
 }
 ```
+
+`explanationLanguage` selects Arabic (`ar`), English (`en`), German (`de`), or French (`fr`) regardless of the source question language. It takes priority over `additionalContext`. Without it, the backend prefers question/option block language metadata, then shared-context language metadata; ambiguous or absent metadata falls back to Arabic/English character counts, including option blocks. The selected code is saved as the run's `languageCode`.
+
+Use `additionalContext` for teaching preferences such as “Use the substitution method”, “Explain for a beginner”, or course terminology. Define named methods such as “method B” if the question does not define them. Preferences cannot change the verified answer, selected language, or JSON format. For German or French explanations, send `explanationLanguage: "de"` or `explanationLanguage: "fr"` rather than requesting the language only in `additionalContext`.
+
+Generated explanations are checked locally for clear language mismatches, excluding quoted text, code, and LaTeX formulas. A mismatch triggers one new generation within the original request timeout; a second mismatch returns HTTP 503 and stores a failed run. Short or ambiguous text can pass the check and still requires administrator review. When a retry succeeds, `rawResponse.languageRetryResponses` retains both provider responses and usage totals include both calls where available.
 
 The response is a `PENDING_REVIEW` run. Its `proposedAnswer` is exactly the verified supplied answer. AI output consists only of `structuredExplanation`, explanation-quality `confidence`, and `warnings`; there is no AI answer or conflict warning.
 

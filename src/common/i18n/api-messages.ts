@@ -170,6 +170,9 @@ const translations: Record<string, string> = {
   'AI assessment service is not configured':
     'لم يتم تكوين خدمة تقييم الذكاء الاصطناعي',
   'AI explanation request failed': 'فشل طلب تفسير الذكاء الاصطناعي',
+  'AI returned an explanation in the wrong language':
+    'أعاد الذكاء الاصطناعي تفسيرًا بلغة غير المطلوبة',
+  'Unsupported explanation language': 'لغة التفسير غير مدعومة',
   'AI question explanation is not configured':
     'لم يتم تكوين شرح سؤال الذكاء الاصطناعي',
   'AI question import is not configured':
@@ -541,6 +544,9 @@ const translations: Record<string, string> = {
   'Only active referral programs can be ended or suspended':
     'يمكن إنهاء أو تعليق برامج الإحالة النشطة فقط',
   'Only active students can be reset': 'يمكن إعادة تعيين الطلاب النشطين فقط',
+  'Only active partners can be reset':
+    'يمكن إعادة تعيين كلمات مرور الشركاء النشطين فقط',
+  'Partner state changed; try again': 'تغيرت حالة الشريك؛ حاول مرة أخرى',
   'Only an unreferenced draft question can be deleted':
     'يمكن حذف مسودة سؤال غير مرجعية فقط',
   'Only archived records can be restored': 'يمكن استعادة السجلات المؤرشفة فقط',

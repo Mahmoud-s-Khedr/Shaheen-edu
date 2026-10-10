@@ -1,6 +1,8 @@
 import { Prisma } from '@prisma/client';
+import { randomBytes } from 'node:crypto';
 import {
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -21,15 +23,15 @@ import {
 } from '../../common/types/roles.enum';
 import type { CreatePartnerDto } from './dto/create-partner.dto';
 import type { UpdatePartnerDto } from './dto/update-partner.dto';
+import type { UpdatePartnerEmailDto } from './dto/update-partner-email.dto';
 import type { RequestUser } from '../../common/types/request-with-user.types';
 import { toPaginationMeta } from '../../common/dto/pagination-query.dto';
 import type { QueryAdminPartnersDto } from './dto/query-admin-partners.dto';
 
 /**
  * Admin-side methods here are reached only via routes guarded by
- * @Roles(SUPER_ADMIN, ADMIN) - no extra actor-role re-check needed per the
- * plan's authorization matrix (unlike AdminsService, which guards the most
- * sensitive account type and re-checks defensively).
+ * @Roles(SUPER_ADMIN, ADMIN). Credential changes additionally re-check the
+ * actor's role before changing credentials.
  */
 @Injectable()
 export class PartnersService {
@@ -339,6 +341,66 @@ export class PartnersService {
     return this.getById(id);
   }
 
+  async updateEmail(
+    actor: RequestUser,
+    id: string,
+    dto: UpdatePartnerEmailDto,
+  ) {
+    if (actor.role !== Role.ADMIN && actor.role !== Role.SUPER_ADMIN) {
+      throw new ForbiddenException('Forbidden');
+    }
+    const partner = await this.prisma.user.findUnique({ where: { id } });
+    if (!partner || partner.role !== Role.PARTNER) {
+      throw new NotFoundException('Partner not found');
+    }
+    const email = dto.email.trim().toLowerCase();
+    if (email === partner.loginIdentifier) {
+      return this.getById(id);
+    }
+    const existing = await this.prisma.user.findUnique({
+      where: { loginIdentifier: email },
+    });
+    if (existing) {
+      throw new ConflictException('Email already in use');
+    }
+
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        const updated = await tx.user.updateMany({
+          where: {
+            id,
+            role: Role.PARTNER,
+            loginIdentifier: partner.loginIdentifier,
+          },
+          data: { loginIdentifier: email },
+        });
+        if (updated.count !== 1) {
+          throw new ConflictException('Partner state changed; try again');
+        }
+        await tx.authSession.updateMany({
+          where: { userId: id, revoked: false },
+          data: { revoked: true, revokedAt: new Date() },
+        });
+        await this.auditService.recordWithClient(tx, {
+          actorUserId: actor.id,
+          action: 'PARTNER_EMAIL_UPDATED',
+          targetType: 'User',
+          targetId: id,
+          metadata: { previousEmail: partner.loginIdentifier, email },
+        });
+      });
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
+        throw new ConflictException('Email already in use');
+      }
+      throw error;
+    }
+    return this.getById(id);
+  }
+
   async updateOwnProfile(userId: string, dto: UpdatePartnerDto) {
     const partner = await this.prisma.user.findUnique({
       where: { id: userId },
@@ -400,6 +462,43 @@ export class PartnersService {
       targetId: id,
     });
     return this.getById(id);
+  }
+
+  async resetPassword(actor: RequestUser, id: string) {
+    if (actor.role !== Role.ADMIN && actor.role !== Role.SUPER_ADMIN) {
+      throw new ForbiddenException('Forbidden');
+    }
+    const partner = await this.prisma.user.findUnique({ where: { id } });
+    if (!partner || partner.role !== Role.PARTNER) {
+      throw new NotFoundException('Partner not found');
+    }
+    if (partner.status !== AccountStatus.ACTIVE) {
+      throw new ConflictException('Only active partners can be reset');
+    }
+
+    const temporaryPassword = randomBytes(24).toString('base64url');
+    const passwordHash = await this.passwordService.hash(temporaryPassword);
+    const passwordResetAt = new Date();
+    await this.prisma.$transaction(async (tx) => {
+      const reset = await tx.user.updateMany({
+        where: { id, role: Role.PARTNER, status: AccountStatus.ACTIVE },
+        data: { passwordHash, mustChangePassword: true, passwordResetAt },
+      });
+      if (reset.count !== 1) {
+        throw new ConflictException('Partner state changed; try again');
+      }
+      await tx.authSession.updateMany({
+        where: { userId: id, revoked: false },
+        data: { revoked: true, revokedAt: passwordResetAt },
+      });
+      await this.auditService.recordWithClient(tx, {
+        actorUserId: actor.id,
+        action: 'PARTNER_PASSWORD_RESET',
+        targetType: 'User',
+        targetId: id,
+      });
+    });
+    return { temporaryPassword, passwordResetAt };
   }
 
   /** Ownership is structural: keyed off req.user.id, never an id param. */

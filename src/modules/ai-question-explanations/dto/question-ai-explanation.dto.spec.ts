@@ -6,6 +6,39 @@ import {
 } from './question-ai-explanation.dto';
 
 describe('CreateAiQuestionExplanationRunDto', () => {
+  it.each(['ar', 'en', 'de', 'fr'])(
+    'accepts explicit language %s',
+    async (explanationLanguage) => {
+      expect(
+        await validate(
+          plainToInstance(CreateAiQuestionExplanationRunDto, {
+            suppliedAnswer: { acceptedAnswers: ['42'] },
+            explanationLanguage,
+          }),
+          { whitelist: true, forbidNonWhitelisted: true },
+        ),
+      ).toEqual([]);
+    },
+  );
+
+  it.each(['es', '', 123])(
+    'rejects unsupported language %j',
+    async (explanationLanguage) => {
+      expect(
+        await validate(
+          plainToInstance(CreateAiQuestionExplanationRunDto, {
+            suppliedAnswer: { acceptedAnswers: ['42'] },
+            explanationLanguage,
+          }),
+        ),
+      ).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ property: 'explanationLanguage' }),
+        ]),
+      );
+    },
+  );
+
   it.each([
     { acceptedAnswers: [123] },
     { selectedOptionIndexes: [-1] },

@@ -1,4 +1,7 @@
-import { BadRequestException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { QuestionType, Role } from '../../common/types/roles.enum';
 import { QuestionAiExplanationsService } from './question-ai-explanations.service';
 
@@ -104,8 +107,126 @@ describe('Verified-answer explanation generation', () => {
       {} as any,
       client as any,
     );
-    return { service, client, prisma };
+    return { service, client, prisma, question };
   }
+
+  it.each(['ar', 'en', 'de', 'fr'] as const)(
+    'uses and retains explicit %s language',
+    async (explanationLanguage) => {
+      const { service, client } = setup(QuestionType.SHORT_ANSWER);
+      const run = await service.create(actor, 'question', {
+        suppliedAnswer: { acceptedAnswers: ['42'] },
+        explanationLanguage,
+        additionalContext: 'Use the substitution method.',
+      });
+      expect(client.generate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          languageCode: explanationLanguage,
+          additionalContext: 'Use the substitution method.',
+        }),
+      );
+      expect(run.languageCode).toBe(explanationLanguage);
+      expect(run.promptVersion).toBe('question-verified-answer-explanation-v3');
+    },
+  );
+
+  it('retains text detection when no language or metadata is supplied', async () => {
+    const { service } = setup(QuestionType.SHORT_ANSWER);
+    const run = await service.create(actor, 'question', {
+      suppliedAnswer: { acceptedAnswers: ['42'] },
+    });
+    expect(run.languageCode).toBe('en');
+  });
+
+  it('detects French from question block metadata', () => {
+    const { service } = setup(QuestionType.SHORT_ANSWER);
+    expect(
+      service['language']({
+        body: 'Question',
+        contentBlocks: [{ languageCode: 'fr', text: 'English terminology' }],
+      }),
+    ).toBe('fr');
+  });
+
+  it.each([
+    {
+      contentBlocks: [
+        { languageCode: 'ar', text: 'English scientific terminology' },
+      ],
+    },
+    {
+      options: [
+        {
+          body: 'English',
+          contentBlocks: [{ languageCode: 'ar', text: 'English terminology' }],
+        },
+      ],
+    },
+    {
+      contexts: [
+        { languageCode: 'ar', body: 'English passage', contentBlocks: [] },
+      ],
+    },
+    {
+      options: [
+        {
+          body: 'A',
+          contentBlocks: [
+            {
+              text: 'هذا هو نص الاختيار باللغة العربية وهو يتضمن شرحا تفصيليا للإجابة',
+            },
+          ],
+        },
+      ],
+    },
+  ])('detects language from metadata and option blocks: %j', (extra) => {
+    const { service } = setup(QuestionType.SHORT_ANSWER);
+    expect(service['language']({ body: 'Question', ...extra })).toBe('ar');
+  });
+
+  it('prefers question block metadata over shared-context metadata', () => {
+    const { service } = setup(QuestionType.SHORT_ANSWER);
+    expect(
+      service['language']({
+        contentBlocks: [{ languageCode: 'de' }],
+        contexts: [{ languageCode: 'en', contentBlocks: [] }],
+      }),
+    ).toBe('de');
+  });
+
+  it('falls back to question text when metadata is tied', () => {
+    const { service } = setup(QuestionType.SHORT_ANSWER);
+    expect(
+      service['language']({
+        body: 'هذا السؤال مكتوب باللغة العربية',
+        contentBlocks: [{ languageCode: 'ar' }, { languageCode: 'en' }],
+        contexts: [{ languageCode: 'en' }],
+      }),
+    ).toBe('ar');
+  });
+
+  it('retains a failed run with the selected language when generation fails', async () => {
+    const { service, client, prisma } = setup(QuestionType.SHORT_ANSWER);
+    client.generate.mockRejectedValue(
+      new ServiceUnavailableException(
+        'AI returned an explanation in the wrong language',
+      ),
+    );
+    await expect(
+      service.create(actor, 'question', {
+        suppliedAnswer: { acceptedAnswers: ['42'] },
+        explanationLanguage: 'ar',
+      }),
+    ).rejects.toThrow('AI returned an explanation in the wrong language');
+    expect(prisma.questionAiExplanationRun.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        status: 'FAILED',
+        languageCode: 'ar',
+        promptVersion: 'question-verified-answer-explanation-v3',
+      }),
+    });
+    expect(prisma.question.update).not.toHaveBeenCalled();
+  });
 
   it.each([
     [QuestionType.SINGLE_CHOICE, { selectedOptionIndexes: [0, 1] }],
