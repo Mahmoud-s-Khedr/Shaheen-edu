@@ -43,6 +43,7 @@ export {
   QuestionContextType,
   QuestionContentBlockType,
   QuestionExplanationOrigin,
+  QuestionExplanationFormat,
   QuestionAiExplanationRunMode,
   QuestionAiExplanationRunStatus,
   QuestionAnswerOrigin,

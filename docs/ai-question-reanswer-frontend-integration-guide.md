@@ -1,5 +1,7 @@
 # Verified Answer Explanation — Frontend Integration Guide
 
+> For dual-format explanation editors and proposed maximum points, follow the [Question Explanation Formats and Maximum Points frontend guide](question-explanation-formats-and-marks-frontend-integration-guide.md). It supersedes this document's six-section-only editing instructions.
+
 The re-answer route now generates an explanation only. An `ADMIN` or `SUPER_ADMIN` must first supply a verified answer; AI never infers, proposes, compares, or stores an answer.
 
 ```http

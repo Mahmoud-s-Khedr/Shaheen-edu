@@ -1,4 +1,11 @@
 import {
+  explanationEnvelope,
+  explanationPersistence,
+  isWrittenQuestion,
+  QuestionExplanationFormat,
+  renderStructuredExplanation,
+} from '../../common/utils/structured-explanation';
+import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
@@ -605,17 +612,41 @@ export class QuestionBanksService {
   }
   private renderExplanation(x?: any) {
     return x
-      ? [
-          x.keywords,
-          x.eliminationStrategy,
-          x.whyCorrect,
-          x.generalRule,
-          x.whatIf,
-          x.commonMistakes,
-        ]
-          .map((value) => value.trim())
-          .join('\n\n')
+      ? renderStructuredExplanation(
+          x,
+          x.structuredExplanationFormat ??
+            QuestionExplanationFormat.SIX_SECTION,
+        )
       : undefined;
+  }
+  private normalizeExplanation(
+    dto: {
+      structuredExplanation?: any;
+      structuredExplanationFormat?: QuestionExplanationFormat;
+    },
+    type: string,
+  ) {
+    if (
+      dto.structuredExplanationFormat !== undefined &&
+      !dto.structuredExplanation
+    )
+      throw new BadRequestException(
+        'Explanation format requires a structured explanation',
+      );
+    if (!dto.structuredExplanation) return;
+    const format =
+      dto.structuredExplanationFormat ?? QuestionExplanationFormat.SIX_SECTION;
+    if (
+      format === QuestionExplanationFormat.WRITTEN_FOUR_SECTION &&
+      !isWrittenQuestion(type)
+    )
+      throw new BadRequestException(
+        'Four-section explanations require a written question',
+      );
+    dto.structuredExplanation = explanationPersistence(
+      dto.structuredExplanation,
+      format,
+    );
   }
   private async invalidateStructuredExplanation(questionId: string) {
     await this.prisma.questionExplanation.updateMany({
@@ -779,6 +810,7 @@ export class QuestionBanksService {
   }
   async createQuestion(actor: RequestUser, dto: CreateQuestionDto) {
     this.admin(actor);
+    this.normalizeExplanation(dto, dto.type ?? QuestionType.SINGLE_CHOICE);
     await Promise.all([
       this.source(dto.sourceId),
       this.bank(dto.bankId),
@@ -1216,6 +1248,7 @@ export class QuestionBanksService {
     this.admin(actor);
     const old = await this.question(id);
     this.editable(old.status);
+    this.normalizeExplanation(dto, dto.type ?? old.type);
     this.rejectUnsafeLegacyBodyUpdate(
       dto.body,
       dto.contentBlocks,
@@ -1338,6 +1371,9 @@ export class QuestionBanksService {
         dto.gradingRubric,
         dto.explanation,
         dto.answerOrigin,
+        ...(isWrittenQuestion(old.type) && dto.maxPoints !== old.maxPoints
+          ? [dto.maxPoints]
+          : []),
       ].some((value) => value !== undefined)
     )
       await this.invalidateStructuredExplanation(id);
@@ -2058,6 +2094,7 @@ export class QuestionBanksService {
   private adminDto(x: any) {
     return {
       ...x,
+      ...explanationEnvelope(x.structuredExplanation),
       bankName: x.bank?.title ?? null,
       ...(x.source ? { source: this.sourceDto(x.source) } : {}),
       scope: {

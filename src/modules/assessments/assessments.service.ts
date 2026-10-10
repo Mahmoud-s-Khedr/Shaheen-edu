@@ -1,4 +1,9 @@
 import {
+  allExplanationFields,
+  explanationEnvelope,
+  QuestionExplanationFormat,
+} from '../../common/utils/structured-explanation';
+import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
@@ -744,21 +749,26 @@ export class AssessmentsService {
               languageCode: block.languageCode,
             })),
           },
+          structuredExplanationFormat:
+            question.structuredExplanation?.structuredExplanationFormat ??
+            QuestionExplanationFormat.SIX_SECTION,
           structuredExplanation: question.structuredExplanation
-            ? {
-                languageCode: question.structuredExplanation.languageCode,
-                keywords: question.structuredExplanation.keywords,
-                eliminationStrategy:
-                  question.structuredExplanation.eliminationStrategy,
-                whyCorrect: question.structuredExplanation.whyCorrect,
-                generalRule: question.structuredExplanation.generalRule,
-                whatIf: question.structuredExplanation.whatIf,
-                commonMistakes: question.structuredExplanation.commonMistakes,
-                origin: question.structuredExplanation.origin,
-                confidence: question.structuredExplanation.confidence,
-                answerOrigin: question.structuredExplanation.answerOrigin,
-                warnings: question.structuredExplanation.warnings,
-              }
+            ? explanationEnvelope(
+                {
+                  languageCode: question.structuredExplanation.languageCode,
+                  ...Object.fromEntries(
+                    allExplanationFields.map((key) => [
+                      key,
+                      question.structuredExplanation[key],
+                    ]),
+                  ),
+                  origin: question.structuredExplanation.origin,
+                  confidence: question.structuredExplanation.confidence,
+                  answerOrigin: question.structuredExplanation.answerOrigin,
+                  warnings: question.structuredExplanation.warnings,
+                },
+                question.structuredExplanation.structuredExplanationFormat,
+              ).structuredExplanation
             : undefined,
           options: {
             create: question.options.map((option: any, index: number) => ({
@@ -2927,9 +2937,16 @@ export class AssessmentsService {
             ? q.options.filter((o) => o.isCorrect).map((o) => o.id)
             : null,
           explanation: showAnswer
-            ? formatStudentExplanation(q.explanation, q.structuredExplanation)
+            ? formatStudentExplanation(
+                q.explanation,
+                q.structuredExplanation,
+                q.structuredExplanationFormat,
+              )
             : null,
-          structuredExplanation: showAnswer ? q.structuredExplanation : null,
+          ...explanationEnvelope(
+            showAnswer ? q.structuredExplanation : null,
+            q.structuredExplanationFormat,
+          ),
         };
       }),
     };
@@ -3172,6 +3189,7 @@ export class AssessmentsService {
           ? formatStudentExplanation(
               question.explanation,
               question.structuredExplanation,
+              question.structuredExplanationFormat,
             )
           : null,
     };
@@ -3179,7 +3197,7 @@ export class AssessmentsService {
 
   async pendingAiGrades(actor: RequestUser) {
     this.assertAdmin(actor);
-    return this.prisma.assessmentAttemptAnswer.findMany({
+    const answers = await this.prisma.assessmentAttemptAnswer.findMany({
       where: { outcome: AssessmentQuestionOutcome.PENDING_AI_GRADING },
       include: {
         attempt: {
@@ -3193,6 +3211,16 @@ export class AssessmentsService {
       },
       orderBy: { answeredAt: 'asc' },
     });
+    return answers.map((answer) => ({
+      ...answer,
+      assessmentQuestion: {
+        ...answer.assessmentQuestion,
+        ...explanationEnvelope(
+          answer.assessmentQuestion.structuredExplanation,
+          answer.assessmentQuestion.structuredExplanationFormat,
+        ),
+      },
+    }));
   }
 
   /** Retry a failed/awaiting AI proposal for one written answer. Failed run
@@ -3603,6 +3631,7 @@ export class AssessmentsService {
           explanation: formatStudentExplanation(
             q.explanation,
             q.structuredExplanation,
+            q.structuredExplanationFormat,
           ),
           options: q.options.map((o) => ({
             id: o.id,

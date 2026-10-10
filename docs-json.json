@@ -24075,7 +24075,113 @@
         },
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "structuredExplanationFormat": {
+                      "type": "string",
+                      "enum": [
+                        "SIX_SECTION",
+                        "WRITTEN_FOUR_SECTION"
+                      ],
+                      "nullable": true,
+                      "description": "Sibling of structuredExplanation; both are null when absent or hidden. Older records default to SIX_SECTION."
+                    },
+                    "structuredExplanation": {
+                      "nullable": true,
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "additionalProperties": true,
+                          "required": [
+                            "keywords",
+                            "eliminationStrategy",
+                            "whyCorrect",
+                            "generalRule",
+                            "whatIf",
+                            "commonMistakes"
+                          ],
+                          "properties": {
+                            "keywords": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 10000
+                            },
+                            "eliminationStrategy": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 10000
+                            },
+                            "whyCorrect": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 10000
+                            },
+                            "generalRule": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 10000
+                            },
+                            "whatIf": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 10000
+                            },
+                            "commonMistakes": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 10000
+                            }
+                          }
+                        },
+                        {
+                          "type": "object",
+                          "additionalProperties": true,
+                          "required": [
+                            "answerElements",
+                            "scientificExplanation",
+                            "commonMistakes",
+                            "whatIf"
+                          ],
+                          "properties": {
+                            "answerElements": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 10000
+                            },
+                            "scientificExplanation": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 10000
+                            },
+                            "commonMistakes": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 10000
+                            },
+                            "whatIf": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 10000
+                            }
+                          }
+                        }
+                      ],
+                      "description": "Active educational sections plus existing explanation metadata; never contains the format."
+                    },
+                    "proposedMaxPoints": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "nullable": true,
+                      "description": "Maximum points used for generation; saved with applyAnswer=true. Null for legacy runs."
+                    }
+                  }
+                }
+              }
+            }
           }
         },
         "security": [
@@ -24102,7 +24208,116 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "structuredExplanationFormat": {
+                        "type": "string",
+                        "enum": [
+                          "SIX_SECTION",
+                          "WRITTEN_FOUR_SECTION"
+                        ],
+                        "nullable": true,
+                        "description": "Sibling of structuredExplanation; both are null when absent or hidden. Older records default to SIX_SECTION."
+                      },
+                      "structuredExplanation": {
+                        "nullable": true,
+                        "oneOf": [
+                          {
+                            "type": "object",
+                            "additionalProperties": true,
+                            "required": [
+                              "keywords",
+                              "eliminationStrategy",
+                              "whyCorrect",
+                              "generalRule",
+                              "whatIf",
+                              "commonMistakes"
+                            ],
+                            "properties": {
+                              "keywords": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 10000
+                              },
+                              "eliminationStrategy": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 10000
+                              },
+                              "whyCorrect": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 10000
+                              },
+                              "generalRule": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 10000
+                              },
+                              "whatIf": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 10000
+                              },
+                              "commonMistakes": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 10000
+                              }
+                            }
+                          },
+                          {
+                            "type": "object",
+                            "additionalProperties": true,
+                            "required": [
+                              "answerElements",
+                              "scientificExplanation",
+                              "commonMistakes",
+                              "whatIf"
+                            ],
+                            "properties": {
+                              "answerElements": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 10000
+                              },
+                              "scientificExplanation": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 10000
+                              },
+                              "commonMistakes": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 10000
+                              },
+                              "whatIf": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 10000
+                              }
+                            }
+                          }
+                        ],
+                        "description": "Active educational sections plus existing explanation metadata; never contains the format."
+                      },
+                      "proposedMaxPoints": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "nullable": true,
+                        "description": "Maximum points used for generation; saved with applyAnswer=true. Null for legacy runs."
+                      }
+                    }
+                  }
+                }
+              }
+            }
           }
         },
         "security": [
@@ -24139,7 +24354,113 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "structuredExplanationFormat": {
+                      "type": "string",
+                      "enum": [
+                        "SIX_SECTION",
+                        "WRITTEN_FOUR_SECTION"
+                      ],
+                      "nullable": true,
+                      "description": "Sibling of structuredExplanation; both are null when absent or hidden. Older records default to SIX_SECTION."
+                    },
+                    "structuredExplanation": {
+                      "nullable": true,
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "additionalProperties": true,
+                          "required": [
+                            "keywords",
+                            "eliminationStrategy",
+                            "whyCorrect",
+                            "generalRule",
+                            "whatIf",
+                            "commonMistakes"
+                          ],
+                          "properties": {
+                            "keywords": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 10000
+                            },
+                            "eliminationStrategy": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 10000
+                            },
+                            "whyCorrect": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 10000
+                            },
+                            "generalRule": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 10000
+                            },
+                            "whatIf": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 10000
+                            },
+                            "commonMistakes": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 10000
+                            }
+                          }
+                        },
+                        {
+                          "type": "object",
+                          "additionalProperties": true,
+                          "required": [
+                            "answerElements",
+                            "scientificExplanation",
+                            "commonMistakes",
+                            "whatIf"
+                          ],
+                          "properties": {
+                            "answerElements": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 10000
+                            },
+                            "scientificExplanation": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 10000
+                            },
+                            "commonMistakes": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 10000
+                            },
+                            "whatIf": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 10000
+                            }
+                          }
+                        }
+                      ],
+                      "description": "Active educational sections plus existing explanation metadata; never contains the format."
+                    },
+                    "proposedMaxPoints": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "nullable": true,
+                      "description": "Maximum points used for generation; saved with applyAnswer=true. Null for legacy runs."
+                    }
+                  }
+                }
+              }
+            }
           }
         },
         "security": [
@@ -24186,7 +24507,107 @@
         },
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "structuredExplanationFormat": {
+                      "type": "string",
+                      "enum": [
+                        "SIX_SECTION",
+                        "WRITTEN_FOUR_SECTION"
+                      ],
+                      "nullable": true,
+                      "description": "Sibling of structuredExplanation; both are null when absent or hidden. Older records default to SIX_SECTION."
+                    },
+                    "structuredExplanation": {
+                      "nullable": true,
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "additionalProperties": true,
+                          "required": [
+                            "keywords",
+                            "eliminationStrategy",
+                            "whyCorrect",
+                            "generalRule",
+                            "whatIf",
+                            "commonMistakes"
+                          ],
+                          "properties": {
+                            "keywords": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 10000
+                            },
+                            "eliminationStrategy": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 10000
+                            },
+                            "whyCorrect": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 10000
+                            },
+                            "generalRule": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 10000
+                            },
+                            "whatIf": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 10000
+                            },
+                            "commonMistakes": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 10000
+                            }
+                          }
+                        },
+                        {
+                          "type": "object",
+                          "additionalProperties": true,
+                          "required": [
+                            "answerElements",
+                            "scientificExplanation",
+                            "commonMistakes",
+                            "whatIf"
+                          ],
+                          "properties": {
+                            "answerElements": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 10000
+                            },
+                            "scientificExplanation": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 10000
+                            },
+                            "commonMistakes": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 10000
+                            },
+                            "whatIf": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 10000
+                            }
+                          }
+                        }
+                      ],
+                      "description": "Active educational sections plus existing explanation metadata; never contains the format."
+                    }
+                  }
+                }
+              }
+            }
           }
         },
         "security": [
@@ -24233,7 +24654,113 @@
         },
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "structuredExplanationFormat": {
+                      "type": "string",
+                      "enum": [
+                        "SIX_SECTION",
+                        "WRITTEN_FOUR_SECTION"
+                      ],
+                      "nullable": true,
+                      "description": "Sibling of structuredExplanation; both are null when absent or hidden. Older records default to SIX_SECTION."
+                    },
+                    "structuredExplanation": {
+                      "nullable": true,
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "additionalProperties": true,
+                          "required": [
+                            "keywords",
+                            "eliminationStrategy",
+                            "whyCorrect",
+                            "generalRule",
+                            "whatIf",
+                            "commonMistakes"
+                          ],
+                          "properties": {
+                            "keywords": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 10000
+                            },
+                            "eliminationStrategy": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 10000
+                            },
+                            "whyCorrect": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 10000
+                            },
+                            "generalRule": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 10000
+                            },
+                            "whatIf": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 10000
+                            },
+                            "commonMistakes": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 10000
+                            }
+                          }
+                        },
+                        {
+                          "type": "object",
+                          "additionalProperties": true,
+                          "required": [
+                            "answerElements",
+                            "scientificExplanation",
+                            "commonMistakes",
+                            "whatIf"
+                          ],
+                          "properties": {
+                            "answerElements": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 10000
+                            },
+                            "scientificExplanation": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 10000
+                            },
+                            "commonMistakes": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 10000
+                            },
+                            "whatIf": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 10000
+                            }
+                          }
+                        }
+                      ],
+                      "description": "Active educational sections plus existing explanation metadata; never contains the format."
+                    },
+                    "proposedMaxPoints": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "nullable": true,
+                      "description": "Maximum points used for generation; saved with applyAnswer=true. Null for legacy runs."
+                    }
+                  }
+                }
+              }
+            }
           }
         },
         "security": [
@@ -29965,6 +30492,12 @@
           "generalRule": {
             "type": "string"
           },
+          "answerElements": {
+            "type": "string"
+          },
+          "scientificExplanation": {
+            "type": "string"
+          },
           "whatIf": {
             "type": "string"
           },
@@ -29973,10 +30506,6 @@
           }
         },
         "required": [
-          "keywords",
-          "eliminationStrategy",
-          "whyCorrect",
-          "generalRule",
           "whatIf",
           "commonMistakes"
         ]
@@ -30028,7 +30557,97 @@
             }
           },
           "structuredExplanation": {
-            "$ref": "#/components/schemas/QuestionExplanationDto"
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "keywords",
+                  "eliminationStrategy",
+                  "whyCorrect",
+                  "generalRule",
+                  "whatIf",
+                  "commonMistakes"
+                ],
+                "properties": {
+                  "keywords": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 10000
+                  },
+                  "eliminationStrategy": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 10000
+                  },
+                  "whyCorrect": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 10000
+                  },
+                  "generalRule": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 10000
+                  },
+                  "whatIf": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 10000
+                  },
+                  "commonMistakes": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 10000
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "answerElements",
+                  "scientificExplanation",
+                  "commonMistakes",
+                  "whatIf"
+                ],
+                "properties": {
+                  "answerElements": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 10000
+                  },
+                  "scientificExplanation": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 10000
+                  },
+                  "commonMistakes": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 10000
+                  },
+                  "whatIf": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 10000
+                  }
+                }
+              }
+            ],
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/QuestionExplanationDto"
+              }
+            ]
+          },
+          "structuredExplanationFormat": {
+            "type": "string",
+            "enum": [
+              "SIX_SECTION",
+              "WRITTEN_FOUR_SECTION"
+            ],
+            "description": "Sibling of structuredExplanation. Required for WRITTEN_FOUR_SECTION; legacy requests default to SIX_SECTION."
           },
           "maxPoints": {
             "type": "number",
@@ -30166,7 +30785,97 @@
             }
           },
           "structuredExplanation": {
-            "$ref": "#/components/schemas/QuestionExplanationDto"
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "keywords",
+                  "eliminationStrategy",
+                  "whyCorrect",
+                  "generalRule",
+                  "whatIf",
+                  "commonMistakes"
+                ],
+                "properties": {
+                  "keywords": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 10000
+                  },
+                  "eliminationStrategy": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 10000
+                  },
+                  "whyCorrect": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 10000
+                  },
+                  "generalRule": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 10000
+                  },
+                  "whatIf": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 10000
+                  },
+                  "commonMistakes": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 10000
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "answerElements",
+                  "scientificExplanation",
+                  "commonMistakes",
+                  "whatIf"
+                ],
+                "properties": {
+                  "answerElements": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 10000
+                  },
+                  "scientificExplanation": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 10000
+                  },
+                  "commonMistakes": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 10000
+                  },
+                  "whatIf": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 10000
+                  }
+                }
+              }
+            ],
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/QuestionExplanationDto"
+              }
+            ]
+          },
+          "structuredExplanationFormat": {
+            "type": "string",
+            "enum": [
+              "SIX_SECTION",
+              "WRITTEN_FOUR_SECTION"
+            ],
+            "description": "Sibling of structuredExplanation. Required for WRITTEN_FOUR_SECTION; legacy requests default to SIX_SECTION."
           },
           "maxPoints": {
             "type": "number",
@@ -32546,6 +33255,14 @@
             "type": "object",
             "nullable": true
           },
+          "structuredExplanationFormat": {
+            "type": "string",
+            "enum": [
+              "SIX_SECTION",
+              "WRITTEN_FOUR_SECTION"
+            ],
+            "nullable": true
+          },
           "outcome": {
             "type": "string",
             "nullable": true
@@ -32571,7 +33288,8 @@
           "options",
           "selectedOptionIds",
           "maxPoints",
-          "answered"
+          "answered",
+          "structuredExplanationFormat"
         ]
       },
       "AssessmentAttemptStateDto": {
@@ -33887,6 +34605,21 @@
       "CreateAiQuestionExplanationRunDto": {
         "type": "object",
         "properties": {
+          "maxPoints": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Proposed maximum points. Omission uses the saved question score. Saved only when this run is approved with applyAnswer=true."
+          },
+          "explanationLanguage": {
+            "type": "string",
+            "enum": [
+              "ar",
+              "en",
+              "de",
+              "fr"
+            ],
+            "description": "Explanation language. Takes priority over automatic detection and additionalContext."
+          },
           "suppliedAnswer": {
             "description": "Verified answer supplied by an administrator. AI uses it only to generate an explanation.",
             "allOf": [
@@ -33896,7 +34629,8 @@
             ]
           },
           "additionalContext": {
-            "type": "string"
+            "type": "string",
+            "description": "Teaching preferences, such as method, level, or terminology. Cannot override the verified answer or explanationLanguage."
           }
         },
         "required": [
@@ -33913,12 +34647,98 @@
             "type": "boolean"
           },
           "structuredExplanation": {
-            "description": "Complete administrator-edited explanation, with all six sections. Requires applyExplanation=true. Omit to approve the generated explanation unchanged.",
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "keywords",
+                  "eliminationStrategy",
+                  "whyCorrect",
+                  "generalRule",
+                  "whatIf",
+                  "commonMistakes"
+                ],
+                "properties": {
+                  "keywords": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 10000
+                  },
+                  "eliminationStrategy": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 10000
+                  },
+                  "whyCorrect": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 10000
+                  },
+                  "generalRule": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 10000
+                  },
+                  "whatIf": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 10000
+                  },
+                  "commonMistakes": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 10000
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "answerElements",
+                  "scientificExplanation",
+                  "commonMistakes",
+                  "whatIf"
+                ],
+                "properties": {
+                  "answerElements": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 10000
+                  },
+                  "scientificExplanation": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 10000
+                  },
+                  "commonMistakes": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 10000
+                  },
+                  "whatIf": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 10000
+                  }
+                }
+              }
+            ],
+            "description": "Complete administrator-edited explanation, with all sections of the stored run format. Requires applyExplanation=true. Omit to approve the generated explanation unchanged.",
             "allOf": [
               {
                 "$ref": "#/components/schemas/QuestionExplanationDto"
               }
             ]
+          },
+          "structuredExplanationFormat": {
+            "type": "string",
+            "enum": [
+              "SIX_SECTION",
+              "WRITTEN_FOUR_SECTION"
+            ],
+            "description": "Must match the stored run; omission uses the run format."
           },
           "note": {
             "type": "string"

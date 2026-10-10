@@ -6689,9 +6689,8 @@ No path, query, or header input.
 
 **Authorization:** Bearer token; role must be `ADMIN` or `SUPER_ADMIN`
 
-Creates one retained AI answer-and-explanation review run. `INFER` asks AI to
-propose the answer; `GROUNDED` requires the admin-supplied answer and uses it as
-the authoritative answer while generating the explanation.
+Creates a retained explanation review run grounded in the required verified
+administrator-supplied answer. AI generation does not change the saved answer.
 
 **Request**
 
@@ -6699,8 +6698,9 @@ the authoritative answer while generating the explanation.
 
 ```json
 {
-  "mode": "INFER | GROUNDED",
-  "suppliedAnswer?": {
+  "explanationLanguage?": "ar | en | de | fr",
+  "maxPoints?": "integer >= 1",
+  "suppliedAnswer": {
     "selectedOptionIndexes?": [0],
     "acceptedAnswers?": ["string"],
     "gradingRubric?": "string"
@@ -6709,16 +6709,25 @@ the authoritative answer while generating the explanation.
 }
 ```
 
-For `GROUNDED`, provide exactly the answer format that matches the question:
+Optional `maxPoints` proposes a new maximum score for generation; omission uses
+saved marks. It must be an integer >= 1; null is rejected. The question is only
+updated on approval with `applyAnswer=true`. Runs expose `proposedMaxPoints`
+(null for older runs). Explanation-only approval requires matching saved marks.
+
+Provide exactly the answer format that matches the question:
 `selectedOptionIndexes` for choice questions, `acceptedAnswers` for written
-questions, or `gradingRubric` for long-answer questions. Do not provide
-`suppliedAnswer` with `INFER`.
+questions, or `gradingRubric` for long-answer questions.
 
 **Success response — HTTP 201**
 
 Returns the retained `QuestionAiExplanationRun`, including its proposed answer,
-six-part structured explanation, confidence, warnings, model metadata, and
-`PENDING_REVIEW` status.
+format-aware structured explanation, confidence, warnings, model metadata, and
+`PENDING_REVIEW` status. `structuredExplanationFormat` is always beside
+`structuredExplanation`: `WRITTEN_FOUR_SECTION` uses `answerElements`,
+`scientificExplanation`, `commonMistakes`, and `whatIf` for written questions;
+`SIX_SECTION` retains the existing choice sections. Legacy written explanations
+can remain `SIX_SECTION`. Both fields are null when no explanation is available.
+See [format contracts and approval-edit examples](ai-question-import-explanation-integration-guide.md#verified-answer-explanation-formats).
 
 ### `GET /api/v1/admin/questions/{questionId}/ai/re-answer`
 
@@ -6763,6 +6772,8 @@ archives the original question.
 {
   "applyAnswer": "boolean",
   "applyExplanation": "boolean",
+  "structuredExplanationFormat?": "SIX_SECTION | WRITTEN_FOUR_SECTION",
+  "structuredExplanation?": "Complete sections matching the stored run format",
   "note?": "string"
 }
 ```

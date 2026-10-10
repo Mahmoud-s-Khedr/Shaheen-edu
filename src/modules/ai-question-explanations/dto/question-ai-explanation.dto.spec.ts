@@ -116,3 +116,23 @@ describe('ApplyAiQuestionExplanationRunDto', () => {
     },
   );
 });
+
+describe('AI explanation proposed maximum points', () => {
+  it.each([undefined, 1, 5])('accepts %s', async (maxPoints) => {
+    const dto = plainToInstance(CreateAiQuestionExplanationRunDto, {
+      suppliedAnswer: { acceptedAnswers: ['42'] },
+      maxPoints,
+    });
+    expect(await validate(dto)).toEqual([]);
+  });
+
+  it.each([null, 0, -1, 1.5])('rejects %s', async (maxPoints) => {
+    const dto = plainToInstance(CreateAiQuestionExplanationRunDto, {
+      suppliedAnswer: { acceptedAnswers: ['42'] },
+      maxPoints,
+    });
+    expect((await validate(dto)).map((error) => error.property)).toContain(
+      'maxPoints',
+    );
+  });
+});

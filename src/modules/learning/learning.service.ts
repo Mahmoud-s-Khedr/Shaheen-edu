@@ -1,3 +1,4 @@
+import { explanationEnvelope } from '../../common/utils/structured-explanation';
 import {
   BadRequestException,
   ConflictException,
@@ -912,8 +913,9 @@ export class LearningService {
       explanation: formatStudentExplanation(
         question.explanation,
         question.structuredExplanation,
+        question.structuredExplanation?.structuredExplanationFormat,
       ),
-      structuredExplanation: question.structuredExplanation,
+      ...explanationEnvelope(question.structuredExplanation),
       submittedAt: attempt.submittedAt,
     };
   }

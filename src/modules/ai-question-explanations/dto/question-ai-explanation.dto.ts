@@ -1,3 +1,7 @@
+import {
+  explanationObjectSchemas,
+  QuestionExplanationFormat,
+} from '../../../common/utils/structured-explanation';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
@@ -7,6 +11,7 @@ import {
   IsBoolean,
   IsDefined,
   IsInt,
+  IsEnum,
   IsIn,
   IsNotEmpty,
   IsObject,
@@ -49,6 +54,17 @@ export class AiQuestionAnswerDto {
 
 export class CreateAiQuestionExplanationRunDto {
   @ApiPropertyOptional({
+    type: 'integer',
+    minimum: 1,
+    description:
+      'Proposed maximum points. Omission uses the saved question score. Saved only when this run is approved with applyAnswer=true.',
+  })
+  @ValidateIf((_object, value) => value !== undefined)
+  @IsInt()
+  @Min(1)
+  maxPoints?: number;
+
+  @ApiPropertyOptional({
     enum: ['ar', 'en', 'de', 'fr'],
     description:
       'Explanation language. Takes priority over automatic detection and additionalContext.',
@@ -82,15 +98,23 @@ export class ApplyAiQuestionExplanationRunDto {
   @ApiProperty() @IsBoolean() applyAnswer!: boolean;
   @ApiProperty() @IsBoolean() applyExplanation!: boolean;
   @ApiPropertyOptional({
-    type: QuestionExplanationDto,
+    oneOf: explanationObjectSchemas,
     description:
-      'Complete administrator-edited explanation, with all six sections. Requires applyExplanation=true. Omit to approve the generated explanation unchanged.',
+      'Complete administrator-edited explanation, with all sections of the stored run format. Requires applyExplanation=true. Omit to approve the generated explanation unchanged.',
   })
   @ValidateIf((_object, value) => value !== undefined)
   @IsObject()
   @ValidateNested()
   @Type(() => QuestionExplanationDto)
   structuredExplanation?: QuestionExplanationDto;
+
+  @ApiPropertyOptional({
+    enum: QuestionExplanationFormat,
+    description: 'Must match the stored run; omission uses the run format.',
+  })
+  @IsOptional()
+  @IsEnum(QuestionExplanationFormat)
+  structuredExplanationFormat?: QuestionExplanationFormat;
 
   @ApiPropertyOptional()
   @IsOptional()

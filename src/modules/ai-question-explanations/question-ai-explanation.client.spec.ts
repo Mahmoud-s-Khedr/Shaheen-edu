@@ -1,3 +1,7 @@
+import {
+  explanationFields,
+  formatForQuestion,
+} from '../../common/utils/structured-explanation';
 import { QuestionAiExplanationClient } from './question-ai-explanation.client';
 
 describe('QuestionAiExplanationClient', () => {
@@ -15,6 +19,7 @@ describe('QuestionAiExplanationClient', () => {
               content: JSON.stringify({
                 confidence: 0.9,
                 warnings: [],
+                structuredExplanationFormat: 'SIX_SECTION',
                 structuredExplanation: {
                   keywords: 'k',
                   eliminationStrategy: 's',
@@ -51,6 +56,7 @@ describe('QuestionAiExplanationClient', () => {
                 content: JSON.stringify({
                   confidence: 0.9,
                   warnings: [],
+                  structuredExplanationFormat: 'SIX_SECTION',
                   structuredExplanation: {
                     keywords: 'k',
                     eliminationStrategy: 's',
@@ -123,6 +129,169 @@ describe('QuestionAiExplanationClient', () => {
       });
     },
   );
+
+  it.each([
+    'SINGLE_CHOICE',
+    'MULTIPLE_CHOICE',
+    'SHORT_ANSWER',
+    'FILL_IN_THE_BLANK',
+    'LONG_ANSWER',
+  ])('selects strict schema and marking guidance for %s', async (type) => {
+    const format = formatForQuestion(type);
+    const result = {
+      confidence: 0.95,
+      warnings: [],
+      structuredExplanationFormat: format,
+      structuredExplanation: Object.fromEntries(
+        explanationFields(format).map((key) => [key, 'Content']),
+      ),
+    };
+    const spy = jest
+      .spyOn(global, 'fetch')
+      .mockResolvedValue({
+        ok: true,
+        text: async () =>
+          JSON.stringify({
+            choices: [{ message: { content: JSON.stringify(result) } }],
+          }),
+      } as any);
+    await new QuestionAiExplanationClient(config).generate({
+      languageCode: 'en',
+      question: { type },
+      maxPoints: 5,
+      suppliedAnswer:
+        type === 'LONG_ANSWER'
+          ? {
+              gradingRubric:
+                'Explain the concept (2 marks) and apply it (3 marks).',
+            }
+          : { acceptedAnswers: ['Content'] },
+      images: [],
+    });
+    const request = JSON.parse(spy.mock.calls[0][1]!.body as string);
+    const schema = request.response_format.json_schema.schema;
+    expect(schema.properties.structuredExplanationFormat.enum).toEqual([
+      format,
+    ]);
+    expect(schema.properties.structuredExplanation.required).toEqual(
+      explanationFields(format),
+    );
+    expect(
+      schema.properties.structuredExplanation.properties,
+    ).not.toHaveProperty('structuredExplanationFormat');
+    expect(JSON.parse(request.messages[1].content).maxPoints).toBe(5);
+    if (format === 'WRITTEN_FOUR_SECTION') {
+      expect(request.messages[0].content).toContain(
+        'Without explicit numerical allocations',
+      );
+      expect(request.messages[0].content).toContain(
+        'Warn if supplied allocations conflict with maxPoints',
+      );
+      expect(request.messages[0].content).toContain(
+        'Never invent marking criteria',
+      );
+    }
+  });
+  it.each([
+    {
+      answerElements: 'Answer',
+      scientificExplanation: 'Concept',
+      commonMistakes: 'Mistakes',
+      whatIf: 'Variation',
+      keywords: 'Mixed',
+    },
+    {
+      answerElements: 'Answer',
+      scientificExplanation: ' ',
+      commonMistakes: 'Mistakes',
+      whatIf: 'Variation',
+    },
+  ])(
+    'rejects invalid provider written sections',
+    async (structuredExplanation) => {
+      jest
+        .spyOn(global, 'fetch')
+        .mockResolvedValue({
+          ok: true,
+          text: async () =>
+            JSON.stringify({
+              choices: [
+                {
+                  message: {
+                    content: JSON.stringify({
+                      confidence: 1,
+                      warnings: [],
+                      structuredExplanationFormat: 'WRITTEN_FOUR_SECTION',
+                      structuredExplanation,
+                    }),
+                  },
+                },
+              ],
+            }),
+        } as any);
+      await expect(
+        new QuestionAiExplanationClient(config).generate({
+          languageCode: 'en',
+          question: { type: 'LONG_ANSWER' },
+          suppliedAnswer: { gradingRubric: 'Explain.' },
+          images: [],
+        }),
+      ).rejects.toThrow('AI explanation request failed');
+    },
+  );
+  it('rejects provider format disagreement', async () => {
+    jest
+      .spyOn(global, 'fetch')
+      .mockResolvedValue(providerResponse('Short') as any);
+    await expect(
+      new QuestionAiExplanationClient(config).generate({
+        languageCode: 'en',
+        question: { type: 'SHORT_ANSWER' },
+        suppliedAnswer: { acceptedAnswers: ['4'] },
+        images: [],
+      }),
+    ).rejects.toThrow('invalid explanation format');
+  });
+  it('retries mismatched scientificExplanation and preserves image input', async () => {
+    const response = (scientificExplanation: string) => ({
+      ok: true,
+      text: async () =>
+        JSON.stringify({
+          choices: [
+            {
+              message: {
+                content: JSON.stringify({
+                  confidence: 1,
+                  warnings: [],
+                  structuredExplanationFormat: 'WRITTEN_FOUR_SECTION',
+                  structuredExplanation: {
+                    answerElements: '4',
+                    scientificExplanation,
+                    commonMistakes: 'm',
+                    whatIf: 'w',
+                  },
+                }),
+              },
+            },
+          ],
+        }),
+    });
+    const spy = jest
+      .spyOn(global, 'fetch')
+      .mockResolvedValueOnce(response(english) as any)
+      .mockResolvedValueOnce(response(arabic) as any);
+    await new QuestionAiExplanationClient(config).generate({
+      languageCode: 'ar',
+      question: { type: 'SHORT_ANSWER' },
+      suppliedAnswer: { acceptedAnswers: ['4'] },
+      images: [{ mimeType: 'image/png', data: Buffer.from('image') }],
+    });
+    expect(spy).toHaveBeenCalledTimes(2);
+    const request = JSON.parse(spy.mock.calls[1][1]!.body as string);
+    expect(request.messages[1].content[1].image_url.url).toBe(
+      'data:image/png;base64,aW1hZ2U=',
+    );
+  });
 
   it('retries English output requested in Arabic and accounts for both calls', async () => {
     const spy = jest

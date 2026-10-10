@@ -1,4 +1,8 @@
 import {
+  formatForQuestion,
+  QuestionExplanationFormat,
+} from '../../common/utils/structured-explanation';
+import {
   BadRequestException,
   ServiceUnavailableException,
 } from '@nestjs/common';
@@ -64,6 +68,7 @@ describe('Verified-answer explanation generation', () => {
       id: 'question',
       type,
       body: 'Question',
+      maxPoints: 5,
       status: 'DRAFT',
       options: [
         { body: 'A', isCorrect: false, contentBlocks: [] },
@@ -83,7 +88,17 @@ describe('Verified-answer explanation generation', () => {
     const client = {
       generate: jest.fn().mockResolvedValue({
         result: {
-          structuredExplanation: explanation,
+          structuredExplanationFormat: formatForQuestion(type),
+          structuredExplanation:
+            formatForQuestion(type) ===
+            QuestionExplanationFormat.WRITTEN_FOUR_SECTION
+              ? {
+                  answerElements: '42',
+                  scientificExplanation: 'Reason',
+                  commonMistakes: 'Mistakes',
+                  whatIf: 'Change',
+                }
+              : explanation,
           confidence: 1,
           warnings: [],
         },
@@ -126,9 +141,51 @@ describe('Verified-answer explanation generation', () => {
         }),
       );
       expect(run.languageCode).toBe(explanationLanguage);
-      expect(run.promptVersion).toBe('question-verified-answer-explanation-v3');
+      expect(run.promptVersion).toBe('question-verified-answer-explanation-v4');
     },
   );
+
+  it.each([undefined, 8])(
+    'generates with proposed marks %s without saving the question',
+    async (maxPoints) => {
+      const { service, client, prisma, question } = setup(
+        QuestionType.SHORT_ANSWER,
+      );
+      const run = await service.create(actor, question.id, {
+        suppliedAnswer: { acceptedAnswers: ['42'] },
+        maxPoints,
+      });
+      const effective = maxPoints ?? 5;
+      expect(client.generate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          maxPoints: effective,
+          question: expect.objectContaining({ maxPoints: effective }),
+        }),
+      );
+      expect(run.proposedMaxPoints).toBe(effective);
+      expect(run.questionSnapshot).toMatchObject({ maxPoints: 5 });
+      expect(run.sourceFingerprint).toBe(
+        service['fingerprint'](service['snapshot'](question)),
+      );
+      expect(prisma.question.update).not.toHaveBeenCalled();
+      expect(question.maxPoints).toBe(5);
+    },
+  );
+
+  it('retains proposed marks on failed generation', async () => {
+    const { service, client, prisma } = setup(QuestionType.LONG_ANSWER);
+    client.generate.mockRejectedValueOnce(new Error('Provider failed'));
+    await expect(
+      service.create(actor, 'question', {
+        suppliedAnswer: { gradingRubric: 'Explain.' },
+        maxPoints: 8,
+      }),
+    ).rejects.toThrow('Provider failed');
+    expect(prisma.questionAiExplanationRun.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ status: 'FAILED', proposedMaxPoints: 8 }),
+    });
+    expect(prisma.question.update).not.toHaveBeenCalled();
+  });
 
   it('retains text detection when no language or metadata is supplied', async () => {
     const { service } = setup(QuestionType.SHORT_ANSWER);
@@ -222,7 +279,7 @@ describe('Verified-answer explanation generation', () => {
       data: expect.objectContaining({
         status: 'FAILED',
         languageCode: 'ar',
-        promptVersion: 'question-verified-answer-explanation-v3',
+        promptVersion: 'question-verified-answer-explanation-v4',
       }),
     });
     expect(prisma.question.update).not.toHaveBeenCalled();
@@ -293,6 +350,7 @@ describe('Reviewing edited explanations', () => {
       type: QuestionType.SHORT_ANSWER,
       status,
       body: 'What is 2 + 2?',
+      maxPoints: 5,
       options: [],
       contentBlocks: [],
       contexts: [],
@@ -322,6 +380,7 @@ describe('Reviewing edited explanations', () => {
           .mockResolvedValue({ ...source, id: 'replacement', status: 'DRAFT' }),
       },
       questionAiExplanationRun: { update: jest.fn() },
+      questionExplanation: { deleteMany: jest.fn() },
     };
     const applied = {
       ...source,
@@ -345,7 +404,9 @@ describe('Reviewing edited explanations', () => {
       {} as any,
       {} as any,
     );
-    run.sourceFingerprint = service['fingerprint'](service['snapshot'](source));
+    run.sourceFingerprint = service['fingerprint'](
+      service['snapshot'](source, true),
+    );
     jest.spyOn(service, 'get').mockResolvedValue(run as any);
     const apply = (extra = {}) =>
       service.apply(actor, source.id, run.id, {
@@ -353,8 +414,135 @@ describe('Reviewing edited explanations', () => {
         applyExplanation: true,
         ...extra,
       });
-    return { apply, tx, prisma, audit, run };
+    return { apply, tx, prisma, audit, run, source, service };
   }
+
+  it.each(['DRAFT', 'PUBLISHED'])(
+    'saves proposed marks on combined approval for %s',
+    async (status) => {
+      const { apply, run, tx, audit } = setup(status);
+      Object.assign(run, { proposedMaxPoints: 8 });
+      await apply();
+      const id = status === 'PUBLISHED' ? 'replacement' : 'question';
+      expect(tx.question.update).toHaveBeenCalledWith({
+        where: { id },
+        data: { maxPoints: 8, updatedById: actor.id },
+      });
+      if (status === 'PUBLISHED')
+        expect(tx.question.create).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({ maxPoints: 8 }),
+          }),
+        );
+      expect(audit.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          metadata: expect.objectContaining({
+            proposedMaxPoints: 8,
+            appliedMaxPoints: 8,
+          }),
+        }),
+      );
+    },
+  );
+
+  it('saves marks on answer-only approval and clears the previous explanation', async () => {
+    const { apply, run, tx } = setup();
+    Object.assign(run, { proposedMaxPoints: 8 });
+    await apply({ applyExplanation: false });
+    expect(tx.question.update).toHaveBeenCalledWith({
+      where: { id: 'question' },
+      data: { maxPoints: 8, updatedById: actor.id },
+    });
+    expect(tx.questionExplanation.deleteMany).toHaveBeenCalledWith({
+      where: { questionId: 'question' },
+    });
+    expect(tx.question.update).toHaveBeenCalledWith({
+      where: { id: 'question' },
+      data: { explanation: null, updatedById: actor.id },
+    });
+  });
+
+  it('applies proposed marks to choice answers too', async () => {
+    const { apply, run, tx, source, service } = setup();
+    Object.assign(source, {
+      type: QuestionType.SINGLE_CHOICE,
+      options: [
+        { id: 'option', body: 'Four', isCorrect: false, contentBlocks: [] },
+      ],
+    });
+    Object.assign(run, {
+      proposedMaxPoints: 3,
+      proposedAnswer: { selectedOptionIndexes: [0] },
+    });
+    run.sourceFingerprint = service['fingerprint'](
+      service['snapshot'](source, true),
+    );
+    const questionOption = {
+      updateMany: jest.fn(),
+      findMany: jest.fn().mockResolvedValue(source.options),
+    };
+    Object.assign(tx, { questionOption });
+    await apply();
+    expect(tx.question.update).toHaveBeenCalledWith({
+      where: { id: 'question' },
+      data: { maxPoints: 3, updatedById: actor.id },
+    });
+    expect(questionOption.updateMany).toHaveBeenCalledWith({
+      where: { id: { in: ['option'] } },
+      data: { isCorrect: true },
+    });
+  });
+
+  it('rejects explanation-only approval when proposed marks differ', async () => {
+    const { apply, run, prisma } = setup('DRAFT', true);
+    Object.assign(run, { proposedMaxPoints: 8 });
+    await expect(apply({ applyAnswer: false })).rejects.toThrow(
+      'approve the answer too',
+    );
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it.each([5, null])(
+    'allows explanation-only approval with matching or legacy marks %s',
+    async (proposedMaxPoints) => {
+      const { apply, run, tx } = setup('DRAFT', true);
+      Object.assign(run, { proposedMaxPoints });
+      await apply({ applyAnswer: false });
+      expect(
+        tx.question.update.mock.calls.some(
+          ([arg]) => arg.data.maxPoints !== undefined,
+        ),
+      ).toBe(false);
+    },
+  );
+
+  it('rejects new runs when the saved marks changed after generation', async () => {
+    const { apply, run, source, service, prisma } = setup();
+    Object.assign(run, {
+      proposedMaxPoints: 8,
+      promptVersion: 'question-verified-answer-explanation-v4',
+    });
+    run.sourceFingerprint = service['fingerprint'](service['snapshot'](source));
+    source.maxPoints = 6;
+    await expect(apply()).rejects.toThrow('Question changed after this AI run');
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('rejects a run without saving its proposed marks', async () => {
+    const { run, service, prisma, audit } = setup();
+    Object.assign(run, { proposedMaxPoints: 8 });
+    Object.assign(prisma.questionAiExplanationRun, {
+      update: jest.fn().mockResolvedValue({ ...run, status: 'REJECTED' }),
+    });
+    const result = await service.reject(actor, 'question', 'run', {
+      note: 'Discard',
+    });
+    expect(result.proposedMaxPoints).toBe(8);
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(audit.record).toHaveBeenCalledWith(
+      expect.objectContaining({ metadata: { proposedMaxPoints: 8 } }),
+    );
+  });
 
   it.each(['DRAFT', 'PUBLISHED'])(
     'applies edited text to a %s and retains original AI output',
@@ -408,6 +596,63 @@ describe('Reviewing edited explanations', () => {
       );
     },
   );
+
+  it.each(['DRAFT', 'PUBLISHED'])(
+    'retains four-section format and human audit evidence on %s edits',
+    async (status) => {
+      const { apply, tx, run, audit } = setup(status, true);
+      (run as any).structuredExplanationFormat =
+        QuestionExplanationFormat.WRITTEN_FOUR_SECTION;
+      const written = {
+        answerElements: '4',
+        scientificExplanation: 'Add two and two.',
+        commonMistakes: 'Do not multiply.',
+        whatIf: 'Changing an addend changes the sum.',
+      };
+      (run as any).structuredExplanation = written;
+      await apply({
+        applyAnswer: false,
+        structuredExplanation: written,
+        structuredExplanationFormat:
+          QuestionExplanationFormat.WRITTEN_FOUR_SECTION,
+      });
+      const data = tx.question.update.mock.calls.find(
+        ([arg]) => arg.data.structuredExplanation,
+      )![0].data;
+      expect(data.structuredExplanation.upsert.update).toMatchObject({
+        ...written,
+        structuredExplanationFormat: 'WRITTEN_FOUR_SECTION',
+        keywords: null,
+        whyCorrect: null,
+        origin: 'HUMAN',
+      });
+      expect(audit.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          metadata: expect.objectContaining({ reviewedExplanation: written }),
+        }),
+      );
+    },
+  );
+  it('rejects an edit format that differs from the stored run', async () => {
+    const { apply, prisma } = setup();
+    await expect(
+      apply({
+        structuredExplanation: edited,
+        structuredExplanationFormat: 'WRITTEN_FOUR_SECTION',
+      }),
+    ).rejects.toThrow('must match the stored run');
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+  it('includes changed marks in new-run fingerprints and preserves legacy calculations', async () => {
+    const { apply, run, source, service, prisma } = setup();
+    (run as any).promptVersion = 'question-verified-answer-explanation-v4';
+    (source as any).maxPoints = 2;
+    run.sourceFingerprint = service['fingerprint'](service['snapshot'](source));
+    (source as any).maxPoints = 3;
+    await expect(apply()).rejects.toThrow('Question changed after this AI run');
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(service['snapshot'](source, true)).not.toHaveProperty('maxPoints');
+  });
 
   it('still applies the generated explanation when edits are omitted', async () => {
     const { apply, tx } = setup();
@@ -590,7 +835,9 @@ describe('Applied AI re-answer response', () => {
       {} as any,
       {} as any,
     );
-    run.sourceFingerprint = service['fingerprint'](service['snapshot'](source));
+    run.sourceFingerprint = service['fingerprint'](
+      service['snapshot'](source, true),
+    );
     jest.spyOn(service, 'get').mockResolvedValue(run as any);
 
     return {

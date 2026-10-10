@@ -14,6 +14,8 @@ export function hasExplanationLanguageMismatch(
 ): boolean {
   if (!explanation || typeof explanation !== 'object') return false;
   const fields = [
+    'answerElements',
+    'scientificExplanation',
     'keywords',
     'eliminationStrategy',
     'whyCorrect',

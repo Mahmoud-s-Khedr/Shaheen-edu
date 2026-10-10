@@ -1,3 +1,7 @@
+import {
+  explanationObjectSchemas,
+  QuestionExplanationFormat,
+} from '../../../common/utils/structured-explanation';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import {
@@ -16,6 +20,7 @@ import {
   Min,
   MinLength,
   ValidateNested,
+  ValidateIf,
 } from 'class-validator';
 import {
   PaginationQueryDto,
@@ -107,23 +112,73 @@ export class QuestionPlacementDto {
   @ApiPropertyOptional() @IsOptional() @IsString() sectionId?: string;
 }
 export class QuestionExplanationDto {
-  @ApiProperty() @IsString() @MinLength(1) @MaxLength(10000) keywords!: string;
+  @ApiPropertyOptional()
+  @ValidateIf(
+    (o) =>
+      (o.answerElements === undefined &&
+        o.scientificExplanation === undefined) ||
+      o.keywords !== undefined,
+  )
+  @IsString()
+  @MinLength(1)
+  @MaxLength(10000)
+  keywords?: string;
+  @ApiPropertyOptional()
+  @ValidateIf(
+    (o) =>
+      (o.answerElements === undefined &&
+        o.scientificExplanation === undefined) ||
+      o.eliminationStrategy !== undefined,
+  )
+  @IsString()
+  @MinLength(1)
+  @MaxLength(10000)
+  eliminationStrategy?: string;
+  @ApiPropertyOptional()
+  @ValidateIf(
+    (o) =>
+      (o.answerElements === undefined &&
+        o.scientificExplanation === undefined) ||
+      o.whyCorrect !== undefined,
+  )
+  @IsString()
+  @MinLength(1)
+  @MaxLength(10000)
+  whyCorrect?: string;
+  @ApiPropertyOptional()
+  @ValidateIf(
+    (o) =>
+      (o.answerElements === undefined &&
+        o.scientificExplanation === undefined) ||
+      o.generalRule !== undefined,
+  )
+  @IsString()
+  @MinLength(1)
+  @MaxLength(10000)
+  generalRule?: string;
+  @ApiPropertyOptional()
+  @ValidateIf(
+    (o) =>
+      o.answerElements !== undefined || o.scientificExplanation !== undefined,
+  )
+  @IsString()
+  @MinLength(1)
+  @MaxLength(10000)
+  answerElements?: string;
+  @ApiPropertyOptional()
+  @ValidateIf(
+    (o) =>
+      o.answerElements !== undefined || o.scientificExplanation !== undefined,
+  )
+  @IsString()
+  @MinLength(1)
+  @MaxLength(10000)
+  scientificExplanation?: string;
   @ApiProperty()
   @IsString()
   @MinLength(1)
   @MaxLength(10000)
-  eliminationStrategy!: string;
-  @ApiProperty()
-  @IsString()
-  @MinLength(1)
-  @MaxLength(10000)
-  whyCorrect!: string;
-  @ApiProperty()
-  @IsString()
-  @MinLength(1)
-  @MaxLength(10000)
-  generalRule!: string;
-  @ApiProperty() @IsString() @MinLength(1) @MaxLength(10000) whatIf!: string;
+  whatIf!: string;
   @ApiProperty()
   @IsString()
   @MinLength(1)
@@ -273,11 +328,20 @@ export class CreateQuestionDto {
   @IsArray()
   @IsString({ each: true })
   contextIds?: string[];
-  @ApiPropertyOptional({ type: QuestionExplanationDto })
+  @ApiPropertyOptional({ oneOf: explanationObjectSchemas })
   @IsOptional()
   @ValidateNested()
   @Type(() => QuestionExplanationDto)
   structuredExplanation?: QuestionExplanationDto;
+
+  @ApiPropertyOptional({
+    enum: QuestionExplanationFormat,
+    description:
+      'Sibling of structuredExplanation. Required for WRITTEN_FOUR_SECTION; legacy requests default to SIX_SECTION.',
+  })
+  @IsOptional()
+  @IsEnum(QuestionExplanationFormat)
+  structuredExplanationFormat?: QuestionExplanationFormat;
   @ApiPropertyOptional({ minimum: 1, default: 1 })
   @IsOptional()
   @Type(() => Number)
@@ -349,11 +413,20 @@ export class UpdateQuestionDto {
   @IsArray()
   @IsString({ each: true })
   contextIds?: string[];
-  @ApiPropertyOptional({ type: QuestionExplanationDto })
+  @ApiPropertyOptional({ oneOf: explanationObjectSchemas })
   @IsOptional()
   @ValidateNested()
   @Type(() => QuestionExplanationDto)
   structuredExplanation?: QuestionExplanationDto;
+
+  @ApiPropertyOptional({
+    enum: QuestionExplanationFormat,
+    description:
+      'Sibling of structuredExplanation. Required for WRITTEN_FOUR_SECTION; legacy requests default to SIX_SECTION.',
+  })
+  @IsOptional()
+  @IsEnum(QuestionExplanationFormat)
+  structuredExplanationFormat?: QuestionExplanationFormat;
   @ApiPropertyOptional({ minimum: 1 })
   @IsOptional()
   @Type(() => Number)

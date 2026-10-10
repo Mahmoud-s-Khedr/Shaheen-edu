@@ -1,5 +1,12 @@
+import { explanationResponseSchema } from '../../common/utils/structured-explanation';
 import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiCreatedResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiTags,
+} from '@nestjs/swagger';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -12,6 +19,20 @@ import {
 } from './dto/question-ai-explanation.dto';
 import { QuestionAiExplanationsService } from './question-ai-explanations.service';
 
+const runExplanationResponseSchema = {
+  ...explanationResponseSchema,
+  properties: {
+    ...explanationResponseSchema.properties,
+    proposedMaxPoints: {
+      type: 'integer' as const,
+      minimum: 1,
+      nullable: true,
+      description:
+        'Maximum points used for generation; saved with applyAnswer=true. Null for legacy runs.',
+    },
+  },
+};
+
 @ApiTags('admin/questions/ai')
 @ApiBearerAuth()
 @UseGuards(RolesGuard)
@@ -20,6 +41,7 @@ import { QuestionAiExplanationsService } from './question-ai-explanations.servic
 export class QuestionAiExplanationsController {
   constructor(private readonly service: QuestionAiExplanationsService) {}
   @Post()
+  @ApiCreatedResponse({ schema: runExplanationResponseSchema })
   @ApiOperation({ summary: 'Generate explanation from verified answer' })
   create(
     @CurrentUser() actor: RequestUser,
@@ -29,6 +51,9 @@ export class QuestionAiExplanationsController {
     return this.service.create(actor, questionId, dto);
   }
   @Get()
+  @ApiOkResponse({
+    schema: { type: 'array', items: runExplanationResponseSchema },
+  })
   @ApiOperation({ summary: 'List retained AI re-answer review runs' })
   list(
     @CurrentUser() actor: RequestUser,
@@ -37,6 +62,7 @@ export class QuestionAiExplanationsController {
     return this.service.list(actor, questionId);
   }
   @Get(':runId')
+  @ApiOkResponse({ schema: runExplanationResponseSchema })
   @ApiOperation({ summary: 'Get an AI re-answer review run' })
   get(
     @CurrentUser() actor: RequestUser,
@@ -46,6 +72,7 @@ export class QuestionAiExplanationsController {
     return this.service.get(actor, questionId, runId);
   }
   @Post(':runId/apply')
+  @ApiCreatedResponse({ schema: explanationResponseSchema })
   @ApiOperation({
     summary: 'Apply reviewed answer and/or optionally edited explanation',
   })
@@ -58,6 +85,7 @@ export class QuestionAiExplanationsController {
     return this.service.apply(actor, questionId, runId, dto);
   }
   @Post(':runId/reject')
+  @ApiCreatedResponse({ schema: runExplanationResponseSchema })
   @ApiOperation({ summary: 'Reject an AI re-answer review run' })
   reject(
     @CurrentUser() actor: RequestUser,

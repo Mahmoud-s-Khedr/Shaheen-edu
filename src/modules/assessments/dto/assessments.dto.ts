@@ -550,6 +550,12 @@ export class AssessmentAttemptQuestionDto {
     string | null;
   @ApiPropertyOptional({ type: Object, nullable: true })
   structuredExplanation!: object | null;
+
+  @ApiProperty({
+    enum: ['SIX_SECTION', 'WRITTEN_FOUR_SECTION'],
+    nullable: true,
+  })
+  structuredExplanationFormat!: string | null;
   @ApiPropertyOptional({ type: String, nullable: true }) outcome!:
     string | null;
   @ApiPropertyOptional({ type: String, nullable: true }) graderFeedback!:

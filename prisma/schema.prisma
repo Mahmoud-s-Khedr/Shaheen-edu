@@ -314,6 +314,11 @@ enum QuestionContentBlockType {
   EQUATION
 }
 
+enum QuestionExplanationFormat {
+  SIX_SECTION
+  WRITTEN_FOUR_SECTION
+}
+
 enum QuestionExplanationOrigin {
   AI
   HUMAN
@@ -1271,60 +1276,65 @@ model QuestionContextQuestion {
 }
 
 model QuestionExplanation {
-  id                  String                    @id @default(cuid())
-  questionId          String                    @unique
-  question            Question                  @relation(fields: [questionId], references: [id], onDelete: Cascade)
-  languageCode        String                    @default("ar")
-  keywords            String
-  eliminationStrategy String
-  whyCorrect          String
-  generalRule         String
-  whatIf              String
-  commonMistakes      String
-  origin              QuestionExplanationOrigin @default(HUMAN)
-  model               String?
-  confidence          Float?
-  answerOrigin        QuestionAnswerOrigin?
-  warnings            Json?
-  sourceFingerprint   String?
-  staleAt             DateTime?
-  reviewedAt          DateTime?
-  reviewedById        String?
-  createdAt           DateTime                  @default(now())
-  updatedAt           DateTime                  @updatedAt
+  id                          String                    @id @default(cuid())
+  questionId                  String                    @unique
+  question                    Question                  @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  languageCode                String                    @default("ar")
+  structuredExplanationFormat QuestionExplanationFormat @default(SIX_SECTION)
+  answerElements              String?
+  scientificExplanation       String?
+  keywords                    String?
+  eliminationStrategy         String?
+  whyCorrect                  String?
+  generalRule                 String?
+  whatIf                      String
+  commonMistakes              String
+  origin                      QuestionExplanationOrigin @default(HUMAN)
+  model                       String?
+  confidence                  Float?
+  answerOrigin                QuestionAnswerOrigin?
+  warnings                    Json?
+  sourceFingerprint           String?
+  staleAt                     DateTime?
+  reviewedAt                  DateTime?
+  reviewedById                String?
+  createdAt                   DateTime                  @default(now())
+  updatedAt                   DateTime                  @updatedAt
 }
 
 /// Every admin-triggered AI answer/explanation evaluation is retained for
 /// audit and review. Only an explicitly applied run can change a question.
 model QuestionAiExplanationRun {
-  id                    String                         @id @default(cuid())
-  questionId            String
-  question              Question                       @relation(fields: [questionId], references: [id], onDelete: Cascade)
-  mode                  QuestionAiExplanationRunMode
-  status                QuestionAiExplanationRunStatus @default(PENDING_REVIEW)
-  questionSnapshot      Json
-  sourceFingerprint     String
-  languageCode          String                         @default("ar")
-  suppliedAnswer        Json?
-  additionalContext     String?
-  proposedAnswer        Json?
-  structuredExplanation Json?
-  confidence            Float?
-  warnings              Json?
-  conflictWarning       String?
-  model                 String
-  promptVersion         String
-  rawResponse           Json?
-  usage                 Json?
-  createdById           String
-  reviewedById          String?
-  reviewedAt            DateTime?
-  applyAnswer           Boolean?
-  applyExplanation      Boolean?
-  appliedQuestionId     String?
-  reviewNote            String?
-  createdAt             DateTime                       @default(now())
-  updatedAt             DateTime                       @updatedAt
+  id                          String                         @id @default(cuid())
+  questionId                  String
+  question                    Question                       @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  mode                        QuestionAiExplanationRunMode
+  status                      QuestionAiExplanationRunStatus @default(PENDING_REVIEW)
+  questionSnapshot            Json
+  sourceFingerprint           String
+  languageCode                String                         @default("ar")
+  suppliedAnswer              Json?
+  additionalContext           String?
+  proposedAnswer              Json?
+  proposedMaxPoints           Int?
+  structuredExplanationFormat QuestionExplanationFormat      @default(SIX_SECTION)
+  structuredExplanation       Json?
+  confidence                  Float?
+  warnings                    Json?
+  conflictWarning             String?
+  model                       String
+  promptVersion               String
+  rawResponse                 Json?
+  usage                       Json?
+  createdById                 String
+  reviewedById                String?
+  reviewedAt                  DateTime?
+  applyAnswer                 Boolean?
+  applyExplanation            Boolean?
+  appliedQuestionId           String?
+  reviewNote                  String?
+  createdAt                   DateTime                       @default(now())
+  updatedAt                   DateTime                       @updatedAt
 
   @@index([questionId, createdAt])
   @@index([status, createdAt])
@@ -1876,29 +1886,30 @@ model AssessmentScope {
 /// archiving or hard-deleting the live Question can never alter or block
 /// deletion of history already generated from it.
 model AssessmentQuestion {
-  id                    String                           @id @default(cuid())
-  assessmentId          String
-  assessment            Assessment                       @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
-  sourceQuestionId      String
-  sortOrder             Int
-  type                  QuestionType
-  body                  String
-  explanation           String?
-  maxPoints             Int
-  acceptedAnswers       Json?
-  gradingRubric         String?
-  answerOrigin          QuestionAnswerProvenance?
-  videoAssetId          String?
-  videoAssetName        String?
-  timestampSeconds      Int?
-  structuredExplanation Json?
-  options               AssessmentQuestionOption[]
-  answers               AssessmentAttemptAnswer[]
-  placements            AssessmentQuestionPlacement[]
-  contexts              AssessmentQuestionContext[]
-  attachments           AssessmentQuestionAsset[]
-  contentBlocks         AssessmentQuestionContentBlock[]
-  attributions          AssessmentQuestionAttribution[]
+  id                          String                           @id @default(cuid())
+  assessmentId                String
+  assessment                  Assessment                       @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  sourceQuestionId            String
+  sortOrder                   Int
+  type                        QuestionType
+  body                        String
+  explanation                 String?
+  maxPoints                   Int
+  acceptedAnswers             Json?
+  gradingRubric               String?
+  answerOrigin                QuestionAnswerProvenance?
+  videoAssetId                String?
+  videoAssetName              String?
+  timestampSeconds            Int?
+  structuredExplanationFormat QuestionExplanationFormat        @default(SIX_SECTION)
+  structuredExplanation       Json?
+  options                     AssessmentQuestionOption[]
+  answers                     AssessmentAttemptAnswer[]
+  placements                  AssessmentQuestionPlacement[]
+  contexts                    AssessmentQuestionContext[]
+  attachments                 AssessmentQuestionAsset[]
+  contentBlocks               AssessmentQuestionContentBlock[]
+  attributions                AssessmentQuestionAttribution[]
 
   @@unique([assessmentId, sortOrder])
   @@index([assessmentId])

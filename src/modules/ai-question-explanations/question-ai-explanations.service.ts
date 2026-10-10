@@ -1,4 +1,12 @@
 import {
+  explanationEnvelope,
+  explanationPersistence,
+  formatForQuestion,
+  QuestionExplanationFormat,
+  renderStructuredExplanation,
+  validateStructuredExplanation,
+} from '../../common/utils/structured-explanation';
+import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
@@ -216,18 +224,13 @@ export class QuestionAiExplanationsService {
       gradingRubric: value?.gradingRubric?.trim?.() ?? null,
     };
   }
-  private render(explanation: StructuredExplanationOutput) {
-    return [
-      explanation.keywords,
-      explanation.eliminationStrategy,
-      explanation.whyCorrect,
-      explanation.generalRule,
-      explanation.whatIf,
-      explanation.commonMistakes,
-    ]
-      .map((x) => x.trim())
-      .join('\n\n');
+  private render(
+    explanation: StructuredExplanationOutput,
+    format: QuestionExplanationFormat,
+  ) {
+    return renderStructuredExplanation(explanation, format);
   }
+
   private language(question: any) {
     const blocks = [
       ...(question.contentBlocks ?? []),
@@ -269,8 +272,9 @@ export class QuestionAiExplanationsService {
     const latin = (text.match(/[a-zA-Z]/g) ?? []).length;
     return latin > arabic ? 'en' : 'ar';
   }
-  private snapshot(question: any) {
+  private snapshot(question: any, legacy = false) {
     return {
+      ...(legacy ? {} : { maxPoints: question.maxPoints }),
       type: question.type,
       body: question.body,
       acceptedAnswers: question.acceptedAnswers,
@@ -326,32 +330,6 @@ export class QuestionAiExplanationsService {
       })),
     );
   }
-  private validateExplanation(
-    value: any,
-    errorMessage = 'AI returned an incomplete structured explanation',
-  ): StructuredExplanationOutput {
-    const fields = [
-      'keywords',
-      'eliminationStrategy',
-      'whyCorrect',
-      'generalRule',
-      'whatIf',
-      'commonMistakes',
-    ] as const;
-    if (
-      !value ||
-      !fields.every(
-        (field) =>
-          typeof value[field] === 'string' &&
-          value[field].trim() &&
-          value[field].length <= 10000,
-      )
-    )
-      throw new BadRequestException(errorMessage);
-    return Object.fromEntries(
-      fields.map((field) => [field, value[field].trim()]),
-    ) as StructuredExplanationOutput;
-  }
 
   async create(
     actor: RequestUser,
@@ -369,17 +347,25 @@ export class QuestionAiExplanationsService {
     );
     const snapshot = this.snapshot(question);
     const sourceFingerprint = this.fingerprint(snapshot);
+    const proposedMaxPoints = dto.maxPoints ?? question.maxPoints;
     const languageCode = dto.explanationLanguage ?? this.language(snapshot);
     try {
       const response = await this.client.generate({
         languageCode,
-        question: snapshot,
+        maxPoints: proposedMaxPoints,
+        question: { ...snapshot, maxPoints: proposedMaxPoints },
         suppliedAnswer,
         additionalContext: dto.additionalContext?.trim(),
         images: await this.images(question),
       });
-      const explanation = this.validateExplanation(
+      const format = formatForQuestion(question.type);
+      if (response.result.structuredExplanationFormat !== format)
+        throw new BadRequestException(
+          'AI explanation format does not match question type',
+        );
+      const explanation = validateStructuredExplanation(
         response.result.structuredExplanation,
+        format,
       );
       const run = await this.prisma.questionAiExplanationRun.create({
         data: {
@@ -391,12 +377,14 @@ export class QuestionAiExplanationsService {
           suppliedAnswer: suppliedAnswer as any,
           additionalContext: dto.additionalContext?.trim() || null,
           proposedAnswer: suppliedAnswer as any,
+          proposedMaxPoints,
+          structuredExplanationFormat: format,
           structuredExplanation: explanation as any,
           confidence: response.result.confidence,
           warnings: response.result.warnings as any,
           conflictWarning: null,
           model: response.model,
-          promptVersion: 'question-verified-answer-explanation-v3',
+          promptVersion: 'question-verified-answer-explanation-v4',
           rawResponse: response.raw,
           usage: response.usage,
           createdById: actor.id,
@@ -407,22 +395,34 @@ export class QuestionAiExplanationsService {
         action: 'AI_QUESTION_REANSWER_CREATED',
         targetType: 'QuestionAiExplanationRun',
         targetId: run.id,
-        metadata: { questionId, mode: QuestionAiExplanationRunMode.GROUNDED },
+        metadata: {
+          questionId,
+          mode: QuestionAiExplanationRunMode.GROUNDED,
+          proposedMaxPoints,
+        },
       });
-      return run;
+      return {
+        ...run,
+        ...explanationEnvelope(
+          run.structuredExplanation,
+          run.structuredExplanationFormat,
+        ),
+      };
     } catch (error) {
       await this.prisma.questionAiExplanationRun.create({
         data: {
           questionId,
           mode: QuestionAiExplanationRunMode.GROUNDED,
           status: QuestionAiExplanationRunStatus.FAILED,
+          proposedMaxPoints,
+          structuredExplanationFormat: formatForQuestion(question.type),
           questionSnapshot: snapshot as any,
           sourceFingerprint,
           languageCode,
           suppliedAnswer: suppliedAnswer as any,
           additionalContext: dto.additionalContext?.trim() || null,
           model: 'unavailable',
-          promptVersion: 'question-verified-answer-explanation-v3',
+          promptVersion: 'question-verified-answer-explanation-v4',
           createdById: actor.id,
           reviewNote:
             error instanceof Error ? error.message : 'AI request failed',
@@ -434,10 +434,17 @@ export class QuestionAiExplanationsService {
   async list(actor: RequestUser, questionId: string) {
     this.admin(actor);
     await this.question(questionId);
-    return this.prisma.questionAiExplanationRun.findMany({
+    const runs = await this.prisma.questionAiExplanationRun.findMany({
       where: { questionId },
       orderBy: { createdAt: 'desc' },
     });
+    return runs.map((run) => ({
+      ...run,
+      ...explanationEnvelope(
+        run.structuredExplanation,
+        run.structuredExplanationFormat,
+      ),
+    }));
   }
   async get(actor: RequestUser, questionId: string, runId: string) {
     this.admin(actor);
@@ -445,7 +452,13 @@ export class QuestionAiExplanationsService {
       where: { id: runId, questionId },
     });
     if (!run) throw new NotFoundException('AI re-answer run not found');
-    return run;
+    return {
+      ...run,
+      ...explanationEnvelope(
+        run.structuredExplanation,
+        run.structuredExplanationFormat,
+      ),
+    };
   }
   async reject(
     actor: RequestUser,
@@ -471,8 +484,15 @@ export class QuestionAiExplanationsService {
       action: 'AI_QUESTION_REANSWER_REJECTED',
       targetType: 'QuestionAiExplanationRun',
       targetId: run.id,
+      metadata: { proposedMaxPoints: run.proposedMaxPoints ?? null },
     });
-    return result;
+    return {
+      ...result,
+      ...explanationEnvelope(
+        result.structuredExplanation,
+        result.structuredExplanationFormat,
+      ),
+    };
   }
 
   async apply(
@@ -505,10 +525,24 @@ export class QuestionAiExplanationsService {
       throw new ConflictException(
         'Only draft, rejected, or published questions can receive an AI re-answer result',
       );
-    const currentFingerprint = this.fingerprint(this.snapshot(source));
+    const currentFingerprint = this.fingerprint(
+      this.snapshot(
+        source,
+        run.promptVersion !== 'question-verified-answer-explanation-v4',
+      ),
+    );
     if (run.sourceFingerprint !== currentFingerprint)
       throw new ConflictException(
         'Question changed after this AI run; generate a new run',
+      );
+    if (
+      dto.applyExplanation &&
+      !dto.applyAnswer &&
+      run.proposedMaxPoints != null &&
+      run.proposedMaxPoints !== source.maxPoints
+    )
+      throw new ConflictException(
+        'Proposed maximum points differ from the saved question; approve the answer too or regenerate using the saved maximum points',
       );
     const answer = this.validAnswer(
       source.type,
@@ -523,14 +557,21 @@ export class QuestionAiExplanationsService {
       throw new ConflictException(
         'An explanation can be applied alone only when its answer matches the question',
       );
+    const format =
+      run.structuredExplanationFormat ?? QuestionExplanationFormat.SIX_SECTION;
+    if (
+      dto.structuredExplanationFormat !== undefined &&
+      (!editedExplanation || dto.structuredExplanationFormat !== format)
+    )
+      throw new BadRequestException(
+        'Edited explanation format must match the stored run',
+      );
     const explanation = dto.applyExplanation
-      ? this.validateExplanation(
+      ? validateStructuredExplanation(
           editedExplanation
             ? dto.structuredExplanation
             : run.structuredExplanation,
-          editedExplanation
-            ? 'Structured explanation must contain all six explanation sections'
-            : undefined,
+          format,
         )
       : null;
     const appliedQuestionId = await this.prisma.$transaction(
@@ -545,7 +586,10 @@ export class QuestionAiExplanationsService {
               type: source.type,
               body: source.body,
               explanation: source.explanation,
-              maxPoints: source.maxPoints,
+              maxPoints:
+                dto.applyAnswer && run.proposedMaxPoints != null
+                  ? run.proposedMaxPoints
+                  : source.maxPoints,
               acceptedAnswers: source.acceptedAnswers,
               gradingRubric: source.gradingRubric,
               answerOrigin: source.answerOrigin,
@@ -619,6 +663,14 @@ export class QuestionAiExplanationsService {
             },
           });
         if (dto.applyAnswer) {
+          if (run.proposedMaxPoints != null)
+            await tx.question.update({
+              where: { id: targetQuestion.id },
+              data: {
+                maxPoints: run.proposedMaxPoints,
+                updatedById: actor.id,
+              },
+            });
           if (
             targetQuestion.type === QuestionType.SINGLE_CHOICE ||
             targetQuestion.type === QuestionType.MULTIPLE_CHOICE
@@ -667,12 +719,12 @@ export class QuestionAiExplanationsService {
           await tx.question.update({
             where: { id: targetQuestion.id },
             data: {
-              explanation: this.render(explanation!),
+              explanation: this.render(explanation!, format),
               updatedById: actor.id,
               structuredExplanation: {
                 upsert: {
                   create: {
-                    ...explanation!,
+                    ...explanationPersistence(explanation!, format),
                     languageCode: run.languageCode,
                     origin: editedExplanation
                       ? QuestionExplanationOrigin.HUMAN
@@ -693,7 +745,7 @@ export class QuestionAiExplanationsService {
                     reviewedById: actor.id,
                   },
                   update: {
-                    ...explanation!,
+                    ...explanationPersistence(explanation!, format),
                     languageCode: run.languageCode,
                     origin: editedExplanation
                       ? QuestionExplanationOrigin.HUMAN
@@ -752,11 +804,20 @@ export class QuestionAiExplanationsService {
         appliedQuestionId,
         applyAnswer: dto.applyAnswer,
         applyExplanation: dto.applyExplanation,
+        proposedMaxPoints: run.proposedMaxPoints ?? null,
+        appliedMaxPoints:
+          dto.applyAnswer && run.proposedMaxPoints != null
+            ? run.proposedMaxPoints
+            : source.maxPoints,
         ...(editedExplanation
           ? { reviewedExplanation: { ...explanation! } }
           : {}),
       },
     });
-    return this.question(appliedQuestionId);
+    const applied = await this.question(appliedQuestionId);
+    return {
+      ...applied,
+      ...explanationEnvelope(applied.structuredExplanation),
+    };
   }
 }
