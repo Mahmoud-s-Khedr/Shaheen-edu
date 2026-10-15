@@ -69,7 +69,8 @@ export class DailyActivityDayDto {
   date!: string;
 
   @ApiProperty({
-    description: 'Distinct questions answered correctly on this Cairo day.',
+    description:
+      'Distinct questions answered correctly in practice or completed assessments on this Cairo day.',
   })
   solvedQuestions!: number;
 

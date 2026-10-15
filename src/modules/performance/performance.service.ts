@@ -1,10 +1,12 @@
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { DateTime } from 'luxon';
 import {
   AssessmentAttemptStatus,
   AssessmentQuestionOutcome,
@@ -75,19 +77,30 @@ export class PerformanceService {
   ) {}
 
   private dates(query: PerformancePeriodQueryDto) {
-    const from = query.from
-      ? new Date(`${query.from}T00:00:00.000Z`)
-      : undefined;
-    const to = query.to ? new Date(`${query.to}T23:59:59.999Z`) : undefined;
+    const day = (value: string, field: string) => {
+      const date = DateTime.fromISO(value, { zone: 'Africa/Cairo' }).startOf(
+        'day',
+      );
+      if (!date.isValid || date.toISODate() !== value)
+        throw new BadRequestException(`${field} must be YYYY-MM-DD`);
+      return date;
+    };
+    const first = query.from ? day(query.from, 'from') : undefined;
+    const last = query.to ? day(query.to, 'to') : undefined;
+    if (first && last && last < first)
+      throw new BadRequestException('from must be on or before to');
+    const from = first?.toUTC().toJSDate();
+    const to = last?.plus({ days: 1 }).toUTC().toJSDate();
     return {
       from,
       to,
       submittedAt:
         from || to
-          ? { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) }
+          ? { ...(from ? { gte: from } : {}), ...(to ? { lt: to } : {}) }
           : undefined,
     };
   }
+
   private round(value: number) {
     return Math.round((value + Number.EPSILON) * 10) / 10;
   }
@@ -468,7 +481,7 @@ export class PerformanceService {
           (a) => a.submittedAt >= previousStart && a.submittedAt < recentStart,
         ),
       );
-    if (recent.answered < 10 || previous.answered < 10)
+    if (recent.answered === 0 || previous.answered === 0)
       return {
         status: 'INSUFFICIENT_DATA',
         recent,
@@ -494,7 +507,9 @@ export class PerformanceService {
     const { activities } = await this.dataset(studentId, query),
       days = new Map<string, Activity[]>();
     for (const activity of activities) {
-      const day = activity.submittedAt.toISOString().slice(0, 10);
+      const day = DateTime.fromJSDate(activity.submittedAt)
+        .setZone('Africa/Cairo')
+        .toISODate()!;
       days.set(day, [...(days.get(day) ?? []), activity]);
     }
     return {
@@ -591,7 +606,7 @@ export class PerformanceService {
     includeErrorReasons = true,
   ) {
     const { activities } = await this.dataset(studentId, query),
-      minimum = 10,
+      minimum = 1,
       allScopes = this.insightGroups(activities),
       scopes = allScopes.filter((scope) => scope.answered >= minimum);
     const decorate = (
@@ -621,7 +636,7 @@ export class PerformanceService {
       .slice(0, 3)
       .map((s) => decorate(s, 'REVIEW_TOPIC'));
     const limitedPractice = allScopes
-      .filter((s) => s.answered > 0 && s.answered < minimum)
+      .filter((s) => s.answered > 0 && s.answered < 10)
       .sort((a, b) => a.answered - b.answered)
       .slice(0, 3)
       .map((s) => decorate(s, 'PRACTICE_MORE'));
@@ -666,6 +681,7 @@ export class PerformanceService {
           ? 'AVAILABLE'
           : 'INSUFFICIENT_DATA',
       minimumAnsweredAttempts: minimum,
+      ...this.metrics(activities),
       strengths,
       weaknesses,
       limitedPractice,

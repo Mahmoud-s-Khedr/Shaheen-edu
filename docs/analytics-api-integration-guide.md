@@ -199,7 +199,40 @@ For peer comparison, suppress the comparison card when the API indicates no
 eligible cohort instead of assuming that zero means the student performed at
 zero percent.
 
+### Performance availability and dates (updated October 16, 2026)
+
+Student and parent performance endpoints use inclusive Africa/Cairo calendar
+filters (`YYYY-MM-DD`). Trend chart rows use the same Cairo dates as daily
+activity. Invalid or reversed date ranges return `400`.
+
+Insights now return `AVAILABLE` from the first answered attempt, with
+`minimumAnsweredAttempts: 1`. Overall `total`, `correct`, `incorrect`, `omitted`,
+`answered`, and `accuracyPercent` are returned alongside the topic lists.
+Strengths (at least 80% accuracy) and weaknesses (below 60%) can appear from the
+first answer in a topic. Topics with 1–9 answers also remain in `limitedPractice`
+to make the small sample visible. Omissions do not count as answered, and an
+omitted-only topic is never classified as a weakness.
+
+Trend classification requires at least one answered attempt in each of the
+latest and preceding 28-day windows. When either window has no answers, its
+status remains `INSUFFICIENT_DATA` and `changePoints` is `null`; actual daily
+rows and both window totals are still returned. These are descriptive results
+from the available sample, not a statistical confidence claim.
+
+The captured insights responses later in this guide predate this change: their
+ten-answer threshold and empty strength lists are historical examples, not the
+current availability contract. Peer comparison retains its separate sample and
+privacy requirements.
+
 ## 4. Parent analytics
+
+`GET /parent/selected-child/analytics/daily-activity?from=YYYY-MM-DD&to=YYYY-MM-DD`
+returns every Cairo day in the inclusive range. `solvedQuestions` counts distinct
+questions answered correctly across direct practice and completed assessments,
+deduplicating retries and overlap between the two sources within each day.
+Incorrect and omitted answers do not increase this field.
+`contentDurationSeconds` sums the estimated durations of content marked complete;
+it is not measured viewing time. Missing estimated durations contribute zero.
 
 Parent endpoints require the parent token and a selected child. Run this flow
 after parent login and whenever the parent changes the active child:

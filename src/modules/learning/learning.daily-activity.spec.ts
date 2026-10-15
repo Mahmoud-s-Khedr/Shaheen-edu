@@ -3,7 +3,8 @@ import { LearningService } from './learning.service';
 
 describe('LearningService daily activity', () => {
   it('uses Cairo days, de-duplicates correct retries, omits missing duration, and fills zero days', async () => {
-    const prisma: any = {
+    const prisma = {
+      assessmentAttemptAnswer: { findMany: jest.fn().mockResolvedValue([]) },
       studentQuestionAttempt: {
         findMany: jest.fn().mockResolvedValue([
           {
@@ -39,15 +40,17 @@ describe('LearningService daily activity', () => {
           parentPhoneNormalized: '+201000000000',
         }),
       },
-      $transaction: jest.fn((queries: any[]) => Promise.all(queries)),
+      $transaction: jest.fn((queries: Promise<unknown>[]) =>
+        Promise.all(queries),
+      ),
     };
     const service = new LearningService(
-      prisma,
-      {} as any,
-      {} as any,
-      {} as any,
-      {} as any,
-      {} as any,
+      prisma as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
     );
     await expect(
       service.dailyActivity('student-1', '2026-09-16', '2026-09-18'),
@@ -63,13 +66,13 @@ describe('LearningService daily activity', () => {
         where: expect.objectContaining({
           studentUserId: 'student-1',
           isCorrect: true,
-        }),
+        }) as unknown,
       }),
     );
   });
 
   it('derives activity only from the selected child in the parent session', async () => {
-    const prisma: any = {
+    const prisma = {
       studentProfile: {
         findUnique: jest.fn().mockResolvedValue({
           userId: 'selected-child-1',
@@ -77,17 +80,20 @@ describe('LearningService daily activity', () => {
           parentPhoneNormalized: '+201000000000',
         }),
       },
+      assessmentAttemptAnswer: { findMany: jest.fn().mockResolvedValue([]) },
       studentQuestionAttempt: { findMany: jest.fn().mockResolvedValue([]) },
       studentContentProgress: { findMany: jest.fn().mockResolvedValue([]) },
-      $transaction: jest.fn((queries: any[]) => Promise.all(queries)),
+      $transaction: jest.fn((queries: Promise<unknown>[]) =>
+        Promise.all(queries),
+      ),
     };
     const service = new LearningService(
-      prisma,
-      {} as any,
-      {} as any,
-      {} as any,
-      {} as any,
-      {} as any,
+      prisma as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
     );
 
     await expect(
@@ -111,19 +117,91 @@ describe('LearningService daily activity', () => {
     });
     expect(prisma.studentQuestionAttempt.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: expect.objectContaining({ studentUserId: 'selected-child-1' }),
+        where: expect.objectContaining({
+          studentUserId: 'selected-child-1',
+        }) as unknown,
+      }),
+    );
+  });
+
+  it('counts assessment-only correct answers and deduplicates them across sources on Cairo days', async () => {
+    const assessmentAnswers = [
+      {
+        assessmentQuestion: { sourceQuestionId: 'q-1' },
+        attempt: { submittedAt: new Date('2026-10-12T21:30:00Z') },
+      },
+      {
+        assessmentQuestion: { sourceQuestionId: 'q-2' },
+        attempt: { submittedAt: new Date('2026-10-12T21:45:00Z') },
+      },
+      {
+        assessmentQuestion: { sourceQuestionId: 'q-2' },
+        attempt: { submittedAt: new Date('2026-10-12T22:00:00Z') },
+      },
+    ];
+    const prisma = {
+      studentQuestionAttempt: { findMany: jest.fn().mockResolvedValue([]) },
+      assessmentAttemptAnswer: {
+        findMany: jest.fn().mockResolvedValue(assessmentAnswers),
+      },
+      studentContentProgress: { findMany: jest.fn().mockResolvedValue([]) },
+      $transaction: (queries: Promise<unknown>[]) => Promise.all(queries),
+    };
+    const service = new LearningService(
+      prisma as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+    );
+    const expected = {
+      days: [
+        { date: '2026-10-12', solvedQuestions: 0, contentDurationSeconds: 0 },
+        { date: '2026-10-13', solvedQuestions: 2, contentDurationSeconds: 0 },
+      ],
+    };
+    await expect(
+      service.dailyActivity('student-1', '2026-10-12', '2026-10-13'),
+    ).resolves.toEqual(expected);
+    prisma.studentQuestionAttempt.findMany.mockResolvedValue([
+      { questionId: 'q-1', submittedAt: new Date('2026-10-12T21:35:00Z') },
+    ]);
+    await expect(
+      service.dailyActivity('student-1', '2026-10-12', '2026-10-13'),
+    ).resolves.toEqual(expected);
+    expect(prisma.assessmentAttemptAnswer.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          attempt: {
+            studentUserId: 'student-1',
+            status: 'COMPLETED',
+            submittedAt: {
+              gte: new Date('2026-10-11T21:00:00Z'),
+              lt: new Date('2026-10-13T21:00:00Z'),
+            },
+          },
+          OR: [
+            { outcome: 'CORRECT' },
+            {
+              outcome: null,
+              isCorrect: true,
+              selectedOptionIds: { isEmpty: false },
+            },
+          ],
+        },
       }),
     );
   });
 
   it('rejects invalid or reversed Cairo calendar ranges', async () => {
     const service = new LearningService(
-      {} as any,
-      {} as any,
-      {} as any,
-      {} as any,
-      {} as any,
-      {} as any,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
     );
     await expect(
       service.dailyActivity('student-1', '2026-09-18', '2026-09-16'),
@@ -143,12 +221,12 @@ describe('LearningService daily activity', () => {
             parentPhoneNormalized: '+201111111111',
           }),
         },
-      } as any,
-      {} as any,
-      {} as any,
-      {} as any,
-      {} as any,
-      {} as any,
+      } as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
     );
     await expect(
       service.parentDailyActivity(

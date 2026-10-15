@@ -102,26 +102,55 @@ export class LearningService {
       gte: firstDay.toUTC().toJSDate(),
       lt: endExclusive.toUTC().toJSDate(),
     };
-    const [attempts, completions] = await this.prisma.$transaction([
-      this.prisma.studentQuestionAttempt.findMany({
-        where: {
-          studentUserId: studentId,
-          isCorrect: true,
-          submittedAt: range,
-        },
-        select: { questionId: true, submittedAt: true },
-      }),
-      this.prisma.studentContentProgress.findMany({
-        where: { studentUserId: studentId, completedAt: range },
-        select: {
-          completedAt: true,
-          contentItem: { select: { estimatedDuration: true } },
-        },
-      }),
-    ]);
+    const [attempts, completions, assessmentAnswers] =
+      await this.prisma.$transaction([
+        this.prisma.studentQuestionAttempt.findMany({
+          where: {
+            studentUserId: studentId,
+            isCorrect: true,
+            submittedAt: range,
+          },
+          select: { questionId: true, submittedAt: true },
+        }),
+        this.prisma.studentContentProgress.findMany({
+          where: { studentUserId: studentId, completedAt: range },
+          select: {
+            completedAt: true,
+            contentItem: { select: { estimatedDuration: true } },
+          },
+        }),
+        this.prisma.assessmentAttemptAnswer.findMany({
+          where: {
+            attempt: {
+              studentUserId: studentId,
+              status: AssessmentAttemptStatus.COMPLETED,
+              submittedAt: range,
+            },
+            OR: [
+              { outcome: AssessmentQuestionOutcome.CORRECT },
+              {
+                outcome: null,
+                isCorrect: true,
+                selectedOptionIds: { isEmpty: false },
+              },
+            ],
+          },
+          select: {
+            assessmentQuestion: { select: { sourceQuestionId: true } },
+            attempt: { select: { submittedAt: true } },
+          },
+        }),
+      ]);
 
     const solvedByDay = new Map<string, Set<string>>();
-    for (const attempt of attempts) {
+    const correctAttempts = [
+      ...attempts,
+      ...assessmentAnswers.map((answer) => ({
+        questionId: answer.assessmentQuestion.sourceQuestionId,
+        submittedAt: answer.attempt.submittedAt!,
+      })),
+    ];
+    for (const attempt of correctAttempts) {
       const date = this.toCairoDate(attempt.submittedAt);
       const questions = solvedByDay.get(date) ?? new Set<string>();
       questions.add(attempt.questionId);

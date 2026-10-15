@@ -354,10 +354,13 @@ export const leaderboardPerformanceJourney: JourneyDefinition = {
         );
         expectStatus(insights, 200);
         assert(
-          insights.body.status === 'INSUFFICIENT_DATA' &&
+          insights.body.status === 'AVAILABLE' &&
+            insights.body.minimumAnsweredAttempts === 1 &&
+            insights.body.answered === 2 &&
+            insights.body.strengths.some((row: any) => row.id === sectionId) &&
             Array.isArray(insights.body.recommendations) &&
             insights.body.trend.status === 'INSUFFICIENT_DATA',
-          'Insights must return an evidence-safe result for limited activity',
+          'Insights must expose actual results and topic classifications for limited activity',
         );
         const peers = await student<any>(
           studentOne,
