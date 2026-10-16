@@ -1,3 +1,4 @@
+import { assertContentStaff } from '../../common/authorization/admin-authorization';
 import {
   BadRequestException,
   ConflictException,
@@ -71,8 +72,7 @@ export class AssetsService {
   private readonly config: AppConfig['storage'];
 
   private assertAdmin(actor: RequestUser) {
-    if (actor.role !== Role.ADMIN && actor.role !== Role.SUPER_ADMIN)
-      throw new ForbiddenException('Forbidden');
+    assertContentStaff(actor);
   }
   private allowed(kind: AssetKind) {
     return kind === AssetKind.COVER_IMAGE ||
@@ -188,6 +188,8 @@ export class AssetsService {
     )
       throw new NotFoundException('Asset not found');
     if (actor.role === Role.STUDENT && asset.kind !== AssetKind.PAYMENT_PROOF)
+      throw new NotFoundException('Asset not found');
+    if (actor.role === Role.ADMIN && asset.kind === AssetKind.PAYMENT_PROOF)
       throw new NotFoundException('Asset not found');
     if (asset.status === AssetStatus.READY) return this.summary(asset);
     if (asset.status !== AssetStatus.UPLOADING || !asset.storageKey)
@@ -373,7 +375,12 @@ export class AssetsService {
   /** Archives an asset displaced by a replacement, but only once nothing else references it. */
   async archiveIfUnreferenced(actor: Pick<RequestUser, 'id'>, id: string) {
     const asset = await this.prisma.asset.findUnique({ where: { id } });
-    if (!asset || asset.status === AssetStatus.ARCHIVED) return;
+    if (
+      !asset ||
+      asset.kind === AssetKind.PAYMENT_PROOF ||
+      asset.status === AssetStatus.ARCHIVED
+    )
+      return;
     if (await this.isReferenced(id)) return;
     await this.prisma.asset.update({
       where: { id },
@@ -479,6 +486,8 @@ export class AssetsService {
     );
   }
   assertCompatible(asset: { kind: AssetKind }, type: ContentItemType) {
+    if (asset.kind === AssetKind.PAYMENT_PROOF)
+      throw new BadRequestException('Payment proofs cannot be content assets');
     const expected: Record<ContentItemType, AssetKind | undefined> = {
       TEXT: undefined,
       EXTERNAL_LINK: undefined,

@@ -54,22 +54,22 @@ export const pricingPublisherAgreementsJourney: JourneyDefinition = {
     });
 
     await step('Activating course and chapter publisher agreements with chapter precedence', async () => {
-      const course = await admin.request<any>('POST', '/admin/publisher-agreements', { courseId, publisherUserId, revenueShareBps: 1_000, startsAt, isPrimary: true });
+      const course = await clients.superAdmin.request<any>('POST', '/admin/publisher-agreements', { courseId, publisherUserId, revenueShareBps: 1_000, startsAt, isPrimary: true });
       expectStatus(course, 201); courseAgreementId = course.body.id;
-      expectStatus(await admin.request<any>('POST', `/admin/publisher-agreements/${courseAgreementId}/activate`), 201);
-      const chapter = await admin.request<any>('POST', '/admin/publisher-agreements', { chapterId, publisherUserId, revenueShareBps: 2_500, startsAt, isPrimary: true });
+      expectStatus(await clients.superAdmin.request<any>('POST', `/admin/publisher-agreements/${courseAgreementId}/activate`), 201);
+      const chapter = await clients.superAdmin.request<any>('POST', '/admin/publisher-agreements', { chapterId, publisherUserId, revenueShareBps: 2_500, startsAt, isPrimary: true });
       expectStatus(chapter, 201);
-      expectStatus(await admin.request<any>('POST', `/admin/publisher-agreements/${chapter.body.id}/activate`), 201);
-      const resolved = await admin.request<any>('GET', `/admin/publisher-agreements/effective?lessonId=${lessonId}`);
+      expectStatus(await clients.superAdmin.request<any>('POST', `/admin/publisher-agreements/${chapter.body.id}/activate`), 201);
+      const resolved = await clients.superAdmin.request<any>('GET', `/admin/publisher-agreements/effective?lessonId=${lessonId}`);
       expectStatus(resolved, 200);
       assert(resolved.body.agreement?.id === chapter.body.id && resolved.body.agreement.revenueShareBps === 2_500 && resolved.body.agreement.publisherUserId === publisherUserId && typeof resolved.body.agreement.publisherName === 'string' && resolved.body.resolvedFrom.chapterId === chapterId && typeof resolved.body.resolvedFrom.chapterName === 'string', 'Chapter agreement must return paired publisher and resolved-target labels');
     });
 
     await step('Rejecting an overlapping primary agreement while retaining agreement history', async () => {
-      const overlapping = await admin.request<any>('POST', '/admin/publisher-agreements', { chapterId, publisherUserId, revenueShareBps: 3_000, startsAt, isPrimary: true });
+      const overlapping = await clients.superAdmin.request<any>('POST', '/admin/publisher-agreements', { chapterId, publisherUserId, revenueShareBps: 3_000, startsAt, isPrimary: true });
       expectStatus(overlapping, 201);
-      expectStatus(await admin.request<any>('POST', `/admin/publisher-agreements/${overlapping.body.id}/activate`), 409);
-      const history = await admin.request<any>('GET', '/admin/publisher-agreements?history=true');
+      expectStatus(await clients.superAdmin.request<any>('POST', `/admin/publisher-agreements/${overlapping.body.id}/activate`), 409);
+      const history = await clients.superAdmin.request<any>('GET', '/admin/publisher-agreements?history=true');
       expectStatus(history, 200);
       assert(history.body.data.some((agreement: any) => agreement.id === courseAgreementId && agreement.courseId === courseId && typeof agreement.courseName === 'string' && agreement.publisherUserId === publisherUserId && typeof agreement.publisherName === 'string') && history.body.meta.total >= 1, 'Agreement history must retain related IDs with display names');
     });

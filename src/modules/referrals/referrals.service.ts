@@ -1,7 +1,7 @@
+import { assertSuperAdmin } from '../../common/authorization/admin-authorization';
 import {
   BadRequestException,
   ConflictException,
-  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -50,8 +50,7 @@ export class ReferralsService {
   }
 
   private admin(actor: RequestUser) {
-    if (actor.role !== Role.ADMIN && actor.role !== Role.SUPER_ADMIN)
-      throw new ForbiddenException('Forbidden');
+    assertSuperAdmin(actor);
   }
   private dates(startsAt?: Date, endsAt?: Date | null) {
     if (startsAt && endsAt && endsAt <= startsAt)

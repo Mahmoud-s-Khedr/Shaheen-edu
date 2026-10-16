@@ -110,7 +110,11 @@ export class AdminQuestionReportsController {
   constructor(private readonly assessments: AssessmentsService) {}
 
   @Get()
-  @ApiOperation({ summary: 'List student question reports for moderation' })
+  @ApiOperation({
+    summary: 'List student question reports for moderation',
+    description:
+      'ADMIN receives workflow fields and question context with student identity and account relations omitted. SUPER_ADMIN retains the full response.',
+  })
   list(
     @CurrentUser() user: RequestUser,
     @Query() query: QueryQuestionReportDto,
@@ -119,7 +123,11 @@ export class AdminQuestionReportsController {
   }
 
   @Post(':reportId/review')
-  @ApiOperation({ summary: 'Assign and transition a student question report' })
+  @ApiOperation({
+    summary: 'Assign and transition a student question report',
+    description:
+      'ADMIN mutation responses omit student identity and account relations. SUPER_ADMIN retains the full response.',
+  })
   review(
     @CurrentUser() user: RequestUser,
     @Param('reportId') reportId: string,

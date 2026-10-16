@@ -624,6 +624,10 @@ const translations: Record<string, string> = {
     'لقد تم بالفعل إرسال أصل إثبات الدفع',
   'Payment proof must be a ready asset uploaded by the student':
     'يجب أن يكون إثبات الدفع أصلًا جاهزًا تم تحميله بواسطة الطالب',
+  'Payment proofs cannot be content assets':
+    'لا يمكن استخدام إثباتات الدفع كملفات للمحتوى',
+  'The studentId filter requires Super Admin':
+    'تصفية النتائج حسب الطالب تتطلب صلاحية المشرف الأعلى',
   'Payment proofs cannot be content attachments':
     'لا يمكن أن تكون إثباتات الدفع مرفقة بالمحتوى',
   'Payment proofs must use the student payment endpoint':

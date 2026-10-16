@@ -1,3 +1,4 @@
+import { assertSuperAdmin } from '../../common/authorization/admin-authorization';
 import {
   BadRequestException,
   ConflictException,
@@ -88,8 +89,7 @@ export class CommerceService {
     };
   }
   private admin(actor: RequestUser) {
-    if (actor.role !== Role.ADMIN && actor.role !== Role.SUPER_ADMIN)
-      throw new ForbiddenException('Forbidden');
+    assertSuperAdmin(actor);
   }
   private assertIdempotencyKey(key: string) {
     if (!key?.trim())

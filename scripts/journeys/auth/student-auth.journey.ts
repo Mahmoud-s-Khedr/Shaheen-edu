@@ -16,7 +16,7 @@ export const studentJourney: JourneyDefinition = {
     await step(
       'Fetching a published grade for student registration',
       async () => {
-        const governorate = await clients.admin.request<any>(
+        const governorate = await clients.superAdmin.request<any>(
           'POST',
           '/admin/geography/governorates',
           factory.localizedTitle('Registration governorate'),
@@ -164,13 +164,13 @@ export const studentJourney: JourneyDefinition = {
         );
         expectStatus(parentLogin, 201);
         clients.parent.accessToken = parentLogin.body.accessToken;
-        const updatedGovernorate = await clients.admin.request<any>(
+        const updatedGovernorate = await clients.superAdmin.request<any>(
           'POST',
           '/admin/geography/governorates',
           factory.localizedTitle('Updated profile governorate'),
         );
         expectStatus(updatedGovernorate, 201);
-        const updatedCenter = await clients.admin.request<any>(
+        const updatedCenter = await clients.superAdmin.request<any>(
           'POST',
           `/admin/geography/governorates/${updatedGovernorate.body.id}/centers`,
           factory.localizedTitle('Updated profile center'),
@@ -312,7 +312,7 @@ export const studentJourney: JourneyDefinition = {
     await step(
       'Completing an administrator-forced password reset',
       async () => {
-        const reset = await clients.admin.request<any>(
+        const reset = await clients.superAdmin.request<any>(
           'POST',
           `/admin/students/${context.students[0].id}/reset-password`,
         );

@@ -1,4 +1,9 @@
 import {
+  contentQuestionReport,
+  contentGradingAnswer,
+} from '../../common/privacy/content-moderation.projections';
+import { assertContentStaff } from '../../common/authorization/admin-authorization';
+import {
   allExplanationFields,
   explanationEnvelope,
   QuestionExplanationFormat,
@@ -166,8 +171,7 @@ export class AssessmentsService {
   ) {}
 
   private assertAdmin(actor: RequestUser) {
-    if (actor.role !== Role.ADMIN && actor.role !== Role.SUPER_ADMIN)
-      throw new ForbiddenException('Forbidden');
+    assertContentStaff(actor);
   }
 
   private async studentGrade(studentId: string) {
@@ -1781,7 +1785,10 @@ export class AssessmentsService {
       }),
       this.prisma.questionReport.count({ where }),
     ]);
-    return { data, meta: toPaginationMeta(query.page, query.limit, total) };
+    return {
+      data: actor.role === Role.ADMIN ? data.map(contentQuestionReport) : data,
+      meta: toPaginationMeta(query.page, query.limit, total),
+    };
   }
 
   async reviewQuestionReport(
@@ -1836,7 +1843,7 @@ export class AssessmentsService {
       targetId: reportId,
       metadata: { fromStatus: report.status, toStatus: dto.status },
     });
-    return updated;
+    return actor.role === Role.ADMIN ? contentQuestionReport(updated) : updated;
   }
 
   // --- Student: list/get ----------------------------------------------
@@ -3211,16 +3218,21 @@ export class AssessmentsService {
       },
       orderBy: { answeredAt: 'asc' },
     });
-    return answers.map((answer) => ({
-      ...answer,
-      assessmentQuestion: {
-        ...answer.assessmentQuestion,
-        ...explanationEnvelope(
-          answer.assessmentQuestion.structuredExplanation,
-          answer.assessmentQuestion.structuredExplanationFormat,
-        ),
-      },
-    }));
+    return answers.map((answer) => {
+      const normalized = {
+        ...answer,
+        assessmentQuestion: {
+          ...answer.assessmentQuestion,
+          ...explanationEnvelope(
+            answer.assessmentQuestion.structuredExplanation,
+            answer.assessmentQuestion.structuredExplanationFormat,
+          ),
+        },
+      };
+      return actor.role === Role.ADMIN
+        ? contentGradingAnswer(normalized)
+        : normalized;
+    });
   }
 
   /** Retry a failed/awaiting AI proposal for one written answer. Failed run
@@ -3244,9 +3256,12 @@ export class AssessmentsService {
       targetType: 'AssessmentAttemptAnswer',
       targetId: answer.id,
     });
-    return this.prisma.assessmentAttemptAnswer.findUniqueOrThrow({
-      where: { id: answer.id },
-    });
+    const updated = await this.prisma.assessmentAttemptAnswer.findUniqueOrThrow(
+      {
+        where: { id: answer.id },
+      },
+    );
+    return actor.role === Role.ADMIN ? contentGradingAnswer(updated) : updated;
   }
 
   async reportActiveTime(

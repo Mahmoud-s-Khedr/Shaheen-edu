@@ -1129,3 +1129,6 @@ not return student identity or answer text.
 - [Question intelligence/report controller](../src/modules/assessments/question-intelligence.controller.ts)
 - [Partner analytics controller](../src/modules/partner-analytics/partner-analytics.controller.ts)
 - [Detailed API reference](./api-reference-detailed.md)
+
+
+See [Admin content permissions and response changes](admin-content-permissions-frontend-handoff.md) for the current permission matrix, publisher selector, aggregate question statistics and identity-filtered moderation/grading responses. This supersedes earlier descriptions of general Admin platform access.

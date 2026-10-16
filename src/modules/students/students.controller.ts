@@ -64,7 +64,7 @@ export class StudentsController {
 @ApiTags('admin/students')
 @ApiBearerAuth()
 @UseGuards(RolesGuard)
-@Roles(Role.ADMIN, Role.SUPER_ADMIN)
+@Roles(Role.SUPER_ADMIN)
 @Controller({ path: 'admin/students', version: '1' })
 export class AdminStudentsController {
   constructor(private readonly studentsService: StudentsService) {}

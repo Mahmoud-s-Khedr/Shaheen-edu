@@ -313,3 +313,6 @@ Request cheat sheet for the implementation-backed API contract. Base URL is `/ap
 | `POST /api/v1/admin/geography/governorates/{governorateId}/centers` | Create a center                           | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: governorateId<br>body: `{ ar, en }` |
 | `DELETE /api/v1/admin/geography/centers/{id}`                       | Delete an unreferenced center             | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id                                  |
 | `DELETE /api/v1/admin/geography/governorates/{id}`                  | Delete an unreferenced governorate        | Bearer token; role must be `ADMIN` or `SUPER_ADMIN` | path: id                                  |
+
+
+See [Admin content permissions and response changes](admin-content-permissions-frontend-handoff.md) for the current permission matrix, publisher selector, aggregate question statistics and identity-filtered moderation/grading responses. This supersedes earlier descriptions of general Admin platform access.

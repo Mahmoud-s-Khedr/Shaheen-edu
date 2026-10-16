@@ -10,7 +10,7 @@ export const partnerJourney: JourneyDefinition = {
     const email = factory.email('partner');
     const password = factory.password('Partner');
     await step('Creating content-publisher partner', async () => {
-      const r = await clients.admin.request<any>('POST', '/admin/partners', {
+      const r = await clients.superAdmin.request<any>('POST', '/admin/partners', {
         email,
         password,
         partnerType: 'CONTENT_PUBLISHER',
@@ -24,7 +24,7 @@ export const partnerJourney: JourneyDefinition = {
       );
       context.partner = { id: r.body.id, email, password };
       context.created.partners.push(r.body.id);
-      const listed = await clients.admin.request<any>(
+      const listed = await clients.superAdmin.request<any>(
         'GET',
         `/admin/partners?q=${encodeURIComponent('partner')}&limit=1`,
       );
@@ -38,7 +38,7 @@ export const partnerJourney: JourneyDefinition = {
     await step(
       'Updating, logging in, and self-updating the partner profile',
       async () => {
-        const update = await clients.admin.request<any>(
+        const update = await clients.superAdmin.request<any>(
           'PATCH',
           `/admin/partners/${context.partner.id}`,
           { displayName: factory.title('Updated partner') },
@@ -98,7 +98,7 @@ export const partnerJourney: JourneyDefinition = {
       expectStatus(r, 403);
     });
     await step('Suspending and reactivating partner', async () => {
-      const suspend = await clients.admin.request<any>(
+      const suspend = await clients.superAdmin.request<any>(
         'POST',
         `/admin/partners/${context.partner.id}/suspend`,
       );
@@ -110,7 +110,7 @@ export const partnerJourney: JourneyDefinition = {
         { email, password },
       );
       expectStatus(rejected, 401);
-      const reactivate = await clients.admin.request<any>(
+      const reactivate = await clients.superAdmin.request<any>(
         'POST',
         `/admin/partners/${context.partner.id}/reactivate`,
       );

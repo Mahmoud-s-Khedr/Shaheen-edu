@@ -321,7 +321,7 @@ export class CommerceController {
 @ApiTags('admin/manual-payments')
 @ApiBearerAuth()
 @UseGuards(RolesGuard)
-@Roles(Role.ADMIN, Role.SUPER_ADMIN)
+@Roles(Role.SUPER_ADMIN)
 @Controller({ path: 'admin', version: '1' })
 export class ManualPaymentAdminController {
   constructor(private readonly commerce: CommerceService) {}

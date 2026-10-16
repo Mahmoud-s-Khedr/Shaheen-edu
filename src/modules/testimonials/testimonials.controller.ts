@@ -33,7 +33,7 @@ import { TestimonialsService } from './testimonials.service';
 @ApiTags('admin/testimonials')
 @ApiBearerAuth()
 @UseGuards(RolesGuard)
-@Roles(Role.ADMIN, Role.SUPER_ADMIN)
+@Roles(Role.SUPER_ADMIN)
 @Controller({ path: 'admin/testimonials', version: '1' })
 export class TestimonialsController {
   constructor(private readonly testimonials: TestimonialsService) {}

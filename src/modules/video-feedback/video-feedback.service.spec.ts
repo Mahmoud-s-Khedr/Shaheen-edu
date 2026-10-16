@@ -86,7 +86,10 @@ describe('VideoFeedbackService', () => {
     expect(prisma.videoFeedback.upsert).toHaveBeenNthCalledWith(
       2,
       expect.objectContaining({
-        create: expect.objectContaining({ comment: 'Clear lesson', rating: null }),
+        create: expect.objectContaining({
+          comment: 'Clear lesson',
+          rating: null,
+        }),
         update: { comment: 'Clear lesson', rating: null },
       }),
     );
@@ -104,10 +107,10 @@ describe('VideoFeedbackService', () => {
     expect(prisma.videoFeedback.upsert).not.toHaveBeenCalled();
   });
 
-  it('filters the admin list by video owner, student, rating, and Cairo date range', async () => {
+  it('filters the Super Admin list by video owner, student, rating, and Cairo date range', async () => {
     const { service, prisma } = build();
     await service.list(
-      { id: 'admin-1', role: Role.ADMIN, sessionId: 'session-1' },
+      { id: 'admin-1', role: Role.SUPER_ADMIN, sessionId: 'session-1' },
       {
         page: 1,
         limit: 20,
@@ -134,6 +137,55 @@ describe('VideoFeedbackService', () => {
       }),
     );
   });
+
+  it('rejects Admin student filters before reading any feedback', async () => {
+    const { service, prisma } = build();
+    await expect(
+      service.list({ id: 'admin', role: Role.ADMIN } as any, {
+        page: 1,
+        limit: 20,
+        studentId: 'known-student',
+      }),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(prisma.videoFeedback.findMany).not.toHaveBeenCalled();
+  });
+
+  it.each([Role.ADMIN, Role.SUPER_ADMIN])(
+    'projects feedback for %s',
+    async (role) => {
+      const { service, prisma } = build();
+      prisma.videoFeedback.findMany.mockResolvedValue([
+        {
+          id: 'feedback',
+          comment: 'Please fix',
+          rating: 3,
+          studentUserId: 'secret',
+          student: {
+            userId: 'secret',
+            fullName: 'Secret name',
+            user: { loginIdentifier: 'secret@example.com' },
+          },
+          videoAsset: {
+            assetId: 'video',
+            asset: { filename: 'lesson', primaryFor: [{ id: 'content' }] },
+          },
+        },
+      ]);
+      const result = await service.list({ id: 'staff', role } as any, {
+        page: 1,
+        limit: 20,
+      });
+      expect(result.data[0]).toMatchObject({
+        id: 'feedback',
+        comment: 'Please fix',
+      });
+      if (role === Role.ADMIN)
+        expect(JSON.stringify(result)).not.toMatch(
+          /secret|student|fullName|loginIdentifier/i,
+        );
+      else expect(result.data[0].student?.fullName).toBe('Secret name');
+    },
+  );
 
   it('requires a ready video with a published primary content owner', async () => {
     const { service, prisma } = build();

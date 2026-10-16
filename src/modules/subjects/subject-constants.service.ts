@@ -1,11 +1,10 @@
+import { assertContentStaff } from '../../common/authorization/admin-authorization';
 import {
   ConflictException,
-  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { Role } from '../../common/types/roles.enum';
 import type { RequestUser } from '../../common/types/request-with-user.types';
 import { PrismaService } from '../../database/prisma.service';
 import { AuditService } from '../audit/audit.service';
@@ -22,8 +21,7 @@ export class SubjectConstantsService {
   ) {}
 
   private assertAdmin(actor: RequestUser) {
-    if (actor.role !== Role.ADMIN && actor.role !== Role.SUPER_ADMIN)
-      throw new ForbiddenException('Forbidden');
+    assertContentStaff(actor);
   }
   private async subject(subjectId: string) {
     const subject = await this.prisma.subject.findUnique({

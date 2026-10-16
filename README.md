@@ -163,3 +163,6 @@ This is a private, unlicensed repository. Reuse or redistribution requires an
 explicit ownership and licensing decision. Do not commit `.env` files,
 provider credentials, or production data. Review the provenance and any
 personal-data exposure in the tracked example assets before sharing them.
+
+
+Role access and Admin moderation/grading response changes: [Admin content permissions and dashboard handoff](docs/admin-content-permissions-frontend-handoff.md).

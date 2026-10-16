@@ -1,7 +1,7 @@
+import { assertSuperAdmin } from '../../common/authorization/admin-authorization';
 import { Prisma } from '@prisma/client';
 import {
   ConflictException,
-  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -29,9 +29,8 @@ import { toPaginationMeta } from '../../common/dto/pagination-query.dto';
 import type { QueryAdminPartnersDto } from './dto/query-admin-partners.dto';
 
 /**
- * Admin-side methods here are reached only via routes guarded by
- * @Roles(SUPER_ADMIN, ADMIN). Credential changes additionally re-check the
- * actor's role before changing credentials.
+ * Administrative entry points require Super Admin at both controller and service
+ * boundaries. Partner self-service uses a private account lookup.
  */
 @Injectable()
 export class PartnersService {
@@ -43,6 +42,7 @@ export class PartnersService {
   ) {}
 
   async create(actor: RequestUser, dto: CreatePartnerDto) {
+    assertSuperAdmin(actor);
     const normalizedEmail = dto.email.trim().toLowerCase();
     const existing = await this.prisma.user.findUnique({
       where: { loginIdentifier: normalizedEmail },
@@ -82,10 +82,11 @@ export class PartnersService {
       metadata: { email: normalizedEmail },
     });
 
-    return this.getById(user.id);
+    return this.getById(actor, user.id);
   }
 
-  async list(pagination: QueryAdminPartnersDto) {
+  async list(actor: RequestUser, pagination: QueryAdminPartnersDto) {
+    assertSuperAdmin(actor);
     const where = {
       role: Role.PARTNER,
       ...(pagination.partnerType
@@ -131,7 +132,12 @@ export class PartnersService {
     };
   }
 
-  async getById(id: string) {
+  async getById(actor: RequestUser, id: string) {
+    assertSuperAdmin(actor);
+    return this.partnerSummary(id);
+  }
+
+  private async partnerSummary(id: string) {
     const partner = await this.prisma.user.findUnique({
       where: { id },
       include: { partnerProfile: true },
@@ -148,6 +154,7 @@ export class PartnersService {
    * order rows are not selected, even though allocations are order-item based.
    */
   async detail(actor: RequestUser, id: string) {
+    assertSuperAdmin(actor);
     const partner = await this.prisma.user.findUnique({
       where: { id },
       include: { partnerProfile: true },
@@ -317,6 +324,7 @@ export class PartnersService {
   }
 
   async update(actor: RequestUser, id: string, dto: UpdatePartnerDto) {
+    assertSuperAdmin(actor);
     const partner = await this.prisma.user.findUnique({ where: { id } });
     if (!partner || partner.role !== Role.PARTNER) {
       throw new NotFoundException('Partner not found');
@@ -338,7 +346,7 @@ export class PartnersService {
       targetId: id,
     });
 
-    return this.getById(id);
+    return this.getById(actor, id);
   }
 
   async updateEmail(
@@ -346,16 +354,14 @@ export class PartnersService {
     id: string,
     dto: UpdatePartnerEmailDto,
   ) {
-    if (actor.role !== Role.ADMIN && actor.role !== Role.SUPER_ADMIN) {
-      throw new ForbiddenException('Forbidden');
-    }
+    assertSuperAdmin(actor);
     const partner = await this.prisma.user.findUnique({ where: { id } });
     if (!partner || partner.role !== Role.PARTNER) {
       throw new NotFoundException('Partner not found');
     }
     const email = dto.email.trim().toLowerCase();
     if (email === partner.loginIdentifier) {
-      return this.getById(id);
+      return this.getById(actor, id);
     }
     const existing = await this.prisma.user.findUnique({
       where: { loginIdentifier: email },
@@ -398,7 +404,7 @@ export class PartnersService {
       }
       throw error;
     }
-    return this.getById(id);
+    return this.getById(actor, id);
   }
 
   async updateOwnProfile(userId: string, dto: UpdatePartnerDto) {
@@ -428,6 +434,7 @@ export class PartnersService {
   }
 
   async suspend(actor: RequestUser, id: string) {
+    assertSuperAdmin(actor);
     const partner = await this.prisma.user.findUnique({ where: { id } });
     if (!partner || partner.role !== Role.PARTNER) {
       throw new NotFoundException('Partner not found');
@@ -443,10 +450,11 @@ export class PartnersService {
       targetType: 'User',
       targetId: id,
     });
-    return this.getById(id);
+    return this.getById(actor, id);
   }
 
   async reactivate(actor: RequestUser, id: string) {
+    assertSuperAdmin(actor);
     const partner = await this.prisma.user.findUnique({ where: { id } });
     if (!partner || partner.role !== Role.PARTNER) {
       throw new NotFoundException('Partner not found');
@@ -461,7 +469,7 @@ export class PartnersService {
       targetType: 'User',
       targetId: id,
     });
-    return this.getById(id);
+    return this.getById(actor, id);
   }
 
   async resetPassword(
@@ -469,9 +477,7 @@ export class PartnersService {
     id: string,
     dto: ResetPartnerPasswordDto,
   ) {
-    if (actor.role !== Role.ADMIN && actor.role !== Role.SUPER_ADMIN) {
-      throw new ForbiddenException('Forbidden');
-    }
+    assertSuperAdmin(actor);
     const partner = await this.prisma.user.findUnique({ where: { id } });
     if (!partner || partner.role !== Role.PARTNER) {
       throw new NotFoundException('Partner not found');
@@ -506,7 +512,7 @@ export class PartnersService {
 
   /** Ownership is structural: keyed off req.user.id, never an id param. */
   async getOwnProfile(userId: string) {
-    return this.getById(userId);
+    return this.partnerSummary(userId);
   }
 
   private toSummary(user: {

@@ -1,7 +1,7 @@
+import { assertSuperAdmin } from '../../common/authorization/admin-authorization';
 import {
   BadRequestException,
   ConflictException,
-  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -16,7 +16,6 @@ import {
   AssetKind,
   AssetStatus,
   ContentStatus,
-  Role,
 } from '../../common/types/roles.enum';
 import { PrismaService } from '../../database/prisma.service';
 import { AssetsService } from '../assets/assets.service';
@@ -74,8 +73,7 @@ export class TestimonialsService {
   ) {}
 
   private assertAdmin(actor: RequestUser) {
-    if (actor.role !== Role.ADMIN && actor.role !== Role.SUPER_ADMIN)
-      throw new ForbiddenException('Forbidden');
+    assertSuperAdmin(actor);
   }
 
   private async getOrThrow(id: string): Promise<TestimonialRecord> {

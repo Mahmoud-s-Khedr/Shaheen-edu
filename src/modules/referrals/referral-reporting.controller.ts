@@ -45,7 +45,7 @@ export class PartnerReferralReportingController {
 @ApiTags('admin/referral-reporting')
 @ApiBearerAuth()
 @UseGuards(RolesGuard)
-@Roles(Role.ADMIN, Role.SUPER_ADMIN)
+@Roles(Role.SUPER_ADMIN)
 @Controller({ path: 'admin/referral-reporting', version: '1' })
 export class AdminReferralReportingController {
   constructor(private readonly reports: ReferralReportingService) {}

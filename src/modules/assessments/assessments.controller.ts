@@ -379,6 +379,8 @@ export class AdminAssessmentsController {
   @Get('grading/pending')
   @ApiOperation({
     summary: 'List submitted written answers awaiting AI grading',
+    description:
+      'ADMIN receives answer IDs, submitted text, scores, feedback, question context and a minimal attempt with assessment ID/title. Student identity and raw AI payloads are omitted. SUPER_ADMIN retains the existing response.',
   })
   pendingGrades(@CurrentUser() user: RequestUser) {
     return this.assessments.pendingAiGrades(user);
@@ -387,6 +389,8 @@ export class AdminAssessmentsController {
   @Post('grading/answers/:answerId/retry-ai')
   @ApiOperation({
     summary: 'Retry AI grading for one pending written answer',
+    description:
+      'ADMIN receives allowlisted answer workflow fields without student identities or account relations. SUPER_ADMIN retains the existing response. This endpoint does not provide manual score editing.',
   })
   @ApiCreatedResponse()
   @ApiStandardErrors(401, 403, 404, 409)
@@ -398,7 +402,11 @@ export class AdminAssessmentsController {
   }
 
   @Get('question-reports')
-  @ApiOperation({ summary: 'List student question reports for moderation' })
+  @ApiOperation({
+    summary: 'List student question reports for moderation',
+    description:
+      'ADMIN receives workflow fields and question context with student identity and account relations omitted. SUPER_ADMIN retains the full response.',
+  })
   questionReports(
     @CurrentUser() user: RequestUser,
     @Query() query: QueryQuestionReportDto,
@@ -407,7 +415,11 @@ export class AdminAssessmentsController {
   }
 
   @Post('question-reports/:reportId/review')
-  @ApiOperation({ summary: 'Assign and transition a student question report' })
+  @ApiOperation({
+    summary: 'Assign and transition a student question report',
+    description:
+      'ADMIN mutation responses omit student identity and account relations. SUPER_ADMIN retains the full response.',
+  })
   reviewQuestionReport(
     @CurrentUser() user: RequestUser,
     @Param('reportId') reportId: string,

@@ -437,3 +437,6 @@ unique.
       the successful row and handle `404` as already removed.
 - [ ] Handle `VIDEO_ALREADY_ASSIGNED_TO_CONTENT_ITEM` in the primary-asset
       editor without overwriting the editor state.
+
+
+Role access and Admin moderation/grading response changes: [Admin content permissions and dashboard handoff](admin-content-permissions-frontend-handoff.md).

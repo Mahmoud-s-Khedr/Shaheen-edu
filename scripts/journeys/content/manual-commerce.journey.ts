@@ -41,7 +41,7 @@ export const manualCommerceJourney: JourneyDefinition = {
     await step(
       'Creating an active manual payment method and student',
       async () => {
-        const method = await admin.request<any>(
+        const method = await clients.superAdmin.request<any>(
           'POST',
           '/admin/manual-payment-methods',
           {
@@ -92,7 +92,7 @@ export const manualCommerceJourney: JourneyDefinition = {
     await step(
       'Managing payment methods and a cancellable course order',
       async () => {
-        const listed = await admin.request<any>(
+        const listed = await clients.superAdmin.request<any>(
           'GET',
           `/admin/manual-payment-methods?limit=1&q=${encodeURIComponent(methodSearchTerm)}`,
         );
@@ -102,7 +102,7 @@ export const manualCommerceJourney: JourneyDefinition = {
             listed.body.meta.total >= 1,
           'Created payment method must be searchable and paginated for admins',
         );
-        const updated = await admin.request<any>(
+        const updated = await clients.superAdmin.request<any>(
           'PATCH',
           `/admin/manual-payment-methods/${methodId}`,
           { titleEn: 'Bank transfer' },
@@ -112,13 +112,13 @@ export const manualCommerceJourney: JourneyDefinition = {
           updated.body.titleEn === 'Bank transfer',
           'Payment method update must persist',
         );
-        const allMethods = await admin.request<any>(
+        const allMethods = await clients.superAdmin.request<any>(
           'GET',
           '/admin/manual-payment-methods?limit=100',
         );
         expectStatus(allMethods, 200);
         expectStatus(
-          await admin.request<any>(
+          await clients.superAdmin.request<any>(
             'POST',
             '/admin/manual-payment-methods/reorder',
             { methodIds: allMethods.body.data.map((x: any) => x.id) },
@@ -178,7 +178,7 @@ export const manualCommerceJourney: JourneyDefinition = {
       async () => {
         const startsAt = new Date(Date.now() - 60_000).toISOString();
         const endsAt = new Date(Date.now() + 86_400_000).toISOString();
-        const campaign = await admin.request<any>(
+        const campaign = await clients.superAdmin.request<any>(
           'POST',
           '/admin/discount-campaigns',
           {
@@ -192,7 +192,7 @@ export const manualCommerceJourney: JourneyDefinition = {
         );
         expectStatus(campaign, 201);
         const campaignId = campaign.body.id;
-        const campaigns = await admin.request<any>(
+        const campaigns = await clients.superAdmin.request<any>(
           'GET',
           '/admin/discount-campaigns?limit=100',
         );
@@ -202,7 +202,7 @@ export const manualCommerceJourney: JourneyDefinition = {
           'Created campaign must be listed for admins',
         );
         expectStatus(
-          await admin.request<any>(
+          await clients.superAdmin.request<any>(
             'PATCH',
             `/admin/discount-campaigns/${campaignId}`,
             { priority: 1 },
@@ -210,14 +210,14 @@ export const manualCommerceJourney: JourneyDefinition = {
           200,
         );
         expectStatus(
-          await admin.request<any>(
+          await clients.superAdmin.request<any>(
             'POST',
             `/admin/discount-campaigns/${campaignId}/deactivate`,
           ),
           201,
         );
         expectStatus(
-          await admin.request<any>(
+          await clients.superAdmin.request<any>(
             'POST',
             `/admin/discount-campaigns/${campaignId}/activate`,
           ),
@@ -225,7 +225,7 @@ export const manualCommerceJourney: JourneyDefinition = {
         );
 
         const couponCode = factory.slug('coupon').toUpperCase();
-        const coupon = await admin.request<any>('POST', '/admin/coupons', {
+        const coupon = await clients.superAdmin.request<any>('POST', '/admin/coupons', {
           name: factory.title('Course coupon'),
           code: couponCode,
           kind: 'FIXED',
@@ -236,7 +236,7 @@ export const manualCommerceJourney: JourneyDefinition = {
         });
         expectStatus(coupon, 201);
         const couponId = coupon.body.id;
-        const coupons = await admin.request<any>(
+        const coupons = await clients.superAdmin.request<any>(
           'GET',
           '/admin/coupons?limit=100',
         );
@@ -246,20 +246,20 @@ export const manualCommerceJourney: JourneyDefinition = {
           'Created coupon must be listed for admins',
         );
         expectStatus(
-          await admin.request<any>('PATCH', `/admin/coupons/${couponId}`, {
+          await clients.superAdmin.request<any>('PATCH', `/admin/coupons/${couponId}`, {
             minimumOrderMinor: 1,
           }),
           200,
         );
         expectStatus(
-          await admin.request<any>(
+          await clients.superAdmin.request<any>(
             'POST',
             `/admin/coupons/${couponId}/deactivate`,
           ),
           201,
         );
         expectStatus(
-          await admin.request<any>(
+          await clients.superAdmin.request<any>(
             'POST',
             `/admin/coupons/${couponId}/activate`,
           ),
@@ -360,7 +360,7 @@ export const manualCommerceJourney: JourneyDefinition = {
           },
         );
         expectStatus(first, 201);
-        const queue = await admin.request<any>(
+        const queue = await clients.superAdmin.request<any>(
           'GET',
           '/admin/payment-submissions?status=SUBMITTED',
         );
@@ -370,14 +370,14 @@ export const manualCommerceJourney: JourneyDefinition = {
         );
         assert(submission, 'Submitted payment must be visible to admins');
         expectStatus(
-          await admin.request<any>(
+          await clients.superAdmin.request<any>(
             'GET',
             `/admin/payment-submissions/${first.body.id}`,
           ),
           200,
         );
         expectStatus(
-          await admin.request<any>(
+          await clients.superAdmin.request<any>(
             'POST',
             `/admin/payment-submissions/${first.body.id}/reject`,
             { rejectionReason: 'Receipt is not readable' },
@@ -434,7 +434,7 @@ export const manualCommerceJourney: JourneyDefinition = {
           'Rejected proof history must be preserved',
         );
         expectStatus(
-          await admin.request<any>(
+          await clients.superAdmin.request<any>(
             'POST',
             `/admin/payment-submissions/${replacement.body.id}/approve`,
           ),

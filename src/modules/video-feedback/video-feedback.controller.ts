@@ -59,7 +59,11 @@ export class AdminVideoFeedbackController {
   constructor(private readonly feedback: VideoFeedbackService) {}
 
   @Get()
-  @ApiOperation({ summary: 'List student video feedback' })
+  @ApiOperation({
+    summary: 'List student video feedback',
+    description:
+      'ADMIN receives no student object and cannot use the studentId filter (403). SUPER_ADMIN retains student details and filtering.',
+  })
   @ApiOkResponse()
   @ApiStandardErrors(400, 401, 403)
   list(

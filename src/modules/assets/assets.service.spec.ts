@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  NotFoundException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { AssetKind, AssetStatus, Role } from '../../common/types/roles.enum';
@@ -77,6 +78,38 @@ function build() {
 }
 
 describe('AssetsService direct uploads', () => {
+  it('blocks known payment-proof IDs on every content asset path', async () => {
+    const { service, prisma, storage } = build();
+    prisma.asset.findUnique.mockResolvedValue({
+      id: 'proof',
+      provider: 'BUNNY_STORAGE',
+      kind: AssetKind.PAYMENT_PROOF,
+      uploadedById: admin.id,
+      status: AssetStatus.READY,
+    });
+    for (const method of [
+      'get',
+      'adminAccess',
+      'completeUpload',
+      'archive',
+      'delete',
+    ] as const) {
+      await expect(service[method](admin, 'proof')).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+    }
+    await service.archiveIfUnreferenced(admin, 'proof');
+    expect(prisma.asset.update).not.toHaveBeenCalled();
+    expect(storage.inspect).not.toHaveBeenCalled();
+    expect(storage.delete).not.toHaveBeenCalled();
+    expect(() =>
+      service.assertCompatible(
+        { kind: AssetKind.PAYMENT_PROOF },
+        'TEXT' as any,
+      ),
+    ).toThrow(BadRequestException);
+  });
+
   it('keeps an asset referenced by an assessment video snapshot', async () => {
     const { service, prisma } = build();
     prisma.$transaction.mockResolvedValue([

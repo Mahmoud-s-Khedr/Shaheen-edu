@@ -310,4 +310,174 @@ describe('Admin question list hierarchy filters (e2e)', () => {
       expect(body.meta).toEqual({ page: 2, limit: 2, total: 4, totalPages: 2 });
     });
   });
+  it('returns only aggregate statistics to both content roles, with empty and unknown handling', async () => {
+    const created = await app.inject({
+      method: 'POST',
+      url: '/api/v1/admin/admins',
+      headers,
+      payload: {
+        email: 'statistics-admin@example.com',
+        password: 'AdminP@ss1!',
+      },
+    });
+    expect(created.statusCode).toBe(201);
+    const login = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/admins/login',
+      payload: {
+        email: 'statistics-admin@example.com',
+        password: 'AdminP@ss1!',
+      },
+    });
+    const adminHeaders = {
+      authorization: `Bearer ${JSON.parse(login.body).accessToken}`,
+    };
+    const questionId = Object.values(questions)[0];
+    for (const authorization of [headers, adminHeaders]) {
+      const response = await app.inject({
+        method: 'GET',
+        url: `/api/v1/admin/questions/${questionId}/statistics`,
+        headers: authorization,
+      });
+      expect(response.statusCode).toBe(200);
+      expect(JSON.parse(response.body)).toEqual({
+        questionId,
+        totalResponses: 0,
+        correctResponses: 0,
+        incorrectResponses: 0,
+        incorrectRate: null,
+        difficultyBand: null,
+        calculatedAt: null,
+      });
+      const unknown = await app.inject({
+        method: 'GET',
+        url: '/api/v1/admin/questions/unknown/statistics',
+        headers: authorization,
+      });
+      expect(unknown.statusCode).toBe(404);
+    }
+    await app.get(PrismaService).questionCommunityStat.create({
+      data: {
+        questionId,
+        totalResponses: 10,
+        correctResponses: 6,
+        incorrectResponses: 4,
+        incorrectRate: 0.4,
+        difficultyBand: 'B',
+      },
+    });
+    const response = await app.inject({
+      method: 'GET',
+      url: `/api/v1/admin/questions/${questionId}/statistics`,
+      headers: adminHeaders,
+    });
+    expect(JSON.parse(response.body)).toMatchObject({
+      questionId,
+      totalResponses: 10,
+      correctResponses: 6,
+      incorrectResponses: 4,
+      incorrectRate: 0.4,
+      difficultyBand: 'B',
+      calculatedAt: expect.any(String),
+    });
+  });
+  it('hides student identities in both report route families and review mutations', async () => {
+    const prisma = app.get(PrismaService);
+    const governorate = await prisma.governorate.create({
+      data: { nameAr: 'Test', nameEn: 'Test' },
+    });
+    const student = await prisma.user.create({
+      data: {
+        role: 'STUDENT',
+        status: 'ACTIVE',
+        loginIdentifier: 'secret-student@example.test',
+        passwordHash: 'unused',
+        studentProfile: {
+          create: {
+            fullName: 'Secret Student',
+            nationalIdHash: 'secret-hash',
+            nationalIdLast4: '1234',
+            governorate: 'Test',
+            governorateId: governorate.id,
+            parentPhoneNormalized: '01000000000',
+          },
+        },
+      },
+    });
+    const report = await prisma.questionReport.create({
+      data: {
+        questionId: Object.values(questions)[0],
+        studentUserId: student.id,
+        type: 'UNCLEAR_WORDING',
+        note: 'Please clarify',
+        questionSnapshot: {
+          id: Object.values(questions)[0],
+          body: 'Question',
+          student: { userId: student.id, fullName: 'Secret Student' },
+        },
+      },
+    });
+    await app.inject({
+      method: 'POST',
+      url: '/api/v1/admin/admins',
+      headers,
+      payload: {
+        email: 'moderation-admin@example.com',
+        password: 'AdminP@ss1!',
+      },
+    });
+    const login = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/admins/login',
+      payload: {
+        email: 'moderation-admin@example.com',
+        password: 'AdminP@ss1!',
+      },
+    });
+    expect(login.statusCode).toBe(201);
+    const adminHeaders = {
+      authorization: `Bearer ${JSON.parse(login.body).accessToken}`,
+    };
+    for (const prefix of [
+      'admin/question-reports',
+      'admin/assessments/question-reports',
+    ]) {
+      const response = await app.inject({
+        method: 'GET',
+        url: `/api/v1/${prefix}`,
+        headers: adminHeaders,
+      });
+      expect(response.statusCode).toBe(200);
+      expect(JSON.parse(response.body).data[0]).toMatchObject({
+        id: report.id,
+        note: 'Please clarify',
+      });
+      expect(response.body).not.toMatch(
+        /student|fullName|loginIdentifier|secret/i,
+      );
+      const reviewed = await app.inject({
+        method: 'POST',
+        url: `/api/v1/${prefix}/${report.id}/review`,
+        headers: adminHeaders,
+        payload: { status: 'UNDER_REVIEW', note: 'Investigating' },
+      });
+      expect(reviewed.statusCode).toBe(201);
+      expect(JSON.parse(reviewed.body)).toMatchObject({
+        id: report.id,
+        status: 'UNDER_REVIEW',
+      });
+      expect(reviewed.body).not.toMatch(
+        /student|fullName|loginIdentifier|secret/i,
+      );
+      const full = await app.inject({
+        method: 'GET',
+        url: `/api/v1/${prefix}`,
+        headers,
+      });
+      expect(JSON.parse(full.body).data[0]).toMatchObject({
+        studentUserId: student.id,
+        student: { fullName: 'Secret Student' },
+      });
+    }
+  });
 });

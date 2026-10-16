@@ -7373,3 +7373,16 @@ body as the assessment error-reflection route.
 Accept a multipart `file` recording and optional `language` query parameter,
 send the bytes to OpenRouter speech-to-text, and return its transcript without
 retaining the audio.
+
+
+## Admin content role update
+
+The [Admin permission matrix and dashboard handoff](admin-content-permissions-frontend-handoff.md) supersedes earlier Admin access descriptions throughout this reference. Restricted platform operations require Super Admin and return 403 for Admin. Both question-report route families and review mutation responses omit structured student identity for Admin. Video-feedback studentId filters require Super Admin. Pending grading and retry responses use the documented Admin projections.
+
+### `GET /api/v1/admin/question-banks/publishers`
+
+Roles: ADMIN, SUPER_ADMIN. Search with `q` and paginate with `page` (default 1) and `limit` (default 20, maximum 100). Returns active, non-deleted CONTENT_PUBLISHER accounts as `data: [{ userId, displayName }]` and the standard offset pagination `meta`. No other partner or account fields are returned. General partner endpoints require SUPER_ADMIN.
+
+### `GET /api/v1/admin/questions/{id}/statistics`
+
+Roles: ADMIN, SUPER_ADMIN. Returns `questionId`, `totalResponses`, `correctResponses`, `incorrectResponses`, `incorrectRate`, `difficultyBand`, `calculatedAt`. Counts are zero and rate/band/time are null when no aggregate exists. Unknown question: 404. No student or attempt records are exposed.

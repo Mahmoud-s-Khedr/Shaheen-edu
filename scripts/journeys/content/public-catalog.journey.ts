@@ -154,7 +154,7 @@ export const publicCatalogJourney: JourneyDefinition = {
     await step(
       'Unlocking the same outline for an entitled student',
       async () => {
-        const grant = await admin.request<any>('POST', '/admin/entitlements', {
+        const grant = await clients.superAdmin.request<any>('POST', '/admin/entitlements', {
           studentUserId: studentId,
           courseId: paidCourseId,
         });

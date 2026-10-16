@@ -1,3 +1,4 @@
+import { assertContentStaff } from '../../common/authorization/admin-authorization';
 import {
   explanationEnvelope,
   explanationPersistence,
@@ -8,7 +9,6 @@ import {
 import {
   BadRequestException,
   ConflictException,
-  ForbiddenException,
   HttpException,
   Injectable,
   Logger,
@@ -16,6 +16,7 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import {
+  AccountStatus,
   AssetKind,
   AssetStatus,
   ContentStatus,
@@ -29,10 +30,14 @@ import {
   Role,
   VideoProcessingStatus,
 } from '../../common/types/roles.enum';
-import { toPaginationMeta } from '../../common/dto/pagination-query.dto';
+import {
+  SearchPaginationQueryDto,
+  toPaginationMeta,
+} from '../../common/dto/pagination-query.dto';
 import type { RequestUser } from '../../common/types/request-with-user.types';
 import { PrismaService } from '../../database/prisma.service';
 import {
+  arabicMatch,
   paginateArabicSearch,
   sqlAnd,
 } from '../../common/search/arabic-search';
@@ -60,6 +65,63 @@ import {
 
 @Injectable()
 export class QuestionBanksService {
+  async listPublishers(actor: RequestUser, query: SearchPaginationQueryDto) {
+    assertContentStaff(actor);
+    const where = {
+      role: Role.PARTNER,
+      status: AccountStatus.ACTIVE,
+      deletedAt: null,
+      partnerProfile: { is: { partnerType: PartnerType.CONTENT_PUBLISHER } },
+    };
+    const { data, total } = await paginateArabicSearch({
+      prisma: this.prisma,
+      delegate: this.prisma.user,
+      target: 'user',
+      q: query.q,
+      scope: {
+        where: Prisma.sql`t.role = ${Role.PARTNER}::"Role" AND t.status = ${AccountStatus.ACTIVE}::"AccountStatus" AND t."deletedAt" IS NULL
+          AND EXISTS (SELECT 1 FROM "PartnerProfile" pp WHERE pp."userId" = t.id AND pp."partnerType" = ${PartnerType.CONTENT_PUBLISHER}::"PartnerType")`,
+        alsoMatches: Prisma.sql`EXISTS (SELECT 1 FROM "PartnerProfile" pp WHERE pp."userId" = t.id AND ${arabicMatch('partnerProfile', query.q ?? '', 'pp')})`,
+      },
+      where,
+      orderBySql: Prisma.sql`t."createdAt" DESC, t.id DESC`,
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      args: {
+        select: { id: true, partnerProfile: { select: { displayName: true } } },
+      },
+      page: query.page,
+      limit: query.limit,
+    });
+    return {
+      data: data.map((publisher) => ({
+        userId: publisher.id,
+        displayName: publisher.partnerProfile.displayName,
+      })),
+      meta: toPaginationMeta(query.page, query.limit, total),
+    };
+  }
+
+  async questionStatistics(actor: RequestUser, id: string) {
+    assertContentStaff(actor);
+    const question = await this.prisma.question.findUnique({
+      where: { id },
+      select: { id: true },
+    });
+    if (!question) throw new NotFoundException('Question not found');
+    const stats = await this.prisma.questionCommunityStat.findUnique({
+      where: { questionId: id },
+    });
+    return {
+      questionId: id,
+      totalResponses: stats?.totalResponses ?? 0,
+      correctResponses: stats?.correctResponses ?? 0,
+      incorrectResponses: stats?.incorrectResponses ?? 0,
+      incorrectRate: stats?.incorrectRate ?? null,
+      difficultyBand: stats?.difficultyBand ?? null,
+      calculatedAt: stats?.calculatedAt ?? null,
+    };
+  }
+
   private readonly logger = new Logger(QuestionBanksService.name);
   private static readonly LEGACY_ATTACHMENT_KINDS: AssetKind[] = [
     AssetKind.IMAGE,
@@ -83,8 +145,7 @@ export class QuestionBanksService {
     private readonly audit: AuditService,
   ) {}
   private admin(actor: RequestUser) {
-    if (actor.role !== Role.ADMIN && actor.role !== Role.SUPER_ADMIN)
-      throw new ForbiddenException('Forbidden');
+    assertContentStaff(actor);
   }
   private async log(
     actor: RequestUser,

@@ -60,6 +60,62 @@ describe('Admin (e2e)', () => {
     await app.close();
   });
 
+  it.each([
+    'students',
+    'partners',
+    'admins',
+    'publisher-agreements',
+    'entitlements',
+    'reports/commerce',
+    'geography/governorates',
+    'testimonials',
+  ])('denies Admin reads of %s', async (area) => {
+    const response = await app.inject({
+      method: 'GET',
+      url: `/api/v1/admin/${area}`,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(response.statusCode).toBe(403);
+  });
+
+  it.each([
+    'students/known-student/suspend',
+    'partners/known-partner/suspend',
+    'publisher-agreements/known-agreement/activate',
+  ])('denies Admin writes to %s before lookup', async (area) => {
+    const response = await app.inject({
+      method: 'POST',
+      url: `/api/v1/admin/${area}`,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(response.statusCode).toBe(403);
+  });
+
+  it('preserves Admin current-user and content access', async () => {
+    for (const path of [
+      'auth/me',
+      'admin/academic-grades',
+      'admin/question-banks',
+      'admin/questions',
+      'admin/assessments/grading/pending',
+      'admin/question-reports',
+      'admin/assessments/question-reports',
+    ]) {
+      const response = await app.inject({
+        method: 'GET',
+        url: `/api/v1/${path}`,
+        headers: { authorization: `Bearer ${adminToken}` },
+      });
+      expect(response.statusCode).toBe(200);
+    }
+    const filtered = await app.inject({
+      method: 'GET',
+      url: '/api/v1/admin/video-feedback?studentId=known-student',
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(filtered.statusCode).toBe(403);
+  });
+
   it('CANNOT create another admin (403)', async () => {
     const response = await app.inject({
       method: 'POST',
@@ -85,7 +141,7 @@ describe('Admin (e2e)', () => {
     const partnersResponse = await app.inject({
       method: 'GET',
       url: '/api/v1/admin/partners?page=3&limit=1',
-      headers: { authorization: `Bearer ${adminToken}` },
+      headers: { authorization: `Bearer ${superAdminToken}` },
     });
     expect(partnersResponse.statusCode).toBe(200);
     expect(JSON.parse(partnersResponse.body)).toEqual({
@@ -103,11 +159,11 @@ describe('Admin (e2e)', () => {
     expect(response.statusCode).toBe(403);
   });
 
-  it('CAN create a partner', async () => {
+  it('Super Admin can create a partner', async () => {
     const response = await app.inject({
       method: 'POST',
       url: '/api/v1/admin/partners',
-      headers: { authorization: `Bearer ${adminToken}` },
+      headers: { authorization: `Bearer ${superAdminToken}` },
       payload: {
         email: 'partner-by-admin@example.com',
         password: 'PartnerP@ss1!',
@@ -121,7 +177,7 @@ describe('Admin (e2e)', () => {
     const list = await app.inject({
       method: 'GET',
       url: '/api/v1/admin/partners',
-      headers: { authorization: `Bearer ${adminToken}` },
+      headers: { authorization: `Bearer ${superAdminToken}` },
     });
     expect(list.statusCode).toBe(200);
     expect(JSON.parse(list.body)).toMatchObject({
@@ -140,7 +196,7 @@ describe('Admin (e2e)', () => {
       app.inject({
         method: 'POST',
         url: '/api/v1/admin/partners',
-        headers: { authorization: `Bearer ${adminToken}` },
+        headers: { authorization: `Bearer ${superAdminToken}` },
         payload: {
           email,
           password: 'PartnerP@ss1!',
@@ -154,7 +210,7 @@ describe('Admin (e2e)', () => {
     const response = await app.inject({
       method: 'GET',
       url: '/api/v1/admin/partners?partnerType=REFERRAL_PARTNER&q=REFERRAL_PARTNER',
-      headers: { authorization: `Bearer ${adminToken}` },
+      headers: { authorization: `Bearer ${superAdminToken}` },
     });
 
     expect(response.statusCode).toBe(200);
@@ -162,5 +218,43 @@ describe('Admin (e2e)', () => {
       data: [expect.objectContaining({ partnerType: 'REFERRAL_PARTNER' })],
     });
     expect(JSON.parse(response.body).data).toHaveLength(1);
+  });
+  it('offers Admin only active publisher IDs and display names with search and pagination', async () => {
+    const created = await app.inject({
+      method: 'POST',
+      url: '/api/v1/admin/partners',
+      headers: { authorization: `Bearer ${superAdminToken}` },
+      payload: {
+        email: 'selector@example.com',
+        password: 'PublisherP@ss1!',
+        partnerType: 'CONTENT_PUBLISHER',
+        displayName: 'Selector Publisher',
+      },
+    });
+    expect(created.statusCode).toBe(201);
+    const publisherId = JSON.parse(created.body).id;
+    const headers = { authorization: `Bearer ${adminToken}` };
+    const read = () =>
+      app.inject({
+        method: 'GET',
+        url: '/api/v1/admin/question-banks/publishers?q=Selector&page=1&limit=1',
+        headers,
+      });
+    const response = await read();
+    expect(response.statusCode).toBe(200);
+    expect(JSON.parse(response.body)).toMatchObject({
+      data: [{ userId: publisherId, displayName: 'Selector Publisher' }],
+      meta: { total: 1, page: 1, limit: 1 },
+    });
+    expect(Object.keys(JSON.parse(response.body).data[0]).sort()).toEqual([
+      'displayName',
+      'userId',
+    ]);
+    await app.inject({
+      method: 'POST',
+      url: `/api/v1/admin/partners/${publisherId}/suspend`,
+      headers: { authorization: `Bearer ${superAdminToken}` },
+    });
+    expect(JSON.parse((await read()).body).data).toEqual([]);
   });
 });

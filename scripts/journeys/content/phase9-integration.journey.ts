@@ -284,7 +284,7 @@ export const phase9IntegrationJourney: JourneyDefinition = {
           ),
           201,
         );
-        const agreement = await admin.request<any>(
+        const agreement = await clients.superAdmin.request<any>(
           'POST',
           '/admin/publisher-agreements',
           {
@@ -299,7 +299,7 @@ export const phase9IntegrationJourney: JourneyDefinition = {
         );
         expectStatus(agreement, 201);
         expectStatus(
-          await admin.request<any>(
+          await clients.superAdmin.request<any>(
             'POST',
             `/admin/publisher-agreements/${agreement.body.id}/activate`,
           ),
@@ -436,7 +436,7 @@ export const phase9IntegrationJourney: JourneyDefinition = {
         context.created.students.push(deliveryStudentId);
 
         expectStatus(
-          await admin.request<any>('POST', '/admin/entitlements', {
+          await clients.superAdmin.request<any>('POST', '/admin/entitlements', {
             studentUserId: deliveryStudentId,
             courseId,
           }),

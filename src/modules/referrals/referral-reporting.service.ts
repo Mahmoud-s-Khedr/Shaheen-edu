@@ -1,3 +1,4 @@
+import { assertSuperAdmin } from '../../common/authorization/admin-authorization';
 import {
   BadRequestException,
   ConflictException,
@@ -9,7 +10,6 @@ import { DateTime } from 'luxon';
 import {
   PartnerAllocationKind,
   PartnerType,
-  Role,
 } from '../../common/types/roles.enum';
 import type { AppConfig } from '../../config/configuration';
 import { PrismaService } from '../../database/prisma.service';
@@ -87,8 +87,7 @@ export class ReferralReportingService {
       );
   }
   private admin(actor: RequestUser) {
-    if (actor.role !== Role.ADMIN && actor.role !== Role.SUPER_ADMIN)
-      throw new ForbiddenException('Forbidden');
+    assertSuperAdmin(actor);
   }
   private bucket(date: Date, granularity: 'day' | 'month'): string {
     const dt = DateTime.fromJSDate(date, { zone: 'utc' }).setZone(CAIRO);

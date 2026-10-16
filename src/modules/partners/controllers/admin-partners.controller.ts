@@ -38,7 +38,7 @@ import {
 @ApiTags('admin/partners')
 @ApiBearerAuth()
 @UseGuards(RolesGuard)
-@Roles(Role.SUPER_ADMIN, Role.ADMIN)
+@Roles(Role.SUPER_ADMIN)
 @Controller({ path: 'admin/partners', version: '1' })
 export class AdminPartnersController {
   constructor(private readonly partnersService: PartnersService) {}
@@ -58,16 +58,19 @@ export class AdminPartnersController {
   })
   @ApiOkResponse({ type: PaginatedPartnerResponseDto })
   @ApiStandardErrors(400, 401, 403)
-  list(@Query() pagination: QueryAdminPartnersDto) {
-    return this.partnersService.list(pagination);
+  list(
+    @CurrentUser() actor: RequestUser,
+    @Query() pagination: QueryAdminPartnersDto,
+  ) {
+    return this.partnersService.list(actor, pagination);
   }
 
   @Get(':id')
   @ApiOperation({ summary: 'Get a partner by ID' })
   @ApiOkResponse({ type: PartnerSummaryDto })
   @ApiStandardErrors(401, 403, 404)
-  getById(@Param('id') id: string) {
-    return this.partnersService.getById(id);
+  getById(@CurrentUser() actor: RequestUser, @Param('id') id: string) {
+    return this.partnersService.getById(actor, id);
   }
 
   @Get(':id/detail')

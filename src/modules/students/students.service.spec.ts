@@ -6,7 +6,7 @@ import {
 import { StudentsService } from './students.service';
 import { AccountStatus, Role } from '../../common/types/roles.enum';
 
-const actor = { id: 'admin-1', role: Role.ADMIN, sessionId: 'session-1' };
+const actor = { id: 'admin-1', role: Role.SUPER_ADMIN, sessionId: 'session-1' };
 
 describe('StudentsService administration', () => {
   const tx = {
@@ -297,7 +297,12 @@ describe('StudentsService Student 360', () => {
       service.student360(actor, 'student-1', undefined, 'CONTACT'),
     ).rejects.toBeInstanceOf(BadRequestException);
     await expect(
-      service.student360(actor, 'student-1', 'support request', 'AUDIT_EVENTS'),
+      service.student360(
+        { ...actor, role: Role.ADMIN },
+        'student-1',
+        'support request',
+        'AUDIT_EVENTS',
+      ),
     ).rejects.toBeInstanceOf(ForbiddenException);
     expect(prisma.user.findFirst).not.toHaveBeenCalled();
   });

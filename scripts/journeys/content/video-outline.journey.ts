@@ -127,7 +127,7 @@ export const videoOutlineJourney: JourneyDefinition = {
         // session therefore needs an explicit grant before this journey can
         // exercise the protected student-delivery endpoint.
         expectStatus(
-          await admin.request('POST', '/admin/entitlements', {
+          await clients.superAdmin.request('POST', '/admin/entitlements', {
             studentUserId: studentId,
             courseId,
           }),

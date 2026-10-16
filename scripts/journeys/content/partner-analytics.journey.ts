@@ -9,7 +9,6 @@ export const partnerAnalyticsJourney: JourneyDefinition = {
   dependsOn: ['CONTENT-005', 'CONTENT-012'],
   async run({ clients, context, factory, step }) {
     const partner = clients.partner;
-    const admin = clients.admin;
     const courseId = String(context.academic.courseId);
     const chapterId = String(context.academic.chapterId);
 
@@ -110,7 +109,7 @@ export const partnerAnalyticsJourney: JourneyDefinition = {
       async () => {
         const email = factory.email('referral-reporting');
         const password = factory.password('Referral');
-        const created = await admin.request<any>('POST', '/admin/partners', {
+        const created = await clients.superAdmin.request<any>('POST', '/admin/partners', {
           email,
           password,
           partnerType: 'REFERRAL_PARTNER',

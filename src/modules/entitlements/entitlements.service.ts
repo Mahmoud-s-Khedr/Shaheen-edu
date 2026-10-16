@@ -1,6 +1,6 @@
+import { assertSuperAdmin } from '../../common/authorization/admin-authorization';
 import {
   BadRequestException,
-  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -27,8 +27,7 @@ export class EntitlementsService {
   ) {}
 
   private assertAdmin(actor: RequestUser) {
-    if (actor.role !== Role.ADMIN && actor.role !== Role.SUPER_ADMIN)
-      throw new ForbiddenException('Forbidden');
+    assertSuperAdmin(actor);
   }
 
   private entitlementDto(entitlement: any) {

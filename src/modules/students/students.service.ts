@@ -1,7 +1,7 @@
+import { assertSuperAdmin } from '../../common/authorization/admin-authorization';
 import {
   BadRequestException,
   ConflictException,
-  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -757,9 +757,7 @@ export class StudentsService {
   }
 
   private assertAdmin(actor: RequestUser) {
-    if (actor.role !== Role.ADMIN && actor.role !== Role.SUPER_ADMIN) {
-      throw new ForbiddenException('Forbidden');
-    }
+    assertSuperAdmin(actor);
   }
 
   private async getStudentOrThrow(targetId: string) {

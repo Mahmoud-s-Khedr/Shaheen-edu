@@ -241,14 +241,14 @@ export const studentCatalogJourney: JourneyDefinition = {
       'Applying a chapter entitlement without unlocking sibling content',
       async () => {
         expectStatus(
-          await admin.request<any>('POST', '/admin/entitlements', {
+          await clients.superAdmin.request<any>('POST', '/admin/entitlements', {
             studentUserId: studentId,
             chapterId: entitledChapterId,
           }),
           201,
         );
         expectStatus(
-          await admin.request<any>('POST', '/admin/entitlements', {
+          await clients.superAdmin.request<any>('POST', '/admin/entitlements', {
             studentUserId: existingStudent.id,
             courseId,
           }),

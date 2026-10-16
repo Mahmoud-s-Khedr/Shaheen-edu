@@ -1,7 +1,7 @@
+import { assertSuperAdmin } from '../../common/authorization/admin-authorization';
 import {
   BadRequestException,
   ConflictException,
-  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -10,7 +10,6 @@ import {
   PartnerAllocationState,
   PaymentAttemptStatus,
   PaymentChannel,
-  Role,
 } from '../../common/types/roles.enum';
 import { toPaginationMeta } from '../../common/dto/pagination-query.dto';
 import type { RequestUser } from '../../common/types/request-with-user.types';
@@ -37,8 +36,7 @@ export class PartnerFinanceService {
     private readonly usageRollups: PublisherUsageRollupsService,
   ) {}
   private admin(actor: RequestUser) {
-    if (actor.role !== Role.ADMIN && actor.role !== Role.SUPER_ADMIN)
-      throw new ForbiddenException('Forbidden');
+    assertSuperAdmin(actor);
   }
   private dateRange(from?: string, to?: string) {
     if (!from && !to) return undefined;

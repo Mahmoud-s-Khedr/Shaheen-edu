@@ -13,7 +13,7 @@ import {
 } from '../../common/types/roles.enum';
 import { TestimonialsService } from './testimonials.service';
 
-const actor = { id: 'admin-1', role: Role.ADMIN, sessionId: 'session-1' };
+const actor = { id: 'admin-1', role: Role.SUPER_ADMIN, sessionId: 'session-1' };
 const draft = {
   id: 'testimonial-1',
   reviewText: 'Clear explanations made a real difference.',

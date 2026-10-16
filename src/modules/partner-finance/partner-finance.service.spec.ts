@@ -2,7 +2,7 @@ import { ConflictException } from '@nestjs/common';
 import { PartnerAllocationState, Role } from '../../common/types/roles.enum';
 import { PartnerFinanceService } from './partner-finance.service';
 
-const actor = { id: 'admin-1', role: Role.ADMIN } as any;
+const actor = { id: 'admin-1', role: Role.SUPER_ADMIN } as any;
 
 describe('PartnerFinanceService settlements', () => {
   function build() {

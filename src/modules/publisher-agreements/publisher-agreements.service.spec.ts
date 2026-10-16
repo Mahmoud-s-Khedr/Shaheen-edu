@@ -38,7 +38,7 @@ describe('PublisherAgreementsService replacement', () => {
       record: jest.fn(),
     } as any);
     jest
-      .spyOn(service, 'getOrThrow')
+      .spyOn(service as any, 'getOrThrow')
       .mockResolvedValueOnce(prior)
       .mockResolvedValueOnce({
         ...prior,
@@ -46,7 +46,7 @@ describe('PublisherAgreementsService replacement', () => {
         version: 3,
       });
     await service.replace(
-      { id: 'admin-1', role: Role.ADMIN } as any,
+      { id: 'admin-1', role: Role.SUPER_ADMIN } as any,
       'agreement-1',
       {
         publisherUserId: 'publisher-1',

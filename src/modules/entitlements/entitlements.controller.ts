@@ -32,7 +32,7 @@ import { EntitlementsService } from './entitlements.service';
 @ApiTags('admin/entitlements')
 @ApiBearerAuth()
 @UseGuards(RolesGuard)
-@Roles(Role.ADMIN, Role.SUPER_ADMIN)
+@Roles(Role.SUPER_ADMIN)
 @Controller({ path: 'admin/entitlements', version: '1' })
 export class EntitlementsController {
   constructor(private readonly service: EntitlementsService) {}

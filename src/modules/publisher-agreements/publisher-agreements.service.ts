@@ -1,14 +1,16 @@
 import {
+  assertContentStaff,
+  assertSuperAdmin,
+} from '../../common/authorization/admin-authorization';
+import {
   BadRequestException,
   ConflictException,
-  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import {
   PartnerType,
   PublisherAgreementStatus,
-  Role,
 } from '../../common/types/roles.enum';
 import { PrismaService } from '../../database/prisma.service';
 import { AuditService } from '../audit/audit.service';
@@ -33,8 +35,7 @@ export class PublisherAgreementsService {
   ) {}
 
   private assertAdmin(actor: RequestUser) {
-    if (actor.role !== Role.ADMIN && actor.role !== Role.SUPER_ADMIN)
-      throw new ForbiddenException('Forbidden');
+    assertContentStaff(actor);
   }
   private agreementDto(agreement: any) {
     const { publisher, course, chapter, lesson, ...record } = agreement;
@@ -145,7 +146,7 @@ export class PublisherAgreementsService {
   }
 
   async create(actor: RequestUser, dto: CreatePublisherAgreementDto) {
-    this.assertAdmin(actor);
+    assertSuperAdmin(actor);
     await this.assertTargetExists(dto);
     await this.assertPublisher(dto.publisherUserId);
     this.assertDates(dto.startsAt, dto.endsAt);
@@ -166,7 +167,7 @@ export class PublisherAgreementsService {
     id: string,
     dto: UpdatePublisherAgreementDto,
   ) {
-    this.assertAdmin(actor);
+    assertSuperAdmin(actor);
     const agreement = await this.getOrThrow(id);
     if (agreement.status !== PublisherAgreementStatus.DRAFT)
       throw new ConflictException('Only draft agreements can be updated');
@@ -186,7 +187,7 @@ export class PublisherAgreementsService {
     return this.agreementDto(await this.getOrThrow(id));
   }
   async activate(actor: RequestUser, id: string) {
-    this.assertAdmin(actor);
+    assertSuperAdmin(actor);
     const agreement = await this.getOrThrow(id);
     if (agreement.status !== PublisherAgreementStatus.DRAFT)
       throw new ConflictException('Only draft agreements can be activated');
@@ -238,7 +239,7 @@ export class PublisherAgreementsService {
     return this.agreementDto(await this.getOrThrow(updated.id));
   }
   async end(actor: RequestUser, id: string, dto: EndPublisherAgreementDto) {
-    this.assertAdmin(actor);
+    assertSuperAdmin(actor);
     const agreement = await this.getOrThrow(id);
     if (agreement.status !== PublisherAgreementStatus.ACTIVE)
       throw new ConflictException('Only active agreements can be ended');
@@ -261,7 +262,7 @@ export class PublisherAgreementsService {
     id: string,
     dto: ReplacePublisherAgreementDto,
   ) {
-    this.assertAdmin(actor);
+    assertSuperAdmin(actor);
     const prior = await this.getOrThrow(id);
     if (prior.status !== PublisherAgreementStatus.ACTIVE)
       throw new ConflictException('Only active agreements can be replaced');
@@ -318,7 +319,7 @@ export class PublisherAgreementsService {
     return this.agreementDto(await this.getOrThrow(created.id));
   }
   async list(actor: RequestUser, query: PublisherAgreementsQueryDto) {
-    this.assertAdmin(actor);
+    assertSuperAdmin(actor);
     const where = query.history
       ? {}
       : { status: { not: PublisherAgreementStatus.ENDED } };
@@ -337,7 +338,7 @@ export class PublisherAgreementsService {
       meta: toPaginationMeta(query.page, query.limit, total),
     };
   }
-  async getOrThrow(id: string) {
+  private async getOrThrow(id: string) {
     const agreement = await this.prisma.publisherAgreement.findUnique({
       where: { id },
       include: this.agreementInclude(),
@@ -369,7 +370,7 @@ export class PublisherAgreementsService {
     ];
   }
   async resolve(actor: RequestUser, target: Target, at = new Date()) {
-    this.assertAdmin(actor);
+    assertSuperAdmin(actor);
     const targets = await this.hierarchyTarget(target);
     for (const candidate of targets) {
       const agreement = await this.prisma.publisherAgreement.findFirst({

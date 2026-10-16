@@ -30,7 +30,7 @@ import { PartnerFinanceService } from './partner-finance.service';
 @ApiTags('admin/partner-finance')
 @ApiBearerAuth()
 @UseGuards(RolesGuard)
-@Roles(Role.ADMIN, Role.SUPER_ADMIN)
+@Roles(Role.SUPER_ADMIN)
 @Controller({ path: 'admin/partner-finance', version: '1' })
 export class PartnerFinanceController {
   constructor(private readonly finance: PartnerFinanceService) {}

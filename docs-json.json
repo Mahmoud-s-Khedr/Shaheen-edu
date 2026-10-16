@@ -1441,6 +1441,9 @@
         "summary": "Create a partner account",
         "tags": [
           "admin/partners"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       },
       "get": {
@@ -1545,6 +1548,9 @@
         "summary": "List partner accounts",
         "tags": [
           "admin/partners"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -1611,6 +1617,9 @@
         "summary": "Get a partner by ID",
         "tags": [
           "admin/partners"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       },
       "patch": {
@@ -1695,6 +1704,9 @@
         "summary": "Update a partner profile",
         "tags": [
           "admin/partners"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -1752,6 +1764,9 @@
         "summary": "Get administrative partner account, programme, ledger, and audit history",
         "tags": [
           "admin/partners"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -1848,6 +1863,9 @@
         "summary": "Change a partner login email and revoke sessions",
         "tags": [
           "admin/partners"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -1914,6 +1932,9 @@
         "summary": "Suspend a partner and revoke sessions",
         "tags": [
           "admin/partners"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -1980,6 +2001,9 @@
         "summary": "Reactivate a partner",
         "tags": [
           "admin/partners"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -2076,6 +2100,9 @@
         "summary": "Set a partner password without requiring a password change",
         "tags": [
           "admin/partners"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -2133,6 +2160,9 @@
         "summary": "Get the authenticated partner profile",
         "tags": [
           "partners"
+        ],
+        "x-roles": [
+          "PARTNER"
         ]
       },
       "patch": {
@@ -2208,6 +2238,9 @@
         "summary": "Update the authenticated partner profile",
         "tags": [
           "partners"
+        ],
+        "x-roles": [
+          "PARTNER"
         ]
       }
     },
@@ -2265,6 +2298,9 @@
         "summary": "Get the authenticated student profile",
         "tags": [
           "students"
+        ],
+        "x-roles": [
+          "STUDENT"
         ]
       },
       "patch": {
@@ -2340,6 +2376,9 @@
         "summary": "Update the authenticated student profile",
         "tags": [
           "students"
+        ],
+        "x-roles": [
+          "STUDENT"
         ]
       }
     },
@@ -2478,6 +2517,9 @@
         "summary": "List student accounts",
         "tags": [
           "admin/students"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -2544,6 +2586,9 @@
         "summary": "Get a student account",
         "tags": [
           "admin/students"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       },
       "delete": {
@@ -2641,6 +2686,9 @@
         "summary": "Soft-delete a student account",
         "tags": [
           "admin/students"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -2676,6 +2724,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -2686,6 +2737,9 @@
         "summary": "Get an audited Student 360 summary; national ID is limited to the stored last four digits",
         "tags": [
           "admin/students"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -2738,6 +2792,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -2748,6 +2805,9 @@
         "summary": "List audited Student 360 order records",
         "tags": [
           "admin/students"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -2800,6 +2860,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -2810,6 +2873,9 @@
         "summary": "List audited Student 360 entitlement records",
         "tags": [
           "admin/students"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -2862,6 +2928,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -2872,6 +2941,9 @@
         "summary": "List audited Student 360 assessment records",
         "tags": [
           "admin/students"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -2924,6 +2996,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -2934,6 +3009,9 @@
         "summary": "List audited Student 360 administrative events",
         "tags": [
           "admin/students"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -3010,6 +3088,9 @@
         "summary": "Suspend a student and revoke sessions",
         "tags": [
           "admin/students"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -3086,6 +3167,9 @@
         "summary": "Reactivate a suspended student",
         "tags": [
           "admin/students"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -3162,6 +3246,9 @@
         "summary": "Reset a student password",
         "tags": [
           "admin/students"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -3218,6 +3305,9 @@
         "summary": "Revoke all active refresh sessions for a student",
         "tags": [
           "admin/students"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -3295,6 +3385,10 @@
         "summary": "Create an academic grade",
         "tags": [
           "admin/academic-grades"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       },
       "get": {
@@ -3400,6 +3494,10 @@
         "summary": "List academic grades",
         "tags": [
           "admin/academic-grades"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -3466,6 +3564,10 @@
         "summary": "Get an academic grade by ID",
         "tags": [
           "admin/academic-grades"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       },
       "patch": {
@@ -3560,6 +3662,10 @@
         "summary": "Update an academic grade",
         "tags": [
           "admin/academic-grades"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       },
       "delete": {
@@ -3624,6 +3730,10 @@
         "summary": "Delete an eligible draft or archived academic grade",
         "tags": [
           "admin/academic-grades"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -3701,6 +3811,10 @@
         "summary": "Atomically reorder academic grades",
         "tags": [
           "admin/academic-grades"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -3777,6 +3891,10 @@
         "summary": "Publish an academic grade",
         "tags": [
           "admin/academic-grades"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -3853,6 +3971,10 @@
         "summary": "Archive an academic grade",
         "tags": [
           "admin/academic-grades"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -3929,6 +4051,10 @@
         "summary": "Restore an archived academic grade",
         "tags": [
           "admin/academic-grades"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -4084,6 +4210,10 @@
         "summary": "Create a subject",
         "tags": [
           "admin/subjects"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       },
       "get": {
@@ -4197,6 +4327,10 @@
         "summary": "List subjects",
         "tags": [
           "admin/subjects"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -4263,6 +4397,10 @@
         "summary": "Get a subject by ID",
         "tags": [
           "admin/subjects"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       },
       "patch": {
@@ -4357,6 +4495,10 @@
         "summary": "Update a subject",
         "tags": [
           "admin/subjects"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       },
       "delete": {
@@ -4421,6 +4563,10 @@
         "summary": "Delete an eligible draft or archived subject",
         "tags": [
           "admin/subjects"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -4498,6 +4644,10 @@
         "summary": "Atomically reorder subjects within an academic grade",
         "tags": [
           "admin/subjects"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -4594,6 +4744,10 @@
         "summary": "Move a subject to a different academic grade",
         "tags": [
           "admin/subjects"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -4670,6 +4824,10 @@
         "summary": "Publish a subject",
         "tags": [
           "admin/subjects"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -4746,6 +4904,10 @@
         "summary": "Archive a subject",
         "tags": [
           "admin/subjects"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -4822,6 +4984,10 @@
         "summary": "Restore an archived subject",
         "tags": [
           "admin/subjects"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -4879,6 +5045,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -4889,6 +5058,10 @@
         "summary": "List constants for a subject",
         "tags": [
           "admin/subjects/constants"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       },
       "post": {
@@ -4923,6 +5096,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -4933,6 +5109,10 @@
         "summary": "Create a subject constant",
         "tags": [
           "admin/subjects/constants"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -4967,6 +5147,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -4977,6 +5160,10 @@
         "summary": "Get a subject constant",
         "tags": [
           "admin/subjects/constants"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       },
       "patch": {
@@ -5019,6 +5206,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -5029,6 +5219,10 @@
         "summary": "Update a subject constant",
         "tags": [
           "admin/subjects/constants"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       },
       "delete": {
@@ -5054,6 +5248,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -5064,6 +5261,10 @@
         "summary": "Delete a subject constant",
         "tags": [
           "admin/subjects/constants"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -5151,6 +5352,10 @@
         "summary": "Create a course",
         "tags": [
           "admin/courses"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       },
       "get": {
@@ -5264,6 +5469,10 @@
         "summary": "List courses",
         "tags": [
           "admin/courses"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -5330,6 +5539,10 @@
         "summary": "Get a course by ID",
         "tags": [
           "admin/courses"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       },
       "patch": {
@@ -5424,6 +5637,10 @@
         "summary": "Update a course",
         "tags": [
           "admin/courses"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       },
       "delete": {
@@ -5488,6 +5705,10 @@
         "summary": "Delete an eligible draft or archived course",
         "tags": [
           "admin/courses"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -5517,6 +5738,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -5527,6 +5751,10 @@
         "summary": "Set the course access type",
         "tags": [
           "admin/courses"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -5604,6 +5832,10 @@
         "summary": "Atomically reorder courses within a subject",
         "tags": [
           "admin/courses"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -5700,6 +5932,10 @@
         "summary": "Move a course to a different subject",
         "tags": [
           "admin/courses"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -5776,6 +6012,10 @@
         "summary": "Publish a course",
         "tags": [
           "admin/courses"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -5852,6 +6092,10 @@
         "summary": "Archive a course",
         "tags": [
           "admin/courses"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -5928,6 +6172,10 @@
         "summary": "Restore an archived course",
         "tags": [
           "admin/courses"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -6015,6 +6263,10 @@
         "summary": "Create a chapter",
         "tags": [
           "admin/chapters"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       },
       "get": {
@@ -6128,6 +6380,10 @@
         "summary": "List chapters",
         "tags": [
           "admin/chapters"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -6194,6 +6450,10 @@
         "summary": "Get a chapter by ID",
         "tags": [
           "admin/chapters"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       },
       "patch": {
@@ -6288,6 +6548,10 @@
         "summary": "Update a chapter",
         "tags": [
           "admin/chapters"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       },
       "delete": {
@@ -6352,6 +6616,10 @@
         "summary": "Delete an eligible draft or archived chapter",
         "tags": [
           "admin/chapters"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -6381,6 +6649,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -6391,6 +6662,10 @@
         "summary": "Set the chapter access type",
         "tags": [
           "admin/chapters"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -6468,6 +6743,10 @@
         "summary": "Atomically reorder chapters within a course",
         "tags": [
           "admin/chapters"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -6564,6 +6843,10 @@
         "summary": "Move a chapter to a different course",
         "tags": [
           "admin/chapters"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -6640,6 +6923,10 @@
         "summary": "Publish a chapter",
         "tags": [
           "admin/chapters"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -6716,6 +7003,10 @@
         "summary": "Archive a chapter",
         "tags": [
           "admin/chapters"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -6792,6 +7083,10 @@
         "summary": "Restore an archived chapter",
         "tags": [
           "admin/chapters"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -6879,6 +7174,10 @@
         "summary": "Create a lesson",
         "tags": [
           "admin/lessons"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       },
       "get": {
@@ -6992,6 +7291,10 @@
         "summary": "List lessons",
         "tags": [
           "admin/lessons"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -7058,6 +7361,10 @@
         "summary": "Get a lesson by ID",
         "tags": [
           "admin/lessons"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       },
       "patch": {
@@ -7152,6 +7459,10 @@
         "summary": "Update a lesson",
         "tags": [
           "admin/lessons"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       },
       "delete": {
@@ -7216,6 +7527,10 @@
         "summary": "Delete an eligible draft or archived lesson",
         "tags": [
           "admin/lessons"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -7245,6 +7560,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -7255,6 +7573,10 @@
         "summary": "Set the lesson access type",
         "tags": [
           "admin/lessons"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -7332,6 +7654,10 @@
         "summary": "Atomically reorder lessons within a chapter",
         "tags": [
           "admin/lessons"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -7428,6 +7754,10 @@
         "summary": "Move a lesson to a different chapter",
         "tags": [
           "admin/lessons"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -7504,6 +7834,10 @@
         "summary": "Publish a lesson",
         "tags": [
           "admin/lessons"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -7580,6 +7914,10 @@
         "summary": "Archive a lesson",
         "tags": [
           "admin/lessons"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -7656,6 +7994,10 @@
         "summary": "Restore an archived lesson",
         "tags": [
           "admin/lessons"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -7743,6 +8085,10 @@
         "summary": "Create a section",
         "tags": [
           "admin/sections"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       },
       "get": {
@@ -7856,6 +8202,10 @@
         "summary": "List sections",
         "tags": [
           "admin/sections"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -7922,6 +8272,10 @@
         "summary": "Get a section by ID",
         "tags": [
           "admin/sections"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       },
       "patch": {
@@ -8016,6 +8370,10 @@
         "summary": "Update a section",
         "tags": [
           "admin/sections"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       },
       "delete": {
@@ -8080,6 +8438,10 @@
         "summary": "Delete an eligible draft or archived section",
         "tags": [
           "admin/sections"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -8109,6 +8471,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -8119,6 +8484,10 @@
         "summary": "Set the section access type",
         "tags": [
           "admin/sections"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -8196,6 +8565,10 @@
         "summary": "Atomically reorder sections within a lesson",
         "tags": [
           "admin/sections"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -8292,6 +8665,10 @@
         "summary": "Move a section to a different lesson",
         "tags": [
           "admin/sections"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -8368,6 +8745,10 @@
         "summary": "Publish a section",
         "tags": [
           "admin/sections"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -8444,6 +8825,10 @@
         "summary": "Archive a section",
         "tags": [
           "admin/sections"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -8520,6 +8905,10 @@
         "summary": "Restore an archived section",
         "tags": [
           "admin/sections"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -8607,6 +8996,10 @@
         "summary": "Create a content item at one hierarchy target",
         "tags": [
           "admin/content-items"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       },
       "get": {
@@ -8773,6 +9166,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -8783,6 +9179,10 @@
         "summary": "List content items",
         "tags": [
           "admin/content-items"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -8809,6 +9209,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -8819,6 +9222,10 @@
         "summary": "Get a content item by ID",
         "tags": [
           "admin/content-items"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       },
       "patch": {
@@ -8853,6 +9260,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -8863,6 +9273,10 @@
         "summary": "Update a content item",
         "tags": [
           "admin/content-items"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       },
       "delete": {
@@ -8880,6 +9294,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -8890,6 +9307,10 @@
         "summary": "Delete an eligible draft or archived content item",
         "tags": [
           "admin/content-items"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -8926,6 +9347,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -8936,6 +9360,10 @@
         "summary": "Replace the optional ordered topics and concepts for a video",
         "tags": [
           "admin/content-items"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -8965,6 +9393,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -8975,6 +9406,10 @@
         "summary": "Set the content item access type",
         "tags": [
           "admin/content-items"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -9052,6 +9487,10 @@
         "summary": "Atomically reorder all content at one target",
         "tags": [
           "admin/content-items"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -9088,6 +9527,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -9098,6 +9540,10 @@
         "summary": "Move a content item to a hierarchy target",
         "tags": [
           "admin/content-items"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -9117,6 +9563,9 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -9127,6 +9576,10 @@
         "summary": "Publish a content item",
         "tags": [
           "admin/content-items"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -9146,6 +9599,9 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -9156,6 +9612,10 @@
         "summary": "Archive a content item",
         "tags": [
           "admin/content-items"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -9175,6 +9635,9 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -9185,6 +9648,10 @@
         "summary": "Restore an archived content item as draft",
         "tags": [
           "admin/content-items"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -9204,6 +9671,9 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -9214,6 +9684,10 @@
         "summary": "Set the content item primary asset",
         "tags": [
           "admin/content-items"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -9233,6 +9707,9 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -9243,6 +9720,10 @@
         "summary": "Add an ordered attachment to a content item",
         "tags": [
           "admin/content-items"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -9262,6 +9743,9 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -9272,6 +9756,10 @@
         "summary": "Reorder content item attachments",
         "tags": [
           "admin/content-items"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -9299,6 +9787,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -9309,6 +9800,10 @@
         "summary": "Remove an attachment from a content item",
         "tags": [
           "admin/content-items"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -9328,6 +9823,9 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -9338,6 +9836,10 @@
         "summary": "Authorize a direct Bunny file upload",
         "tags": [
           "admin/assets"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -9357,6 +9859,9 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -9367,6 +9872,10 @@
         "summary": "Verify a direct Bunny upload and mark its asset ready",
         "tags": [
           "admin/assets"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -9401,6 +9910,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -9411,6 +9923,10 @@
         "summary": "List assets",
         "tags": [
           "admin/assets"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -9430,6 +9946,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -9440,6 +9959,10 @@
         "summary": "Get an asset by ID",
         "tags": [
           "admin/assets"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       },
       "delete": {
@@ -9457,6 +9980,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -9467,6 +9993,10 @@
         "summary": "Delete an unused draft asset",
         "tags": [
           "admin/assets"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -9486,6 +10016,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -9496,6 +10029,10 @@
         "summary": "Get a short-lived preview URL for an admin asset",
         "tags": [
           "admin/assets"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -9515,6 +10052,9 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -9525,6 +10065,10 @@
         "summary": "Archive an asset",
         "tags": [
           "admin/assets"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -9552,6 +10096,9 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -9562,6 +10109,10 @@
         "summary": "Set a hierarchy record cover image",
         "tags": [
           "admin/assets"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       },
       "delete": {
@@ -9587,6 +10138,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -9597,6 +10151,10 @@
         "summary": "Remove a hierarchy record cover image",
         "tags": [
           "admin/assets"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -9661,6 +10219,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -9671,6 +10232,9 @@
         "summary": "Grant a student entitlement",
         "tags": [
           "admin/entitlements"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       },
       "get": {
@@ -9718,6 +10282,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -9728,6 +10295,9 @@
         "summary": "List student entitlements",
         "tags": [
           "admin/entitlements"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -9754,6 +10324,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -9764,6 +10337,9 @@
         "summary": "Revoke a student entitlement",
         "tags": [
           "admin/entitlements"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -9783,6 +10359,9 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -9793,6 +10372,9 @@
         "summary": "Revoke retained archived access for a student",
         "tags": [
           "admin/entitlements"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -9824,6 +10406,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -9834,6 +10419,9 @@
         "summary": "Get a content item the student can access",
         "tags": [
           "student/content"
+        ],
+        "x-roles": [
+          "STUDENT"
         ]
       }
     },
@@ -9917,6 +10505,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -9927,6 +10518,9 @@
         "summary": "Get a protected asset access URL for an entitled student",
         "tags": [
           "student/content-assets"
+        ],
+        "x-roles": [
+          "STUDENT"
         ]
       }
     },
@@ -9937,6 +10531,9 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -9947,6 +10544,10 @@
         "summary": "Create a video asset",
         "tags": [
           "admin/videos"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -9966,6 +10567,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -9976,6 +10580,10 @@
         "summary": "Get a video asset by ID",
         "tags": [
           "admin/videos"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       },
       "delete": {
@@ -9993,6 +10601,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -10003,6 +10614,10 @@
         "summary": "Delete an unreferenced Bunny video asset",
         "tags": [
           "admin/videos"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -10022,6 +10637,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -10032,6 +10650,10 @@
         "summary": "Get a short-lived preview URL for an admin video asset",
         "tags": [
           "admin/videos"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -10051,6 +10673,9 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -10061,6 +10686,10 @@
         "summary": "Create a short-lived direct-upload authorization",
         "tags": [
           "admin/videos"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -10080,6 +10709,9 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -10090,6 +10722,10 @@
         "summary": "Record client-reported direct-upload completion",
         "tags": [
           "admin/videos"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -10109,6 +10745,9 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -10119,6 +10758,10 @@
         "summary": "Retry a failed video asset",
         "tags": [
           "admin/videos"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -10188,6 +10831,10 @@
         "summary": "Archive a video asset",
         "tags": [
           "admin/videos"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -10659,6 +11306,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -10669,6 +11319,9 @@
         "summary": "Get the authenticated student catalogue summary",
         "tags": [
           "student/catalog"
+        ],
+        "x-roles": [
+          "STUDENT"
         ]
       }
     },
@@ -10721,6 +11374,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -10731,6 +11387,9 @@
         "summary": "List published subjects in the student grade",
         "tags": [
           "student/catalog"
+        ],
+        "x-roles": [
+          "STUDENT"
         ]
       }
     },
@@ -10791,6 +11450,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -10801,6 +11463,9 @@
         "summary": "List grade-scoped courses for a subject",
         "tags": [
           "student/catalog"
+        ],
+        "x-roles": [
+          "STUDENT"
         ]
       }
     },
@@ -10866,6 +11531,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -10876,6 +11544,9 @@
         "summary": "Search published chapters, lessons, and sections within a subject",
         "tags": [
           "student/catalog"
+        ],
+        "x-roles": [
+          "STUDENT"
         ]
       }
     },
@@ -10902,6 +11573,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -10912,6 +11586,9 @@
         "summary": "Get a grade-scoped course",
         "tags": [
           "student/catalog"
+        ],
+        "x-roles": [
+          "STUDENT"
         ]
       }
     },
@@ -10969,6 +11646,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -10979,6 +11659,9 @@
         "summary": "List published chapters in a grade-scoped course",
         "tags": [
           "student/catalog"
+        ],
+        "x-roles": [
+          "STUDENT"
         ]
       }
     },
@@ -11036,6 +11719,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -11046,6 +11732,9 @@
         "summary": "List published lessons in a grade-scoped chapter",
         "tags": [
           "student/catalog"
+        ],
+        "x-roles": [
+          "STUDENT"
         ]
       }
     },
@@ -11145,6 +11834,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -11155,6 +11847,9 @@
         "summary": "List all accessible published lessons in the student grade",
         "tags": [
           "student/catalog"
+        ],
+        "x-roles": [
+          "STUDENT"
         ]
       }
     },
@@ -11263,6 +11958,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -11273,6 +11971,9 @@
         "summary": "List all accessible published sections in the student grade",
         "tags": [
           "student/catalog"
+        ],
+        "x-roles": [
+          "STUDENT"
         ]
       }
     },
@@ -11330,6 +12031,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -11340,6 +12044,9 @@
         "summary": "List published sections in a grade-scoped lesson",
         "tags": [
           "student/catalog"
+        ],
+        "x-roles": [
+          "STUDENT"
         ]
       }
     },
@@ -11405,6 +12112,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -11415,6 +12125,9 @@
         "summary": "List published content previews directly placed on a hierarchy node",
         "tags": [
           "student/catalog"
+        ],
+        "x-roles": [
+          "STUDENT"
         ]
       }
     },
@@ -11467,6 +12180,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -11477,6 +12193,9 @@
         "summary": "List the student active library across grades",
         "tags": [
           "student/catalog"
+        ],
+        "x-roles": [
+          "STUDENT"
         ]
       }
     },
@@ -11529,6 +12248,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -11539,6 +12261,9 @@
         "summary": "List subjects with active course or chapter access and calculated progress",
         "tags": [
           "student/catalog"
+        ],
+        "x-roles": [
+          "STUDENT"
         ]
       }
     },
@@ -11580,6 +12305,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -11590,6 +12318,9 @@
         "summary": "List the authenticated student active entitlements",
         "tags": [
           "student/catalog"
+        ],
+        "x-roles": [
+          "STUDENT"
         ]
       }
     },
@@ -11610,6 +12341,9 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -11620,6 +12354,9 @@
         "summary": "Create a draft publisher agreement",
         "tags": [
           "admin/publisher-agreements"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       },
       "get": {
@@ -11666,6 +12403,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -11676,6 +12416,9 @@
         "summary": "List publisher agreements",
         "tags": [
           "admin/publisher-agreements"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -11705,6 +12448,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -11715,6 +12461,9 @@
         "summary": "Update a draft publisher agreement",
         "tags": [
           "admin/publisher-agreements"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -11734,6 +12483,9 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -11744,6 +12496,9 @@
         "summary": "Activate a publisher agreement",
         "tags": [
           "admin/publisher-agreements"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -11773,6 +12528,9 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -11783,6 +12541,9 @@
         "summary": "Create an immutable successor version for an active publisher agreement",
         "tags": [
           "admin/publisher-agreements"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -11812,6 +12573,9 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -11822,6 +12586,9 @@
         "summary": "End a publisher agreement",
         "tags": [
           "admin/publisher-agreements"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -11871,6 +12638,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -11881,6 +12651,9 @@
         "summary": "Resolve the effective publisher agreement",
         "tags": [
           "admin/publisher-agreements"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -11910,6 +12683,9 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -11920,6 +12696,10 @@
         "summary": "Set course pricing",
         "tags": [
           "admin/pricing"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -11949,6 +12729,9 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -11959,6 +12742,10 @@
         "summary": "Set chapter pricing",
         "tags": [
           "admin/pricing"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -11988,6 +12775,9 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -11998,6 +12788,10 @@
         "summary": "Set lesson pricing",
         "tags": [
           "admin/pricing"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -12039,6 +12833,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -12049,6 +12846,109 @@
         "summary": "Resolve effective pricing",
         "tags": [
           "admin/pricing"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
+        ]
+      }
+    },
+    "/api/v1/admin/question-banks/publishers": {
+      "get": {
+        "description": "Available to Admin and Super Admin. Supports q, page and limit.",
+        "operationId": "QuestionBanksController_publishers_v1",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "One-based page number.",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Maximum records to return per page.",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Case-insensitive text search.",
+            "schema": {
+              "minLength": 1,
+              "maxLength": 120,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "meta"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ContentPublisherSelectorDto"
+                      }
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "page": {
+                          "type": "integer"
+                        },
+                        "limit": {
+                          "type": "integer"
+                        },
+                        "total": {
+                          "type": "integer"
+                        },
+                        "totalPages": {
+                          "type": "integer"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List active content publishers (userId and displayName only)",
+        "tags": [
+          "admin/question-banks"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -12069,6 +12969,9 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -12079,6 +12982,10 @@
         "summary": "Create a question source",
         "tags": [
           "admin/question-banks"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       },
       "get": {
@@ -12150,6 +13057,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -12160,6 +13070,10 @@
         "summary": "List question sources",
         "tags": [
           "admin/question-banks"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -12179,6 +13093,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -12189,6 +13106,10 @@
         "summary": "Get a question source",
         "tags": [
           "admin/question-banks"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       },
       "patch": {
@@ -12216,6 +13137,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -12226,6 +13150,10 @@
         "summary": "Update a question source",
         "tags": [
           "admin/question-banks"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       },
       "delete": {
@@ -12243,6 +13171,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -12253,6 +13184,10 @@
         "summary": "Delete an eligible draft or archived question source",
         "tags": [
           "admin/question-banks"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -12272,6 +13207,9 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -12282,6 +13220,10 @@
         "summary": "Publish a question source",
         "tags": [
           "admin/question-banks"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -12301,6 +13243,9 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -12311,6 +13256,10 @@
         "summary": "Archive a question source",
         "tags": [
           "admin/question-banks"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -12330,6 +13279,9 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -12340,6 +13292,10 @@
         "summary": "Restore a question source",
         "tags": [
           "admin/question-banks"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -12360,6 +13316,9 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -12370,6 +13329,10 @@
         "summary": "Create a question bank",
         "tags": [
           "admin/question-banks"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       },
       "get": {
@@ -12426,6 +13389,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -12436,6 +13402,10 @@
         "summary": "List question banks",
         "tags": [
           "admin/question-banks"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -12455,6 +13425,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -12465,6 +13438,10 @@
         "summary": "Get a question bank",
         "tags": [
           "admin/question-banks"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       },
       "patch": {
@@ -12492,6 +13469,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -12502,6 +13482,10 @@
         "summary": "Update a question bank",
         "tags": [
           "admin/question-banks"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       },
       "delete": {
@@ -12519,6 +13503,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -12529,6 +13516,10 @@
         "summary": "Delete an eligible draft or archived question bank",
         "tags": [
           "admin/question-banks"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -12548,6 +13539,9 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -12558,6 +13552,10 @@
         "summary": "Publish a question bank",
         "tags": [
           "admin/question-banks"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -12577,6 +13575,9 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -12587,6 +13588,10 @@
         "summary": "Archive a question bank",
         "tags": [
           "admin/question-banks"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -12606,6 +13611,9 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -12616,6 +13624,10 @@
         "summary": "Restore a question bank",
         "tags": [
           "admin/question-banks"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -12636,6 +13648,9 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -12646,6 +13661,10 @@
         "summary": "Create reusable question context",
         "tags": [
           "admin/questions"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       },
       "get": {
@@ -12688,6 +13707,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -12698,6 +13720,10 @@
         "summary": "List reusable question contexts",
         "tags": [
           "admin/questions"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -12727,6 +13753,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -12737,6 +13766,10 @@
         "summary": "Update reusable question context",
         "tags": [
           "admin/questions"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       },
       "delete": {
@@ -12754,6 +13787,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -12764,6 +13800,10 @@
         "summary": "Delete unreferenced question context",
         "tags": [
           "admin/questions"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -12784,6 +13824,9 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -12794,6 +13837,10 @@
         "summary": "Create a question",
         "tags": [
           "admin/questions"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       },
       "get": {
@@ -12916,6 +13963,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -12926,6 +13976,10 @@
         "summary": "List questions",
         "tags": [
           "admin/questions"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -12953,6 +14007,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -12963,6 +14020,54 @@
         "summary": "Directly publish selected draft, rejected, or in-review questions",
         "tags": [
           "admin/questions"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
+        ]
+      }
+    },
+    "/api/v1/admin/questions/{id}/statistics": {
+      "get": {
+        "description": "Available to Admin and Super Admin. Returns zero counts and null rate, difficultyBand and calculatedAt when no aggregate exists; 404 for an unknown question. No student or attempt records are exposed.",
+        "operationId": "QuestionsController_statistics_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuestionStatisticsDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get aggregate question response statistics",
+        "tags": [
+          "admin/questions"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -12982,6 +14087,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -12992,6 +14100,10 @@
         "summary": "Get a question",
         "tags": [
           "admin/questions"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       },
       "patch": {
@@ -13019,6 +14131,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -13029,6 +14144,10 @@
         "summary": "Update a question",
         "tags": [
           "admin/questions"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       },
       "delete": {
@@ -13046,6 +14165,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -13056,6 +14178,10 @@
         "summary": "Delete an eligible draft or archived question",
         "tags": [
           "admin/questions"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -13075,6 +14201,9 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -13085,6 +14214,10 @@
         "summary": "Submit a question for review",
         "tags": [
           "admin/questions"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -13104,6 +14237,9 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -13114,6 +14250,10 @@
         "summary": "Publish a reviewed question",
         "tags": [
           "admin/questions"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -13143,6 +14283,9 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -13153,6 +14296,10 @@
         "summary": "Reject a question in review",
         "tags": [
           "admin/questions"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -13172,6 +14319,9 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -13182,6 +14332,10 @@
         "summary": "Archive a question",
         "tags": [
           "admin/questions"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -13211,6 +14365,9 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -13221,6 +14378,10 @@
         "summary": "Add a question option",
         "tags": [
           "admin/questions"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -13258,6 +14419,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -13268,6 +14432,10 @@
         "summary": "Update a question option",
         "tags": [
           "admin/questions"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       },
       "delete": {
@@ -13293,6 +14461,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -13303,6 +14474,10 @@
         "summary": "Delete a question option",
         "tags": [
           "admin/questions"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -13332,6 +14507,9 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -13342,6 +14520,10 @@
         "summary": "Reorder question options",
         "tags": [
           "admin/questions"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -13361,6 +14543,9 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -13371,6 +14556,10 @@
         "summary": "Attach a legacy-compatible asset to a question content block",
         "tags": [
           "admin/questions"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -13398,6 +14587,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -13408,6 +14600,10 @@
         "summary": "Remove a legacy-compatible question asset block",
         "tags": [
           "admin/questions"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -13437,6 +14633,9 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -13447,6 +14646,10 @@
         "summary": "Reorder legacy-compatible question asset blocks",
         "tags": [
           "admin/questions"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -13476,6 +14679,9 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -13486,6 +14692,10 @@
         "summary": "Set a question video link",
         "tags": [
           "admin/questions"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       },
       "delete": {
@@ -13503,6 +14713,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -13513,6 +14726,10 @@
         "summary": "Remove a question video link",
         "tags": [
           "admin/questions"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -13565,6 +14782,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -13575,6 +14795,9 @@
         "summary": "List managed governorates and centers",
         "tags": [
           "admin/geography"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       },
       "post": {
@@ -13593,6 +14816,9 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -13603,6 +14829,9 @@
         "summary": "Create a governorate",
         "tags": [
           "admin/geography"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -13632,6 +14861,9 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -13642,6 +14874,9 @@
         "summary": "Create a center",
         "tags": [
           "admin/geography"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -13661,6 +14896,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -13671,6 +14909,9 @@
         "summary": "Delete an unreferenced center",
         "tags": [
           "admin/geography"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -13690,6 +14931,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -13700,6 +14944,9 @@
         "summary": "Delete an unreferenced governorate",
         "tags": [
           "admin/geography"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -13849,6 +15096,9 @@
         "summary": "List active manual payment methods",
         "tags": [
           "student/commerce"
+        ],
+        "x-roles": [
+          "STUDENT"
         ]
       }
     },
@@ -13896,6 +15146,9 @@
         "summary": "Get the current student cart",
         "tags": [
           "student/commerce"
+        ],
+        "x-roles": [
+          "STUDENT"
         ]
       }
     },
@@ -13916,6 +15169,9 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -13926,6 +15182,9 @@
         "summary": "Preview current campaign/coupon prices for purchasable targets",
         "tags": [
           "student/commerce"
+        ],
+        "x-roles": [
+          "STUDENT"
         ]
       }
     },
@@ -14013,6 +15272,9 @@
         "summary": "Add a purchasable target to the cart",
         "tags": [
           "student/commerce"
+        ],
+        "x-roles": [
+          "STUDENT"
         ]
       }
     },
@@ -14079,6 +15341,9 @@
         "summary": "Remove an item from the cart",
         "tags": [
           "student/commerce"
+        ],
+        "x-roles": [
+          "STUDENT"
         ]
       }
     },
@@ -14175,6 +15440,9 @@
         "summary": "Create an order from the current cart",
         "tags": [
           "student/commerce"
+        ],
+        "x-roles": [
+          "STUDENT"
         ]
       }
     },
@@ -14202,6 +15470,9 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -14212,6 +15483,9 @@
         "summary": "Create a fresh hosted XPay checkout attempt for an unpaid order",
         "tags": [
           "student/commerce"
+        ],
+        "x-roles": [
+          "STUDENT"
         ]
       }
     },
@@ -14278,6 +15552,9 @@
         "summary": "Get the current student order for an XPay Checkout Session",
         "tags": [
           "student/commerce"
+        ],
+        "x-roles": [
+          "STUDENT"
         ]
       }
     },
@@ -14359,6 +15636,9 @@
         "summary": "List the student orders",
         "tags": [
           "student/commerce"
+        ],
+        "x-roles": [
+          "STUDENT"
         ]
       }
     },
@@ -14425,6 +15705,9 @@
         "summary": "Get an order by ID",
         "tags": [
           "student/commerce"
+        ],
+        "x-roles": [
+          "STUDENT"
         ]
       }
     },
@@ -14501,6 +15784,9 @@
         "summary": "Cancel an eligible order",
         "tags": [
           "student/commerce"
+        ],
+        "x-roles": [
+          "STUDENT"
         ]
       }
     },
@@ -14622,6 +15908,9 @@
         "summary": "Authorize a manual-payment receipt upload",
         "tags": [
           "student/commerce"
+        ],
+        "x-roles": [
+          "STUDENT"
         ]
       }
     },
@@ -14726,6 +16015,9 @@
         "summary": "Confirm a direct payment-proof upload",
         "tags": [
           "student/commerce"
+        ],
+        "x-roles": [
+          "STUDENT"
         ]
       }
     },
@@ -14855,6 +16147,9 @@
         "summary": "Authorize a replacement receipt upload",
         "tags": [
           "student/commerce"
+        ],
+        "x-roles": [
+          "STUDENT"
         ]
       }
     },
@@ -14967,6 +16262,9 @@
         "summary": "Confirm a direct replacement receipt upload",
         "tags": [
           "student/commerce"
+        ],
+        "x-roles": [
+          "STUDENT"
         ]
       }
     },
@@ -15059,6 +16357,9 @@
         "summary": "List all manual payment methods",
         "tags": [
           "admin/manual-payments"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       },
       "post": {
@@ -15124,6 +16425,9 @@
         "summary": "Create a manual payment method",
         "tags": [
           "admin/manual-payments"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -15210,6 +16514,9 @@
         "summary": "Update a manual payment method",
         "tags": [
           "admin/manual-payments"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -15277,6 +16584,9 @@
         "summary": "Reorder manual payment methods",
         "tags": [
           "admin/manual-payments"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -15379,6 +16689,9 @@
         "summary": "List manual payment submissions",
         "tags": [
           "admin/manual-payments"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -15445,6 +16758,9 @@
         "summary": "Get a manual payment submission",
         "tags": [
           "admin/manual-payments"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -15521,6 +16837,9 @@
         "summary": "Approve a manual payment submission",
         "tags": [
           "admin/manual-payments"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -15617,6 +16936,9 @@
         "summary": "Reject a manual payment submission",
         "tags": [
           "admin/manual-payments"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -15651,6 +16973,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -15661,6 +16986,9 @@
         "summary": "List timed discount campaigns",
         "tags": [
           "admin/manual-payments"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       },
       "post": {
@@ -15679,6 +17007,9 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -15689,6 +17020,9 @@
         "summary": "Create a timed discount campaign",
         "tags": [
           "admin/manual-payments"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -15718,6 +17052,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -15728,6 +17065,9 @@
         "summary": "Update a timed discount campaign",
         "tags": [
           "admin/manual-payments"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -15747,6 +17087,9 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -15757,6 +17100,9 @@
         "summary": "Activate a timed discount campaign",
         "tags": [
           "admin/manual-payments"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -15776,6 +17122,9 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -15786,6 +17135,9 @@
         "summary": "Deactivate a timed discount campaign",
         "tags": [
           "admin/manual-payments"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -15820,6 +17172,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -15830,6 +17185,9 @@
         "summary": "List coupons",
         "tags": [
           "admin/manual-payments"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       },
       "post": {
@@ -15848,6 +17206,9 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -15858,6 +17219,9 @@
         "summary": "Create a coupon",
         "tags": [
           "admin/manual-payments"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -15887,6 +17251,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -15897,6 +17264,9 @@
         "summary": "Update a coupon",
         "tags": [
           "admin/manual-payments"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -15916,6 +17286,9 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -15926,6 +17299,9 @@
         "summary": "Activate a coupon",
         "tags": [
           "admin/manual-payments"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -15945,6 +17321,9 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -15955,6 +17334,9 @@
         "summary": "Deactivate a coupon",
         "tags": [
           "admin/manual-payments"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -15999,6 +17381,9 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -16009,6 +17394,9 @@
         "summary": "Request a manual refund for complete approved order items; ineligible requests are rejected automatically.",
         "tags": [
           "student/refunds"
+        ],
+        "x-roles": [
+          "STUDENT"
         ]
       }
     },
@@ -16056,6 +17444,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -16066,6 +17457,9 @@
         "summary": "List the authenticated student’s refund requests.",
         "tags": [
           "student/refunds"
+        ],
+        "x-roles": [
+          "STUDENT"
         ]
       }
     },
@@ -16121,6 +17515,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -16131,6 +17528,9 @@
         "summary": "List manual refund requests and their policy snapshot.",
         "tags": [
           "admin/refunds"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -16141,6 +17541,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -16151,6 +17554,9 @@
         "summary": "Get the active versioned refund eligibility policy.",
         "tags": [
           "admin/refunds"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       },
       "patch": {
@@ -16169,6 +17575,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -16179,6 +17588,9 @@
         "summary": "Activate a new versioned refund eligibility policy; existing request snapshots are unchanged.",
         "tags": [
           "admin/refunds"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -16208,6 +17620,9 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -16218,6 +17633,9 @@
         "summary": "Record a completed manual refund, revoke associated access, and create partner-ledger reversals.",
         "tags": [
           "admin/refunds"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -16247,6 +17665,9 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -16257,6 +17678,9 @@
         "summary": "Manually reject an otherwise eligible refund request.",
         "tags": [
           "admin/refunds"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -16276,6 +17700,9 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -16286,6 +17713,9 @@
         "summary": "Mark an accessible content item complete",
         "tags": [
           "student/learning"
+        ],
+        "x-roles": [
+          "STUDENT"
         ]
       }
     },
@@ -16315,6 +17745,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -16325,6 +17758,9 @@
         "summary": "Record study activity and optional video resume position",
         "tags": [
           "student/learning"
+        ],
+        "x-roles": [
+          "STUDENT"
         ]
       }
     },
@@ -16335,6 +17771,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -16345,6 +17784,9 @@
         "summary": "Get the most recently studied accessible content item",
         "tags": [
           "student/learning"
+        ],
+        "x-roles": [
+          "STUDENT"
         ]
       }
     },
@@ -16355,6 +17797,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -16365,6 +17810,9 @@
         "summary": "Get current-grade learning completion",
         "tags": [
           "student/learning"
+        ],
+        "x-roles": [
+          "STUDENT"
         ]
       }
     },
@@ -16392,6 +17840,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -16402,6 +17853,9 @@
         "summary": "Get detailed progress for an owned course or chapter",
         "tags": [
           "student/learning"
+        ],
+        "x-roles": [
+          "STUDENT"
         ]
       }
     },
@@ -16468,6 +17922,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -16478,6 +17935,9 @@
         "summary": "List eligible direct-practice questions for one hierarchy scope",
         "tags": [
           "student/learning"
+        ],
+        "x-roles": [
+          "STUDENT"
         ]
       }
     },
@@ -16507,6 +17967,9 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -16517,6 +17980,9 @@
         "summary": "Submit an immutable practice answer attempt",
         "tags": [
           "student/learning"
+        ],
+        "x-roles": [
+          "STUDENT"
         ]
       },
       "get": {
@@ -16589,6 +18055,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -16599,6 +18068,9 @@
         "summary": "List personal attempt history for a question",
         "tags": [
           "student/learning"
+        ],
+        "x-roles": [
+          "STUDENT"
         ]
       }
     },
@@ -16693,6 +18165,9 @@
         "summary": "Lock a self-reported reason for an incorrect practice answer",
         "tags": [
           "student/learning"
+        ],
+        "x-roles": [
+          "STUDENT"
         ]
       }
     },
@@ -16720,6 +18195,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -16730,6 +18208,9 @@
         "summary": "Get protected access to an eligible canonical content-block asset (legacy attachments are also supported)",
         "tags": [
           "student/learning"
+        ],
+        "x-roles": [
+          "STUDENT"
         ]
       }
     },
@@ -16749,6 +18230,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -16759,6 +18243,9 @@
         "summary": "Get playback for a video reachable through student-authorized content",
         "tags": [
           "student/learning"
+        ],
+        "x-roles": [
+          "STUDENT"
         ]
       }
     },
@@ -16769,6 +18256,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -16779,6 +18269,9 @@
         "summary": "Get current-grade direct-practice performance",
         "tags": [
           "student/learning"
+        ],
+        "x-roles": [
+          "STUDENT"
         ]
       }
     },
@@ -17196,6 +18689,9 @@
         "summary": "Generate a standard (random-sample) quiz/exam from a chosen scope",
         "tags": [
           "student/assessments"
+        ],
+        "x-roles": [
+          "STUDENT"
         ]
       },
       "get": {
@@ -17299,6 +18795,9 @@
         "summary": "List own and publicly visible assessments",
         "tags": [
           "student/assessments"
+        ],
+        "x-roles": [
+          "STUDENT"
         ]
       }
     },
@@ -17319,6 +18818,9 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -17329,6 +18831,9 @@
         "summary": "Generate a private quiz from a student prompt and permitted scope",
         "tags": [
           "student/assessments"
+        ],
+        "x-roles": [
+          "STUDENT"
         ]
       }
     },
@@ -17414,6 +18919,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -17424,6 +18932,9 @@
         "summary": "List entitled community-most-incorrect question cards without answers",
         "tags": [
           "student/assessments"
+        ],
+        "x-roles": [
+          "STUDENT"
         ]
       }
     },
@@ -17444,6 +18955,9 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -17454,6 +18968,9 @@
         "summary": "Create a tutor assessment from accessible ranked question cards",
         "tags": [
           "student/assessments"
+        ],
+        "x-roles": [
+          "STUDENT"
         ]
       }
     },
@@ -17500,6 +19017,9 @@
         "summary": "List accessible question banks, optionally within one subject",
         "tags": [
           "student/assessments"
+        ],
+        "x-roles": [
+          "STUDENT"
         ]
       }
     },
@@ -17556,6 +19076,9 @@
         "summary": "List accessible sources in a selected question bank",
         "tags": [
           "student/assessments"
+        ],
+        "x-roles": [
+          "STUDENT"
         ]
       }
     },
@@ -17612,6 +19135,9 @@
         "summary": "Mark an accessible question",
         "tags": [
           "student/assessments"
+        ],
+        "x-roles": [
+          "STUDENT"
         ]
       },
       "delete": {
@@ -17656,6 +19182,9 @@
         "summary": "Remove a question mark",
         "tags": [
           "student/assessments"
+        ],
+        "x-roles": [
+          "STUDENT"
         ]
       }
     },
@@ -17693,6 +19222,9 @@
         "summary": "List the current student’s accessible marked questions",
         "tags": [
           "student/assessments"
+        ],
+        "x-roles": [
+          "STUDENT"
         ]
       }
     },
@@ -17754,6 +19286,9 @@
         "summary": "List the current student’s accessible private question notes",
         "tags": [
           "student/assessments"
+        ],
+        "x-roles": [
+          "STUDENT"
         ]
       }
     },
@@ -17830,6 +19365,9 @@
         "summary": "Create or update a private note for an accessible question",
         "tags": [
           "student/assessments"
+        ],
+        "x-roles": [
+          "STUDENT"
         ]
       },
       "delete": {
@@ -17884,6 +19422,9 @@
         "summary": "Delete the current student’s private question note",
         "tags": [
           "student/assessments"
+        ],
+        "x-roles": [
+          "STUDENT"
         ]
       }
     },
@@ -17913,6 +19454,9 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -17923,6 +19467,9 @@
         "summary": "Report an accessible authored or assessment-snapshot question",
         "tags": [
           "student/assessments"
+        ],
+        "x-roles": [
+          "STUDENT"
         ]
       }
     },
@@ -18021,6 +19568,9 @@
         "summary": "Get completed-assessment subject, chapter, and topic analytics",
         "tags": [
           "student/assessments"
+        ],
+        "x-roles": [
+          "STUDENT"
         ]
       }
     },
@@ -18087,6 +19637,9 @@
         "summary": "Get an assessment by ID",
         "tags": [
           "student/assessments"
+        ],
+        "x-roles": [
+          "STUDENT"
         ]
       },
       "patch": {
@@ -18171,6 +19724,9 @@
         "summary": "Rename an owned assessment",
         "tags": [
           "student/assessments"
+        ],
+        "x-roles": [
+          "STUDENT"
         ]
       },
       "delete": {
@@ -18235,6 +19791,9 @@
         "summary": "Delete an owned assessment",
         "tags": [
           "student/assessments"
+        ],
+        "x-roles": [
+          "STUDENT"
         ]
       }
     },
@@ -18311,6 +19870,9 @@
         "summary": "Start or resume the attempt for an assessment",
         "tags": [
           "student/assessments"
+        ],
+        "x-roles": [
+          "STUDENT"
         ]
       }
     },
@@ -18377,6 +19939,9 @@
         "summary": "Get the current (resumable) attempt state",
         "tags": [
           "student/assessments"
+        ],
+        "x-roles": [
+          "STUDENT"
         ]
       }
     },
@@ -18459,6 +20024,9 @@
         "summary": "Get protected access to an assessment-question attachment",
         "tags": [
           "student/assessments"
+        ],
+        "x-roles": [
+          "STUDENT"
         ]
       }
     },
@@ -18556,6 +20124,9 @@
         "summary": "Autosave a selected answer",
         "tags": [
           "student/assessments"
+        ],
+        "x-roles": [
+          "STUDENT"
         ]
       }
     },
@@ -18650,6 +20221,9 @@
         "summary": "Lock a self-reported reason for an incorrect reviewed answer",
         "tags": [
           "student/assessments"
+        ],
+        "x-roles": [
+          "STUDENT"
         ]
       }
     },
@@ -18747,6 +20321,9 @@
         "summary": "Record monotonic active time for a question in a resumable attempt",
         "tags": [
           "student/assessments"
+        ],
+        "x-roles": [
+          "STUDENT"
         ]
       }
     },
@@ -18813,6 +20390,9 @@
         "summary": "Submit and score the attempt",
         "tags": [
           "student/assessments"
+        ],
+        "x-roles": [
+          "STUDENT"
         ]
       }
     },
@@ -18902,16 +20482,23 @@
         "summary": "Get the full result/review after submission",
         "tags": [
           "student/assessments"
+        ],
+        "x-roles": [
+          "STUDENT"
         ]
       }
     },
     "/api/v1/admin/assessments/grading/pending": {
       "get": {
+        "description": "ADMIN receives answer IDs, submitted text, scores, feedback, question context and a minimal attempt with assessment ID/title. Student identity and raw AI payloads are omitted. SUPER_ADMIN retains the existing response.",
         "operationId": "AdminAssessmentsController_pendingGrades_v1",
         "parameters": [],
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -18922,11 +20509,16 @@
         "summary": "List submitted written answers awaiting AI grading",
         "tags": [
           "admin/assessments"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
     "/api/v1/admin/assessments/grading/answers/{answerId}/retry-ai": {
       "post": {
+        "description": "ADMIN receives allowlisted answer workflow fields without student identities or account relations. SUPER_ADMIN retains the existing response. This endpoint does not provide manual score editing.",
         "operationId": "AdminAssessmentsController_retryAiGrade_v1",
         "parameters": [
           {
@@ -18991,11 +20583,16 @@
         "summary": "Retry AI grading for one pending written answer",
         "tags": [
           "admin/assessments"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
     "/api/v1/admin/assessments/question-reports": {
       "get": {
+        "description": "ADMIN receives workflow fields and question context with student identity and account relations omitted. SUPER_ADMIN retains the full response.",
         "operationId": "AdminAssessmentsController_questionReports_v1",
         "parameters": [
           {
@@ -19050,6 +20647,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -19060,11 +20660,16 @@
         "summary": "List student question reports for moderation",
         "tags": [
           "admin/assessments"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
     "/api/v1/admin/assessments/question-reports/{reportId}/review": {
       "post": {
+        "description": "ADMIN mutation responses omit student identity and account relations. SUPER_ADMIN retains the full response.",
         "operationId": "AdminAssessmentsController_reviewQuestionReport_v1",
         "parameters": [
           {
@@ -19089,6 +20694,9 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -19099,6 +20707,10 @@
         "summary": "Assign and transition a student question report",
         "tags": [
           "admin/assessments"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -19166,6 +20778,10 @@
         "summary": "Create a quiz/exam via random sample from the question bank",
         "tags": [
           "admin/assessments"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -19233,6 +20849,10 @@
         "summary": "Create a quiz/exam by hand-picking questions from the question bank",
         "tags": [
           "admin/assessments"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -19336,6 +20956,10 @@
         "summary": "List admin-created assessments",
         "tags": [
           "admin/assessments"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -19402,6 +21026,10 @@
         "summary": "Get an admin-created assessment, including correct answers",
         "tags": [
           "admin/assessments"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       },
       "patch": {
@@ -19496,6 +21124,10 @@
         "summary": "Update a draft assessment (title, mode, timer)",
         "tags": [
           "admin/assessments"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       },
       "delete": {
@@ -19570,6 +21202,10 @@
         "summary": "Delete a draft or archived assessment",
         "tags": [
           "admin/assessments"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -19646,6 +21282,10 @@
         "summary": "Publish a draft assessment",
         "tags": [
           "admin/assessments"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -19722,6 +21362,10 @@
         "summary": "Archive a published assessment",
         "tags": [
           "admin/assessments"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -19807,6 +21451,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -19817,6 +21464,9 @@
         "summary": "List entitled community-most-incorrect question cards without answers",
         "tags": [
           "student/questions"
+        ],
+        "x-roles": [
+          "STUDENT"
         ]
       }
     },
@@ -19846,6 +21496,9 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -19856,6 +21509,9 @@
         "summary": "Report an accessible authored or assessment-snapshot question",
         "tags": [
           "student/questions"
+        ],
+        "x-roles": [
+          "STUDENT"
         ]
       }
     },
@@ -19894,6 +21550,9 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -19904,11 +21563,15 @@
         "summary": "Transcribe a student voice-answer recording without retaining audio",
         "tags": [
           "student/voice"
+        ],
+        "x-roles": [
+          "STUDENT"
         ]
       }
     },
     "/api/v1/admin/question-reports": {
       "get": {
+        "description": "ADMIN receives workflow fields and question context with student identity and account relations omitted. SUPER_ADMIN retains the full response.",
         "operationId": "AdminQuestionReportsController_list_v1",
         "parameters": [
           {
@@ -19963,6 +21626,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -19973,11 +21639,16 @@
         "summary": "List student question reports for moderation",
         "tags": [
           "admin/question-reports"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
     "/api/v1/admin/question-reports/{reportId}/review": {
       "post": {
+        "description": "ADMIN mutation responses omit student identity and account relations. SUPER_ADMIN retains the full response.",
         "operationId": "AdminQuestionReportsController_review_v1",
         "parameters": [
           {
@@ -20002,6 +21673,9 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -20012,6 +21686,10 @@
         "summary": "Assign and transition a student question report",
         "tags": [
           "admin/question-reports"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -20046,6 +21724,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -20056,6 +21737,9 @@
         "summary": "Get the current weekly leaderboard",
         "tags": [
           "student/leaderboard"
+        ],
+        "x-roles": [
+          "STUDENT"
         ]
       }
     },
@@ -20098,6 +21782,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -20108,6 +21795,9 @@
         "summary": "Get a historical weekly leaderboard",
         "tags": [
           "student/leaderboard"
+        ],
+        "x-roles": [
+          "STUDENT"
         ]
       }
     },
@@ -20118,6 +21808,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -20128,6 +21821,9 @@
         "summary": "Get the student performance overview",
         "tags": [
           "student/performance"
+        ],
+        "x-roles": [
+          "STUDENT"
         ]
       }
     },
@@ -20173,6 +21869,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -20183,6 +21882,9 @@
         "summary": "Analyze performance by academic hierarchy level",
         "tags": [
           "student/performance"
+        ],
+        "x-roles": [
+          "STUDENT"
         ]
       }
     },
@@ -20193,6 +21895,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -20203,6 +21908,9 @@
         "summary": "Get student performance trends over time",
         "tags": [
           "student/performance"
+        ],
+        "x-roles": [
+          "STUDENT"
         ]
       }
     },
@@ -20213,6 +21921,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -20223,6 +21934,9 @@
         "summary": "Get unified performance insights and recommendations",
         "tags": [
           "student/performance"
+        ],
+        "x-roles": [
+          "STUDENT"
         ]
       }
     },
@@ -20233,6 +21947,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -20243,6 +21960,9 @@
         "summary": "Compare student performance with peers",
         "tags": [
           "student/performance"
+        ],
+        "x-roles": [
+          "STUDENT"
         ]
       }
     },
@@ -20253,6 +21973,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -20263,6 +21986,9 @@
         "summary": "Get answer-change performance statistics",
         "tags": [
           "student/performance"
+        ],
+        "x-roles": [
+          "STUDENT"
         ]
       }
     },
@@ -20449,6 +22175,9 @@
         "summary": "Get content publisher dashboard metrics and compact earnings trend",
         "tags": [
           "partners/analytics"
+        ],
+        "x-roles": [
+          "PARTNER"
         ]
       }
     },
@@ -20530,6 +22259,9 @@
         "summary": "Get immutable-ledger publisher earnings trends",
         "tags": [
           "partners/analytics"
+        ],
+        "x-roles": [
+          "PARTNER"
         ]
       }
     },
@@ -20584,6 +22316,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -20594,6 +22329,9 @@
         "summary": "List immutable ledger allocations for the authenticated partner",
         "tags": [
           "partners/analytics"
+        ],
+        "x-roles": [
+          "PARTNER"
         ]
       }
     },
@@ -20707,6 +22445,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -20717,6 +22458,9 @@
         "summary": "Get aggregate-only publisher question usage and correctness metrics",
         "tags": [
           "partners/analytics"
+        ],
+        "x-roles": [
+          "PARTNER"
         ]
       }
     },
@@ -20830,6 +22574,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -20840,6 +22587,9 @@
         "summary": "Get a paginated source breakdown without learner identity",
         "tags": [
           "partners/analytics"
+        ],
+        "x-roles": [
+          "PARTNER"
         ]
       }
     },
@@ -20953,6 +22703,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -20963,6 +22716,9 @@
         "summary": "Get a paginated frozen-question usage breakdown without learner identity",
         "tags": [
           "partners/analytics"
+        ],
+        "x-roles": [
+          "PARTNER"
         ]
       }
     },
@@ -21047,6 +22803,9 @@
         "summary": "List the authenticated publisher agreement-covered content",
         "tags": [
           "partners/analytics"
+        ],
+        "x-roles": [
+          "PARTNER"
         ]
       }
     },
@@ -21067,6 +22826,9 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -21077,6 +22839,9 @@
         "summary": "Create a draft referral program",
         "tags": [
           "admin/referral-programs"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       },
       "get": {
@@ -21117,6 +22882,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -21127,6 +22895,9 @@
         "summary": "List referral programs",
         "tags": [
           "admin/referral-programs"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -21146,6 +22917,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -21156,6 +22930,9 @@
         "summary": "Get a referral program with codes and rules",
         "tags": [
           "admin/referral-programs"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       },
       "patch": {
@@ -21183,6 +22960,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -21193,6 +22973,9 @@
         "summary": "Update a draft referral program",
         "tags": [
           "admin/referral-programs"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -21212,6 +22995,9 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -21222,6 +23008,9 @@
         "summary": "Activate a referral program",
         "tags": [
           "admin/referral-programs"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -21241,6 +23030,9 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -21251,6 +23043,9 @@
         "summary": "Suspend a referral program",
         "tags": [
           "admin/referral-programs"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -21270,6 +23065,9 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -21280,6 +23078,9 @@
         "summary": "Resume a referral program",
         "tags": [
           "admin/referral-programs"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -21299,6 +23100,9 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -21309,6 +23113,9 @@
         "summary": "End a referral program",
         "tags": [
           "admin/referral-programs"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -21338,6 +23145,9 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -21348,6 +23158,9 @@
         "summary": "Create a referral code",
         "tags": [
           "admin/referral-programs"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -21377,6 +23190,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -21387,6 +23203,9 @@
         "summary": "Update a referral code",
         "tags": [
           "admin/referral-programs"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -21406,6 +23225,9 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -21416,6 +23238,9 @@
         "summary": "Suspend a referral code",
         "tags": [
           "admin/referral-programs"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -21435,6 +23260,9 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -21445,6 +23273,9 @@
         "summary": "Resume a referral code",
         "tags": [
           "admin/referral-programs"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -21474,6 +23305,9 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -21484,6 +23318,9 @@
         "summary": "Create a referral commission rule",
         "tags": [
           "admin/referral-programs"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -21511,6 +23348,9 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -21521,6 +23361,9 @@
         "summary": "Activate a referral commission rule",
         "tags": [
           "admin/referral-programs"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -21550,6 +23393,9 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -21560,6 +23406,9 @@
         "summary": "Create a referral review rule",
         "tags": [
           "admin/referral-programs"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -21589,6 +23438,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -21599,6 +23451,9 @@
         "summary": "Update a referral review rule",
         "tags": [
           "admin/referral-programs"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -21663,6 +23518,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -21673,6 +23531,9 @@
         "summary": "List referral review flags",
         "tags": [
           "admin/referral-programs"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -21702,6 +23563,9 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -21712,6 +23576,9 @@
         "summary": "Create a manual referral review flag",
         "tags": [
           "admin/referral-programs"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -21741,6 +23608,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -21751,6 +23621,9 @@
         "summary": "Assign a referral review flag",
         "tags": [
           "admin/referral-programs"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -21780,6 +23653,9 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -21790,6 +23666,9 @@
         "summary": "Add a referral review note",
         "tags": [
           "admin/referral-programs"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -21819,6 +23698,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -21829,6 +23711,9 @@
         "summary": "Resolve a referral review flag",
         "tags": [
           "admin/referral-programs"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -21872,6 +23757,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -21882,6 +23770,9 @@
         "summary": "Get privacy-safe aggregate referral conversions, sales, commissions, trends, products, and categories.",
         "tags": [
           "partners/referrals"
+        ],
+        "x-roles": [
+          "PARTNER"
         ]
       }
     },
@@ -21925,6 +23816,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -21935,6 +23829,9 @@
         "summary": "Get privacy-safe aggregate referral settlement summaries without order rows.",
         "tags": [
           "partners/referrals"
+        ],
+        "x-roles": [
+          "PARTNER"
         ]
       }
     },
@@ -21987,6 +23884,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -21997,6 +23897,9 @@
         "summary": "Get aggregate referral reporting for a referral partner; administrative responses are not cohort-suppressed.",
         "tags": [
           "admin/referral-reporting"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -22097,6 +24000,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -22107,6 +24013,9 @@
         "summary": "List allocation-ledger rows with administrative filters",
         "tags": [
           "admin/partner-finance"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -22127,6 +24036,9 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -22137,6 +24049,9 @@
         "summary": "Create a settlement for a selected immutable set of payable allocations",
         "tags": [
           "admin/partner-finance"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       },
       "get": {
@@ -22205,6 +24120,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -22215,6 +24133,9 @@
         "summary": "List partner settlements",
         "tags": [
           "admin/partner-finance"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -22234,6 +24155,9 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -22244,6 +24168,9 @@
         "summary": "Mark every allocation in a settlement paid",
         "tags": [
           "admin/partner-finance"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -22264,6 +24191,9 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -22274,6 +24204,9 @@
         "summary": "Rebuild derived publisher usage rollups for an audited Cairo-date range",
         "tags": [
           "admin/partner-finance"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -22294,6 +24227,9 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -22304,6 +24240,9 @@
         "summary": "Create a reconciliation scoped to explicit approved pilot order IDs",
         "tags": [
           "admin/partner-finance"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       },
       "get": {
@@ -22336,6 +24275,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -22346,6 +24288,9 @@
         "summary": "List persistent partner-finance reconciliation runs",
         "tags": [
           "admin/partner-finance"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -22365,6 +24310,9 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -22375,6 +24323,9 @@
         "summary": "Run independent expected-allocation and lifecycle checks for a reconciliation",
         "tags": [
           "admin/partner-finance"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -22394,6 +24345,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -22404,6 +24358,9 @@
         "summary": "Get a reconciliation run and its discrepancies",
         "tags": [
           "admin/partner-finance"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -22454,6 +24411,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -22464,6 +24424,9 @@
         "summary": "List discrepancies for a reconciliation run",
         "tags": [
           "admin/partner-finance"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -22493,6 +24456,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -22503,6 +24469,9 @@
         "summary": "Assign a reconciliation discrepancy",
         "tags": [
           "admin/partner-finance"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -22532,6 +24501,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -22542,6 +24514,9 @@
         "summary": "Resolve or accept a reconciliation discrepancy",
         "tags": [
           "admin/partner-finance"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -22699,6 +24674,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -22709,6 +24687,9 @@
         "summary": "Get aggregate platform commerce totals",
         "tags": [
           "admin/reports"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -22866,6 +24847,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -22876,6 +24860,9 @@
         "summary": "Get aggregate approved revenue and discount totals",
         "tags": [
           "admin/reports"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -23033,6 +25020,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -23043,6 +25033,9 @@
         "summary": "Get aggregate refund request and approved reimbursement totals",
         "tags": [
           "admin/reports"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -23200,6 +25193,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -23210,6 +25206,9 @@
         "summary": "Get aggregate payment-attempt totals",
         "tags": [
           "admin/reports"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -23367,6 +25366,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -23377,6 +25379,9 @@
         "summary": "Get aggregate student registration totals",
         "tags": [
           "admin/reports"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -23534,6 +25539,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -23544,6 +25552,9 @@
         "summary": "Get aggregate approved purchaser and current-access totals",
         "tags": [
           "admin/reports"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -23701,6 +25712,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -23711,6 +25725,9 @@
         "summary": "Get aggregate entitlement grant, revocation, expiry, and active-access totals",
         "tags": [
           "admin/reports"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -23868,6 +25885,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -23878,6 +25898,9 @@
         "summary": "Get aggregate publisher and referral obligation totals",
         "tags": [
           "admin/reports"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -23898,6 +25921,9 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -23908,6 +25934,9 @@
         "summary": "Queue a secure CSV report export",
         "tags": [
           "admin/reports"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       },
       "get": {
@@ -23940,6 +25969,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -23950,6 +25982,9 @@
         "summary": "List secure report export jobs",
         "tags": [
           "admin/reports"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -23969,6 +26004,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -23979,6 +26017,9 @@
         "summary": "Get a secure report export download URL",
         "tags": [
           "admin/reports"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -23998,6 +26039,9 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -24008,6 +26052,9 @@
         "summary": "Cancel a queued or running report export",
         "tags": [
           "admin/reports"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -24028,6 +26075,9 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -24038,6 +26088,10 @@
         "summary": "Extract and queue AI question drafts",
         "tags": [
           "admin/ai/question-imports"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       },
       "get": {
@@ -24100,6 +26154,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -24110,6 +26167,10 @@
         "summary": "List AI question imports",
         "tags": [
           "admin/ai/question-imports"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -24129,6 +26190,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -24139,6 +26203,10 @@
         "summary": "Get AI question import progress and diagnostics",
         "tags": [
           "admin/ai/question-imports"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -24158,6 +26226,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -24168,6 +26239,10 @@
         "summary": "Get retained normalized source text for review",
         "tags": [
           "admin/ai/question-imports"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       },
       "patch": {
@@ -24195,6 +26270,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -24205,6 +26283,10 @@
         "summary": "Correct source text and rerun AI boundary identification",
         "tags": [
           "admin/ai/question-imports"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -24277,6 +26359,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -24287,6 +26372,10 @@
         "summary": "List AI question import candidates",
         "tags": [
           "admin/ai/question-imports"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -24306,6 +26395,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -24316,6 +26408,10 @@
         "summary": "List extracted PDF visual regions and protected previews",
         "tags": [
           "admin/ai/question-imports"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       },
       "post": {
@@ -24343,6 +26439,9 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -24353,6 +26452,10 @@
         "summary": "Add and materialize a manual PDF visual region",
         "tags": [
           "admin/ai/question-imports"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -24390,6 +26493,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -24400,6 +26506,10 @@
         "summary": "Review, reclassify, or resize an extracted visual region",
         "tags": [
           "admin/ai/question-imports"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -24427,6 +26537,9 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -24437,6 +26550,10 @@
         "summary": "Retry a failed PDF visual crop",
         "tags": [
           "admin/ai/question-imports"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -24456,6 +26573,9 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -24466,6 +26586,10 @@
         "summary": "Retry failed import chunks",
         "tags": [
           "admin/ai/question-imports"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -24493,6 +26617,9 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -24503,6 +26630,10 @@
         "summary": "Retry one failed import chunk",
         "tags": [
           "admin/ai/question-imports"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -24530,6 +26661,9 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -24540,6 +26674,10 @@
         "summary": "Retry one failed or review-required PDF transcription page",
         "tags": [
           "admin/ai/question-imports"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -24567,6 +26705,9 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -24577,6 +26718,10 @@
         "summary": "Retry one failed page-range import",
         "tags": [
           "admin/ai/question-imports"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -24604,6 +26749,9 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -24614,6 +26762,10 @@
         "summary": "Retry one failed import item",
         "tags": [
           "admin/ai/question-imports"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -24651,6 +26803,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -24661,6 +26816,10 @@
         "summary": "Approve, reject, move, or reorder visual ownership assignments",
         "tags": [
           "admin/ai/question-imports"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -24698,6 +26857,9 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -24708,6 +26870,10 @@
         "summary": "Accept a corrected review candidate and create one draft question",
         "tags": [
           "admin/ai/question-imports"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -24745,6 +26911,9 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -24755,6 +26924,10 @@
         "summary": "Reject an unresolved review candidate",
         "tags": [
           "admin/ai/question-imports"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -24890,6 +27063,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -24900,6 +27076,10 @@
         "summary": "Generate explanation from verified answer",
         "tags": [
           "admin/questions/ai"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       },
       "get": {
@@ -25026,6 +27206,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -25036,6 +27219,10 @@
         "summary": "List retained AI re-answer review runs",
         "tags": [
           "admin/questions/ai"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -25169,6 +27356,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -25179,6 +27369,10 @@
         "summary": "Get an AI re-answer review run",
         "tags": [
           "admin/questions/ai"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -25316,6 +27510,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -25326,6 +27523,10 @@
         "summary": "Apply reviewed answer and/or optionally edited explanation",
         "tags": [
           "admin/questions/ai"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -25469,6 +27670,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -25479,6 +27683,10 @@
         "summary": "Reject an AI re-answer review run",
         "tags": [
           "admin/questions/ai"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -25505,6 +27713,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -25515,6 +27726,9 @@
         "summary": "List the student’s private highlights for an accessible question",
         "tags": [
           "student/questions"
+        ],
+        "x-roles": [
+          "STUDENT"
         ]
       },
       "post": {
@@ -25549,6 +27763,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -25559,6 +27776,9 @@
         "summary": "Create a private question-text highlight",
         "tags": [
           "student/questions"
+        ],
+        "x-roles": [
+          "STUDENT"
         ]
       }
     },
@@ -25586,6 +27806,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -25596,6 +27819,9 @@
         "summary": "Delete the student’s own question highlight",
         "tags": [
           "student/questions"
+        ],
+        "x-roles": [
+          "STUDENT"
         ]
       }
     },
@@ -25613,6 +27839,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -25623,6 +27852,9 @@
         "summary": "List the student’s global notebook pages",
         "tags": [
           "student/notebook"
+        ],
+        "x-roles": [
+          "STUDENT"
         ]
       },
       "post": {
@@ -25648,6 +27880,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -25658,6 +27893,9 @@
         "summary": "Create a global notebook page",
         "tags": [
           "student/notebook"
+        ],
+        "x-roles": [
+          "STUDENT"
         ]
       }
     },
@@ -25677,6 +27915,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -25687,6 +27928,9 @@
         "summary": "Get the student’s notebook page",
         "tags": [
           "student/notebook"
+        ],
+        "x-roles": [
+          "STUDENT"
         ]
       },
       "patch": {
@@ -25714,6 +27958,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -25724,6 +27971,9 @@
         "summary": "Update the student’s notebook page",
         "tags": [
           "student/notebook"
+        ],
+        "x-roles": [
+          "STUDENT"
         ]
       },
       "delete": {
@@ -25741,6 +27991,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -25751,6 +28004,9 @@
         "summary": "Delete the student’s notebook page",
         "tags": [
           "student/notebook"
+        ],
+        "x-roles": [
+          "STUDENT"
         ]
       }
     },
@@ -25821,6 +28077,9 @@
         "summary": "Create a testimonial draft",
         "tags": [
           "admin/testimonials"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       },
       "get": {
@@ -25867,6 +28126,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -25877,6 +28139,9 @@
         "summary": "List testimonials for administration",
         "tags": [
           "admin/testimonials"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -25896,6 +28161,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -25906,6 +28174,9 @@
         "summary": "Get a testimonial for administration",
         "tags": [
           "admin/testimonials"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       },
       "patch": {
@@ -25993,6 +28264,9 @@
         "summary": "Edit a testimonial",
         "tags": [
           "admin/testimonials"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       },
       "delete": {
@@ -26057,6 +28331,9 @@
         "summary": "Delete a draft or archived testimonial",
         "tags": [
           "admin/testimonials"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -26134,6 +28411,9 @@
         "summary": "Atomically reorder non-archived testimonials",
         "tags": [
           "admin/testimonials"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -26153,6 +28433,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -26163,6 +28446,9 @@
         "summary": "Publish a testimonial",
         "tags": [
           "admin/testimonials"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -26182,6 +28468,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -26192,6 +28481,9 @@
         "summary": "Return a published testimonial to draft",
         "tags": [
           "admin/testimonials"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -26211,6 +28503,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -26221,6 +28516,9 @@
         "summary": "Archive a testimonial",
         "tags": [
           "admin/testimonials"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -26240,6 +28538,9 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -26250,6 +28551,9 @@
         "summary": "Restore an archived testimonial as a draft",
         "tags": [
           "admin/testimonials"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -26342,6 +28646,9 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -26352,11 +28659,15 @@
         "summary": "Create or update personal feedback for an accessible ready video",
         "tags": [
           "student/video-feedback"
+        ],
+        "x-roles": [
+          "STUDENT"
         ]
       }
     },
     "/api/v1/admin/video-feedback": {
       "get": {
+        "description": "ADMIN receives no student object and cannot use the studentId filter (403). SUPER_ADMIN retains student details and filtering.",
         "operationId": "AdminVideoFeedbackController_list_v1",
         "parameters": [
           {
@@ -26478,6 +28789,10 @@
         "summary": "List student video feedback",
         "tags": [
           "admin/video-feedback"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -26548,13 +28863,17 @@
         "summary": "Permanently delete student video feedback",
         "tags": [
           "admin/video-feedback"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "SUPER_ADMIN"
         ]
       }
     }
   },
   "info": {
     "title": "Shaheen Edu API",
-    "description": "REST API for Shaheen Edu authentication, academic content, learning, assets, commerce, and administration.",
+    "description": "REST API for Shaheen Edu authentication, academic content, learning, assets, commerce, and administration. ADMIN manages all educational content, questions, assessments, pricing, moderation and AI grading retries. Moderation and grading responses omit structured student identity for ADMIN; video-feedback studentId filters require SUPER_ADMIN (403 otherwise). SUPER_ADMIN retains platform-wide access. Student, partner and administrator management, publisher agreements, entitlements, commerce, referrals, finance, platform reports/exports, geography management and testimonials require SUPER_ADMIN. No ownership restriction applies to content staff.",
     "version": "1.0",
     "contact": {}
   },
@@ -31005,6 +33324,21 @@
           "isPurchasable"
         ]
       },
+      "ContentPublisherSelectorDto": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "userId",
+          "displayName"
+        ]
+      },
       "CreateQuestionSourceDto": {
         "type": "object",
         "properties": {
@@ -31474,6 +33808,55 @@
         "required": [
           "publishedIds",
           "failed"
+        ]
+      },
+      "QuestionStatisticsDto": {
+        "type": "object",
+        "properties": {
+          "questionId": {
+            "type": "string"
+          },
+          "totalResponses": {
+            "type": "number",
+            "minimum": 0
+          },
+          "correctResponses": {
+            "type": "number",
+            "minimum": 0
+          },
+          "incorrectResponses": {
+            "type": "number",
+            "minimum": 0
+          },
+          "incorrectRate": {
+            "type": "number",
+            "nullable": true
+          },
+          "difficultyBand": {
+            "type": "string",
+            "enum": [
+              "A_PLUS",
+              "A",
+              "B",
+              "C",
+              "D"
+            ],
+            "nullable": true
+          },
+          "calculatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": [
+          "questionId",
+          "totalResponses",
+          "correctResponses",
+          "incorrectResponses",
+          "incorrectRate",
+          "difficultyBand",
+          "calculatedAt"
         ]
       },
       "UpdateQuestionDto": {

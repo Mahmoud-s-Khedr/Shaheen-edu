@@ -119,7 +119,7 @@ describe('CommerceService payment proofs', () => {
 
     await expect(
       service.submission(
-        { id: 'admin-1', role: Role.ADMIN } as any,
+        { id: 'admin-1', role: Role.SUPER_ADMIN } as any,
         'submission-1',
       ),
     ).resolves.toMatchObject({ createdAt, reviewedAt });
@@ -173,7 +173,7 @@ describe('CommerceService payment proofs', () => {
 
     await expect(
       service.approve(
-        { id: 'admin-1', role: Role.ADMIN } as any,
+        { id: 'admin-1', role: Role.SUPER_ADMIN } as any,
         'submission-1',
       ),
     ).rejects.toBeInstanceOf(ConflictException);
@@ -195,7 +195,7 @@ describe('CommerceService payment proofs', () => {
     prisma.$transaction = jest.fn((callback) => callback(tx));
 
     await expect(
-      service.createMethod({ id: 'admin-1', role: Role.ADMIN } as any, {
+      service.createMethod({ id: 'admin-1', role: Role.SUPER_ADMIN } as any, {
         titleAr: 'تحويل',
         instructionsAr: 'ارفع الإيصال',
       }),
@@ -231,10 +231,10 @@ describe('CommerceService payment proofs', () => {
       findMany: jest.fn().mockResolvedValue([{ id: 'b' }, { id: 'a' }]),
     };
 
-    await service.reorderMethods({ id: 'admin-1', role: Role.ADMIN } as any, [
-      'b',
-      'a',
-    ]);
+    await service.reorderMethods(
+      { id: 'admin-1', role: Role.SUPER_ADMIN } as any,
+      ['b', 'a'],
+    );
 
     expect(update.mock.calls.map(([call]) => call.data.sortOrder)).toEqual([
       3, 4, 1, 2,
@@ -920,7 +920,7 @@ describe('CommerceService stale cart cleanup', () => {
 });
 
 describe('CommerceService coupon priority', () => {
-  const admin = { id: 'admin-1', role: Role.ADMIN } as any;
+  const admin = { id: 'admin-1', role: Role.SUPER_ADMIN } as any;
   const startsAt = new Date('2026-09-01T00:00:00.000Z');
   const endsAt = new Date('2026-10-01T00:00:00.000Z');
 

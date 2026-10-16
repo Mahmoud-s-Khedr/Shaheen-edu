@@ -1163,3 +1163,6 @@ no
 
 - Request: `DELETE /api/v1/admin/assessments/cmsksbd6h00synw01ebpt732i` (no body)
 - Response — `200 OK`: `{ "id": "cmsksbd6h00synw01ebpt732i", "deleted": true }`
+
+
+See [Admin content permissions and response changes](admin-content-permissions-frontend-handoff.md) for the current permission matrix, publisher selector, aggregate question statistics and identity-filtered moderation/grading responses. This supersedes earlier descriptions of general Admin platform access.

@@ -27,7 +27,7 @@ import { GeographyNameDto } from './geography.dto';
 @ApiTags('admin/geography')
 @ApiBearerAuth()
 @UseGuards(RolesGuard)
-@Roles(Role.ADMIN, Role.SUPER_ADMIN)
+@Roles(Role.SUPER_ADMIN)
 @Controller({ path: 'admin/geography', version: '1' })
 export class GeographyController {
   constructor(private readonly service: GeographyService) {}
@@ -38,7 +38,7 @@ export class GeographyController {
     @CurrentUser() _actor: RequestUser,
     @Query() query: GovernoratesQueryDto,
   ) {
-    return this.service.listGovernorates(query);
+    return this.service.listForAdmin(_actor, query);
   }
   @Post('governorates')
   @ApiOperation({ summary: 'Create a governorate' })
@@ -46,7 +46,7 @@ export class GeographyController {
     @CurrentUser() _actor: RequestUser,
     @Body() dto: GeographyNameDto,
   ) {
-    return this.service.createGovernorate(dto);
+    return this.service.createGovernorate(_actor, dto);
   }
   @Post('governorates/:governorateId/centers')
   @ApiOperation({ summary: 'Create a center' })
@@ -55,12 +55,12 @@ export class GeographyController {
     @Param('governorateId') governorateId: string,
     @Body() dto: GeographyNameDto,
   ) {
-    return this.service.createCenter(governorateId, dto);
+    return this.service.createCenter(_actor, governorateId, dto);
   }
   @Delete('centers/:id')
   @ApiOperation({ summary: 'Delete an unreferenced center' })
   deleteCenter(@CurrentUser() _actor: RequestUser, @Param('id') id: string) {
-    return this.service.deleteCenter(id);
+    return this.service.deleteCenter(_actor, id);
   }
   @Delete('governorates/:id')
   @ApiOperation({ summary: 'Delete an unreferenced governorate' })
@@ -68,6 +68,6 @@ export class GeographyController {
     @CurrentUser() _actor: RequestUser,
     @Param('id') id: string,
   ) {
-    return this.service.deleteGovernorate(id);
+    return this.service.deleteGovernorate(_actor, id);
   }
 }

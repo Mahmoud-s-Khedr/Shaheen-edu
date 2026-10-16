@@ -1,7 +1,7 @@
+import { assertContentStaff } from '../../common/authorization/admin-authorization';
 import {
   BadRequestException,
   ConflictException,
-  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -11,7 +11,6 @@ import { Prisma } from '@prisma/client';
 import {
   AssetKind,
   AssetStatus,
-  Role,
   VideoProcessingStatus,
 } from '../../common/types/roles.enum';
 import type { RequestUser } from '../../common/types/request-with-user.types';
@@ -33,8 +32,7 @@ export class VideosService {
     this.config = config.get('stream', { infer: true });
   }
   private assertAdmin(actor: RequestUser) {
-    if (actor.role !== Role.ADMIN && actor.role !== Role.SUPER_ADMIN)
-      throw new ForbiddenException('Forbidden');
+    assertContentStaff(actor);
   }
 
   private async createBunnyVideo(title: string) {

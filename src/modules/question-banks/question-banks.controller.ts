@@ -1,4 +1,9 @@
 import {
+  ContentPublisherSelectorDto,
+  QuestionStatisticsDto,
+} from './dto/content-staff-responses.dto';
+import { SearchPaginationQueryDto } from '../../common/dto/pagination-query.dto';
+import {
   Body,
   Controller,
   Delete,
@@ -13,6 +18,9 @@ import {
   ApiBearerAuth,
   ApiCreatedResponse,
   ApiOperation,
+  ApiOkResponse,
+  ApiExtraModels,
+  getSchemaPath,
   ApiTags,
 } from '@nestjs/swagger';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -51,6 +59,41 @@ import { QuestionBanksService } from './question-banks.service';
 @Controller({ path: 'admin/question-banks', version: '1' })
 export class QuestionBanksController {
   constructor(private readonly service: QuestionBanksService) {}
+  @Get('publishers')
+  @ApiExtraModels(ContentPublisherSelectorDto)
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      required: ['data', 'meta'],
+      properties: {
+        data: {
+          type: 'array',
+          items: { $ref: getSchemaPath(ContentPublisherSelectorDto) },
+        },
+        meta: {
+          type: 'object',
+          properties: {
+            page: { type: 'integer' },
+            limit: { type: 'integer' },
+            total: { type: 'integer' },
+            totalPages: { type: 'integer' },
+          },
+        },
+      },
+    },
+  })
+  @ApiOperation({
+    summary: 'List active content publishers (userId and displayName only)',
+    description:
+      'Available to Admin and Super Admin. Supports q, page and limit.',
+  })
+  publishers(
+    @CurrentUser() actor: RequestUser,
+    @Query() query: SearchPaginationQueryDto,
+  ) {
+    return this.service.listPublishers(actor, query);
+  }
+
   @Post('sources')
   @ApiOperation({ summary: 'Create a question source' })
   createSource(
@@ -213,6 +256,17 @@ export class QuestionsController {
   ) {
     return this.service.bulkPublishQuestions(a, d.questionIds);
   }
+  @Get(':id/statistics')
+  @ApiOkResponse({ type: QuestionStatisticsDto })
+  @ApiOperation({
+    summary: 'Get aggregate question response statistics',
+    description:
+      'Available to Admin and Super Admin. Returns zero counts and null rate, difficultyBand and calculatedAt when no aggregate exists; 404 for an unknown question. No student or attempt records are exposed.',
+  })
+  statistics(@CurrentUser() actor: RequestUser, @Param('id') id: string) {
+    return this.service.questionStatistics(actor, id);
+  }
+
   @Get(':id') @ApiOperation({ summary: 'Get a question' }) get(
     @CurrentUser() a: RequestUser,
     @Param('id') id: string,

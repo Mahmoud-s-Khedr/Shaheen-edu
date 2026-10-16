@@ -28,7 +28,7 @@ import { PublisherAgreementsService } from './publisher-agreements.service';
 @ApiTags('admin/publisher-agreements')
 @ApiBearerAuth()
 @UseGuards(RolesGuard)
-@Roles(Role.ADMIN, Role.SUPER_ADMIN)
+@Roles(Role.SUPER_ADMIN)
 @Controller({ path: 'admin/publisher-agreements', version: '1' })
 export class PublisherAgreementsController {
   constructor(private readonly service: PublisherAgreementsService) {}

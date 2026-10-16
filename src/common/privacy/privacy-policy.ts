@@ -39,9 +39,6 @@ export class PrivacyPolicy {
 
   student360SectionsFor(role: Role): readonly Student360Section[] {
     if (role === Role.SUPER_ADMIN) return STUDENT_360_SECTIONS;
-    if (role === Role.ADMIN) {
-      return ['PROFILE', 'CONTACT', 'ACCESS', 'COMMERCE', 'PERFORMANCE'];
-    }
     return [];
   }
 

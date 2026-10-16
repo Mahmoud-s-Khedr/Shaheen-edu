@@ -22,7 +22,7 @@ import { ReportsService } from './reports.service';
 @ApiTags('admin/reports')
 @ApiBearerAuth()
 @UseGuards(RolesGuard)
-@Roles(Role.ADMIN, Role.SUPER_ADMIN)
+@Roles(Role.SUPER_ADMIN)
 @Controller({ path: 'admin/reports', version: '1' })
 export class ReportsController {
   constructor(private readonly reports: ReportsService) {}

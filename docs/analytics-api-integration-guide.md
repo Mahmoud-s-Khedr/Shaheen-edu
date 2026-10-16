@@ -2431,3 +2431,6 @@ Accept: application/json
   }
 }
 ```
+
+
+See [Admin content permissions and response changes](admin-content-permissions-frontend-handoff.md) for the current permission matrix, publisher selector, aggregate question statistics and identity-filtered moderation/grading responses. This supersedes earlier descriptions of general Admin platform access.

@@ -1,3 +1,4 @@
+import { assertContentStaff } from '../../common/authorization/admin-authorization';
 import {
   BadRequestException,
   ConflictException,
@@ -74,8 +75,9 @@ export class VideoFeedbackService {
   }
 
   async list(actor: RequestUser, query: QueryVideoFeedbackDto) {
-    if (actor.role !== Role.ADMIN && actor.role !== Role.SUPER_ADMIN)
-      throw new ForbiddenException('Forbidden');
+    assertContentStaff(actor);
+    if (actor.role === Role.ADMIN && query.studentId !== undefined)
+      throw new ForbiddenException('The studentId filter requires Super Admin');
     const createdAt = this.createdAtRange(query.from, query.to);
     const where: any = {
       ...(query.videoAssetId ? { videoAssetId: query.videoAssetId } : {}),
@@ -131,11 +133,15 @@ export class VideoFeedbackService {
         rating: feedback.rating,
         createdAt: feedback.createdAt,
         updatedAt: feedback.updatedAt,
-        student: {
-          id: feedback.student.userId,
-          fullName: feedback.student.fullName,
-          loginIdentifier: feedback.student.user.loginIdentifier,
-        },
+        ...(actor.role === Role.SUPER_ADMIN
+          ? {
+              student: {
+                id: feedback.student.userId,
+                fullName: feedback.student.fullName,
+                loginIdentifier: feedback.student.user.loginIdentifier,
+              },
+            }
+          : {}),
         video: {
           id: feedback.videoAsset.assetId,
           filename: feedback.videoAsset.asset.filename,
@@ -150,8 +156,7 @@ export class VideoFeedbackService {
   }
 
   async remove(actor: RequestUser, id: string) {
-    if (actor.role !== Role.ADMIN && actor.role !== Role.SUPER_ADMIN)
-      throw new ForbiddenException('Forbidden');
+    assertContentStaff(actor);
     const result = await this.prisma.videoFeedback.deleteMany({
       where: { id },
     });

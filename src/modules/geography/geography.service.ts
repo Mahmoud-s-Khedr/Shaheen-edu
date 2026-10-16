@@ -1,3 +1,5 @@
+import { assertSuperAdmin } from '../../common/authorization/admin-authorization';
+import type { RequestUser } from '../../common/types/request-with-user.types';
 import {
   ConflictException,
   Injectable,
@@ -18,6 +20,11 @@ import {
 @Injectable()
 export class GeographyService {
   constructor(private readonly prisma: PrismaService) {}
+
+  async listForAdmin(actor: RequestUser, query: SearchPaginationQueryDto) {
+    assertSuperAdmin(actor);
+    return this.listGovernorates(query);
+  }
 
   async listGovernorates(query: SearchPaginationQueryDto) {
     const needle = query.q?.trim();
@@ -51,7 +58,8 @@ export class GeographyService {
       meta: toPaginationMeta(query.page, query.limit, total),
     };
   }
-  async createGovernorate(name: GeographyNameDto) {
+  async createGovernorate(actor: RequestUser, name: GeographyNameDto) {
+    assertSuperAdmin(actor);
     try {
       return this.governorateDto(
         await this.prisma.governorate.create({
@@ -62,7 +70,12 @@ export class GeographyService {
       throw new ConflictException('Governorate already exists');
     }
   }
-  async createCenter(governorateId: string, name: GeographyNameDto) {
+  async createCenter(
+    actor: RequestUser,
+    governorateId: string,
+    name: GeographyNameDto,
+  ) {
+    assertSuperAdmin(actor);
     const governorate = await this.prisma.governorate.findUnique({
       where: { id: governorateId },
     });
@@ -81,7 +94,8 @@ export class GeographyService {
       throw new ConflictException('Center already exists in this governorate');
     }
   }
-  async deleteCenter(id: string) {
+  async deleteCenter(actor: RequestUser, id: string) {
+    assertSuperAdmin(actor);
     try {
       await this.prisma.center.delete({ where: { id } });
       return { id, deleted: true };
@@ -89,7 +103,8 @@ export class GeographyService {
       throw new ConflictException('Center cannot be deleted while referenced');
     }
   }
-  async deleteGovernorate(id: string) {
+  async deleteGovernorate(actor: RequestUser, id: string) {
+    assertSuperAdmin(actor);
     try {
       await this.prisma.governorate.delete({ where: { id } });
       return { id, deleted: true };

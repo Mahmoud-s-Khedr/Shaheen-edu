@@ -1,3 +1,4 @@
+import { assertSuperAdmin } from '../../common/authorization/admin-authorization';
 import {
   BadRequestException,
   ConflictException,
@@ -71,7 +72,7 @@ export const REPORT_EXPORT_POLICIES: Record<ReportType, ReportExportPolicy> = {
       'totalMinor',
       'currency',
     ],
-    roles: [Role.ADMIN, Role.SUPER_ADMIN],
+    roles: [Role.SUPER_ADMIN],
     privileged: true,
     retentionMs: 24 * 60 * 60 * 1000,
     signedUrlMs: 15 * 60 * 1000,
@@ -87,7 +88,7 @@ export const REPORT_EXPORT_POLICIES: Record<ReportType, ReportExportPolicy> = {
       'totalMinor',
       'currency',
     ],
-    roles: [Role.ADMIN, Role.SUPER_ADMIN],
+    roles: [Role.SUPER_ADMIN],
     privileged: true,
     retentionMs: 24 * 60 * 60 * 1000,
     signedUrlMs: 15 * 60 * 1000,
@@ -95,7 +96,7 @@ export const REPORT_EXPORT_POLICIES: Record<ReportType, ReportExportPolicy> = {
   REFUNDS: {
     classification: ReportDataClassification.NON_PII,
     columns: ['requestedAt', 'reviewedAt', 'status', 'amountMinor', 'currency'],
-    roles: [Role.ADMIN, Role.SUPER_ADMIN],
+    roles: [Role.SUPER_ADMIN],
     privileged: true,
     retentionMs: 24 * 60 * 60 * 1000,
     signedUrlMs: 15 * 60 * 1000,
@@ -103,7 +104,7 @@ export const REPORT_EXPORT_POLICIES: Record<ReportType, ReportExportPolicy> = {
   PAYMENTS: {
     classification: ReportDataClassification.NON_PII,
     columns: ['initiatedAt', 'completedAt', 'channel', 'status'],
-    roles: [Role.ADMIN, Role.SUPER_ADMIN],
+    roles: [Role.SUPER_ADMIN],
     privileged: true,
     retentionMs: 24 * 60 * 60 * 1000,
     signedUrlMs: 15 * 60 * 1000,
@@ -111,7 +112,7 @@ export const REPORT_EXPORT_POLICIES: Record<ReportType, ReportExportPolicy> = {
   REGISTRATIONS: {
     classification: ReportDataClassification.NON_PII,
     columns: ['createdAt', 'academicGradeId', 'governorateId', 'centerId'],
-    roles: [Role.ADMIN, Role.SUPER_ADMIN],
+    roles: [Role.SUPER_ADMIN],
     privileged: false,
     retentionMs: 24 * 60 * 60 * 1000,
     signedUrlMs: 15 * 60 * 1000,
@@ -119,7 +120,7 @@ export const REPORT_EXPORT_POLICIES: Record<ReportType, ReportExportPolicy> = {
   ACTIVE_PURCHASERS: {
     classification: ReportDataClassification.NON_PII,
     columns: ['approvedPurchasers', 'purchasersWithCurrentAccess'],
-    roles: [Role.ADMIN, Role.SUPER_ADMIN],
+    roles: [Role.SUPER_ADMIN],
     privileged: true,
     retentionMs: 24 * 60 * 60 * 1000,
     signedUrlMs: 15 * 60 * 1000,
@@ -134,7 +135,7 @@ export const REPORT_EXPORT_POLICIES: Record<ReportType, ReportExportPolicy> = {
       'expiresAt',
       'revokedAt',
     ],
-    roles: [Role.ADMIN, Role.SUPER_ADMIN],
+    roles: [Role.SUPER_ADMIN],
     privileged: false,
     retentionMs: 24 * 60 * 60 * 1000,
     signedUrlMs: 15 * 60 * 1000,
@@ -150,7 +151,7 @@ export const REPORT_EXPORT_POLICIES: Record<ReportType, ReportExportPolicy> = {
       'amountMinor',
       'currency',
     ],
-    roles: [Role.ADMIN, Role.SUPER_ADMIN],
+    roles: [Role.SUPER_ADMIN],
     privileged: true,
     retentionMs: 24 * 60 * 60 * 1000,
     signedUrlMs: 15 * 60 * 1000,
@@ -176,7 +177,7 @@ export const REPORT_EXPORT_POLICIES: Record<ReportType, ReportExportPolicy> = {
       'paymentReference',
       'settlementPaidAt',
     ],
-    roles: [Role.ADMIN, Role.SUPER_ADMIN],
+    roles: [Role.SUPER_ADMIN],
     privileged: true,
     retentionMs: 24 * 60 * 60 * 1000,
     signedUrlMs: 15 * 60 * 1000,
@@ -194,7 +195,7 @@ export const REPORT_EXPORT_POLICIES: Record<ReportType, ReportExportPolicy> = {
       'publisherAllocationCount',
       'publisherTotalMinor',
     ],
-    roles: [Role.ADMIN, Role.SUPER_ADMIN],
+    roles: [Role.SUPER_ADMIN],
     privileged: true,
     retentionMs: 24 * 60 * 60 * 1000,
     signedUrlMs: 15 * 60 * 1000,
@@ -212,7 +213,7 @@ export const REPORT_EXPORT_POLICIES: Record<ReportType, ReportExportPolicy> = {
       'paidAt',
       'reversedAt',
     ],
-    roles: [Role.ADMIN, Role.SUPER_ADMIN],
+    roles: [Role.SUPER_ADMIN],
     privileged: true,
     retentionMs: 24 * 60 * 60 * 1000,
     signedUrlMs: 15 * 60 * 1000,
@@ -228,7 +229,7 @@ export const REPORT_EXPORT_POLICIES: Record<ReportType, ReportExportPolicy> = {
       'paidAt',
       'referralAllocationCount',
     ],
-    roles: [Role.ADMIN, Role.SUPER_ADMIN],
+    roles: [Role.SUPER_ADMIN],
     privileged: true,
     retentionMs: 24 * 60 * 60 * 1000,
     signedUrlMs: 15 * 60 * 1000,
@@ -243,7 +244,7 @@ export const REPORT_EXPORT_POLICIES: Record<ReportType, ReportExportPolicy> = {
       'expiresAt',
       'revokedAt',
     ],
-    roles: [Role.ADMIN, Role.SUPER_ADMIN],
+    roles: [Role.SUPER_ADMIN],
     privileged: false,
     retentionMs: 24 * 60 * 60 * 1000,
     signedUrlMs: 15 * 60 * 1000,
@@ -271,8 +272,7 @@ export class ReportsService {
   }
 
   private admin(actor: RequestUser) {
-    if (actor.role !== Role.ADMIN && actor.role !== Role.SUPER_ADMIN)
-      throw new ForbiddenException('Forbidden');
+    assertSuperAdmin(actor);
   }
 
   private dates(query: PlatformReportQueryDto) {

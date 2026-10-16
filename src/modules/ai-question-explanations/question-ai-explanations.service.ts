@@ -1,3 +1,4 @@
+import { assertContentStaff } from '../../common/authorization/admin-authorization';
 import {
   explanationEnvelope,
   explanationPersistence,
@@ -9,7 +10,6 @@ import {
 import {
   BadRequestException,
   ConflictException,
-  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -23,7 +23,6 @@ import {
   QuestionExplanationOrigin,
   QuestionStatus,
   QuestionType,
-  Role,
 } from '../../common/types/roles.enum';
 import type { RequestUser } from '../../common/types/request-with-user.types';
 import { PrismaService } from '../../database/prisma.service';
@@ -49,8 +48,7 @@ export class QuestionAiExplanationsService {
   ) {}
 
   private admin(actor: RequestUser) {
-    if (actor.role !== Role.ADMIN && actor.role !== Role.SUPER_ADMIN)
-      throw new ForbiddenException('Forbidden');
+    assertContentStaff(actor);
   }
   private async question(id: string) {
     const value = await this.prisma.question.findUnique({

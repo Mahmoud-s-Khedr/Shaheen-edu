@@ -1,8 +1,8 @@
+import { assertContentStaff } from '../../common/authorization/admin-authorization';
 import {
   HttpStatus,
   BadRequestException,
   ConflictException,
-  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -19,7 +19,6 @@ import {
   AssetStatus,
   ContentItemType,
   ContentStatus,
-  Role,
 } from '../../common/types/roles.enum';
 import type { RequestUser } from '../../common/types/request-with-user.types';
 import type { CreateContentItemDto } from './dto/create-content-item.dto';
@@ -58,8 +57,7 @@ export class ContentItemsService {
   ) {}
 
   private assertActorRole(actor: RequestUser): void {
-    if (actor.role !== Role.ADMIN && actor.role !== Role.SUPER_ADMIN)
-      throw new ForbiddenException('Forbidden');
+    assertContentStaff(actor);
   }
 
   private readonly placementNames = {

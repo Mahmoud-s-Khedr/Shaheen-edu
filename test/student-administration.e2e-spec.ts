@@ -87,7 +87,7 @@ describe('Student administration (e2e)', () => {
     const response = await app.inject({
       method: 'GET',
       url: `/api/v1/admin/students?search=ahmed&governorateId=${governorateId}&academicGradeId=${gradeId}`,
-      headers: { authorization: `Bearer ${adminToken}` },
+      headers: { authorization: `Bearer ${superAdminToken}` },
     });
     expect(response.statusCode).toBe(200);
     expect(response.body).not.toContain(student.nationalId);
@@ -109,7 +109,7 @@ describe('Student administration (e2e)', () => {
     const reset = await app.inject({
       method: 'POST',
       url: `/api/v1/admin/students/${studentId}/reset-password`,
-      headers: { authorization: `Bearer ${adminToken}` },
+      headers: { authorization: `Bearer ${superAdminToken}` },
     });
     expect(reset.statusCode).toBe(200);
     const temporaryPassword = JSON.parse(reset.body).temporaryPassword;
@@ -194,7 +194,7 @@ describe('Student administration (e2e)', () => {
     const suspend = await app.inject({
       method: 'POST',
       url: `/api/v1/admin/students/${studentId}/suspend`,
-      headers: { authorization: `Bearer ${adminToken}` },
+      headers: { authorization: `Bearer ${superAdminToken}` },
     });
     expect(suspend.statusCode).toBe(200);
     const deniedLogin = await app.inject({
@@ -239,20 +239,20 @@ describe('Student administration (e2e)', () => {
     const reactivate = await app.inject({
       method: 'POST',
       url: `/api/v1/admin/students/${studentId}/reactivate`,
-      headers: { authorization: `Bearer ${adminToken}` },
+      headers: { authorization: `Bearer ${superAdminToken}` },
     });
     expect(reactivate.statusCode).toBe(200);
     const deleted = await app.inject({
       method: 'DELETE',
       url: `/api/v1/admin/students/${studentId}`,
-      headers: { authorization: `Bearer ${adminToken}` },
+      headers: { authorization: `Bearer ${superAdminToken}` },
       payload: { deletionReason: 'Support-requested closure' },
     });
     expect(deleted.statusCode).toBe(200);
     const defaultList = await app.inject({
       method: 'GET',
       url: '/api/v1/admin/students',
-      headers: { authorization: `Bearer ${adminToken}` },
+      headers: { authorization: `Bearer ${superAdminToken}` },
     });
     expect(JSON.parse(defaultList.body).data).not.toEqual(
       expect.arrayContaining([expect.objectContaining({ id: studentId })]),
@@ -260,7 +260,7 @@ describe('Student administration (e2e)', () => {
     const deletedList = await app.inject({
       method: 'GET',
       url: '/api/v1/admin/students?status=DISABLED',
-      headers: { authorization: `Bearer ${adminToken}` },
+      headers: { authorization: `Bearer ${superAdminToken}` },
     });
     expect(JSON.parse(deletedList.body).data).toEqual(
       expect.arrayContaining([
@@ -270,19 +270,19 @@ describe('Student administration (e2e)', () => {
     const cannotSuspend = await app.inject({
       method: 'POST',
       url: `/api/v1/admin/students/${studentId}/suspend`,
-      headers: { authorization: `Bearer ${adminToken}` },
+      headers: { authorization: `Bearer ${superAdminToken}` },
     });
     expect(cannotSuspend.statusCode).toBe(409);
     const cannotReactivate = await app.inject({
       method: 'POST',
       url: `/api/v1/admin/students/${studentId}/reactivate`,
-      headers: { authorization: `Bearer ${adminToken}` },
+      headers: { authorization: `Bearer ${superAdminToken}` },
     });
     expect(cannotReactivate.statusCode).toBe(409);
     const cannotResetPassword = await app.inject({
       method: 'POST',
       url: `/api/v1/admin/students/${studentId}/reset-password`,
-      headers: { authorization: `Bearer ${adminToken}` },
+      headers: { authorization: `Bearer ${superAdminToken}` },
     });
     expect(cannotResetPassword.statusCode).toBe(409);
   });

@@ -16,7 +16,8 @@ export const apiCoverageJourney: JourneyDefinition = {
   async run({ clients, context, environment, factory, step }) {
     const admin = clients.admin;
     const create = async (path: string, body: unknown) => {
-      const response = await admin.request<any>('POST', path, body);
+      const client = /^\/admin\/(entitlements|publisher-agreements)(\/|$)/.test(path) ? clients.superAdmin : admin;
+      const response = await client.request<any>('POST', path, body);
       expectStatus(response, 201);
       return response.body;
     };
@@ -41,10 +42,10 @@ export const apiCoverageJourney: JourneyDefinition = {
 
     await step('Listing administrators, partners, and students created by earlier journeys', async () => {
       expectStatus(await clients.superAdmin.request('GET', '/admin/admins'), 200);
-      expectStatus(await admin.request('GET', '/admin/partners'), 200);
-      expectStatus(await admin.request('GET', `/admin/partners/${context.partner.id}`), 200);
-      expectStatus(await admin.request('GET', '/admin/students'), 200);
-      expectStatus(await admin.request('GET', `/admin/students/${catalogStudent.id}`), 200);
+      expectStatus(await clients.superAdmin.request('GET', '/admin/partners'), 200);
+      expectStatus(await clients.superAdmin.request('GET', `/admin/partners/${context.partner.id}`), 200);
+      expectStatus(await clients.superAdmin.request('GET', '/admin/students'), 200);
+      expectStatus(await clients.superAdmin.request('GET', `/admin/students/${catalogStudent.id}`), 200);
     });
 
     await step('Soft-deleting a disposable student account', async () => {
@@ -63,7 +64,7 @@ export const apiCoverageJourney: JourneyDefinition = {
       );
       expectStatus(disposableStudent, 201);
       context.created.students.push(disposableStudent.body.user.id);
-      const deleted = await admin.request<any>(
+      const deleted = await clients.superAdmin.request<any>(
         'DELETE',
         `/admin/students/${disposableStudent.body.user.id}`,
         { deletionReason: 'Disposable API acceptance coverage account' },
@@ -269,7 +270,7 @@ export const apiCoverageJourney: JourneyDefinition = {
       assert(typeof login.body.accessToken === 'string', 'Entitlement student login must return an access token');
       const entitlement = await create('/admin/entitlements', { studentUserId: entitlementStudent.id, courseId: course });
       assert(entitlement.studentUserId === entitlementStudent.id && typeof entitlement.studentName === 'string' && entitlement.courseId === course && typeof entitlement.targetName === 'string' && typeof entitlement.grantedByName === 'string', 'Granted entitlement must pair every returned related ID with its label');
-      const entitlementList = await admin.request<any>('GET', `/admin/entitlements?studentUserId=${entitlementStudent.id}`); expectStatus(entitlementList, 200);
+      const entitlementList = await clients.superAdmin.request<any>('GET', `/admin/entitlements?studentUserId=${entitlementStudent.id}`); expectStatus(entitlementList, 200);
       assert(entitlementList.body.data.some((item: any) => item.id === entitlement.id && item.studentUserId === entitlementStudent.id && typeof item.studentName === 'string' && item.courseId === course && typeof item.targetName === 'string' && typeof item.grantedByName === 'string'), 'Admin entitlement listing must retain all related labels');
       const studentDetail = await clients.student.request<any>('GET', `/student/content-items/${item.id}`, undefined, { accessToken: login.body.accessToken });
       expectStatus(studentDetail, 200);
@@ -281,17 +282,17 @@ export const apiCoverageJourney: JourneyDefinition = {
         'Student content detail must return its ordered attachment metadata',
       );
       expectStatus(await admin.request('DELETE', `/admin/content-items/${item.id}/attachments/${pdf.id}`), 200);
-      const revokedEntitlement = await admin.request<any>('POST', `/admin/entitlements/${entitlement.id}/revoke`); expectStatus(revokedEntitlement, 200);
+      const revokedEntitlement = await clients.superAdmin.request<any>('POST', `/admin/entitlements/${entitlement.id}/revoke`); expectStatus(revokedEntitlement, 200);
       assert(revokedEntitlement.body.id === entitlement.id && typeof revokedEntitlement.body.revokedByName === 'string', 'Revoked entitlement must return the revoking admin label');
       const agreement = await create('/admin/publisher-agreements', { lessonId: lesson, publisherUserId: String(context.partner.id), revenueShareBps: 1000, startsAt: new Date().toISOString(), isPrimary: false });
-      expectStatus(await admin.request('PATCH', `/admin/publisher-agreements/${agreement.id}`, { revenueShareBps: 1200 }), 200);
-      expectStatus(await admin.request('POST', `/admin/publisher-agreements/${agreement.id}/activate`), 201);
-      const replacement = await admin.request<any>('POST', `/admin/publisher-agreements/${agreement.id}/replace`, {
+      expectStatus(await clients.superAdmin.request('PATCH', `/admin/publisher-agreements/${agreement.id}`, { revenueShareBps: 1200 }), 200);
+      expectStatus(await clients.superAdmin.request('POST', `/admin/publisher-agreements/${agreement.id}/activate`), 201);
+      const replacement = await clients.superAdmin.request<any>('POST', `/admin/publisher-agreements/${agreement.id}/replace`, {
         lessonId: lesson, publisherUserId: String(context.partner.id), revenueShareBps: 1300, startsAt: new Date().toISOString(), isPrimary: false, activateImmediately: true,
       });
       expectStatus(replacement, 201);
-      expectStatus(await admin.request('POST', `/admin/publisher-agreements/${replacement.body.id}/end`, { endsAt: new Date().toISOString() }), 201);
-      expectStatus(await admin.request('GET', `/admin/publisher-agreements/effective?lessonId=${lesson}`), 200);
+      expectStatus(await clients.superAdmin.request('POST', `/admin/publisher-agreements/${replacement.body.id}/end`, { endsAt: new Date().toISOString() }), 201);
+      expectStatus(await clients.superAdmin.request('GET', `/admin/publisher-agreements/effective?lessonId=${lesson}`), 200);
       expectStatus(await admin.request('POST', `/admin/pricing/lesson/${lesson}`, { isPurchasable: false }), 201);
       // Keep video referenced in the coverage record so the variable is intentionally checked.
       assert(typeof video.id === 'string', 'Video asset ID must be present');

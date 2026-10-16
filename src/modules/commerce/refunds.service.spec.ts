@@ -3,7 +3,7 @@ import { RefundsService } from './refunds.service';
 
 describe('RefundsService', () => {
   const studentUserId = 'student-1';
-  const actor = { id: 'admin-1', role: Role.ADMIN } as any;
+  const actor = { id: 'admin-1', role: Role.SUPER_ADMIN } as any;
 
   function build(
     policy = { eligibilityWindowDays: 7, maximumConsumptionBps: 1_000 },

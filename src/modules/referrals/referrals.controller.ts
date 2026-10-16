@@ -34,7 +34,7 @@ import { ReferralsService } from './referrals.service';
 @ApiTags('admin/referral-programs')
 @ApiBearerAuth()
 @UseGuards(RolesGuard)
-@Roles(Role.ADMIN, Role.SUPER_ADMIN)
+@Roles(Role.SUPER_ADMIN)
 @Controller({ path: 'admin/referral-programs', version: '1' })
 export class ReferralsController {
   constructor(private readonly referrals: ReferralsService) {}

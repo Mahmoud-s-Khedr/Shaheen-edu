@@ -96,7 +96,7 @@ export async function createApp(
     const swaggerConfig = new DocumentBuilder()
       .setTitle('Shaheen Edu API')
       .setDescription(
-        'REST API for Shaheen Edu authentication, academic content, learning, assets, commerce, and administration.',
+        'REST API for Shaheen Edu authentication, academic content, learning, assets, commerce, and administration. ADMIN manages all educational content, questions, assessments, pricing, moderation and AI grading retries. Moderation and grading responses omit structured student identity for ADMIN; video-feedback studentId filters require SUPER_ADMIN (403 otherwise). SUPER_ADMIN retains platform-wide access. Student, partner and administrator management, publisher agreements, entitlements, commerce, referrals, finance, platform reports/exports, geography management and testimonials require SUPER_ADMIN. No ownership restriction applies to content staff.',
       )
       .setVersion('1.0')
       .addBearerAuth()

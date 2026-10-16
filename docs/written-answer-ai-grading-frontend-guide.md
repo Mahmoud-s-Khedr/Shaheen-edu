@@ -454,3 +454,6 @@ POST /admin/assessments/grading/answers/:answerId
 - [ ] Remove the manual grade form and old endpoint call.
 - [ ] Add the admin pending queue and retry action.
 - [ ] Ensure long-answer authoring requires a non-empty rubric before publish.
+
+
+Role access and Admin moderation/grading response changes: [Admin content permissions and dashboard handoff](admin-content-permissions-frontend-handoff.md).

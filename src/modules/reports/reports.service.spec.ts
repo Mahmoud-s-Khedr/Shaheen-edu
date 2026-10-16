@@ -6,7 +6,7 @@ import {
 } from '../../common/types/roles.enum';
 import { ReportsService } from './reports.service';
 
-const actor = { id: 'admin-1', role: Role.ADMIN } as any;
+const actor = { id: 'admin-1', role: Role.SUPER_ADMIN } as any;
 const enabledConfig = {
   get: jest.fn().mockReturnValue({ reportExportsEnabled: true }),
 } as any;

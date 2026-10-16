@@ -60,7 +60,7 @@ export class StudentRefundsController {
 @ApiTags('admin/refunds')
 @ApiBearerAuth()
 @UseGuards(RolesGuard)
-@Roles(Role.ADMIN, Role.SUPER_ADMIN)
+@Roles(Role.SUPER_ADMIN)
 @Controller({ path: 'admin/refunds', version: '1' })
 export class AdminRefundsController {
   constructor(private readonly refunds: RefundsService) {}

@@ -46,7 +46,7 @@ export const assetAccessJourney: JourneyDefinition = {
     });
 
     await step('Retaining existing student access when the covered course is archived', async () => {
-      expectStatus(await admin.request('POST', '/admin/entitlements', { studentUserId: student.id, courseId }), 201);
+      expectStatus(await clients.superAdmin.request('POST', '/admin/entitlements', { studentUserId: student.id, courseId }), 201);
       expectStatus(await admin.request('POST', `/admin/courses/${courseId}/archive`), 201);
       expectStatus(await clients.public.request('GET', `/catalog/courses/${courseId}/cover/access`), 403);
       const retained = await clients.student.request<any>('GET', `/catalog/courses/${courseId}/cover/access`, undefined, { accessToken: student.accessToken });
@@ -60,7 +60,7 @@ export const assetAccessJourney: JourneyDefinition = {
     });
 
     await step('Revoking retained archived access blocks further cover delivery', async () => {
-      expectStatus(await admin.request('POST', `/admin/entitlements/archived-access/${snapshotId}/revoke`), 201);
+      expectStatus(await clients.superAdmin.request('POST', `/admin/entitlements/archived-access/${snapshotId}/revoke`), 201);
       expectStatus(await clients.student.request('GET', `/catalog/courses/${courseId}/cover/access`, undefined, { accessToken: student.accessToken }), 403);
     });
   },

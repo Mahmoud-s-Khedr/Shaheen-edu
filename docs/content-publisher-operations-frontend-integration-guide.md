@@ -1399,3 +1399,6 @@ The report uses a referral test fixture for the settlement operation. The
 settlement validation and `PAYABLE` → `PAID` state transition are shared by
 publisher-sale allocations; use a selected `PUBLISHER_SALE` allocation in the
 publisher payout screen.
+
+
+Role access and Admin moderation/grading response changes: [Admin content permissions and dashboard handoff](admin-content-permissions-frontend-handoff.md).

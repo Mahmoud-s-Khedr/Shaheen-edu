@@ -12,7 +12,11 @@ import {
 } from '../../common/types/roles.enum';
 
 describe('PartnersService login email changes', () => {
-  const actor = { id: 'admin-1', role: Role.ADMIN, sessionId: 'session-1' };
+  const actor = {
+    id: 'admin-1',
+    role: Role.SUPER_ADMIN,
+    sessionId: 'session-1',
+  };
   const partner = {
     id: 'partner-1',
     role: Role.PARTNER,
@@ -49,7 +53,7 @@ describe('PartnersService login email changes', () => {
     );
   });
 
-  it.each([Role.ADMIN, Role.SUPER_ADMIN])(
+  it.each([Role.SUPER_ADMIN])(
     'allows %s to change only the login email on the existing user',
     async (role) => {
       prisma.user.findUnique
@@ -150,7 +154,11 @@ describe('PartnersService login email changes', () => {
 
 describe('PartnersService password resets', () => {
   const dto = { password: ' AdminChosenPassword123! ' };
-  const actor = { id: 'admin-1', role: Role.ADMIN, sessionId: 'session-1' };
+  const actor = {
+    id: 'admin-1',
+    role: Role.SUPER_ADMIN,
+    sessionId: 'session-1',
+  };
   const tx = {
     user: { updateMany: jest.fn() },
     authSession: { updateMany: jest.fn() },
@@ -182,7 +190,7 @@ describe('PartnersService password resets', () => {
     tx.user.updateMany.mockResolvedValue({ count: 1 });
   });
 
-  it.each([Role.ADMIN, Role.SUPER_ADMIN])(
+  it.each([Role.SUPER_ADMIN])(
     'allows %s to reset an active partner, revoke sessions, and audit atomically',
     async (role) => {
       const result = await service.resetPassword(
@@ -370,7 +378,7 @@ describe('PartnersService self-service profile updates', () => {
     ]);
 
     const result = await service.detail(
-      { id: 'admin-1', role: Role.ADMIN } as any,
+      { id: 'admin-1', role: Role.SUPER_ADMIN } as any,
       partner.id,
     );
 
