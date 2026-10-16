@@ -148,6 +148,7 @@ resources; read [the testing guide](docs/testing/README.md) first.
 - [Student catalog guide](docs/student-content-catalog-api-guide.md),
   [assessment API reference](docs/assessments-api-reference.md), and
   [video API reference](docs/video-api-reference.md)
+- [Admin content filtering frontend integration guide](docs/admin-content-filtering-frontend-integration-guide.md)
 - [Current user journeys](docs/testing/current-user-journeys.md) and
   [testing guidance](docs/testing/README.md)
 - [AI usage and prompt inventory](docs/AI_USAGE_AND_PROMPTS_REPORT.md)
