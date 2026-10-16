@@ -16,11 +16,13 @@ import {
   type SearchPaginationQueryDto,
 } from '../../common/dto/pagination-query.dto';
 import { Prisma } from '@prisma/client';
+import { createHash } from 'node:crypto';
 import { PrismaService } from '../../database/prisma.service';
 import { SearchCursorPaginationQueryDto } from '../../common/dto/cursor-pagination-query.dto';
 import { StudentCatalogSearchDto } from './dto/student-catalog-search.dto';
 import {
   arabicMatchText,
+  arabicMatch,
   normalizeArabic,
   paginateArabicSearch,
   searchArabicOffsetPage,
@@ -38,6 +40,14 @@ import {
   type CompletionContainerType,
 } from '../completion/completion.service';
 import { ObservabilityService } from '../../common/logging/observability.service';
+import {
+  AccessibleLessonsQueryDto,
+  AccessibleSectionsQueryDto,
+} from './dto/accessible-catalog-query.dto';
+import type {
+  AccessibleCatalogNodeDto,
+  CatalogNodeDto,
+} from './dto/student-catalog-response.dto';
 
 const published = ContentStatus.PUBLISHED;
 const order = [{ sortOrder: 'asc' as const }, { id: 'asc' as const }];
@@ -811,6 +821,275 @@ export class StudentCatalogService {
         query.limit,
         query.q,
       ),
+    };
+  }
+
+  accessibleLessons(studentUserId: string, query: AccessibleLessonsQueryDto) {
+    return this.accessibleNodes(studentUserId, 'lesson', query);
+  }
+
+  accessibleSections(studentUserId: string, query: AccessibleSectionsQueryDto) {
+    return this.accessibleNodes(studentUserId, 'section', query);
+  }
+
+  private async accessibleNodes(
+    studentUserId: string,
+    type: 'lesson' | 'section',
+    query: AccessibleSectionsQueryDto,
+  ) {
+    const grade = await this.gradeFor(studentUserId);
+    const needle = searchNeedle(query.q);
+    const fingerprint = createHash('sha256')
+      .update(
+        JSON.stringify({
+          type,
+          studentUserId,
+          gradeId: grade.id,
+          subjectId: query.subjectId ?? null,
+          courseId: query.courseId ?? null,
+          chapterIds: [...new Set(query.chapterIds ?? [])].sort(),
+          lessonIds: [...new Set(query.lessonIds ?? [])].sort(),
+          accessState: query.accessState ?? null,
+          isCompleted: query.isCompleted ?? null,
+          q: normalizeArabic(needle ?? ''),
+        }),
+      )
+      .digest('hex');
+    let position: { sortOrder: number; id: string } | undefined;
+    if (query.cursor) {
+      try {
+        const value = JSON.parse(
+          Buffer.from(query.cursor, 'base64url').toString(),
+        );
+        if (
+          value.version !== 1 ||
+          value.fingerprint !== fingerprint ||
+          !Number.isInteger(value.sortOrder) ||
+          typeof value.id !== 'string' ||
+          !value.id
+        )
+          throw new Error();
+        position = { sortOrder: value.sortOrder, id: value.id };
+      } catch {
+        throw new BadRequestException('Invalid cursor');
+      }
+    }
+
+    const grants = await this.activeGrants(studentUserId);
+    const isSection = type === 'section';
+    const source = isSection
+      ? Prisma.sql`"Section" t JOIN "Lesson" l ON l.id = t."lessonId"
+          JOIN "Chapter" h ON h.id = l."chapterId"`
+      : Prisma.sql`"Lesson" t JOIN "Chapter" h ON h.id = t."chapterId"`;
+    // Match access() precedence: a course/chapter grant wins, otherwise the
+    // nearest non-INHERIT access type determines public/free accessibility.
+    const courseIds = grants.flatMap((grant) =>
+      grant.courseId ? [grant.courseId] : [],
+    );
+    const chapterIds = grants.flatMap((grant) =>
+      grant.chapterId ? [grant.chapterId] : [],
+    );
+    const entitled = Prisma.sql`(
+      ${courseIds.length ? Prisma.sql`c.id IN (${Prisma.join(courseIds)})` : Prisma.sql`FALSE`}
+      OR ${chapterIds.length ? Prisma.sql`h.id IN (${Prisma.join(chapterIds)})` : Prisma.sql`FALSE`}
+    )`;
+    const effectiveAccess = Prisma.sql`COALESCE(
+      NULLIF(t."accessType", 'INHERIT'::"AccessType"),
+      ${isSection ? Prisma.sql`NULLIF(l."accessType", 'INHERIT'::"AccessType"),` : Prisma.empty}
+      NULLIF(h."accessType", 'INHERIT'::"AccessType"),
+      NULLIF(c."accessType", 'INHERIT'::"AccessType"),
+      'PAID'::"AccessType"
+    )`;
+    const accessScope =
+      query.accessState === 'ENTITLED'
+        ? entitled
+        : query.accessState
+          ? Prisma.sql`(NOT ${entitled} AND ${effectiveAccess} = ${query.accessState}::"AccessType")`
+          : Prisma.sql`(${entitled} OR ${effectiveAccess} IN ('PUBLIC'::"AccessType", 'FREE'::"AccessType"))`;
+    // Keep completion identical to CompletionService.containers(): at least
+    // one published placement, and a progress record for every placed item.
+    const placementScope = Prisma.sql`${isSection ? Prisma.sql`p."resolvedSectionId"` : Prisma.sql`p."resolvedLessonId"`} = t.id
+      AND i.status = ${published}::"ContentStatus"`;
+    const completedScope = Prisma.sql`(
+      EXISTS (SELECT 1 FROM "ContentPlacement" p
+        JOIN "ContentItem" i ON i.id = p."contentItemId"
+        WHERE ${placementScope})
+      AND NOT EXISTS (SELECT 1 FROM "ContentPlacement" p
+        JOIN "ContentItem" i ON i.id = p."contentItemId"
+        WHERE ${placementScope} AND NOT EXISTS (
+          SELECT 1 FROM "StudentContentProgress" progress
+          WHERE progress."studentUserId" = ${studentUserId}
+            AND progress."contentItemId" = p."contentItemId"))
+    )`;
+    const scope = sqlAnd(
+      publishedScope,
+      accessScope,
+      query.isCompleted !== undefined
+        ? Prisma.sql`${completedScope} = ${query.isCompleted === 'true'}`
+        : undefined,
+      isSection && Prisma.sql`l.status = ${published}::"ContentStatus"`,
+      Prisma.sql`h.status = ${published}::"ContentStatus"
+        AND c.status = ${published}::"ContentStatus"
+        AND s.status = ${published}::"ContentStatus"
+        AND EXISTS (SELECT 1 FROM "SubjectGrade" sg
+          WHERE sg."subjectId" = s.id AND sg."academicGradeId" = ${grade.id})`,
+      query.subjectId ? Prisma.sql`s.id = ${query.subjectId}` : undefined,
+      query.courseId ? Prisma.sql`c.id = ${query.courseId}` : undefined,
+      query.chapterIds
+        ? Prisma.sql`h.id IN (${Prisma.join(query.chapterIds)})`
+        : undefined,
+      isSection && query.lessonIds
+        ? Prisma.sql`l.id IN (${Prisma.join(query.lessonIds)})`
+        : undefined,
+      needle ? arabicMatch(type, needle) : undefined,
+    )!;
+    const cover = { coverAsset: { select: { filename: true } } };
+    const chapterInclude = {
+      ...cover,
+      course: { include: { ...cover, subject: { include: cover } } },
+    };
+    const lessonInclude = { ...cover, chapter: { include: chapterInclude } };
+    const chapterWhere: Prisma.ChapterWhereInput = {
+      status: published,
+      ...(query.chapterIds ? { id: { in: query.chapterIds } } : {}),
+      course: {
+        status: published,
+        ...(query.courseId ? { id: query.courseId } : {}),
+        subject: {
+          status: published,
+          ...(query.subjectId ? { id: query.subjectId } : {}),
+          gradeAssignments: {
+            some: {
+              academicGradeId: grade.id,
+              academicGrade: { status: published },
+            },
+          },
+        },
+      },
+    };
+    const lessonWhere: Prisma.LessonWhereInput = {
+      status: published,
+      chapter: chapterWhere,
+    };
+    const matches: AccessibleCatalogNodeDto[] = [];
+    // SQL filters before LIMIT, so normal requests hydrate only one page plus
+    // a lookahead. Retry only if concurrent edits invalidate hydrated matches.
+    const batchSize = query.limit + 1;
+    while (matches.length <= query.limit) {
+      const after = position
+        ? Prisma.sql`AND (t."sortOrder", t.id) > (${position.sortOrder}, ${position.id})`
+        : Prisma.empty;
+      const candidates = await this.prisma.$queryRaw<
+        Array<{ id: string; sortOrder: number }>
+      >(Prisma.sql`
+        SELECT t.id, t."sortOrder" FROM ${source}
+        JOIN "Course" c ON c.id = h."courseId"
+        JOIN "Subject" s ON s.id = c."subjectId"
+        WHERE ${scope} ${after}
+        ORDER BY ${sortOrderSql} LIMIT ${batchSize}
+      `);
+      if (!candidates.length) break;
+      const rows = isSection
+        ? (
+            await this.prisma.section.findMany({
+              where: {
+                id: { in: candidates.map((row) => row.id) },
+                status: published,
+                lesson: {
+                  ...lessonWhere,
+                  ...(query.lessonIds ? { id: { in: query.lessonIds } } : {}),
+                },
+              },
+              include: { ...cover, lesson: { include: lessonInclude } },
+              orderBy: order,
+            })
+          ).map((row) => ({ row, lesson: row.lesson }))
+        : (
+            await this.prisma.lesson.findMany({
+              where: {
+                ...lessonWhere,
+                id: { in: candidates.map((row) => row.id) },
+              },
+              include: {
+                ...lessonInclude,
+                _count: {
+                  select: { sections: { where: { status: published } } },
+                },
+              },
+              orderBy: order,
+            })
+          ).map((row) => ({ row, lesson: row }));
+      const accessible = rows.flatMap(({ row, lesson }) => {
+        const chapter = lesson.chapter;
+        const course = chapter.course;
+        const access = this.access(
+          grants,
+          course.id,
+          chapter.id,
+          [
+            row.accessType,
+            ...(isSection ? [lesson.accessType] : []),
+            chapter.accessType,
+            course.accessType,
+          ],
+          this.chapterPricing(chapter, course),
+        );
+        if (
+          access.state === 'LOCKED' ||
+          access.state === 'PURCHASABLE' ||
+          (query.accessState && query.accessState !== access.state)
+        )
+          return [];
+        return [{ row, lesson, chapter, course, access }];
+      });
+      const completions = await this.completion.containers(
+        studentUserId,
+        accessible.map(({ row }) => ({ id: row.id, type })),
+      );
+      for (const { row, lesson, chapter, course, access } of accessible) {
+        const isCompleted = completions.get(`${type}:${row.id}`) ?? false;
+        if (
+          query.isCompleted !== undefined &&
+          isCompleted !== (query.isCompleted === 'true')
+        )
+          continue;
+        const node = this.node(row) as CatalogNodeDto;
+        matches.push({
+          ...node,
+          access,
+          isLocked: false,
+          isCompleted,
+          breadcrumb: {
+            subject: this.node(course.subject),
+            course: this.node(course),
+            chapter: this.node(chapter),
+            ...(isSection ? { lesson: this.node(lesson) } : {}),
+          },
+        });
+        if (matches.length > query.limit) break;
+      }
+      position = candidates.at(-1)!;
+      if (candidates.length < batchSize) break;
+    }
+    const data = matches.slice(0, query.limit);
+    const last = data.at(-1);
+    const hasNextPage = matches.length > query.limit;
+    return {
+      data,
+      pageInfo: {
+        hasNextPage,
+        nextCursor:
+          hasNextPage && last
+            ? Buffer.from(
+                JSON.stringify({
+                  version: 1,
+                  fingerprint,
+                  sortOrder: last.sortOrder,
+                  id: last.id,
+                }),
+              ).toString('base64url')
+            : null,
+      },
     };
   }
 

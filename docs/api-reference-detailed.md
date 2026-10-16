@@ -583,6 +583,12 @@ No path, query, or header input.
 }
 ```
 
+### `GET /api/v1/student/assessments/question-notes`
+
+Requires a student bearer token. Lists the current student's accessible private
+question notes. Accepts optional `page` (one-based, default `1`) and `limit`
+(`1..100`, default `20`).
+
 ### `GET /api/v1/student/assessments/question-marks`
 
 **Authorization:** Bearer token; role must be `STUDENT`
@@ -1781,6 +1787,12 @@ No path, query, or header input.
   "phone": "string | null"
 }
 ```
+
+### `PATCH /api/v1/admin/partners/{id}/email`
+
+Requires an authorized admin bearer token. Changes the partner's login email
+and revokes sessions. Requires path `id` and JSON body `{ "email": "new@example.com" }`
+with a valid email of at most 254 characters. Returns HTTP 200 with `PartnerSummaryDto`.
 
 ### `PATCH /api/v1/admin/partners/{id}`
 
@@ -3800,6 +3812,7 @@ No path, query, or header input.
 
 **Request**
 
+- query `q` (optional; case-insensitive, Arabic-aware search of title, description, and text body)
 - query `page` (optional)
 - query `limit` (optional)
 - query `status` (optional; DRAFT | PUBLISHED | ARCHIVED)
@@ -3809,6 +3822,12 @@ No path, query, or header input.
 - query `chapterId` (optional)
 - query `lessonId` (optional)
 - query `sectionId` (optional)
+
+- query `courseIds`, `chapterIds`, `lessonIds`, `sectionIds` (optional; comma-separated IDs or repeated query keys)
+
+Placement filters use **OR** across all supplied IDs and levels and match content **attached to the selected targets or any of their descendants** using resolved ancestry. Singular and plural values are merged; whitespace is trimmed from plural IDs and duplicates are removed. Empty IDs or invalid list values return HTTP 400. Unknown IDs simply do not match. Other filters combine with the placement union using **AND**. With no status, archived items are excluded. Pagination and ordering by placement sort order, then item ID, are unchanged.
+
+Example: `/api/v1/admin/content-items?courseIds=c1,c2&sectionIds=s1,s2&type=VIDEO` returns videos attached to either selected course or section, including content beneath each selected target. The response `placement` still describes the direct attachment.
 
 **Success response — HTTP 200 (PaginatedContentItemResponseDto)**
 
@@ -5315,6 +5334,52 @@ asset URLs are never returned.
 **Success response — HTTP 200**
 
 Returns the grade-scoped course and subject. Chapters are fetched separately.
+
+### `GET /api/v1/student/catalog/lessons`
+
+**Authorization:** Bearer token; role must be `STUDENT`
+
+Lists accessible published lessons across the student's current published grade,
+with published ancestors. Locked and purchasable lessons are excluded.
+
+**Request**
+
+- query `subjectId`, `courseId` (optional; nonempty IDs)
+- query `chapterIds` (optional; comma-separated nonempty IDs, trimmed and deduplicated)
+- query `accessState` (optional; `PUBLIC`, `FREE`, or `ENTITLED`)
+- query `isCompleted` (optional; exact string `true` or `false`)
+- query `q` (optional; Arabic-normalized search on the lesson, `1..120` trimmed characters)
+- query `cursor`, `limit` (optional; default limit `20`, maximum `100`)
+
+Filters combine with AND; chapter IDs combine with OR. Unknown IDs or conflicting
+hierarchy filters return an empty list. Unknown parameters and malformed values
+return HTTP 400.
+
+**Success response — HTTP 200 (CursorAccessibleCatalogResponseDto)**
+
+Returns `{ data, pageInfo: { hasNextPage, nextCursor } }`. Each lesson includes
+basic node metadata, `hasChildren`, resolved `access`, `isLocked: false`, derived
+`isCompleted`, and a `breadcrumb` containing subject, course, and chapter metadata.
+Completion requires at least one published descendant content item and completion
+of every published descendant item. Results sort globally by lesson `sortOrder`,
+then ID. Cursors are bound to student, grade, endpoint, and filters; limit may change.
+
+### `GET /api/v1/student/catalog/sections`
+
+**Authorization:** Bearer token; role must be `STUDENT`
+
+Lists accessible published sections across the student's grade. Uses the same
+filters and response envelope as the accessible lessons route, plus optional
+`lessonIds` (comma-separated nonempty IDs, trimmed and deduplicated). Lesson IDs
+combine with OR and other filters with AND. The lessons route rejects `lessonIds`.
+
+Each section includes basic node metadata, resolved `access`, `isLocked: false`,
+derived `isCompleted`, and a `breadcrumb` containing subject, course, chapter, and
+lesson metadata. Section items omit `hasChildren`. Results sort globally by section
+`sortOrder`, then ID. The same publication, access, completion, and cursor rules apply.
+
+See the [frontend integration guide](accessible-student-catalog-frontend-integration-guide.md)
+for response examples and pagination guidance for both routes.
 
 ### Cursor-paginated student catalog children
 
@@ -7289,6 +7354,19 @@ List question reports for moderators, optionally filtered by status.
 
 Assign and transition a question report. Closing reports requires a resolution
 note.
+
+### `POST /api/v1/student/assessments/{assessmentId}/attempts/current/questions/{questionId}/error-reflection`
+
+Requires a student bearer token. Locks a self-reported reason for an incorrect
+reviewed assessment answer. Requires path `assessmentId`, `questionId`, and a JSON
+body with `reason`: `DID_NOT_KNOW_HOW_TO_SOLVE`, `DID_NOT_UNDERSTAND_THE_QUESTION`,
+`MADE_A_CALCULATION_MISTAKE`, or `MADE_A_CARELESS_MISTAKE`.
+
+### `POST /api/v1/student/practice/questions/{questionId}/attempts/{attemptId}/error-reflection`
+
+Requires a student bearer token. Locks a self-reported reason for an incorrect
+practice answer. Requires path `questionId`, `attemptId`, and the same `reason`
+body as the assessment error-reflection route.
 
 ### `POST /api/v1/student/voice/transcriptions`
 

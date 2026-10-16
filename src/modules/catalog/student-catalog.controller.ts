@@ -8,6 +8,7 @@ import {
 import {
   CursorCatalogContentItemResponseDto,
   CursorCatalogNodeResponseDto,
+  CursorAccessibleCatalogResponseDto,
   PaginatedCatalogNodeResponseDto,
   PaginatedMySubjectsResponseDto,
   PaginatedStudentEntitlementResponseDto,
@@ -28,6 +29,10 @@ import { Role } from '../../common/types/roles.enum';
 import type { RequestUser } from '../../common/types/request-with-user.types';
 import { StudentCatalogService } from './student-catalog.service';
 import { StudentCatalogSearchDto } from './dto/student-catalog-search.dto';
+import {
+  AccessibleLessonsQueryDto,
+  AccessibleSectionsQueryDto,
+} from './dto/accessible-catalog-query.dto';
 
 @ApiTags('student/catalog')
 @ApiBearerAuth()
@@ -108,6 +113,30 @@ export class StudentCatalogController {
     @Query() query: SearchCursorPaginationQueryDto,
   ) {
     return this.catalog.lessons(user.id, chapterId, query);
+  }
+
+  @Get('catalog/lessons')
+  @ApiOperation({
+    summary: 'List all accessible published lessons in the student grade',
+  })
+  @ApiOkResponse({ type: CursorAccessibleCatalogResponseDto })
+  accessibleLessons(
+    @CurrentUser() user: RequestUser,
+    @Query() query: AccessibleLessonsQueryDto,
+  ) {
+    return this.catalog.accessibleLessons(user.id, query);
+  }
+
+  @Get('catalog/sections')
+  @ApiOperation({
+    summary: 'List all accessible published sections in the student grade',
+  })
+  @ApiOkResponse({ type: CursorAccessibleCatalogResponseDto })
+  accessibleSections(
+    @CurrentUser() user: RequestUser,
+    @Query() query: AccessibleSectionsQueryDto,
+  ) {
+    return this.catalog.accessibleSections(user.id, query);
   }
 
   @Get('catalog/lessons/:lessonId/sections')

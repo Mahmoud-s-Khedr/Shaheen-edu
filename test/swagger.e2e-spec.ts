@@ -15,6 +15,31 @@ describe('Swagger (e2e)', () => {
     await app.close();
   });
 
+  it('documents plural admin content placement filters alongside singular filters', async () => {
+    const response = await app.inject({ method: 'GET', url: '/api/docs-json' });
+    expect(response.statusCode).toBe(200);
+    const document = JSON.parse(response.body);
+    const parameters =
+      document.paths['/api/v1/admin/content-items'].get.parameters;
+    for (const level of ['course', 'chapter', 'lesson', 'section']) {
+      expect(parameters).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            name: `${level}Id`,
+            in: 'query',
+            required: false,
+          }),
+          expect.objectContaining({
+            name: `${level}Ids`,
+            in: 'query',
+            required: false,
+            schema: expect.objectContaining({ type: 'string' }),
+          }),
+        ]),
+      );
+    }
+  });
+
   it('documents paginated collections and shared auth cookie flows', async () => {
     const response = await app.inject({ method: 'GET', url: '/api/docs-json' });
     expect(response.statusCode).toBe(200);
@@ -228,6 +253,43 @@ describe('Swagger (e2e)', () => {
         (parameter: { name: string }) => parameter.name === 'q',
       ),
     ).toMatchObject({ required: true });
+
+    const contentParameters = document.paths['/api/v1/admin/content-items'].get
+      .parameters as Array<{ name: string; description?: string }>;
+    for (const level of ['course', 'chapter', 'lesson', 'section']) {
+      for (const suffix of ['Id', 'Ids']) {
+        const parameter = contentParameters.find(
+          (entry) => entry.name === `${level}${suffix}`,
+        );
+        expect(parameter).toMatchObject({
+          description: expect.stringContaining('descendants'),
+        });
+      }
+    }
+
+    for (const resource of ['lessons', 'sections']) {
+      const operation =
+        document.paths[`/api/v1/student/catalog/${resource}`].get;
+      expect(
+        operation.responses['200'].content['application/json'].schema,
+      ).toEqual({
+        $ref: '#/components/schemas/CursorAccessibleCatalogResponseDto',
+      });
+      const parameters = operation.parameters as Array<{ name: string }>;
+      expect(parameters.map((parameter) => parameter.name)).toEqual(
+        expect.arrayContaining([
+          'subjectId',
+          'courseId',
+          'chapterIds',
+          'accessState',
+          'isCompleted',
+          'q',
+          'limit',
+          'cursor',
+          ...(resource === 'sections' ? ['lessonIds'] : []),
+        ]),
+      );
+    }
 
     // Every StudentCatalogController operation documents a real response
     // schema. Other student controllers still have gaps; this guard covers the

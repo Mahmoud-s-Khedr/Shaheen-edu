@@ -163,6 +163,39 @@ export class CursorCatalogNodeResponseDto {
   pageInfo!: CursorPageInfoDto;
 }
 
+export class AccessibleCatalogBreadcrumbDto {
+  @ApiProperty({ type: CatalogNodeDto })
+  subject!: CatalogNodeDto;
+
+  @ApiProperty({ type: CatalogNodeDto })
+  course!: CatalogNodeDto;
+
+  @ApiProperty({ type: CatalogNodeDto })
+  chapter!: CatalogNodeDto;
+
+  @ApiPropertyOptional({ type: CatalogNodeDto })
+  lesson?: CatalogNodeDto;
+}
+
+export class AccessibleCatalogNodeDto extends CatalogNodeDto {
+  @ApiProperty({ enum: [false] })
+  isLocked!: boolean;
+
+  @ApiProperty()
+  declare isCompleted: boolean;
+
+  @ApiProperty({ type: AccessibleCatalogBreadcrumbDto })
+  breadcrumb!: AccessibleCatalogBreadcrumbDto;
+}
+
+export class CursorAccessibleCatalogResponseDto {
+  @ApiProperty({ type: [AccessibleCatalogNodeDto] })
+  data!: AccessibleCatalogNodeDto[];
+
+  @ApiProperty({ type: CursorPageInfoDto })
+  pageInfo!: CursorPageInfoDto;
+}
+
 export class CatalogContentItemDto {
   @ApiProperty()
   id!: string;

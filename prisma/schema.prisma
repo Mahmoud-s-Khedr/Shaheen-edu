@@ -2350,6 +2350,8 @@ model ContentPlacement {
   @@index([lessonId, sortOrder, id])
   @@index([sectionId, sortOrder, id])
   @@index([subjectId, resolvedCourseId, resolvedChapterId])
+  @@index([resolvedLessonId])
+  @@index([resolvedSectionId])
 }
 
 /// The only persisted content-completion state. Progress above an item is

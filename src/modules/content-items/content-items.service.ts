@@ -314,23 +314,32 @@ export class ContentItemsService {
 
   async list(actor: RequestUser, query: QueryContentItemDto) {
     this.assertActorRole(actor);
-    const targetFields = [
-      query.courseId,
-      query.chapterId,
-      query.lessonId,
-      query.sectionId,
-    ].filter(Boolean);
-    if (targetFields.length > 1)
-      throw new BadRequestException('Use at most one placement target filter');
-    const placementWhere: Prisma.ContentPlacementWhereInput = query.courseId
-      ? { courseId: query.courseId }
-      : query.chapterId
-        ? { chapterId: query.chapterId }
-        : query.lessonId
-          ? { lessonId: query.lessonId }
-          : query.sectionId
-            ? { sectionId: query.sectionId }
-            : {};
+    const placementSelections = (
+      [
+        ['courseId', 'resolvedCourseId'],
+        ['chapterId', 'resolvedChapterId'],
+        ['lessonId', 'resolvedLessonId'],
+        ['sectionId', 'resolvedSectionId'],
+      ] as const
+    )
+      .map(([parameter, field]) => ({
+        field,
+        ids: [
+          ...new Set([
+            ...(query[parameter] ? [query[parameter]] : []),
+            ...(query[`${parameter}s`] ?? []),
+          ]),
+        ],
+      }))
+      .filter(({ ids }) => ids.length > 0);
+    const placementWhere: Prisma.ContentPlacementWhereInput =
+      placementSelections.length > 0
+        ? {
+            OR: placementSelections.map(({ field, ids }) => ({
+              [field]: { in: ids },
+            })),
+          }
+        : {};
     const where: Prisma.ContentItemWhereInput = {
       status: query.status ?? { not: ContentStatus.ARCHIVED },
       type: query.type,
@@ -339,17 +348,16 @@ export class ContentItemsService {
     };
     // ContentPlacement is 1:1 with ContentItem, so the join cannot multiply
     // rows; it mirrors `placement: { is: ... }` and supplies the sort column.
-    const placementColumn = query.courseId
-      ? 'courseId'
-      : query.chapterId
-        ? 'chapterId'
-        : query.lessonId
-          ? 'lessonId'
-          : query.sectionId
-            ? 'sectionId'
-            : undefined;
-    const placementId =
-      query.courseId ?? query.chapterId ?? query.lessonId ?? query.sectionId;
+    const placementSql =
+      placementSelections.length > 0
+        ? Prisma.sql`(${Prisma.join(
+            placementSelections.map(
+              ({ field, ids }) =>
+                Prisma.sql`${Prisma.raw(`p."${field}"`)} IN (${Prisma.join(ids)})`,
+            ),
+            ' OR ',
+          )})`
+        : undefined;
     const { data: items, total } = await paginateArabicSearch({
       prisma: this.prisma,
       delegate: this.prisma.contentItem,
@@ -365,9 +373,7 @@ export class ContentItemsService {
           query.accessType
             ? Prisma.sql`t."accessType" = ${query.accessType}::"AccessType"`
             : undefined,
-          placementColumn && placementId
-            ? Prisma.sql`${Prisma.raw(`p."${placementColumn}"`)} = ${placementId}`
-            : undefined,
+          placementSql,
         ),
       },
       orderBySql: Prisma.sql`p."sortOrder" ASC, t.id ASC`,

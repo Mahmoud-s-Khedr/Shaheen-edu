@@ -69,6 +69,7 @@ export async function cleanDatabase(
   await prisma.lesson.deleteMany();
   await prisma.chapter.deleteMany();
   await prisma.course.deleteMany();
+  await prisma.subjectGrade.deleteMany();
   await prisma.subject.deleteMany();
   // Must run before academicGrade.deleteMany() due to the FK.
   await prisma.studentProfile.deleteMany();

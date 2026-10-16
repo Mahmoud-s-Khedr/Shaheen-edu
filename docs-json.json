@@ -1755,6 +1755,102 @@
         ]
       }
     },
+    "/api/v1/admin/partners/{id}/email": {
+      "patch": {
+        "operationId": "AdminPartnersController_updateEmail_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePartnerEmailDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PartnerSummaryDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Change a partner login email and revoke sessions",
+        "tags": [
+          "admin/partners"
+        ]
+      }
+    },
     "/api/v1/admin/partners/{id}/suspend": {
       "post": {
         "operationId": "AdminPartnersController_suspend_v1",
@@ -1882,6 +1978,102 @@
           }
         ],
         "summary": "Reactivate a partner",
+        "tags": [
+          "admin/partners"
+        ]
+      }
+    },
+    "/api/v1/admin/partners/{id}/reset-password": {
+      "post": {
+        "operationId": "AdminPartnersController_resetPassword_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResetPartnerPasswordDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Set a partner password without requiring a password change",
         "tags": [
           "admin/partners"
         ]
@@ -8502,6 +8694,16 @@
             "name": "courseId",
             "required": false,
             "in": "query",
+            "description": "Matches content attached to this course or its descendants; OR across all hierarchy filters. Merged with courseIds.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "courseIds",
+            "required": false,
+            "in": "query",
+            "description": "Comma-separated or repeated course IDs. Matches content attached to these targets or their descendants; OR across all hierarchy filters. Merged with courseId.",
             "schema": {
               "type": "string"
             }
@@ -8510,6 +8712,16 @@
             "name": "chapterId",
             "required": false,
             "in": "query",
+            "description": "Matches content attached to this chapter or its descendants; OR across all hierarchy filters. Merged with chapterIds.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "chapterIds",
+            "required": false,
+            "in": "query",
+            "description": "Comma-separated or repeated chapter IDs. Matches content attached to these targets or their descendants; OR across all hierarchy filters. Merged with chapterId.",
             "schema": {
               "type": "string"
             }
@@ -8518,6 +8730,16 @@
             "name": "lessonId",
             "required": false,
             "in": "query",
+            "description": "Matches content attached to this lesson or its descendants; OR across all hierarchy filters. Merged with lessonIds.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "lessonIds",
+            "required": false,
+            "in": "query",
+            "description": "Comma-separated or repeated lesson IDs. Matches content attached to these targets or their descendants; OR across all hierarchy filters. Merged with lessonId.",
             "schema": {
               "type": "string"
             }
@@ -8526,6 +8748,16 @@
             "name": "sectionId",
             "required": false,
             "in": "query",
+            "description": "Matches content attached to this section or its descendants; OR across all hierarchy filters. Merged with sectionIds.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sectionIds",
+            "required": false,
+            "in": "query",
+            "description": "Comma-separated or repeated section IDs. Matches content attached to these targets or their descendants; OR across all hierarchy filters. Merged with sectionId.",
             "schema": {
               "type": "string"
             }
@@ -10812,6 +11044,233 @@
           }
         ],
         "summary": "List published lessons in a grade-scoped chapter",
+        "tags": [
+          "student/catalog"
+        ]
+      }
+    },
+    "/api/v1/student/catalog/lessons": {
+      "get": {
+        "operationId": "StudentCatalogController_accessibleLessons_v1",
+        "parameters": [
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "Opaque cursor returned by the preceding page.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Case-insensitive text search. Search cursors are bound to this query.",
+            "schema": {
+              "minLength": 1,
+              "maxLength": 120,
+              "type": "string"
+            }
+          },
+          {
+            "name": "subjectId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "courseId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "chapterIds",
+            "required": false,
+            "in": "query",
+            "description": "Comma-separated chapter IDs (OR). Combined with other filters using AND.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "accessState",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "PUBLIC",
+                "FREE",
+                "ENTITLED"
+              ]
+            }
+          },
+          {
+            "name": "isCompleted",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CursorAccessibleCatalogResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List all accessible published lessons in the student grade",
+        "tags": [
+          "student/catalog"
+        ]
+      }
+    },
+    "/api/v1/student/catalog/sections": {
+      "get": {
+        "operationId": "StudentCatalogController_accessibleSections_v1",
+        "parameters": [
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "Opaque cursor returned by the preceding page.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Case-insensitive text search. Search cursors are bound to this query.",
+            "schema": {
+              "minLength": 1,
+              "maxLength": 120,
+              "type": "string"
+            }
+          },
+          {
+            "name": "subjectId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "courseId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "chapterIds",
+            "required": false,
+            "in": "query",
+            "description": "Comma-separated chapter IDs (OR). Combined with other filters using AND.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "accessState",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "PUBLIC",
+                "FREE",
+                "ENTITLED"
+              ]
+            }
+          },
+          {
+            "name": "isCompleted",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ]
+            }
+          },
+          {
+            "name": "lessonIds",
+            "required": false,
+            "in": "query",
+            "description": "Comma-separated lesson IDs (OR). Combined with other filters using AND.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CursorAccessibleCatalogResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List all accessible published sections in the student grade",
         "tags": [
           "student/catalog"
         ]
@@ -16143,6 +16602,100 @@
         ]
       }
     },
+    "/api/v1/student/practice/questions/{questionId}/attempts/{attemptId}/error-reflection": {
+      "post": {
+        "operationId": "LearningController_errorReflection_v1",
+        "parameters": [
+          {
+            "name": "questionId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "attemptId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateStudentErrorReflectionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Lock a self-reported reason for an incorrect practice answer",
+        "tags": [
+          "student/learning"
+        ]
+      }
+    },
     "/api/v1/student/practice/questions/{questionId}/assets/{assetId}/access": {
       "get": {
         "operationId": "LearningController_assetAccess_v1",
@@ -17143,6 +17696,67 @@
         ]
       }
     },
+    "/api/v1/student/assessments/question-notes": {
+      "get": {
+        "operationId": "AssessmentsController_questionNotes_v1",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "One-based page number.",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Maximum records to return per page.",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the current student’s accessible private question notes",
+        "tags": [
+          "student/assessments"
+        ]
+      }
+    },
     "/api/v1/student/assessments/question-notes/{questionId}": {
       "put": {
         "operationId": "AssessmentsController_saveQuestionNote_v1",
@@ -17940,6 +18554,100 @@
           }
         ],
         "summary": "Autosave a selected answer",
+        "tags": [
+          "student/assessments"
+        ]
+      }
+    },
+    "/api/v1/student/assessments/{assessmentId}/attempts/current/questions/{questionId}/error-reflection": {
+      "post": {
+        "operationId": "AssessmentsController_errorReflection_v1",
+        "parameters": [
+          {
+            "name": "assessmentId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "questionId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateStudentErrorReflectionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Lock a self-reported reason for an incorrect reviewed answer",
         "tags": [
           "student/assessments"
         ]
@@ -25842,102 +26550,6 @@
           "admin/video-feedback"
         ]
       }
-    },
-    "/api/v1/admin/partners/{id}/reset-password": {
-      "post": {
-        "operationId": "AdminPartnersController_resetPassword_v1",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ResetPartnerPasswordDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SuccessResponseDto"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponseDto"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponseDto"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponseDto"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponseDto"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponseDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Set a partner password without requiring a password change",
-        "tags": [
-          "admin/partners"
-        ]
-      }
     }
   },
   "info": {
@@ -26631,6 +27243,33 @@
             "nullable": true
           }
         }
+      },
+      "UpdatePartnerEmailDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "example": "almarji@jibal-platform.com",
+            "maxLength": 254
+          }
+        },
+        "required": [
+          "email"
+        ]
+      },
+      "ResetPartnerPasswordDto": {
+        "type": "object",
+        "properties": {
+          "password": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 128,
+            "writeOnly": true
+          }
+        },
+        "required": [
+          "password"
+        ]
       },
       "LocalizedResponseTextDto": {
         "type": "object",
@@ -29760,6 +30399,107 @@
           "pageInfo"
         ]
       },
+      "AccessibleCatalogBreadcrumbDto": {
+        "type": "object",
+        "properties": {
+          "subject": {
+            "$ref": "#/components/schemas/CatalogNodeDto"
+          },
+          "course": {
+            "$ref": "#/components/schemas/CatalogNodeDto"
+          },
+          "chapter": {
+            "$ref": "#/components/schemas/CatalogNodeDto"
+          },
+          "lesson": {
+            "$ref": "#/components/schemas/CatalogNodeDto"
+          }
+        },
+        "required": [
+          "subject",
+          "course",
+          "chapter"
+        ]
+      },
+      "AccessibleCatalogNodeDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "sortOrder": {
+            "type": "number"
+          },
+          "coverAssetId": {
+            "type": "string",
+            "nullable": true
+          },
+          "coverAssetName": {
+            "type": "string",
+            "nullable": true
+          },
+          "hasChildren": {
+            "type": "boolean",
+            "description": "Present when child counts were requested."
+          },
+          "access": {
+            "type": "object",
+            "description": "Resolved access for the requesting student."
+          },
+          "isCompleted": {
+            "type": "boolean",
+            "description": "Whether every published descendant content item is complete for this student."
+          },
+          "isLocked": {
+            "type": "boolean",
+            "enum": [
+              false
+            ]
+          },
+          "breadcrumb": {
+            "$ref": "#/components/schemas/AccessibleCatalogBreadcrumbDto"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "slug",
+          "description",
+          "sortOrder",
+          "coverAssetId",
+          "coverAssetName",
+          "isLocked",
+          "breadcrumb"
+        ]
+      },
+      "CursorAccessibleCatalogResponseDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AccessibleCatalogNodeDto"
+            }
+          },
+          "pageInfo": {
+            "$ref": "#/components/schemas/CursorPageInfoDto"
+          }
+        },
+        "required": [
+          "data",
+          "pageInfo"
+        ]
+      },
       "CatalogContentItemDto": {
         "type": "object",
         "properties": {
@@ -32326,6 +33066,23 @@
           "optionIds"
         ]
       },
+      "CreateStudentErrorReflectionDto": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "enum": [
+              "DID_NOT_KNOW_HOW_TO_SOLVE",
+              "DID_NOT_UNDERSTAND_THE_QUESTION",
+              "MADE_A_CALCULATION_MISTAKE",
+              "MADE_A_CARELESS_MISTAKE"
+            ]
+          }
+        },
+        "required": [
+          "reason"
+        ]
+      },
       "ParentAnalyticsChildDto": {
         "type": "object",
         "properties": {
@@ -32463,7 +33220,7 @@
           },
           "solvedQuestions": {
             "type": "number",
-            "description": "Distinct questions answered correctly on this Cairo day."
+            "description": "Distinct questions answered correctly in practice or completed assessments on this Cairo day."
           },
           "contentDurationSeconds": {
             "type": "number",
@@ -32516,6 +33273,11 @@
           },
           "title": {
             "type": "string"
+          },
+          "questionBankId": {
+            "type": "string",
+            "deprecated": true,
+            "description": "Compatibility alias for a single question-bank selection. Do not send together with questionBankIds."
           },
           "questionBankIds": {
             "type": "array",
@@ -33475,6 +34237,10 @@
             "format": "date-time",
             "nullable": true
           },
+          "answerChanges": {
+            "type": "object",
+            "description": "Counts of saved answer changes, grouped by correctness transition."
+          },
           "questions": {
             "type": "array",
             "items": {
@@ -33494,6 +34260,7 @@
           "pendingGradingCount",
           "pendingAiGradingCount",
           "answeredCount",
+          "answerChanges",
           "questions"
         ]
       },
@@ -34999,20 +35766,6 @@
             "maximum": 5
           }
         }
-      },
-      "ResetPartnerPasswordDto": {
-        "type": "object",
-        "properties": {
-          "password": {
-            "type": "string",
-            "minLength": 8,
-            "maxLength": 128,
-            "writeOnly": true
-          }
-        },
-        "required": [
-          "password"
-        ]
       }
     }
   }

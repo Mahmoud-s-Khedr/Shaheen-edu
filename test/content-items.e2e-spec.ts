@@ -50,7 +50,7 @@ describe('Content items (e2e)', () => {
       method: 'POST',
       url: '/api/v1/admin/subjects',
       headers: auth(),
-      payload: { title: 'Content Subject', academicGradeId: json(grade).id },
+      payload: { title: 'Content Subject', academicGradeIds: [json(grade).id] },
     });
     const course = await app.inject({
       method: 'POST',
@@ -414,6 +414,320 @@ describe('Content items (e2e)', () => {
       headers: auth(),
     });
     expect(json(after).status).toBe('ARCHIVED');
+  });
+
+  describe('multiple placement filters', () => {
+    let course2: string;
+    let lesson: string;
+    let section: string;
+    let section2: string;
+    const items: Record<string, string> = {};
+    const create = async (
+      resource: string,
+      payload: Record<string, unknown>,
+    ) => {
+      const response = await app.inject({
+        method: 'POST',
+        url: `/api/v1/admin/${resource}`,
+        headers: auth(),
+        payload,
+      });
+      expect(response.statusCode).toBe(201);
+      return json(response).id as string;
+    };
+    const list = async (query = '') => {
+      const response = await app.inject({
+        method: 'GET',
+        url: `/api/v1/admin/content-items?${query}`,
+        headers: auth(),
+      });
+      expect(response.statusCode).toBe(200);
+      return json(response);
+    };
+    const ids = (result: any) => result.data.map((item: any) => item.id);
+
+    beforeAll(async () => {
+      const course = await app
+        .get(PrismaService)
+        .course.findUniqueOrThrow({ where: { id: courseId } });
+      course2 = await create('courses', {
+        title: 'Filter second course',
+        subjectId: course.subjectId,
+        accessType: 'PUBLIC',
+      });
+      lesson = await create('lessons', { title: 'Filter lesson', chapterId });
+      section = await create('sections', {
+        title: 'Filter section',
+        lessonId: lesson,
+      });
+      section2 = await create('sections', {
+        title: 'Filter second section',
+        lessonId: lesson,
+      });
+      const placements = {
+        course: { courseId },
+        course2: { courseId: course2 },
+        chapter: { chapterId },
+        lesson: { lessonId: lesson },
+        section: { sectionId: section },
+        section2: { sectionId: section2 },
+      };
+      for (const [key, placement] of Object.entries(placements)) {
+        items[key] = await create('content-items', {
+          type: 'TEXT',
+          title: `Filter ${key}`,
+          textBody: 'مُعَلِّم filterfixture',
+          accessType: 'FREE',
+          placement,
+        });
+      }
+      items.archived = await create('content-items', {
+        type: 'TEXT',
+        title: 'Filter archived',
+        textBody: 'معلم filterfixture',
+        accessType: 'FREE',
+        placement: { sectionId: section },
+      });
+      const archive = await app.inject({
+        method: 'POST',
+        url: `/api/v1/admin/content-items/${items.archived}/archive`,
+        headers: auth(),
+      });
+      expect(archive.statusCode).toBe(201);
+    });
+
+    it.each(['', '&q=معلم'])(
+      'matches resolved ancestry across all levels with search %s',
+      async (search) => {
+        const result = await list(
+          `courseIds=${courseId},${course2}&chapterIds=${chapterId}&lessonIds=${lesson}&sectionIds=${section},${section2}&accessType=FREE&type=TEXT${search}`,
+        );
+        expect(ids(result).sort()).toEqual(
+          Object.entries(items)
+            .filter(([key]) => key !== 'archived')
+            .map(([, id]) => id)
+            .sort(),
+        );
+        expect(result.meta.total).toBe(6);
+      },
+    );
+
+    it.each(['', '&q=معلم'])(
+      'includes direct and descendant content for every singular and plural level %s',
+      async (search) => {
+        const cases = [
+          [
+            'courseId',
+            courseId,
+            ['course', 'chapter', 'lesson', 'section', 'section2'],
+          ],
+          [
+            'chapterId',
+            chapterId,
+            ['chapter', 'lesson', 'section', 'section2'],
+          ],
+          ['lessonId', lesson, ['lesson', 'section', 'section2']],
+          ['sectionId', section, ['section']],
+        ] as const;
+        for (const [parameter, target, keys] of cases) {
+          for (const suffix of ['', 's']) {
+            const result = await list(
+              `${parameter}${suffix}=${target}&accessType=FREE&type=TEXT${search}`,
+            );
+            expect(ids(result).sort()).toEqual(
+              keys.map((key) => items[key]).sort(),
+            );
+            expect(result.meta.total).toBe(keys.length);
+            for (const item of result.data) {
+              if (item.id === items.section) {
+                expect(item.placement).toMatchObject({
+                  courseId: null,
+                  chapterId: null,
+                  lessonId: null,
+                  sectionId: section,
+                });
+              }
+            }
+          }
+        }
+      },
+    );
+
+    it('merges singular/plural filters, deduplicates and accepts repeated keys', async () => {
+      const result = await list(
+        `courseId=${courseId}&courseIds=${courseId}&courseIds=${course2},${course2}&sectionId=${section}&q=filterfixture`,
+      );
+      expect(ids(result).sort()).toEqual(
+        [
+          items.course,
+          items.course2,
+          items.chapter,
+          items.lesson,
+          items.section,
+          items.section2,
+        ].sort(),
+      );
+      expect(result.meta.total).toBe(6);
+      const singulars = await list(
+        `courseId=${courseId}&sectionId=${section}&q=filterfixture`,
+      );
+      expect(ids(singulars).sort()).toEqual(
+        [
+          items.course,
+          items.chapter,
+          items.lesson,
+          items.section,
+          items.section2,
+        ].sort(),
+      );
+    });
+
+    it('includes course descendants and applies other filters to every OR branch', async () => {
+      expect(
+        ids(await list(`courseId=${courseId}&q=filterfixture`)).sort(),
+      ).toEqual(
+        [
+          items.course,
+          items.chapter,
+          items.lesson,
+          items.section,
+          items.section2,
+        ].sort(),
+      );
+      expect(
+        ids(
+          await list(
+            `courseIds=${courseId},${course2}&sectionIds=${section}&accessType=PAID`,
+          ),
+        ),
+      ).toEqual([]);
+      expect(
+        ids(
+          await list(
+            `courseIds=${courseId}&sectionIds=${section}&type=VIDEO&q=filterfixture`,
+          ),
+        ),
+      ).toEqual([]);
+      expect(
+        ids(
+          await list(
+            `courseIds=${courseId}&sectionIds=${section}&status=ARCHIVED&q=filterfixture`,
+          ),
+        ),
+      ).toEqual([items.archived]);
+    });
+
+    it.each(['', '&q=معلم'])(
+      'paginates without duplicates and counts the full union %s',
+      async (search) => {
+        const query = `courseIds=${courseId},${course2}&sectionIds=${section},${section2}&accessType=FREE${search}`;
+        const all = await list(query);
+        const pages = await Promise.all(
+          [1, 2, 3].map((page) => list(`${query}&limit=2&page=${page}`)),
+        );
+        expect(pages.flatMap(ids)).toEqual(ids(all));
+        expect(new Set(pages.flatMap(ids)).size).toBe(6);
+        for (const page of pages)
+          expect(page.meta).toMatchObject({
+            total: 6,
+            totalPages: 3,
+            limit: 2,
+          });
+      },
+    );
+
+    it.each(['', '&q=filterfixture'])(
+      'handles unknown IDs and omitted targets %s',
+      async (search) => {
+        expect((await list(`sectionIds=unknown${search}`)).meta.total).toBe(0);
+        expect(
+          ids(await list(`sectionIds=unknown,${section2}${search}`)),
+        ).toEqual([items.section2]);
+        expect(ids(await list(`limit=100${search}`))).toEqual(
+          expect.arrayContaining([items.course, items.section]),
+        );
+      },
+    );
+
+    it('updates ancestor matches when a newly created section video moves branches', async () => {
+      const chapter2 = await create('chapters', {
+        title: 'Move chapter',
+        courseId: course2,
+      });
+      const lesson2 = await create('lessons', {
+        title: 'Move lesson',
+        chapterId: chapter2,
+      });
+      const destination = await create('sections', {
+        title: 'Move section',
+        lessonId: lesson2,
+      });
+      const video = await create('content-items', {
+        type: 'VIDEO',
+        title: 'فيديو انتقال',
+        accessType: 'FREE',
+        placement: { sectionId: section },
+      });
+      const oldTargets = {
+        courseId,
+        chapterId,
+        lessonId: lesson,
+        sectionId: section,
+      };
+      const newTargets = {
+        courseId: course2,
+        chapterId: chapter2,
+        lessonId: lesson2,
+        sectionId: destination,
+      };
+      const check = async (
+        targets: Record<string, string>,
+        matches: boolean,
+      ) => {
+        for (const [parameter, target] of Object.entries(targets)) {
+          for (const suffix of ['', 's']) {
+            for (const search of ['', '&q=فيديو']) {
+              const result = await list(
+                `${parameter}${suffix}=${target}&type=VIDEO${search}`,
+              );
+              if (matches) expect(ids(result)).toContain(video);
+              else expect(ids(result)).not.toContain(video);
+            }
+          }
+        }
+      };
+      await check(oldTargets, true);
+      await check(newTargets, false);
+      const moved = await app.inject({
+        method: 'POST',
+        url: `/api/v1/admin/content-items/${video}/move`,
+        headers: auth(),
+        payload: { placement: { sectionId: destination } },
+      });
+      expect(moved.statusCode).toBe(201);
+      expect(json(moved).placement).toMatchObject({
+        courseId: null,
+        chapterId: null,
+        lessonId: null,
+        sectionId: destination,
+      });
+      await check(oldTargets, false);
+      await check(newTargets, true);
+    });
+
+    it.each([
+      'courseIds=',
+      'sectionIds=a,,b',
+      'chapterIds=%20',
+      'lessonIds=a&lessonIds=',
+    ])('rejects malformed HTTP query %s', async (query) => {
+      const response = await app.inject({
+        method: 'GET',
+        url: `/api/v1/admin/content-items?${query}`,
+        headers: auth(),
+      });
+      expect(response.statusCode).toBe(400);
+    });
   });
 
   describe('role protection', () => {
