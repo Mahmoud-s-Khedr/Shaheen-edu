@@ -7235,7 +7235,40 @@ Creates and queues an import from `CreateQuestionImportDto`; returns the queued 
 
 ### `GET /api/v1/admin/ai/question-imports`
 
-Lists imports (HTTP 200). Optional query parameters: `page`, `limit`, `q`, and `status` (`QUEUED`, `EXTRACTING`, `SEGMENTING`, `AWAITING_REVIEW`, `GENERATING`, `COMPLETED`, `COMPLETED_WITH_ERRORS`, or `FAILED`).
+Lists top-level imports (HTTP 200), ordered by `createdAt DESC`, then `id ASC`. Requires an administrator Bearer token. Response remains `{ data, meta: { page, limit, total, totalPages } }`.
+
+| Query parameter | Behavior |
+| --- | --- |
+| `page`, `limit` | One-based page (default `1`); records per page (default `20`, maximum `100`). |
+| `q` | Case-insensitive literal substring search across import ID, source asset filename, raw source text, and normalized source text. Maximum 120 characters. |
+| `status` | One import status; mutually exclusive with `statuses`. |
+| `statuses` | Comma-separated statuses; matches any listed status. |
+| `courseId` | Target course, including every placement depth. |
+| `chapterId` | Direct chapter placement or a placement in one of its lessons or sections. |
+| `lessonId` | Direct lesson placement or a placement in one of its sections. |
+| `sectionId` | Exact section placement. |
+| `bankId`, `sourceId` | Exact question bank or question source ID. |
+| `createdById` | Submitting administrator ID. |
+| `inputType` | `RAW_TEXT` or `ASSET` (PDF/TXT uploads use `ASSET`). |
+| `createdFrom` | Inclusive `createdAt` lower bound; ISO timestamp with timezone. |
+| `createdTo` | Exclusive `createdAt` upper bound; ISO timestamp with timezone. |
+| `hasErrors` | Literal `true` or `false`. Errors mean status `FAILED`/`COMPLETED_WITH_ERRORS`, `failedItems > 0`, or `invalidItems > 0`. False matches the inverse. |
+
+Supported statuses: `QUEUED`, `EXTRACTING`, `TRANSCRIBING`, `SEGMENTING`, `AWAITING_REVIEW`, `GENERATING`, `COMPLETED`, `COMPLETED_WITH_ERRORS`, `FAILED`.
+
+All supplied filters combine with AND; `statuses` combines its values with OR. Combined chapter/lesson/section filters must match the same placement. Ancestor placements do not match descendant filters. Archived hierarchy records remain searchable, and placement filters work before any questions are created. Unknown IDs and incompatible hierarchy combinations return an empty collection. Child imports are never listed.
+
+Malformed values, blank IDs, conflicting `status`/`statuses`, and ranges where `createdFrom >= createdTo` return HTTP 400. Date bounds require timezone-aware timestamps such as `2026-10-01T00:00:00Z`; a date alone is invalid. URL-encode timezone offsets containing `+`.
+
+Examples:
+
+```http
+GET /api/v1/admin/ai/question-imports?courseId=course-id&chapterId=chapter-id&statuses=AWAITING_REVIEW,FAILED&page=1&limit=20
+GET /api/v1/admin/ai/question-imports?createdById=admin-id&hasErrors=true&createdFrom=2026-10-01T00:00:00Z&createdTo=2026-10-20T00:00:00Z
+GET /api/v1/admin/ai/question-imports?bankId=bank-id&sourceId=source-id&inputType=ASSET&q=biology
+```
+
+These collection filters do not change the query contract of `GET /admin/ai/question-imports/{id}/items`.
 
 ### `GET /api/v1/admin/ai/question-imports/{id}`
 

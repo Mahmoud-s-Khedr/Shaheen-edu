@@ -23,6 +23,9 @@ import type { RequestUser } from '../../common/types/request-with-user.types';
 import { toPaginationMeta } from '../../common/dto/pagination-query.dto';
 import { PrismaService } from '../../database/prisma.service';
 import { Prisma } from '@prisma/client';
+import type { ListQuestionImportsDto } from './dto/list-question-imports.dto';
+import { questionImportListPredicate } from './question-import-list.query';
+import { orderByIds } from '../../common/search/arabic-search';
 import { AuditService } from '../audit/audit.service';
 import { QuestionImportQueue } from './question-import.queue';
 import type {
@@ -233,25 +236,34 @@ export class QuestionImportService {
     await this.enqueueBatchOrFail(batch.id);
     return this.summary(batch);
   }
-  async list(actor: RequestUser, query: QueryQuestionImportDto) {
+  async list(actor: RequestUser, query: ListQuestionImportsDto) {
     this.admin(actor);
-    const where: any = {
-      parentId: null,
-      ...(query.status ? { status: query.status } : {}),
-    };
-    const [data, total] = await this.prisma.$transaction([
-      this.prisma.questionImportBatch.findMany({
-        where,
-        orderBy: { createdAt: 'desc' },
-        skip: (query.page - 1) * query.limit,
-        take: query.limit,
-      }),
-      this.prisma.questionImportBatch.count({ where }),
-    ]);
-    return {
-      data: data.map((batch) => this.summary(batch)),
-      meta: toPaginationMeta(query.page, query.limit, total),
-    };
+    const predicate = questionImportListPredicate(query);
+    return this.prisma.$transaction(
+      async (tx) => {
+        const ids = await tx.$queryRaw<Array<{ id: string }>>(Prisma.sql`
+        SELECT b.id FROM "QuestionImportBatch" b WHERE ${predicate}
+        ORDER BY b."createdAt" DESC, b.id ASC
+        LIMIT ${query.limit} OFFSET ${(query.page - 1) * query.limit}
+      `);
+        const [count] = await tx.$queryRaw<Array<{ total: bigint }>>(Prisma.sql`
+        SELECT count(*) AS total FROM "QuestionImportBatch" b WHERE ${predicate}
+      `);
+        const data = ids.length
+          ? await tx.questionImportBatch.findMany({
+              where: { id: { in: ids.map(({ id }) => id) } },
+            })
+          : [];
+        return {
+          data: orderByIds(
+            data,
+            ids.map(({ id }) => id),
+          ).map((batch) => this.summary(batch)),
+          meta: toPaginationMeta(query.page, query.limit, Number(count.total)),
+        };
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
+    );
   }
   async get(actor: RequestUser, id: string) {
     this.admin(actor);

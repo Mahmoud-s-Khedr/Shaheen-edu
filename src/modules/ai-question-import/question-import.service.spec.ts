@@ -27,6 +27,61 @@ describe('QuestionImportService review summaries', () => {
     );
   }
 
+  it('hydrates the selected page in SQL order and strips retained source text', async () => {
+    const service = serviceWith();
+    const tx = {
+      $queryRaw: jest
+        .fn()
+        .mockResolvedValueOnce([{ id: 'b' }, { id: 'a' }])
+        .mockResolvedValueOnce([{ total: 5n }]),
+      questionImportBatch: {
+        findMany: jest.fn().mockResolvedValue([
+          { id: 'a', rawText: 'Source', normalizedText: 'Text' },
+          { id: 'b', rawText: 'Source', normalizedText: 'Text' },
+        ]),
+      },
+    };
+    Reflect.set(service, 'prisma', {
+      $transaction: (work: (client: typeof tx) => unknown) => work(tx),
+    });
+    expect(
+      await service.list(
+        { id: 'admin-1', role: Role.ADMIN, sessionId: 'session-1' },
+        { page: 2, limit: 2 },
+      ),
+    ).toEqual({
+      data: [{ id: 'b' }, { id: 'a' }],
+      meta: { page: 2, limit: 2, total: 5, totalPages: 3 },
+    });
+    expect(tx.questionImportBatch.findMany).toHaveBeenCalledWith({
+      where: { id: { in: ['b', 'a'] } },
+    });
+  });
+
+  it('returns an empty page with its total without hydrating records', async () => {
+    const service = serviceWith();
+    const tx = {
+      $queryRaw: jest
+        .fn()
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([{ total: 0n }]),
+      questionImportBatch: { findMany: jest.fn() },
+    };
+    Reflect.set(service, 'prisma', {
+      $transaction: (work: (client: typeof tx) => unknown) => work(tx),
+    });
+    expect(
+      await service.list(
+        { id: 'admin-1', role: Role.ADMIN, sessionId: 'session-1' },
+        { page: 1, limit: 20 },
+      ),
+    ).toEqual({
+      data: [],
+      meta: { page: 1, limit: 20, total: 0, totalPages: 0 },
+    });
+    expect(tx.questionImportBatch.findMany).not.toHaveBeenCalled();
+  });
+
   it.each(
     ['body', 'explanation'].flatMap((field) =>
       [123, false, {}, [], null, undefined, '   '].map((value) => ({

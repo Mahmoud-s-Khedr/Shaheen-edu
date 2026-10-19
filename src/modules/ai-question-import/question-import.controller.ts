@@ -24,6 +24,7 @@ import {
   UpdateQuestionImportMediaDto,
   UpdateQuestionImportSourceTextDto,
 } from './dto/question-import.dto';
+import { ListQuestionImportsDto } from './dto/list-question-imports.dto';
 import { QuestionImportService } from './question-import.service';
 
 @ApiTags('admin/ai/question-imports')
@@ -43,7 +44,7 @@ export class QuestionImportController {
   }
   @Get() @ApiOperation({ summary: 'List AI question imports' }) list(
     @CurrentUser() actor: RequestUser,
-    @Query() query: QueryQuestionImportDto,
+    @Query() query: ListQuestionImportsDto,
   ) {
     return this.service.list(actor, query);
   }
