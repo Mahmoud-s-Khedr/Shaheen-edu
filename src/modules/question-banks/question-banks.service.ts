@@ -1589,13 +1589,9 @@ export class QuestionBanksService {
   private async validate(
     question: Awaited<ReturnType<QuestionBanksService['question']>>,
   ) {
-    if (
-      !question.body.trim() ||
-      !question.explanation?.trim() ||
-      question.maxPoints < 1
-    )
+    if (!question.body.trim() || question.maxPoints < 1)
       throw new ConflictException(
-        'Question body, explanation, and positive maxPoints are required',
+        'Question body and positive maxPoints are required',
       );
     // Explanation staleness is advisory; publication depends on the question's
     // required content and answer data, not the age of its AI explanation.

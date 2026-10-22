@@ -38,6 +38,9 @@ Each question must still satisfy all normal publication requirements, including
 published source, bank, and course ancestry; valid answer data; placements; and
 ready, compatible assets.
 
+An explanation is optional. Missing, null, empty, or whitespace-only explanations
+do not block publication.
+
 The existing single-question publish endpoint is unchanged: it still accepts
 only `IN_REVIEW` questions.
 

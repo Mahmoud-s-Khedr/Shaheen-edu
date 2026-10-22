@@ -416,6 +416,11 @@ The asset must be ready and compatible with the content block or attachment bein
 
 ## 8. Review and publish questions
 
+An explanation is optional for submission, single-question publication, and bulk
+publication. Missing, null, empty, or whitespace-only explanations do not block
+these actions. Question content, answer data, and all other publication
+requirements still apply.
+
 The normal question lifecycle is:
 
 ```text

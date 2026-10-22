@@ -63,6 +63,50 @@ function setup(
   return { service, tx, question };
 }
 
+describe('Explanation is optional during submission and publication', () => {
+  it.each([undefined, null, '', '   '])(
+    'submits a question with explanation %p',
+    async (explanation) => {
+      const { service, tx, question } = setup(QuestionType.SINGLE_CHOICE);
+      Object.assign(question, { explanation });
+      await service.submit(actor, question.id);
+      expect(tx.question.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ status: QuestionStatus.IN_REVIEW }),
+        }),
+      );
+    },
+  );
+
+  it.each([undefined, null, '', '   '])(
+    'publishes an in-review question with explanation %p',
+    async (explanation) => {
+      const { service, tx, question } = setup(
+        QuestionType.SINGLE_CHOICE,
+        QuestionStatus.IN_REVIEW,
+      );
+      Object.assign(question, { explanation });
+      await service.publishQuestion(actor, question.id);
+      expect(tx.question.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ status: QuestionStatus.PUBLISHED }),
+        }),
+      );
+    },
+  );
+
+  it.each([undefined, null, '', '   '])(
+    'bulk publishes a question with explanation %p',
+    async (explanation) => {
+      const { service, question } = setup(QuestionType.SINGLE_CHOICE);
+      Object.assign(question, { explanation });
+      await expect(
+        service.bulkPublishQuestions(actor, [question.id]),
+      ).resolves.toEqual({ publishedIds: [question.id], failed: [] });
+    },
+  );
+});
+
 describe('Explanation staleness is advisory during publication', () => {
   it.each(types)(
     'bulk publishes a complete %s with a stale explanation',
