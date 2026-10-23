@@ -15,6 +15,38 @@ describe('Swagger (e2e)', () => {
     await app.close();
   });
 
+  it('documents forms, respondent authentication, and typed answers/results', async () => {
+    const response = await app.inject({ method: 'GET', url: '/api/docs-json' });
+    const document = JSON.parse(response.body);
+    const paths = document.paths;
+    expect(
+      paths['/api/v1/admin/forms'].post.responses['201'].content[
+        'application/json'
+      ].schema.$ref,
+    ).toContain('FormDetailDto');
+    expect(
+      paths['/api/v1/admin/forms/{id}/results'].get.responses['200'].content[
+        'application/json'
+      ].schema.$ref,
+    ).toContain('FormResultsDto');
+    expect(paths['/api/v1/admin/forms/{id}/duplicate']).toBeUndefined();
+    for (const role of ['student', 'parent']) {
+      expect(paths[`/api/v1/${role}/forms/active`].get.security).toEqual([
+        { bearer: [] },
+      ]);
+      expect(
+        paths[`/api/v1/${role}/forms/{id}/submissions`].post.responses['201']
+          .content['application/json'].schema.$ref,
+      ).toContain('FormSubmittedDto');
+    }
+    expect(
+      document.components.schemas.FormQuestionInputDto.properties.type.enum,
+    ).toEqual(['TEXT', 'SINGLE_CHOICE', 'MULTIPLE_CHOICE']);
+    expect(
+      document.components.schemas.FormAnswerInputDto.properties.optionIds.type,
+    ).toBe('array');
+  });
+
   it('documents plural admin content placement filters alongside singular filters', async () => {
     const response = await app.inject({ method: 'GET', url: '/api/docs-json' });
     expect(response.statusCode).toBe(200);

@@ -1,3 +1,4 @@
+import { FormsModule } from './modules/forms/forms.module';
 import { Module } from '@nestjs/common';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
@@ -125,6 +126,7 @@ import { normalizeCorrelationId } from './common/logging/correlation-id';
     QuestionAiExplanationsModule,
     StudentWorkspaceModule,
     TestimonialsModule,
+    FormsModule,
     VideoFeedbackModule,
     IntegrityModule,
   ],

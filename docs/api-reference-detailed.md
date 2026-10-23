@@ -7419,3 +7419,71 @@ Roles: ADMIN, SUPER_ADMIN. Search with `q` and paginate with `page` (default 1) 
 ### `GET /api/v1/admin/questions/{id}/statistics`
 
 Roles: ADMIN, SUPER_ADMIN. Returns `questionId`, `totalResponses`, `correctResponses`, `incorrectResponses`, `incorrectRate`, `difficultyBand`, `calculatedAt`. Counts are zero and rate/band/time are null when no aggregate exists. Unknown question: 404. No student or attempt records are exposed.
+
+## Internal forms
+
+Super admins manage forms and read responses. Only authenticated students and parents can respond. At most one form is active globally; one final submission is allowed per student or normalized parent phone per form.
+
+### `POST /api/v1/admin/forms`
+
+Create a form draft. See [the forms integration guide](forms-frontend-integration-guide.md) for request fields, response examples, validation, and lifecycle rules.
+
+### `GET /api/v1/admin/forms`
+
+List forms with submission counts. See [the forms integration guide](forms-frontend-integration-guide.md) for request fields, response examples, validation, and lifecycle rules.
+
+### `GET /api/v1/admin/forms/{id}`
+
+Get a complete form. See [the forms integration guide](forms-frontend-integration-guide.md) for request fields, response examples, validation, and lifecycle rules.
+
+### `PATCH /api/v1/admin/forms/{id}`
+
+Update a draft. See [the forms integration guide](forms-frontend-integration-guide.md) for request fields, response examples, validation, and lifecycle rules.
+
+### `DELETE /api/v1/admin/forms/{id}`
+
+Delete a draft form. See [the forms integration guide](forms-frontend-integration-guide.md) for request fields, response examples, validation, and lifecycle rules.
+
+### `POST /api/v1/admin/forms/{id}/activate`
+
+Activate a draft and atomically close the previous active form. See [the forms integration guide](forms-frontend-integration-guide.md) for request fields, response examples, validation, and lifecycle rules.
+
+### `POST /api/v1/admin/forms/{id}/close`
+
+Close the active form and stop submissions. See [the forms integration guide](forms-frontend-integration-guide.md) for request fields, response examples, validation, and lifecycle rules.
+
+### `GET /api/v1/admin/forms/{id}/submissions`
+
+List submissions with optional respondent-type filter. See [the forms integration guide](forms-frontend-integration-guide.md) for request fields, response examples, validation, and lifecycle rules.
+
+### `GET /api/v1/admin/forms/{id}/submissions/{submissionId}`
+
+Read a complete submission. See [the forms integration guide](forms-frontend-integration-guide.md) for request fields, response examples, validation, and lifecycle rules.
+
+### `GET /api/v1/admin/forms/{id}/results`
+
+Get response totals and choice statistics. See [the forms integration guide](forms-frontend-integration-guide.md) for request fields, response examples, validation, and lifecycle rules.
+
+### `GET /api/v1/student/forms/active`
+
+Get the active form and own submission status. See [the forms integration guide](forms-frontend-integration-guide.md) for request fields, response examples, validation, and lifecycle rules.
+
+### `POST /api/v1/student/forms/{id}/submissions`
+
+Submit a form once. See [the forms integration guide](forms-frontend-integration-guide.md) for request fields, response examples, validation, and lifecycle rules.
+
+### `GET /api/v1/student/forms/{id}/submission`
+
+Read own submitted answers, including after closure. See [the forms integration guide](forms-frontend-integration-guide.md) for request fields, response examples, validation, and lifecycle rules.
+
+### `GET /api/v1/parent/forms/active`
+
+Get the active form and own submission status. See [the forms integration guide](forms-frontend-integration-guide.md) for request fields, response examples, validation, and lifecycle rules.
+
+### `POST /api/v1/parent/forms/{id}/submissions`
+
+Submit a form once. See [the forms integration guide](forms-frontend-integration-guide.md) for request fields, response examples, validation, and lifecycle rules.
+
+### `GET /api/v1/parent/forms/{id}/submission`
+
+Read own submitted answers, including after closure. See [the forms integration guide](forms-frontend-integration-guide.md) for request fields, response examples, validation, and lifecycle rules.

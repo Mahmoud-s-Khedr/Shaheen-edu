@@ -557,6 +557,9 @@ model User {
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
 
+  formsCreated                        Form[]                            @relation("FormCreatedBy")
+  formsUpdated                        Form[]                            @relation("FormUpdatedBy")
+  formSubmissions                     FormSubmission[]
   studentProfile                      StudentProfile?
   partnerProfile                      PartnerProfile?
   authSessions                        AuthSession[]
@@ -3311,4 +3314,106 @@ model Center {
 
   @@unique([governorateId, nameAr])
   @@index([governorateId])
+}
+
+// Internal surveys are separate from graded assessments.
+enum FormStatus {
+  DRAFT
+  ACTIVE
+  CLOSED
+}
+
+enum FormQuestionType {
+  TEXT
+  SINGLE_CHOICE
+  MULTIPLE_CHOICE
+}
+
+enum FormRespondentType {
+  STUDENT
+  PARENT
+}
+
+model Form {
+  id                  String           @id @default(cuid())
+  title               String
+  description         String?
+  confirmationMessage String?
+  status              FormStatus       @default(DRAFT)
+  createdById         String
+  createdBy           User             @relation("FormCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  updatedById         String
+  updatedBy           User             @relation("FormUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+  activatedAt         DateTime?
+  closedAt            DateTime?
+  questions           FormQuestion[]
+  submissions         FormSubmission[]
+
+  @@index([status, createdAt, id])
+}
+
+model FormQuestion {
+  id        String               @id @default(cuid())
+  formId    String
+  form      Form                 @relation(fields: [formId], references: [id], onDelete: Cascade)
+  title     String
+  type      FormQuestionType
+  required  Boolean              @default(false)
+  sortOrder Int
+  options   FormQuestionOption[]
+  answers   FormAnswer[]
+
+  @@unique([formId, sortOrder])
+}
+
+model FormQuestionOption {
+  id         String                @id @default(cuid())
+  questionId String
+  question   FormQuestion          @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  label      String
+  sortOrder  Int
+  selections FormAnswerSelection[]
+
+  @@unique([questionId, sortOrder])
+}
+
+model FormSubmission {
+  id                    String             @id @default(cuid())
+  formId                String
+  form                  Form               @relation(fields: [formId], references: [id], onDelete: Restrict)
+  respondentType        FormRespondentType
+  studentUserId         String?
+  student               User?              @relation(fields: [studentUserId], references: [id], onDelete: Restrict)
+  parentPhoneNormalized String?
+  submittedAt           DateTime           @default(now())
+  answers               FormAnswer[]
+
+  @@unique([formId, studentUserId])
+  @@unique([formId, parentPhoneNormalized])
+  @@index([formId, respondentType, submittedAt, id])
+}
+
+model FormAnswer {
+  id           String                @id @default(cuid())
+  submissionId String
+  submission   FormSubmission        @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  questionId   String
+  question     FormQuestion          @relation(fields: [questionId], references: [id], onDelete: Restrict)
+  text         String?
+  selections   FormAnswerSelection[]
+
+  @@unique([submissionId, questionId])
+  @@index([questionId])
+}
+
+model FormAnswerSelection {
+  answerId String
+  answer   FormAnswer         @relation(fields: [answerId], references: [id], onDelete: Cascade)
+  optionId String
+  option   FormQuestionOption @relation(fields: [optionId], references: [id], onDelete: Restrict)
+
+  @@id([answerId, optionId])
+  @@index([optionId])
 }

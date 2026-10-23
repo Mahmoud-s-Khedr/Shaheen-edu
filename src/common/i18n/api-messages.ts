@@ -39,6 +39,29 @@ const statusTitles: Record<number, LocalizedMessage> = {
 };
 
 const translations: Record<string, string> = {
+  'Form not found': 'لم يتم العثور على النموذج',
+  'Only draft forms can be edited, deleted, or activated':
+    'يمكن تعديل النماذج أو حذفها أو تفعيلها فقط عندما تكون مسودات',
+  'Question IDs must be unique and belong to this draft':
+    'يجب ألا تتكرر معرفات الأسئلة ويجب أن تنتمي إلى هذه المسودة',
+  'Text questions cannot have options; choice questions require at least two options':
+    'لا تقبل الأسئلة النصية خيارات، وتتطلب أسئلة الاختيار خيارين على الأقل',
+  'Option IDs must be unique and belong to their question':
+    'يجب ألا تتكرر معرفات الخيارات ويجب أن تنتمي إلى السؤال المحدد',
+  'Only active forms can be closed': 'يمكن إغلاق النماذج النشطة فقط',
+  'Answers must reference distinct questions belonging to this form':
+    'يجب أن تشير الإجابات إلى أسئلة مختلفة تنتمي إلى هذا النموذج',
+  'Text questions require a nonblank text answer only':
+    'تتطلب الأسئلة النصية إجابة نصية غير فارغة فقط',
+  'Invalid choice answer or option does not belong to this question':
+    'إجابة الاختيار غير صالحة أو الخيار لا ينتمي إلى هذا السؤال',
+  'All required questions must be answered':
+    'يجب الإجابة عن جميع الأسئلة المطلوبة',
+  'Form is no longer accepting submissions': 'لم يعد هذا النموذج يقبل الإجابات',
+  'You have already submitted this form':
+    'لقد أرسلت إجابتك عن هذا النموذج بالفعل',
+  'Submission not found': 'لم يتم العثور على الإجابة المرسلة',
+
   'Edited explanation requires applyExplanation to be true':
     'لتطبيق الشرح المعدّل، يجب تفعيل تطبيق الشرح',
   'Question changed while it was being published; refresh and retry':

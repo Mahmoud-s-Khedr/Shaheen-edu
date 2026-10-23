@@ -69,6 +69,7 @@ describe('Admin (e2e)', () => {
     'reports/commerce',
     'geography/governorates',
     'testimonials',
+    'forms',
   ])('denies Admin reads of %s', async (area) => {
     const response = await app.inject({
       method: 'GET',
