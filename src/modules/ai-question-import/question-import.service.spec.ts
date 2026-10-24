@@ -129,7 +129,7 @@ describe('QuestionImportService review summaries', () => {
       },
     },
   ])(
-    'preserves legacy explanations on acceptance with $label',
+    'does not populate manual additional text from a legacy candidate with $label',
     async ({ structuredExplanation }) => {
       const service = serviceWith();
       const createImportedDraftWithClient = jest
@@ -186,12 +186,12 @@ describe('QuestionImportService review summaries', () => {
       expect(createImportedDraftWithClient).toHaveBeenCalledWith(
         expect.anything(),
         expect.objectContaining({
-          moreExplanation: structuredExplanation
-            ? undefined
-            : 'Adding two pairs gives four.',
           aiExplanation: structuredExplanation,
         }),
         tx,
+      );
+      expect(createImportedDraftWithClient.mock.calls[0][1]).not.toHaveProperty(
+        'moreExplanation',
       );
     },
   );

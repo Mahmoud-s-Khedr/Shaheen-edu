@@ -100,6 +100,29 @@ describe('Question explanation formats (e2e)', () => {
       },
     });
 
+  it('leaves additional text empty until manually supplied', async () => {
+    const created = await create({
+      structuredExplanationFormat: 'WRITTEN_FOUR_SECTION',
+      structuredExplanation: written,
+    });
+    expect(created.statusCode).toBe(201);
+    const question = JSON.parse(created.body);
+    expect(question.moreExplanation).toBeNull();
+    expect(question.structuredExplanation).toMatchObject(written);
+
+    const updated = await app.inject({
+      method: 'PATCH',
+      url: `/api/v1/admin/questions/${question.id}`,
+      headers,
+      payload: { moreExplanation: '  Manually added teaching note.  ' },
+    });
+    expect(updated.statusCode).toBe(200);
+    expect(JSON.parse(updated.body).moreExplanation).toBe(
+      'Manually added teaching note.',
+    );
+    expect(JSON.parse(updated.body).structuredExplanation.staleAt).toBeNull();
+  });
+
   it('edits, preserves and clears additional notes without staling the structured content', async () => {
     const created = await create({
       structuredExplanationFormat: 'WRITTEN_FOUR_SECTION',

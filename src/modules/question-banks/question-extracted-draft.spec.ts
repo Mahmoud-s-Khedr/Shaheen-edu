@@ -54,6 +54,7 @@ describe('Extracted question drafts', () => {
     );
     expect(question.status).toBe('DRAFT');
     const data = client.question.create.mock.calls[0][0].data;
+    expect(data.moreExplanation).toBeNull();
     for (const field of [
       'acceptedAnswers',
       'gradingRubric',
@@ -69,6 +70,36 @@ describe('Extracted question drafts', () => {
       ) ?? true,
     ).toBe(true);
   });
+
+  it.each([false, true])(
+    'ignores additional text carried by imported data (extraction only: %s)',
+    async (extractionOnly) => {
+      const { service, client } = setup();
+      const input = {
+        ...draft(QuestionType.SHORT_ANSWER),
+        options: [],
+        acceptedAnswers: ['42'],
+        moreExplanation: 'AI-generated text must not become manual notes.',
+      };
+      if (extractionOnly)
+        await service.createExtractedDraftWithClient(
+          actor,
+          input,
+          client as any,
+          [],
+        );
+      else
+        await service.createImportedDraftWithClient(
+          actor,
+          input,
+          client as any,
+          [],
+        );
+      expect(
+        client.question.create.mock.calls[0][0].data.moreExplanation,
+      ).toBeNull();
+    },
+  );
 
   it.each([
     QuestionType.SINGLE_CHOICE,
@@ -116,7 +147,7 @@ describe('Extracted question drafts', () => {
       await expect(
         service['validate']({
           ...draft(type),
-          explanation: 'Manual explanation',
+          moreExplanation: 'Manual explanation',
           maxPoints: 1,
           bank: { status: 'PUBLISHED' },
           source: { status: 'PUBLISHED' },
@@ -139,7 +170,7 @@ it.each(types)(
       type === QuestionType.MULTIPLE_CHOICE;
     const question = {
       ...draft(type),
-      explanation: 'Manual explanation',
+      moreExplanation: 'Manual explanation',
       maxPoints: 1,
       bank: { status: 'PUBLISHED' },
       source: { status: 'PUBLISHED' },

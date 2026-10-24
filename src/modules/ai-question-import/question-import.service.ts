@@ -1032,10 +1032,6 @@ export class QuestionImportService {
               placements: item.batch.placements,
               body: normalized.body,
               contentBlocks: questionBlocks,
-              // Older imports may have only reviewed plain text to preserve.
-              moreExplanation: normalized.structuredExplanation
-                ? undefined
-                : normalized.explanation,
               aiExplanation: normalized.structuredExplanation,
               model: item.batch.model,
               type: normalized.type,

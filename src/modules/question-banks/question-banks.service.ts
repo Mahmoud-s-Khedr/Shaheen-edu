@@ -975,7 +975,7 @@ export class QuestionBanksService {
   /** Internal AI-import entry point. It deliberately creates the same ordinary DRAFT questions as the admin UI. */
   async createImportedDraft(
     actor: RequestUser,
-    dto: CreateQuestionDto & {
+    dto: Omit<CreateQuestionDto, 'moreExplanation'> & {
       options?: Array<{ body: string; isCorrect: boolean }>;
     },
   ) {
@@ -994,7 +994,7 @@ export class QuestionBanksService {
   /** Creates an imported draft with its caller's transaction so import bookkeeping can be atomic. */
   async createImportedDraftWithClient(
     actor: RequestUser,
-    dto: CreateQuestionDto & {
+    dto: Omit<CreateQuestionDto, 'moreExplanation'> & {
       options?: Array<{
         body: string;
         isCorrect: boolean;
@@ -1076,7 +1076,8 @@ export class QuestionBanksService {
             sortOrder: index + 1,
           })),
         },
-        moreExplanation: dto.moreExplanation?.trim() || null,
+        // Imports never author manual notes, even if candidate data includes them.
+        moreExplanation: null,
         acceptedAnswers: dto.acceptedAnswers?.map((answer) =>
           answer.trim(),
         ) as any,
@@ -1152,7 +1153,7 @@ export class QuestionBanksService {
    */
   async createExtractedDraftWithClient(
     actor: RequestUser,
-    dto: CreateQuestionDto & {
+    dto: Omit<CreateQuestionDto, 'moreExplanation'> & {
       options?: Array<{ body: string; contentBlocks?: any[] }>;
       contextIds?: string[];
       contentBlocks?: any[];
@@ -1175,7 +1176,6 @@ export class QuestionBanksService {
         })),
         acceptedAnswers: undefined,
         gradingRubric: undefined,
-        moreExplanation: undefined,
         answerOrigin: undefined,
         aiExplanation: undefined,
         aiAnswerOrigin: undefined,

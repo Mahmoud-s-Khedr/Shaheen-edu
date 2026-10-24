@@ -2,6 +2,8 @@
 
 This guide covers the frontend changes for format-aware explanations and proposed maximum points in AI explanation review. It applies to admin question editors, AI generation/review screens, and student explanation displays.
 
+For the complete API inventory, before/after payload changes, migration steps, and review findings for commit `42397ff`, see [the structured and additional explanations integration guide](structured-and-more-explanations-integration-guide.md).
+
 All routes below use the `/api/v1` prefix. Admin routes require a bearer access token for an `ADMIN` or `SUPER_ADMIN`. Examples show the fields relevant to this change; response objects also contain existing question/run fields.
 
 This guide supersedes the six-section-only editing instructions in [the earlier re-answer guide](ai-question-reanswer-frontend-integration-guide.md). See also [question import integration](ai-question-import-explanation-integration-guide.md) and [written-answer grading](written-answer-ai-grading-frontend-guide.md).
@@ -20,6 +22,8 @@ This guide supersedes the six-section-only editing instructions in [the earlier 
 ## 2. Explanation response contract
 
 The format belongs to the containing question or run object. It is never inside the explanation object. Questions also expose `moreExplanation: string | null`. AI generation runs contain only generated sections; additional text belongs to the saved question. The backend no longer stores or returns a compatibility `explanation` string.
+
+`moreExplanation` is exclusively added or edited through explicit administrator input. AI generation and import acceptance never populate it, including for legacy plain-only import candidates. Import drafts start with null; add notes manually through the question editor. Existing saved notes can be copied into replacement drafts and assessment snapshots.
 
 ```json
 {
