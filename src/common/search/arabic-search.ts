@@ -50,7 +50,7 @@ const searchTargets = {
     table: '"ContentItem"',
     columns: ['title', 'description', 'textBody'],
   },
-  question: { table: '"Question"', columns: ['body', 'explanation'] },
+  question: { table: '"Question"', columns: ['body', 'moreExplanation'] },
   questionBank: { table: '"QuestionBank"', columns: ['title', 'description'] },
   questionSource: {
     table: '"QuestionSource"',

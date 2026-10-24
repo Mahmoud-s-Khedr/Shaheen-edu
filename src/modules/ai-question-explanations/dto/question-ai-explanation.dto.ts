@@ -98,6 +98,16 @@ export class ApplyAiQuestionExplanationRunDto {
   @ApiProperty() @IsBoolean() applyAnswer!: boolean;
   @ApiProperty() @IsBoolean() applyExplanation!: boolean;
   @ApiPropertyOptional({
+    type: String,
+    nullable: true,
+    description:
+      'Optional administrator-authored additional explanation. Requires applyExplanation=true. Omit to preserve; null clears it.',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100000)
+  moreExplanation?: string | null;
+  @ApiPropertyOptional({
     oneOf: explanationObjectSchemas,
     description:
       'Complete administrator-edited explanation, with all sections of the stored run format. Requires applyExplanation=true. Omit to approve the generated explanation unchanged.',

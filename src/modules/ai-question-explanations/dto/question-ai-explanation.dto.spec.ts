@@ -101,6 +101,19 @@ describe('ApplyAiQuestionExplanationRunDto', () => {
     expect(await check({ structuredExplanation: explanation })).toEqual([]);
   });
 
+  it.each([undefined, null, 'Admin notes'])(
+    'accepts additional text %p',
+    async (moreExplanation) => {
+      expect(await check({ moreExplanation })).toEqual([]);
+    },
+  );
+  it.each([42, {}, 'x'.repeat(100001)])(
+    'rejects malformed additional text %#',
+    async (moreExplanation) => {
+      expect(await check({ moreExplanation })).not.toHaveLength(0);
+    },
+  );
+
   it.each([
     null,
     'text',

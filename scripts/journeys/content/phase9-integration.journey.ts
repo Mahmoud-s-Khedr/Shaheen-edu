@@ -342,7 +342,7 @@ export const phase9IntegrationJourney: JourneyDefinition = {
           courseId,
           placements: [{ chapterId }],
           body: 'Which option is correct?',
-          explanation: 'The marked option is correct.',
+          moreExplanation: 'The marked option is correct.',
         });
         expectStatus(question, 201);
         questionId = question.body.id;

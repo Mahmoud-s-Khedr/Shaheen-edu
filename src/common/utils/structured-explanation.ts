@@ -72,14 +72,6 @@ export function explanationPersistence(
     structuredExplanationFormat: format,
   };
 }
-export function renderStructuredExplanation(
-  value: any,
-  format: QuestionExplanationFormat = QuestionExplanationFormat.SIX_SECTION,
-) {
-  return explanationFields(format)
-    .map((key) => value[key].trim())
-    .join('\n\n');
-}
 /** Keep historical content/metadata, but never leak inactive columns or nest the format. */
 export function explanationEnvelope(
   value: any,

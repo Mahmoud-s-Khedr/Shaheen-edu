@@ -46,6 +46,7 @@ describe('Assessment explanation formats', () => {
         maxPoints: 5,
         gradingRubric: 'Two elements: 2 marks and 3 marks.',
         acceptedAnswers: null,
+        moreExplanation: 'Extra teaching notes',
         structuredExplanation: {
           ...explanationPersistence(content, format),
           languageCode: 'en',
@@ -82,12 +83,15 @@ describe('Assessment explanation formats', () => {
         maxPoints: 5,
         gradingRubric: question.gradingRubric,
         structuredExplanationFormat: format,
+        moreExplanation: 'Extra teaching notes',
         structuredExplanation: { ...content, languageCode: 'en' },
       });
       expect(snapshot.structuredExplanation).not.toHaveProperty(
         'structuredExplanationFormat',
       );
-      question.structuredExplanation.commonMistakes = 'Later edit';
+      Object.assign(question.structuredExplanation, {
+        commonMistakes: 'Later edit',
+      });
       question.gradingRubric = 'Later rubric';
       question.maxPoints = 9;
       expect(snapshot.structuredExplanation.commonMistakes).toBe(
@@ -112,39 +116,36 @@ describe('Assessment explanation formats', () => {
       Object.assign(service, {
         prisma: {
           assessmentAttemptAnswer: {
-            findMany: jest
-              .fn()
-              .mockResolvedValue(
-                answered
-                  ? [
-                      {
-                        assessmentQuestionId: 'snapshot',
-                        selectedOptionIds: [],
-                        responseText: 'Answer',
-                        aiGradingRuns: [],
-                        responseVersion: 1,
-                      },
-                    ]
-                  : [],
-              ),
+            findMany: jest.fn().mockResolvedValue(
+              answered
+                ? [
+                    {
+                      assessmentQuestionId: 'snapshot',
+                      selectedOptionIds: [],
+                      responseText: 'Answer',
+                      aiGradingRuns: [],
+                      responseVersion: 1,
+                    },
+                  ]
+                : [],
+            ),
           },
         },
       });
       jest
         .spyOn(service as any, 'ensureNotExpired')
         .mockImplementation(async (value) => value);
-      jest
-        .spyOn(service as any, 'questionsForAssessment')
-        .mockResolvedValue([
-          {
-            id: 'snapshot',
-            sourceQuestionId: 'source',
-            maxPoints: 5,
-            options: [],
-            structuredExplanationFormat: Format.WRITTEN_FOUR_SECTION,
-            structuredExplanation: { ...written, languageCode: 'en' },
-          },
-        ]);
+      jest.spyOn(service as any, 'questionsForAssessment').mockResolvedValue([
+        {
+          id: 'snapshot',
+          sourceQuestionId: 'source',
+          maxPoints: 5,
+          options: [],
+          structuredExplanationFormat: Format.WRITTEN_FOUR_SECTION,
+          moreExplanation: 'Extra teaching notes',
+          structuredExplanation: { ...written, languageCode: 'en' },
+        },
+      ]);
       jest
         .spyOn(service as any, 'markedQuestionIds')
         .mockResolvedValue(new Set());
@@ -162,18 +163,17 @@ describe('Assessment explanation formats', () => {
         { id: 'assessment', mode },
       );
       const question = state.questions[0];
+      expect(question).not.toHaveProperty('explanation');
       if (visible) {
         expect(question.structuredExplanationFormat).toBe(
           Format.WRITTEN_FOUR_SECTION,
         );
         expect(question.structuredExplanation).toMatchObject(written);
-        expect(question.explanation).toContain(
-          'Answer elements: Required answer',
-        );
+        expect(question.moreExplanation).toBe('Extra teaching notes');
       } else {
         expect(question.structuredExplanationFormat).toBeNull();
         expect(question.structuredExplanation).toBeNull();
-        expect(question.explanation).toBeNull();
+        expect(question.moreExplanation).toBeNull();
       }
     },
   );

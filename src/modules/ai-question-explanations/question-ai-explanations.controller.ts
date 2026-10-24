@@ -72,7 +72,15 @@ export class QuestionAiExplanationsController {
     return this.service.get(actor, questionId, runId);
   }
   @Post(':runId/apply')
-  @ApiCreatedResponse({ schema: explanationResponseSchema })
+  @ApiCreatedResponse({
+    schema: {
+      ...explanationResponseSchema,
+      properties: {
+        ...explanationResponseSchema.properties,
+        moreExplanation: { type: 'string', nullable: true },
+      },
+    },
+  })
   @ApiOperation({
     summary: 'Apply reviewed answer and/or optionally edited explanation',
   })

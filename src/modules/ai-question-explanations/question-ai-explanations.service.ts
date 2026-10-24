@@ -4,7 +4,6 @@ import {
   explanationPersistence,
   formatForQuestion,
   QuestionExplanationFormat,
-  renderStructuredExplanation,
   validateStructuredExplanation,
 } from '../../common/utils/structured-explanation';
 import {
@@ -33,10 +32,7 @@ import {
   CreateAiQuestionExplanationRunDto,
   RejectAiQuestionExplanationRunDto,
 } from './dto/question-ai-explanation.dto';
-import {
-  QuestionAiExplanationClient,
-  type StructuredExplanationOutput,
-} from './question-ai-explanation.client';
+import { QuestionAiExplanationClient } from './question-ai-explanation.client';
 
 @Injectable()
 export class QuestionAiExplanationsService {
@@ -221,12 +217,6 @@ export class QuestionAiExplanationsService {
         : null,
       gradingRubric: value?.gradingRubric?.trim?.() ?? null,
     };
-  }
-  private render(
-    explanation: StructuredExplanationOutput,
-    format: QuestionExplanationFormat,
-  ) {
-    return renderStructuredExplanation(explanation, format);
   }
 
   private language(question: any) {
@@ -504,6 +494,10 @@ export class QuestionAiExplanationsService {
       throw new BadRequestException(
         'Select an answer and/or explanation to apply',
       );
+    if (dto.moreExplanation !== undefined && !dto.applyExplanation)
+      throw new BadRequestException(
+        'Additional explanation requires applyExplanation to be true',
+      );
     const editedExplanation = dto.structuredExplanation !== undefined;
     if (editedExplanation && !dto.applyExplanation)
       throw new BadRequestException(
@@ -583,7 +577,7 @@ export class QuestionAiExplanationsService {
               courseId: source.courseId,
               type: source.type,
               body: source.body,
-              explanation: source.explanation,
+              moreExplanation: source.moreExplanation,
               maxPoints:
                 dto.applyAnswer && run.proposedMaxPoints != null
                   ? run.proposedMaxPoints
@@ -717,7 +711,9 @@ export class QuestionAiExplanationsService {
           await tx.question.update({
             where: { id: targetQuestion.id },
             data: {
-              explanation: this.render(explanation!, format),
+              ...(dto.moreExplanation !== undefined
+                ? { moreExplanation: dto.moreExplanation?.trim() || null }
+                : {}),
               updatedById: actor.id,
               structuredExplanation: {
                 upsert: {
@@ -771,10 +767,6 @@ export class QuestionAiExplanationsService {
         } else if (dto.applyAnswer) {
           await tx.questionExplanation.deleteMany({
             where: { questionId: targetQuestion.id },
-          });
-          await tx.question.update({
-            where: { id: targetQuestion.id },
-            data: { explanation: null, updatedById: actor.id },
           });
         }
         await tx.questionAiExplanationRun.update({

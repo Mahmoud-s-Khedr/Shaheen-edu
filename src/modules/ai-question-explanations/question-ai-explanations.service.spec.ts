@@ -350,6 +350,7 @@ describe('Reviewing edited explanations', () => {
       type: QuestionType.SHORT_ANSWER,
       status,
       body: 'What is 2 + 2?',
+      moreExplanation: 'Existing admin notes',
       maxPoints: 5,
       options: [],
       contentBlocks: [],
@@ -456,10 +457,10 @@ describe('Reviewing edited explanations', () => {
     expect(tx.questionExplanation.deleteMany).toHaveBeenCalledWith({
       where: { questionId: 'question' },
     });
-    expect(tx.question.update).toHaveBeenCalledWith({
-      where: { id: 'question' },
-      data: { explanation: null, updatedById: actor.id },
-    });
+    for (const [args] of tx.question.update.mock.calls) {
+      expect(args.data).not.toHaveProperty('explanation');
+      expect(args.data).not.toHaveProperty('moreExplanation');
+    }
   });
 
   it('applies proposed marks to choice answers too', async () => {
@@ -559,7 +560,7 @@ describe('Reviewing edited explanations', () => {
       const data = tx.question.update.mock.calls.find(
         ([arg]) => arg.data.structuredExplanation,
       )![0].data;
-      expect(data.explanation).toBe(Object.values(edited).join('\n\n'));
+      expect(data).not.toHaveProperty('explanation');
       for (const branch of ['create', 'update']) {
         expect(data.structuredExplanation.upsert[branch]).toMatchObject({
           ...edited,
@@ -654,13 +655,51 @@ describe('Reviewing edited explanations', () => {
     expect(service['snapshot'](source, true)).not.toHaveProperty('maxPoints');
   });
 
+  it.each(['DRAFT', 'PUBLISHED'])(
+    'preserves admin notes when AI sections are applied to %s',
+    async (status) => {
+      const { apply, tx } = setup(status);
+      await apply();
+      for (const [args] of tx.question.update.mock.calls) {
+        expect(args.data).not.toHaveProperty('explanation');
+        expect(args.data).not.toHaveProperty('moreExplanation');
+      }
+      if (status === 'PUBLISHED')
+        expect(tx.question.create.mock.calls[0][0].data.moreExplanation).toBe(
+          'Existing admin notes',
+        );
+    },
+  );
+
+  it.each(['  Additional reasoning  ', null, '   '])(
+    'saves or clears administrator notes during AI approval: %p',
+    async (moreExplanation) => {
+      const { apply, tx } = setup();
+      await apply({ moreExplanation });
+      const saved = tx.question.update.mock.calls.find(
+        ([arg]) => arg.data.structuredExplanation,
+      )![0].data;
+      expect(saved.moreExplanation).toBe(moreExplanation?.trim() || null);
+      expect(saved).not.toHaveProperty('explanation');
+    },
+  );
+
+  it('rejects additional text when explanation approval is disabled', async () => {
+    const { apply, prisma } = setup();
+    await expect(
+      apply({ applyExplanation: false, moreExplanation: 'Notes' }),
+    ).rejects.toThrow(
+      'Additional explanation requires applyExplanation to be true',
+    );
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
   it('still applies the generated explanation when edits are omitted', async () => {
     const { apply, tx } = setup();
     await apply();
     expect(tx.question.update).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
-          explanation: Object.values(original).join('\n\n'),
           structuredExplanation: {
             upsert: {
               create: expect.objectContaining({
@@ -721,9 +760,10 @@ describe('Reviewing edited explanations', () => {
     const { apply, tx } = setup('DRAFT', true);
     await apply({ applyAnswer: false, structuredExplanation: edited });
     expect(tx.question.update).toHaveBeenCalledTimes(1);
-    expect(tx.question.update.mock.calls[0][0].data.explanation).toContain(
-      edited.whyCorrect,
-    );
+    expect(
+      tx.question.update.mock.calls[0][0].data.structuredExplanation.upsert
+        .update.whyCorrect,
+    ).toBe(edited.whyCorrect);
   });
 });
 
@@ -748,7 +788,7 @@ describe('Applied AI re-answer response', () => {
       type: QuestionType.SINGLE_CHOICE,
       status,
       body: 'Which option is correct?',
-      explanation: null,
+      moreExplanation: 'Admin notes',
       maxPoints: 1,
       acceptedAnswers: null,
       gradingRubric: null,

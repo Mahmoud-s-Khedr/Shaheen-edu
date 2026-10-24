@@ -523,7 +523,7 @@ describe('AssessmentsService', () => {
         id,
         type: QuestionType.SINGLE_CHOICE,
         body: `Body ${id}`,
-        explanation: 'Explanation',
+        moreExplanation: 'Explanation',
         options: [
           { id: `${id}-a`, body: 'A', isCorrect: true },
           { id: `${id}-b`, body: 'B', isCorrect: false },
@@ -774,7 +774,7 @@ describe('AssessmentsService', () => {
           id: 'q1',
           type: QuestionType.SINGLE_CHOICE,
           body: 'Body',
-          explanation: 'Explanation',
+          moreExplanation: 'Explanation',
           options: [
             { id: 'q1-a', body: 'A', isCorrect: true },
             { id: 'q1-b', body: 'B', isCorrect: false },
@@ -1268,7 +1268,7 @@ describe('AssessmentsService', () => {
       prisma.assessmentQuestion.findFirst.mockResolvedValue({
         id: 'q1',
         type: QuestionType.SINGLE_CHOICE,
-        explanation: 'why',
+        moreExplanation: 'why',
         options: [
           { id: 'opt-a', isCorrect: true },
           { id: 'opt-b', isCorrect: false },
@@ -1286,7 +1286,7 @@ describe('AssessmentsService', () => {
       );
       // EXAM mode hides correctness from the immediate autosave response.
       expect(result.isCorrect).toBeNull();
-      expect(result.explanation).toBeNull();
+      expect(result.moreExplanation).toBeNull();
     });
 
     it('reveals correctness immediately in TUTOR mode', async () => {
@@ -1302,7 +1302,7 @@ describe('AssessmentsService', () => {
       prisma.assessmentQuestion.findFirst.mockResolvedValue({
         id: 'q1',
         type: QuestionType.SINGLE_CHOICE,
-        explanation: 'why',
+        moreExplanation: 'why',
         structuredExplanation: {
           languageCode: 'en',
           keywords: 'keyword',
@@ -1318,12 +1318,15 @@ describe('AssessmentsService', () => {
         selectedOptionIds: ['opt-b'],
       });
       expect(result.isCorrect).toBe(false);
-      expect(result.explanation).toBe(
-        'why\n\nKeywords: keyword\n\nWhy this is correct: because',
-      );
+      expect(result.moreExplanation).toBe('why');
+      expect(result.structuredExplanation).toMatchObject({
+        keywords: 'keyword',
+        whyCorrect: 'because',
+      });
+      expect(result).not.toHaveProperty('explanation');
     });
 
-    it('returns the formatted explanation in an answered TUTOR current attempt', async () => {
+    it('returns structured sections and additional text in an answered TUTOR current attempt', async () => {
       const { service, prisma } = build();
       prisma.assessment.findUnique.mockResolvedValue(
         readyAssessment({ mode: AssessmentMode.TUTOR }),
@@ -1343,7 +1346,7 @@ describe('AssessmentsService', () => {
           sortOrder: 1,
           type: QuestionType.SINGLE_CHOICE,
           body: 'Question',
-          explanation: 'Flat explanation',
+          moreExplanation: 'Flat explanation',
           structuredExplanation: {
             languageCode: 'en',
             generalRule: 'Use the matching rule.',
@@ -1372,8 +1375,8 @@ describe('AssessmentsService', () => {
       ).resolves.toMatchObject({
         questions: [
           {
-            explanation:
-              'Flat explanation\n\nGeneral rule: Use the matching rule.',
+            moreExplanation: 'Flat explanation',
+            structuredExplanation: { generalRule: 'Use the matching rule.' },
           },
         ],
       });
@@ -1390,7 +1393,7 @@ describe('AssessmentsService', () => {
       prisma.assessmentQuestion.findFirst.mockResolvedValue({
         id: 'q1',
         type: QuestionType.SINGLE_CHOICE,
-        explanation: null,
+        moreExplanation: null,
         options: [
           { id: 'opt-a', isCorrect: true },
           { id: 'opt-b', isCorrect: false },
@@ -1428,7 +1431,7 @@ describe('AssessmentsService', () => {
       prisma.assessmentQuestion.findFirst.mockResolvedValue({
         id: 'q1',
         type: QuestionType.SINGLE_CHOICE,
-        explanation: 'why',
+        moreExplanation: 'why',
         options: [{ id: 'opt-a', isCorrect: true }],
       });
       await expect(
@@ -1501,7 +1504,7 @@ describe('AssessmentsService', () => {
       prisma.assessmentQuestion.findFirst.mockResolvedValue({
         id: 'q1',
         type: QuestionType.SINGLE_CHOICE,
-        explanation: 'why',
+        moreExplanation: 'why',
         options: [
           { id: 'opt-a', isCorrect: true },
           { id: 'opt-b', isCorrect: false },
@@ -1585,7 +1588,7 @@ describe('AssessmentsService', () => {
           sortOrder: 1,
           type: QuestionType.SINGLE_CHOICE,
           body: 'Question',
-          explanation: 'Flat explanation',
+          moreExplanation: 'Flat explanation',
           structuredExplanation: {
             languageCode: 'en',
             keywords: 'key concept',
@@ -1608,7 +1611,8 @@ describe('AssessmentsService', () => {
         score: 1,
         questions: [
           {
-            explanation: 'Flat explanation\n\nKeywords: key concept',
+            moreExplanation: 'Flat explanation',
+            structuredExplanation: { keywords: 'key concept' },
             attachments: [
               {
                 assetId: 'attachment-1',
@@ -1625,7 +1629,10 @@ describe('AssessmentsService', () => {
       ).resolves.toMatchObject({
         status: AssessmentAttemptStatus.COMPLETED,
         questions: [
-          { explanation: 'Flat explanation\n\nKeywords: key concept' },
+          {
+            moreExplanation: 'Flat explanation',
+            structuredExplanation: { keywords: 'key concept' },
+          },
         ],
       });
     });
@@ -1648,7 +1655,7 @@ describe('AssessmentsService', () => {
           sortOrder: 1,
           type: QuestionType.SINGLE_CHOICE,
           body: 'First',
-          explanation: null,
+          moreExplanation: null,
           structuredExplanation: null,
           attachments: [],
           contexts: [],
@@ -1661,7 +1668,7 @@ describe('AssessmentsService', () => {
           sortOrder: 2,
           type: QuestionType.SINGLE_CHOICE,
           body: 'Second',
-          explanation: null,
+          moreExplanation: null,
           structuredExplanation: null,
           attachments: [],
           contexts: [],

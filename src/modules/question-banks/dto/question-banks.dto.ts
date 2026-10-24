@@ -318,11 +318,16 @@ export class CreateQuestionDto {
   @ValidateNested({ each: true })
   @Type(() => QuestionContentBlockDto)
   contentBlocks?: QuestionContentBlockDto[];
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({
+    type: String,
+    nullable: true,
+    description:
+      'Optional administrator-authored additional explanation. Omit on update to preserve; null clears it.',
+  })
   @IsOptional()
   @IsString()
   @MaxLength(100000)
-  explanation?: string;
+  moreExplanation?: string | null;
   @ApiPropertyOptional({ type: [String] })
   @IsOptional()
   @IsArray()
@@ -403,11 +408,16 @@ export class UpdateQuestionDto {
   @ValidateNested({ each: true })
   @Type(() => QuestionContentBlockDto)
   contentBlocks?: QuestionContentBlockDto[];
-  @ApiPropertyOptional({ nullable: true })
+  @ApiPropertyOptional({
+    type: String,
+    nullable: true,
+    description:
+      'Optional administrator-authored additional explanation. Omit to preserve; null clears it.',
+  })
   @IsOptional()
   @IsString()
   @MaxLength(100000)
-  explanation?: string | null;
+  moreExplanation?: string | null;
   @ApiPropertyOptional({ type: [String] })
   @IsOptional()
   @IsArray()

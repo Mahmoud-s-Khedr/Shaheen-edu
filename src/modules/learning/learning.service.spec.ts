@@ -2,7 +2,7 @@ import { QuestionType } from '../../common/types/roles.enum';
 import { LearningService } from './learning.service';
 
 describe('LearningService practice attempts', () => {
-  it('returns the compatibility-formatted explanation after a practice answer', async () => {
+  it('returns structured sections and additional text after a practice answer', async () => {
     const prisma: any = {
       studentQuestionAttempt: {
         count: jest.fn().mockResolvedValue(0),
@@ -26,7 +26,7 @@ describe('LearningService practice attempts', () => {
       {
         id: 'question-1',
         type: QuestionType.SINGLE_CHOICE,
-        explanation: 'Choose the matching unit.',
+        moreExplanation: 'Choose the matching unit.',
         structuredExplanation: {
           languageCode: 'en',
           keywords: 'units',
@@ -39,11 +39,16 @@ describe('LearningService practice attempts', () => {
       },
     ]);
 
-    await expect(
-      service.attempt('student-1', 'question-1', ['option-1']),
-    ).resolves.toMatchObject({
-      explanation:
-        'Choose the matching unit.\n\nKeywords: units\n\nWhy this is correct: The units match.',
+    const result = await service.attempt('student-1', 'question-1', [
+      'option-1',
+    ]);
+    expect(result).not.toHaveProperty('explanation');
+    expect(result).toMatchObject({
+      moreExplanation: 'Choose the matching unit.',
+      structuredExplanation: {
+        keywords: 'units',
+        whyCorrect: 'The units match.',
+      },
     });
   });
 });

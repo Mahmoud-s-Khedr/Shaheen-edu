@@ -10,7 +10,7 @@ import {
   QuestionType,
 } from '../src/common/types/roles.enum';
 import { createTestApp } from './utils/create-test-app';
-import { cleanDatabase, flushTestRedis, seedSuperAdmin } from './utils/db';
+import { flushTestRedis, seedSuperAdmin } from './utils/db';
 
 const written = {
   answerElements: 'State the required result.',
@@ -100,13 +100,78 @@ describe('Question explanation formats (e2e)', () => {
       },
     });
 
+  it('edits, preserves and clears additional notes without staling the structured content', async () => {
+    const created = await create({
+      structuredExplanationFormat: 'WRITTEN_FOUR_SECTION',
+      structuredExplanation: written,
+      moreExplanation: 'Initial notes',
+    });
+    expect(created.statusCode).toBe(201);
+    const id = JSON.parse(created.body).id;
+    for (const [payload, expected] of [
+      [{ moreExplanation: '  Updated notes  ' }, 'Updated notes'],
+      [
+        {
+          structuredExplanationFormat: 'WRITTEN_FOUR_SECTION',
+          structuredExplanation: written,
+        },
+        'Updated notes',
+      ],
+      [{ moreExplanation: null }, null],
+    ] as const) {
+      const response = await app.inject({
+        method: 'PATCH',
+        url: `/api/v1/admin/questions/${id}`,
+        headers,
+        payload,
+      });
+      expect(response.statusCode).toBe(200);
+      const question = JSON.parse(response.body);
+      expect(question.moreExplanation).toBe(expected);
+      expect(question.structuredExplanation.staleAt).toBeNull();
+      expect(question).not.toHaveProperty('explanation');
+    }
+    const obsolete = await create({ explanation: 'Old compatibility field' });
+    expect(obsolete.statusCode).toBe(400);
+  });
+
+  it('searches structured sections and administrator additional notes', async () => {
+    const created = await create({
+      structuredExplanationFormat: 'WRITTEN_FOUR_SECTION',
+      structuredExplanation: {
+        ...written,
+        scientificExplanation: 'DistinctSectionSearchToken',
+      },
+      moreExplanation: 'DistinctAdditionalSearchToken',
+    });
+    expect(created.statusCode).toBe(201);
+    for (const q of [
+      'DistinctSectionSearchToken',
+      'DistinctAdditionalSearchToken',
+      'Explain DistinctSectionSearchToken',
+    ]) {
+      const result = await app.inject({
+        method: 'GET',
+        url: `/api/v1/admin/questions?q=${encodeURIComponent(q)}`,
+        headers,
+      });
+      expect(result.statusCode).toBe(200);
+      expect(
+        JSON.parse(result.body).data.map((question: any) => question.id),
+      ).toContain(JSON.parse(created.body).id);
+    }
+  });
+
   it('round-trips manual formats, clears inactive columns and stales changed marks', async () => {
     const response = await create({
       structuredExplanationFormat: 'WRITTEN_FOUR_SECTION',
       structuredExplanation: written,
+      moreExplanation: '  Additional admin reasoning  ',
     });
     expect(response.statusCode).toBe(201);
     const question = JSON.parse(response.body);
+    expect(question).not.toHaveProperty('explanation');
+    expect(question.moreExplanation).toBe('Additional admin reasoning');
     expect(question.structuredExplanationFormat).toBe('WRITTEN_FOUR_SECTION');
     expect(question.structuredExplanation).toMatchObject(written);
     expect(question.structuredExplanation).not.toHaveProperty(
@@ -121,6 +186,9 @@ describe('Question explanation formats (e2e)', () => {
     });
     expect(updated.statusCode).toBe(200);
     expect(JSON.parse(updated.body).structuredExplanation.staleAt).toBeTruthy();
+    expect(JSON.parse(updated.body).moreExplanation).toBe(
+      'Additional admin reasoning',
+    );
     updated = await app.inject({
       method: 'PATCH',
       url: `/api/v1/admin/questions/${question.id}`,
@@ -298,6 +366,149 @@ describe('Question explanation formats (e2e)', () => {
     } finally {
       generate.mockRestore();
     }
+  });
+
+  it('migrates distinct legacy text and removes generated duplicates without changing sections', async () => {
+    const migration = readFileSync(
+      resolve(
+        __dirname,
+        '../prisma/migrations/20261024120000_structured_and_more_explanations/migration.sql',
+      ),
+      'utf8',
+    );
+    const helper = migration.match(/CREATE FUNCTION[\s\S]*?\$\$;/)![0];
+    const statements = migration
+      .replace(/^BEGIN;|^COMMIT;/gm, '')
+      .replace(helper, '')
+      .split(';')
+      .filter((value) => value.trim());
+    await prisma.$transaction(async (tx) => {
+      await tx.$executeRawUnsafe(
+        'CREATE SCHEMA additional_explanation_migration_test',
+      );
+      await tx.$executeRawUnsafe(
+        'SET LOCAL search_path TO additional_explanation_migration_test',
+      );
+      await tx.$executeRawUnsafe(
+        'CREATE TABLE "Question" (id TEXT PRIMARY KEY, explanation TEXT)',
+      );
+      await tx.$executeRawUnsafe(
+        'CREATE TABLE "QuestionExplanation" ("questionId" TEXT, "structuredExplanationFormat" TEXT, keywords TEXT, "eliminationStrategy" TEXT, "whyCorrect" TEXT, "generalRule" TEXT, "whatIf" TEXT, "commonMistakes" TEXT, "answerElements" TEXT, "scientificExplanation" TEXT)',
+      );
+      await tx.$executeRawUnsafe(
+        'CREATE TABLE "AssessmentQuestion" (id TEXT PRIMARY KEY, explanation TEXT, "structuredExplanation" JSONB, "structuredExplanationFormat" TEXT)',
+      );
+      await tx.$executeRawUnsafe(
+        'CREATE TABLE "QuestionReport" ("questionSnapshot" JSONB)',
+      );
+      const examples = [
+        {
+          id: 'plain-only',
+          sections: null,
+          flat: 'Legacy human explanation',
+          expected: 'Legacy human explanation',
+        },
+        {
+          id: 'distinct',
+          sections: six,
+          flat: 'Additional teaching note',
+          expected: 'Additional teaching note',
+        },
+        {
+          id: 'generated',
+          sections: six,
+          flat: [
+            'givens',
+            'strategy',
+            'reason',
+            'rule',
+            'variation',
+            'mistakes',
+          ].join('\n\n'),
+          expected: null,
+        },
+        {
+          id: 'labeled',
+          sections: six,
+          flat: 'Keywords: givens\n\nSolution strategy: strategy\n\nWhy this is correct: reason\n\nGeneral rule: rule\n\nWhat if?: variation\n\nCommon mistakes: mistakes',
+          expected: null,
+        },
+        {
+          id: 'written',
+          sections: written,
+          flat: Object.values(written).join('\n\n'),
+          expected: null,
+        },
+        {
+          id: 'formatting-only',
+          sections: six,
+          flat: 'givens \nstrategy\t reason\r\n rule  variation\n mistakes',
+          expected: null,
+        },
+        {
+          id: 'changed-sentence',
+          sections: six,
+          flat: 'givens\n\nstrategy\n\nreason\n\nrule\n\nvariation\n\nmistakes. Additional administrator sentence.',
+          expected:
+            'givens\n\nstrategy\n\nreason\n\nrule\n\nvariation\n\nmistakes. Additional administrator sentence.',
+        },
+        { id: 'empty', sections: null, flat: '   ', expected: null },
+      ];
+      for (const item of examples) {
+        const format =
+          item.id === 'written' ? 'WRITTEN_FOUR_SECTION' : 'SIX_SECTION';
+        await tx.$executeRawUnsafe(
+          'INSERT INTO "Question" VALUES ($1, $2)',
+          item.id,
+          item.flat,
+        );
+        if (item.sections) {
+          await tx.$executeRawUnsafe(
+            `INSERT INTO "QuestionExplanation"
+            SELECT $1, $2, x.keywords, x."eliminationStrategy", x."whyCorrect", x."generalRule", x."whatIf", x."commonMistakes", x."answerElements", x."scientificExplanation"
+            FROM jsonb_to_record($3::jsonb) AS x(keywords TEXT, "eliminationStrategy" TEXT, "whyCorrect" TEXT, "generalRule" TEXT, "whatIf" TEXT, "commonMistakes" TEXT, "answerElements" TEXT, "scientificExplanation" TEXT)`,
+            item.id,
+            format,
+            JSON.stringify(item.sections),
+          );
+        }
+        await tx.$executeRawUnsafe(
+          'INSERT INTO "AssessmentQuestion" VALUES ($1, $2, $3::jsonb, $4)',
+          item.id,
+          item.flat,
+          JSON.stringify(item.sections),
+          format,
+        );
+      }
+      await tx.$executeRawUnsafe(
+        `INSERT INTO "QuestionReport" VALUES ('{"explanation":"Historical report text","body":"Question"}')`,
+      );
+      // Execute the helper as one statement because its body contains semicolons.
+      await tx.$executeRawUnsafe(helper);
+      for (const statement of statements) await tx.$executeRawUnsafe(statement);
+      for (const table of ['Question', 'AssessmentQuestion']) {
+        const rows = await tx.$queryRawUnsafe<any[]>(
+          `SELECT * FROM "${table}" ORDER BY id`,
+        );
+        for (const item of examples) {
+          const row = rows.find((value) => value.id === item.id);
+          expect(row.moreExplanation).toBe(item.expected);
+          expect(row).not.toHaveProperty('explanation');
+          if (table === 'AssessmentQuestion')
+            expect(row.structuredExplanation).toEqual(item.sections);
+        }
+      }
+      const reports = await tx.$queryRawUnsafe<any[]>(
+        'SELECT * FROM "QuestionReport"',
+      );
+      expect(reports[0].questionSnapshot).toEqual({
+        body: 'Question',
+        moreExplanation: 'Historical report text',
+      });
+      await tx.$executeRawUnsafe(
+        'DROP SCHEMA additional_explanation_migration_test CASCADE',
+      );
+    });
   });
 
   it('preserves old explanations, pending runs and immutable snapshots during migration', async () => {

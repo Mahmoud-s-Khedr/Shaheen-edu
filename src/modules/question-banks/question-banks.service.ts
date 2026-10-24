@@ -4,7 +4,6 @@ import {
   explanationPersistence,
   isWrittenQuestion,
   QuestionExplanationFormat,
-  renderStructuredExplanation,
 } from '../../common/utils/structured-explanation';
 import {
   BadRequestException,
@@ -38,6 +37,7 @@ import type { RequestUser } from '../../common/types/request-with-user.types';
 import { PrismaService } from '../../database/prisma.service';
 import {
   arabicMatch,
+  arabicMatchText,
   paginateArabicSearch,
   sqlAnd,
 } from '../../common/search/arabic-search';
@@ -671,15 +671,6 @@ export class QuestionBanksService {
   ) {
     return x ? { create: { ...x, origin } } : undefined;
   }
-  private renderExplanation(x?: any) {
-    return x
-      ? renderStructuredExplanation(
-          x,
-          x.structuredExplanationFormat ??
-            QuestionExplanationFormat.SIX_SECTION,
-        )
-      : undefined;
-  }
   private normalizeExplanation(
     dto: {
       structuredExplanation?: any;
@@ -897,9 +888,7 @@ export class QuestionBanksService {
           type: dto.type ?? QuestionType.SINGLE_CHOICE,
           body: content.body,
           contentBlocks: this.blockCreate(content.rows),
-          explanation:
-            dto.explanation ??
-            this.renderExplanation(dto.structuredExplanation),
+          moreExplanation: dto.moreExplanation?.trim() || null,
           maxPoints: dto.maxPoints ?? 1,
           acceptedAnswers: dto.acceptedAnswers?.map((answer) =>
             answer.trim(),
@@ -1087,7 +1076,7 @@ export class QuestionBanksService {
             sortOrder: index + 1,
           })),
         },
-        explanation: dto.explanation?.trim(),
+        moreExplanation: dto.moreExplanation?.trim() || null,
         acceptedAnswers: dto.acceptedAnswers?.map((answer) =>
           answer.trim(),
         ) as any,
@@ -1186,7 +1175,7 @@ export class QuestionBanksService {
         })),
         acceptedAnswers: undefined,
         gradingRubric: undefined,
-        explanation: undefined,
+        moreExplanation: undefined,
         answerOrigin: undefined,
         aiExplanation: undefined,
         aiAnswerOrigin: undefined,
@@ -1295,6 +1284,21 @@ export class QuestionBanksService {
       target: 'question',
       q: q.q,
       scope: {
+        alsoMatches: q.q
+          ? Prisma.sql`EXISTS (
+              SELECT 1 FROM "QuestionExplanation" qe
+              WHERE qe."questionId" = t.id AND ${arabicMatchText(
+                Prisma.sql`arabic_normalize(
+                  coalesce(t.body, '') || ' ' || coalesce(t."moreExplanation", '') || ' ' ||
+                  CASE WHEN qe."structuredExplanationFormat" = 'WRITTEN_FOUR_SECTION'
+                  THEN coalesce(qe."answerElements", '') || ' ' || coalesce(qe."scientificExplanation", '')
+                  ELSE coalesce(qe.keywords, '') || ' ' || coalesce(qe."eliminationStrategy", '') || ' ' || coalesce(qe."whyCorrect", '') || ' ' || coalesce(qe."generalRule", '') END
+                  || ' ' || coalesce(qe."commonMistakes", '') || ' ' || coalesce(qe."whatIf", '')
+                )`,
+                q.q,
+              )}
+            )`
+          : undefined,
         where: sqlAnd(
           q.status
             ? Prisma.sql`t.status = ${q.status}::"QuestionStatus"`
@@ -1386,14 +1390,10 @@ export class QuestionBanksService {
                 },
               }
             : {}),
-          explanation:
-            dto.explanation !== undefined
-              ? dto.explanation === null
-                ? null
-                : dto.explanation.trim()
-              : dto.structuredExplanation
-                ? this.renderExplanation(dto.structuredExplanation)
-                : undefined,
+          moreExplanation:
+            dto.moreExplanation === undefined
+              ? undefined
+              : dto.moreExplanation?.trim() || null,
           maxPoints: dto.maxPoints,
           ...(dto.acceptedAnswers !== undefined
             ? {
@@ -1451,7 +1451,6 @@ export class QuestionBanksService {
         dto.type,
         dto.acceptedAnswers,
         dto.gradingRubric,
-        dto.explanation,
         dto.answerOrigin,
         ...(isWrittenQuestion(old.type) && dto.maxPoints !== old.maxPoints
           ? [dto.maxPoints]

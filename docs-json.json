@@ -27505,6 +27505,10 @@
                         }
                       ],
                       "description": "Active educational sections plus existing explanation metadata; never contains the format."
+                    },
+                    "moreExplanation": {
+                      "type": "string",
+                      "nullable": true
                     }
                   }
                 }
@@ -35100,8 +35104,10 @@
               "$ref": "#/components/schemas/QuestionContentBlockDto"
             }
           },
-          "explanation": {
-            "type": "string"
+          "moreExplanation": {
+            "type": "string",
+            "nullable": true,
+            "description": "Optional administrator-authored additional explanation. Omit on update to preserve; null clears it."
           },
           "contextIds": {
             "type": "array",
@@ -35376,9 +35382,10 @@
               "$ref": "#/components/schemas/QuestionContentBlockDto"
             }
           },
-          "explanation": {
-            "type": "object",
-            "nullable": true
+          "moreExplanation": {
+            "type": "string",
+            "nullable": true,
+            "description": "Optional administrator-authored additional explanation. Omit to preserve; null clears it."
           },
           "contextIds": {
             "type": "array",
@@ -37871,7 +37878,7 @@
               "type": "string"
             }
           },
-          "explanation": {
+          "moreExplanation": {
             "type": "string",
             "nullable": true
           },
@@ -38189,6 +38196,18 @@
       "AdminAssessmentQuestionDto": {
         "type": "object",
         "properties": {
+          "structuredExplanation": {
+            "type": "object",
+            "nullable": true
+          },
+          "structuredExplanationFormat": {
+            "type": "string",
+            "enum": [
+              "SIX_SECTION",
+              "WRITTEN_FOUR_SECTION"
+            ],
+            "nullable": true
+          },
           "id": {
             "type": "string"
           },
@@ -38201,7 +38220,7 @@
           "body": {
             "type": "string"
           },
-          "explanation": {
+          "moreExplanation": {
             "type": "string",
             "nullable": true
           },
@@ -38240,6 +38259,7 @@
           }
         },
         "required": [
+          "structuredExplanationFormat",
           "id",
           "sortOrder",
           "type",
@@ -39274,6 +39294,11 @@
           },
           "applyExplanation": {
             "type": "boolean"
+          },
+          "moreExplanation": {
+            "type": "string",
+            "nullable": true,
+            "description": "Optional administrator-authored additional explanation. Requires applyExplanation=true. Omit to preserve; null clears it."
           },
           "structuredExplanation": {
             "oneOf": [

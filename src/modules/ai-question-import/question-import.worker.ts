@@ -2615,16 +2615,6 @@ export class QuestionImportWorker {
     // The administrator has the original book and publisher access, so every
     // AI candidate is routed to the authoritative human review queue.
     const reviewRequired = true;
-    const plainExplanation = explanation
-      ? [
-          explanation.keywords,
-          explanation.eliminationStrategy,
-          explanation.whyCorrect,
-          explanation.generalRule,
-          explanation.whatIf,
-          explanation.commonMistakes,
-        ].join('\n\n')
-      : '';
     try {
       return await this.prisma.$transaction(async (tx) => {
         // This insert claims the unique chunk sequence before a question is created.
@@ -2686,7 +2676,6 @@ export class QuestionImportWorker {
             courseId: batch.courseId,
             placements: batch.placements,
             body: c.body,
-            explanation: plainExplanation,
             type: c.type,
             options,
             contextIds: source.contextIds,
@@ -2834,7 +2823,6 @@ export class QuestionImportWorker {
             courseId: batch.courseId,
             placements: batch.placements,
             body: c.body,
-            explanation: c.explanation,
             aiExplanation: c.structuredExplanation,
             aiAnswerOrigin:
               c.answerOrigin === 'SOURCE_MARKED' ? 'EXPLICIT' : 'INFERRED',
@@ -3497,7 +3485,6 @@ export class QuestionImportWorker {
             placements: batch.placements,
             body: c.body,
             contentBlocks: questionBlocks,
-            explanation: c.explanation,
             aiExplanation: c.structuredExplanation,
             aiAnswerOrigin:
               c.answerOrigin === 'SOURCE_MARKED' ? 'EXPLICIT' : 'INFERRED',

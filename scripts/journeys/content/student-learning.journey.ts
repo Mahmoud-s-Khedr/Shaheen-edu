@@ -148,7 +148,7 @@ export const studentLearningJourney: JourneyDefinition = {
           courseId,
           placements: [{ sectionId }],
           body: 'Which option is correct?',
-          explanation: 'The first option is correct.',
+          moreExplanation: 'The first option is correct.',
         });
         questionId = question.id;
         context.created.questions.push(questionId);

@@ -1201,7 +1201,7 @@ model Question {
   courseId              String
   type                  QuestionType               @default(SINGLE_CHOICE)
   body                  String
-  explanation           String?
+  moreExplanation       String?
   maxPoints             Int                        @default(1)
   acceptedAnswers       Json?
   gradingRubric         String?
@@ -1896,7 +1896,7 @@ model AssessmentQuestion {
   sortOrder                   Int
   type                        QuestionType
   body                        String
-  explanation                 String?
+  moreExplanation             String?
   maxPoints                   Int
   acceptedAnswers             Json?
   gradingRubric               String?

@@ -43,7 +43,6 @@ import {
   PaginationQueryDto,
   toPaginationMeta,
 } from '../../common/dto/pagination-query.dto';
-import { formatStudentExplanation } from '../../common/utils/student-explanation.formatter';
 import { studentErrorReasonLabel } from '../../common/utils/student-error-reason';
 import {
   orderByIds,
@@ -718,7 +717,7 @@ export class AssessmentsService {
           sortOrder: i + 1,
           type: question.type,
           body: question.body,
-          explanation: question.explanation,
+          moreExplanation: question.moreExplanation,
           maxPoints: question.maxPoints,
           acceptedAnswers: question.acceptedAnswers ?? undefined,
           gradingRubric: question.gradingRubric,
@@ -1681,7 +1680,21 @@ export class AssessmentsService {
         id: true,
         body: true,
         type: true,
-        explanation: true,
+        moreExplanation: true,
+        structuredExplanation: {
+          select: {
+            structuredExplanationFormat: true,
+            languageCode: true,
+            answerElements: true,
+            scientificExplanation: true,
+            keywords: true,
+            eliminationStrategy: true,
+            whyCorrect: true,
+            generalRule: true,
+            whatIf: true,
+            commonMistakes: true,
+          },
+        },
         updatedAt: true,
       },
     });
@@ -1691,7 +1704,10 @@ export class AssessmentsService {
         questionId: sourceQuestionId,
         type: dto.type,
         note: dto.note?.trim() || null,
-        questionSnapshot: question as any,
+        questionSnapshot: {
+          ...question,
+          ...explanationEnvelope(question.structuredExplanation),
+        } as any,
         actions: {
           create: {
             actorUserId: studentId,
@@ -2943,13 +2959,7 @@ export class AssessmentsService {
           correctOptionIds: showAnswer
             ? q.options.filter((o) => o.isCorrect).map((o) => o.id)
             : null,
-          explanation: showAnswer
-            ? formatStudentExplanation(
-                q.explanation,
-                q.structuredExplanation,
-                q.structuredExplanationFormat,
-              )
-            : null,
+          moreExplanation: showAnswer ? (q.moreExplanation ?? null) : null,
           ...explanationEnvelope(
             showAnswer ? q.structuredExplanation : null,
             q.structuredExplanationFormat,
@@ -3191,14 +3201,16 @@ export class AssessmentsService {
           : null,
       correctOptionIds:
         assessment.mode === AssessmentMode.TUTOR ? correct : null,
-      explanation:
+      moreExplanation:
         assessment.mode === AssessmentMode.TUTOR
-          ? formatStudentExplanation(
-              question.explanation,
-              question.structuredExplanation,
-              question.structuredExplanationFormat,
-            )
+          ? (question.moreExplanation ?? null)
           : null,
+      ...explanationEnvelope(
+        assessment.mode === AssessmentMode.TUTOR
+          ? question.structuredExplanation
+          : null,
+        question.structuredExplanationFormat,
+      ),
     };
   }
 
@@ -3643,8 +3655,8 @@ export class AssessmentsService {
             assetName: attachment.assetName,
             sortOrder: attachment.sortOrder,
           })),
-          explanation: formatStudentExplanation(
-            q.explanation,
+          moreExplanation: q.moreExplanation ?? null,
+          ...explanationEnvelope(
             q.structuredExplanation,
             q.structuredExplanationFormat,
           ),
@@ -4208,7 +4220,11 @@ export class AssessmentsService {
         sortOrder: q.sortOrder,
         type: q.type,
         body: q.body,
-        explanation: q.explanation,
+        moreExplanation: q.moreExplanation,
+        ...explanationEnvelope(
+          q.structuredExplanation,
+          q.structuredExplanationFormat,
+        ),
         video: q.videoAssetId
           ? {
               assetId: q.videoAssetId,

@@ -12,16 +12,18 @@ This guide supersedes the six-section-only editing instructions in [the earlier 
 2. Read `structuredExplanationFormat` beside `structuredExplanation` in responses.
 3. Add a maximum-points input to AI generation, prefilled from the saved question.
 4. Show saved and proposed maximum points separately during review.
-5. Explain that applying the answer also saves proposed marks, while answer-only approval clears the previous explanation.
+5. Explain that applying the answer also saves proposed marks, while answer-only approval clears the previous structured explanation and preserves admin additional text.
 6. Refresh question/run data after approval and follow the returned question ID for replacement drafts.
 7. Keep student answer-reveal behavior and historical assessment scores intact.
+8. Remove the `explanation` field from requests and rendering. Render sections and their labels in the frontend, and add an optional `moreExplanation` input for admin-authored text.
 
 ## 2. Explanation response contract
 
-The format belongs to the containing question or run object. It is never inside the explanation object.
+The format belongs to the containing question or run object. It is never inside the explanation object. Questions also expose `moreExplanation: string | null`. AI generation runs contain only generated sections; additional text belongs to the saved question. The backend no longer stores or returns a compatibility `explanation` string.
 
 ```json
 {
+  "moreExplanation": "Optional administrator teaching notes.",
   "structuredExplanationFormat": "WRITTEN_FOUR_SECTION",
   "structuredExplanation": {
     "answerElements": "Identify the concept: 2 marks. Explain its effect: 3 marks.",
@@ -52,7 +54,7 @@ Inactive sections are omitted from responses. When content is absent or hidden, 
 }
 ```
 
-For compatibility with older API responses, missing format with non-null content may default to `SIX_SECTION`. Do not apply this fallback to null content. For an unknown non-null format, avoid opening an editor that could overwrite the content; offer the flat explanation display when available.
+For compatibility with older API responses, missing format with non-null content may default to `SIX_SECTION`. Do not apply this fallback to null content. For an unknown non-null format, avoid opening an editor that could overwrite the content; preserve the payload and show a format error rather than overwriting content.
 
 ### Suggested frontend types and field definitions
 
@@ -214,11 +216,11 @@ Both booleans are required. At least one must be true.
 | `applyAnswer` | `applyExplanation` | Result |
 | --- | --- | --- |
 | `true` | `true` | Saves the verified answer, proposed maximum points when present, and the reviewed explanation |
-| `true` | `false` | Saves the verified answer and proposed maximum points when present; clears the previous flat and structured explanation |
+| `true` | `false` | Saves the verified answer and proposed maximum points when present; clears the previous structured explanation and preserves `moreExplanation` |
 | `false` | `true` | Saves the explanation only; requires the verified answer and proposed marks to match the saved question |
 | `false` | `false` | Rejected with HTTP 400 |
 
-Make the score consequence visible in the answer approval label/helper text, for example: “Apply verified answer and proposed maximum points.” For answer-only approval, explain that the existing explanation will be cleared.
+Make the score consequence visible in the answer approval label/helper text, for example: “Apply verified answer and proposed maximum points.” For answer-only approval, explain that the existing structured explanation will be cleared; additional admin text is preserved.
 
 If proposed marks differ from saved marks, disable explanation-only approval and offer either approval with the answer or regeneration with the saved score. The backend also checks answer equivalence and rejects mismatches; treat backend validation as authoritative.
 
@@ -233,6 +235,8 @@ The apply endpoint has no `maxPoints` override. If the administrator wants a dif
   "note": "Verified answer, marks, and explanation reviewed."
 }
 ```
+
+The apply request can also include `moreExplanation` (up to 100,000 characters) when `applyExplanation=true`. Omit it to preserve saved admin text, send a string to replace it, or send null to clear it. Whitespace-only text is saved as null. Applying generated sections never copies AI content into `moreExplanation`.
 
 Omit both explanation edit fields when approving unchanged content. Do not send only `structuredExplanationFormat`: a supplied format requires an edited explanation.
 
@@ -297,6 +301,8 @@ Use the existing `POST /api/v1/admin/questions` or `PATCH /api/v1/admin/question
 }
 ```
 
+Add `moreExplanation` to manual create/update requests for optional admin text (up to 100,000 characters). On PATCH, omission preserves the value; null or whitespace-only text clears it. Editing only this field does not mark structured sections stale.
+
 This is a PATCH example; creation also requires the normal question fields. Four-section manual requests must explicitly include the format and use a written question type. Legacy six-section requests may omit the format, which defaults to `SIX_SECTION`; prefer sending it explicitly in new frontend code.
 
 Do not send a format without content. To leave an explanation unchanged, omit both fields. Do not send inactive fields as null or include response metadata. Manual format replacement clears inactive database columns; the UI need not issue separate clearing requests.
@@ -305,13 +311,11 @@ Unlike generation, a manual `maxPoints` update immediately changes the saved que
 
 ## 6. Student displays and assessment history
 
-Use the same format-aware component for structured explanations returned in student assessment attempt state and practice feedback. Some result/feedback endpoints return only the compatibility `explanation` string; keep their existing flat rendering.
+Practice feedback, tutor answer feedback, assessment attempt state, completed results, and admin assessment detail return structured sections and `moreExplanation`. Use the active section list and frontend labels, then render optional additional text separately. No endpoint in these flows returns a formatted compatibility `explanation` string.
 
-For structured display, use the active section list and frontend labels. For flat display, use the API's `explanation` string, which can include localized section headings and existing compatibility text. Avoid displaying both representations together: the flat value can already contain the structured content.
+Assessment attempt state returns `structuredExplanation`, `structuredExplanationFormat`, and `moreExplanation` as null while answers are hidden. Exam-mode explanations are revealed after completion; tutor-mode state may reveal them after an answer is recorded. Follow the server response instead of deriving visibility from the format or fetching admin/source-question content to fill missing sections. Replace cached visible content with null when a newer response hides it.
 
-Assessment attempt state returns both explanation fields as null while answers are hidden. Exam-mode explanations are revealed after completion; tutor-mode state may reveal them after an answer is recorded. Follow the server response instead of deriving visibility from the format or fetching admin/source-question content to fill missing sections. Replace cached visible content with null when a newer response hides it.
-
-Assessment questions freeze their format, explanation, maximum points, and grading criteria. Later edits to a source question do not update existing assessments. Use each assessment question's own `maxPoints` and explanation data in attempts/results; do not overlay the current source-question values. AI explanation generation and student-answer grading remain separate workflows.
+Assessment questions freeze their format, structured sections, additional text, maximum points, and grading criteria. Later edits to a source question do not update existing assessments. Use each assessment question's own `maxPoints` and explanation data in attempts/results; do not overlay the current source-question values. AI explanation generation and student-answer grading remain separate workflows.
 
 ## 7. Errors and recovery
 
@@ -357,3 +361,7 @@ Deploy both backend migrations before the updated backend: `20261010120000_writt
 Ship dual-format frontend rendering and editors before exposing new four-section generation. Frontend implementation is in a separate repository.
 
 The current OpenAPI response schemas for AI review endpoints describe the explanation envelope and proposed score but omit other returned run/question fields. Until those schemas are expanded, retain or extend the frontend's full run/question types using the actual response contract; generating types from only the newly declared schemas will omit fields such as run `id`/`status` and the applied question `id`/`maxPoints`.
+
+## 8. Existing data migration
+
+The migration renames the legacy question and assessment text columns to `moreExplanation`. Generated plain or labeled copies of the structured sections are cleared, including copies that differ only in ASCII whitespace; distinct text and plain-only historical content are preserved. Existing structured sections, AI review runs, and assessment scoring are retained. Deploy the schema migration with this API change and update frontend clients together.

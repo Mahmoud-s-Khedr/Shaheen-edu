@@ -164,7 +164,7 @@ describe('Assessments (e2e)', () => {
           courseId: course.id,
           type: QuestionType.SINGLE_CHOICE,
           body: `Question ${i}`,
-          explanation: `Explanation ${i}`,
+          moreExplanation: `Explanation ${i}`,
           status: QuestionStatus.PUBLISHED,
           publishedAt: now,
           reviewedAt: now,
@@ -424,7 +424,7 @@ describe('Assessments (e2e)', () => {
     expect(resultBody.comparison).toMatchObject({ status: 'NOT_APPLICABLE' });
     expect(resultBody.questions[0].activeSeconds).toBe(30);
     expect(resultBody.questions[0].isMarked).toBe(false);
-    expect(resultBody.questions[0].explanation).toBeDefined();
+    expect(resultBody.questions[0].moreExplanation).toBeDefined();
     expect(resultBody.questions).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ outcome: 'CORRECT' }),
@@ -1013,7 +1013,7 @@ describe('Assessments (e2e)', () => {
           courseId: paidCourse.id,
           type: QuestionType.SINGLE_CHOICE,
           body: 'Chapter A question',
-          explanation: 'Explanation A',
+          moreExplanation: 'Explanation A',
           status: QuestionStatus.PUBLISHED,
           publishedAt: now,
           reviewedAt: now,
@@ -1036,7 +1036,7 @@ describe('Assessments (e2e)', () => {
           courseId: paidCourse.id,
           type: QuestionType.SINGLE_CHOICE,
           body: 'Chapter B question',
-          explanation: 'Explanation B',
+          moreExplanation: 'Explanation B',
           status: QuestionStatus.PUBLISHED,
           publishedAt: now,
           reviewedAt: now,

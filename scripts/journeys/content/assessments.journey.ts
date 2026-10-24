@@ -112,7 +112,7 @@ export const assessmentsJourney: JourneyDefinition = {
             courseId,
             placements: [{ chapterId }],
             body: `Assessment question ${i + 1}`,
-            explanation: `Explanation ${i + 1}`,
+            moreExplanation: `Explanation ${i + 1}`,
           });
           await create(`/admin/questions/${question.id}/options`, {
             body: 'Correct',
@@ -146,7 +146,7 @@ export const assessmentsJourney: JourneyDefinition = {
           courseId,
           placements: [{ chapterId }],
           body: 'Assessment question from second bank',
-          explanation: 'Second-bank explanation',
+          moreExplanation: 'Second-bank explanation',
         });
         await create(`/admin/questions/${secondBankQuestion.id}/options`, {
           body: 'Correct',
@@ -906,7 +906,7 @@ export const assessmentsJourney: JourneyDefinition = {
           placements: [{ chapterId }],
           type: 'SHORT_ANSWER',
           body: 'Write the normalized assessment keyword.',
-          explanation: 'The accepted answer is synthetic.',
+          moreExplanation: 'The accepted answer is synthetic.',
           acceptedAnswers: ['synthetic'],
           answerOrigin: 'HUMAN_REVIEWED',
           maxPoints: 2,
@@ -918,7 +918,7 @@ export const assessmentsJourney: JourneyDefinition = {
           placements: [{ chapterId }],
           type: 'LONG_ANSWER',
           body: 'Explain the synthetic concept in one sentence.',
-          explanation: 'A reviewer will assess the explanation.',
+          moreExplanation: 'A reviewer will assess the explanation.',
           gradingRubric:
             'Award one point for the concept and one for a clear explanation.',
           answerOrigin: 'HUMAN_REVIEWED',
@@ -931,7 +931,7 @@ export const assessmentsJourney: JourneyDefinition = {
           placements: [{ chapterId }],
           type: 'FILL_IN_THE_BLANK',
           body: 'Complete the keyword: synt_____.',
-          explanation: 'The accepted answer is synthetic.',
+          moreExplanation: 'The accepted answer is synthetic.',
           acceptedAnswers: ['synthetic'],
           answerOrigin: 'HUMAN_REVIEWED',
           maxPoints: 2,
@@ -1160,7 +1160,7 @@ export const assessmentsJourney: JourneyDefinition = {
         placements: [{ chapterId }],
         type: 'LONG_ANSWER',
         body: 'Describe the synthetic concept without a rubric.',
-        explanation: 'Long-answer questions require an AI grading rubric.',
+        moreExplanation: 'Long-answer questions require an AI grading rubric.',
         answerOrigin: 'HUMAN_REVIEWED',
         maxPoints: 2,
       });

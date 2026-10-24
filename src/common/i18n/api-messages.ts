@@ -62,6 +62,8 @@ const translations: Record<string, string> = {
     'لقد أرسلت إجابتك عن هذا النموذج بالفعل',
   'Submission not found': 'لم يتم العثور على الإجابة المرسلة',
 
+  'Additional explanation requires applyExplanation to be true':
+    'يتطلب التفسير الإضافي تفعيل applyExplanation',
   'Edited explanation requires applyExplanation to be true':
     'لتطبيق الشرح المعدّل، يجب تفعيل تطبيق الشرح',
   'Question changed while it was being published; refresh and retry':
@@ -861,6 +863,8 @@ const translations: Record<string, string> = {
   'Speech-to-text request failed': 'فشل طلب تحويل الكلام إلى نص',
   'Speech-to-text returned no transcript':
     'لم تُرجع ميزة تحويل الكلام إلى نص أي نص',
+  'Structured explanation must contain exactly the complete sections for its format (nonblank, at most 10000 characters)':
+    'يجب أن يحتوي التفسير المنظم على جميع أقسام التنسيق المحدد فقط، وألا تكون فارغة، وألا يتجاوز كل قسم 10000 حرف',
   'Structured explanation must contain all six explanation sections':
     'يجب أن يحتوي الشرح المنظم على أقسام الشرح الستة جميعها',
   'Student academic grade is required': 'يشترط الدرجة الأكاديمية للطالب',

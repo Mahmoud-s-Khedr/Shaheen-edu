@@ -17,3 +17,6 @@ keys.txt
 *.tsbuildinfo
 .claude
 .pnpm-store
+
+/question-explanation-review*.json
+/response.json

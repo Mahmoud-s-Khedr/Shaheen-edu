@@ -1,5 +1,4 @@
 import { QuestionBanksService } from '../../modules/question-banks/question-banks.service';
-import { formatStudentExplanation } from './student-explanation.formatter';
 import {
   explanationEnvelope,
   explanationFields,
@@ -72,19 +71,6 @@ describe('Format-aware explanations', () => {
       structuredExplanationFormat: null,
       structuredExplanation: null,
     });
-  });
-  it('renders localized four-section headings and legacy headings', () => {
-    expect(
-      formatStudentExplanation(null, written, Format.WRITTEN_FOUR_SECTION),
-    ).toContain('Answer elements: Required answer');
-    expect(
-      formatStudentExplanation(
-        null,
-        { ...written, languageCode: 'ar' },
-        Format.WRITTEN_FOUR_SECTION,
-      ),
-    ).toContain('التفسير العلمي: Supporting concepts');
-    expect(formatStudentExplanation(null, six)).toContain('Keywords: keywords');
   });
   it('requires explicit four-section format for manual input and restricts it to written types', () => {
     const service = Object.create(

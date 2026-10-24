@@ -126,7 +126,7 @@ export const questionBankAuthoringJourney: JourneyDefinition = {
           courseId,
           placements: [{ chapterId }],
           body: 'Which synthetic option is correct?',
-          explanation: 'This is a generated journey explanation.',
+          moreExplanation: 'This is a generated journey explanation.',
         });
         expectStatus(question, 201);
         questionId = question.body.id;
@@ -238,7 +238,7 @@ export const questionBankAuthoringJourney: JourneyDefinition = {
           placements: [{ chapterId }],
           type: 'SHORT_ANSWER',
           body: 'Write the synthetic keyword.',
-          explanation: 'The expected keyword is synthetic.',
+          moreExplanation: 'The expected keyword is synthetic.',
           maxPoints: 2,
         });
         expectStatus(written, 201);
@@ -303,7 +303,7 @@ export const questionBankAuthoringJourney: JourneyDefinition = {
             courseId,
             placements: [{ chapterId }],
             body: 'Denied question',
-            explanation: 'Denied.',
+            moreExplanation: 'Denied.',
           },
         );
         expectStatus(denied, 403);

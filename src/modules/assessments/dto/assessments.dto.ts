@@ -546,7 +546,7 @@ export class AssessmentAttemptQuestionDto {
     boolean | null;
   @ApiPropertyOptional({ type: [String], nullable: true }) correctOptionIds!:
     string[] | null;
-  @ApiPropertyOptional({ type: String, nullable: true }) explanation!:
+  @ApiPropertyOptional({ type: String, nullable: true }) moreExplanation!:
     string | null;
   @ApiPropertyOptional({ type: Object, nullable: true })
   structuredExplanation!: object | null;
@@ -642,11 +642,18 @@ export class AdminAssessmentListItemDto {
 }
 
 export class AdminAssessmentQuestionDto {
+  @ApiPropertyOptional({ type: Object, nullable: true })
+  structuredExplanation!: object | null;
+  @ApiProperty({
+    enum: ['SIX_SECTION', 'WRITTEN_FOUR_SECTION'],
+    nullable: true,
+  })
+  structuredExplanationFormat!: string | null;
   @ApiProperty() id!: string;
   @ApiProperty() sortOrder!: number;
   @ApiProperty() type!: string;
   @ApiProperty() body!: string;
-  @ApiPropertyOptional({ type: String, nullable: true }) explanation!:
+  @ApiPropertyOptional({ type: String, nullable: true }) moreExplanation!:
     string | null;
   @ApiPropertyOptional({ type: AssessmentQuestionVideoDto, nullable: true })
   video!: AssessmentQuestionVideoDto | null;

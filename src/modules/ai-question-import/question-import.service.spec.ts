@@ -115,6 +115,87 @@ describe('QuestionImportService review summaries', () => {
     ).toMatchObject({ body: 'Question', explanation: 'Explanation' });
   });
 
+  it.each([
+    { label: 'plain text only', structuredExplanation: undefined },
+    {
+      label: 'structured sections',
+      structuredExplanation: {
+        keywords: 'pairs',
+        eliminationStrategy: 'Add the two pairs.',
+        whyCorrect: 'Two plus two is four.',
+        generalRule: 'Combine the quantities.',
+        whatIf: 'Another pair would give six.',
+        commonMistakes: 'Do not omit a pair.',
+      },
+    },
+  ])(
+    'preserves legacy explanations on acceptance with $label',
+    async ({ structuredExplanation }) => {
+      const service = serviceWith();
+      const createImportedDraftWithClient = jest
+        .fn()
+        .mockResolvedValue({ id: 'question-1' });
+      const tx = {
+        questionImportItem: {
+          findFirst: jest.fn().mockResolvedValue({
+            id: 'item-1',
+            batchId: 'batch-1',
+            sequence: 1,
+            questionId: null,
+            batch: {
+              schemaVersion: 'question-import-v3',
+              bankId: 'bank-1',
+              sourceId: 'source-1',
+              courseId: 'course-1',
+              placements: [{ courseId: 'course-1' }],
+            },
+            chunk: { text: JSON.stringify([{ contextIds: [] }]) },
+            mediaAssignments: [],
+            visualRequirements: [],
+          }),
+          update: jest.fn().mockResolvedValue({ questionId: 'question-1' }),
+        },
+      };
+      Object.assign(service, {
+        prisma: {
+          $transaction: (work: (client: typeof tx) => unknown) => work(tx),
+        },
+        questions: { createImportedDraftWithClient },
+        audit: { recordWithClient: jest.fn() },
+      });
+      jest
+        .spyOn(service as any, 'refreshReviewSummary')
+        .mockResolvedValue(undefined);
+
+      const result = await service.acceptItem(
+        { id: 'admin-1', role: Role.ADMIN, sessionId: 'session-1' },
+        'batch-1',
+        'item-1',
+        {
+          candidate: {
+            type: 'SHORT_ANSWER',
+            body: 'What is 2 + 2?',
+            explanation: '  Adding two pairs gives four.  ',
+            acceptedAnswers: ['4'],
+            ...(structuredExplanation ? { structuredExplanation } : {}),
+          },
+        },
+      );
+
+      expect(result.questionId).toBe('question-1');
+      expect(createImportedDraftWithClient).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          moreExplanation: structuredExplanation
+            ? undefined
+            : 'Adding two pairs gives four.',
+          aiExplanation: structuredExplanation,
+        }),
+        tx,
+      );
+    },
+  );
+
   it('uses a crop description, never a reviewer-assignment reason, as image alt text', () => {
     const blocks = (serviceWith() as any).anchoredBlocks(
       'Question text',

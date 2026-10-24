@@ -115,7 +115,7 @@ export const leaderboardPerformanceJourney: JourneyDefinition = {
             courseId,
             placements: [{ sectionId }],
             body: `Performance question ${index + 1}`,
-            explanation: 'Explanation',
+            moreExplanation: 'Explanation',
           });
           await create(`/admin/questions/${question.id}/options`, {
             body: 'Correct',

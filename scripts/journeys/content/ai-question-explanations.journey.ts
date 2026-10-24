@@ -20,7 +20,7 @@ export const aiQuestionExplanationsJourney: JourneyDefinition = {
         courseId,
         placements: [{ chapterId }],
         body: 'Which synthetic fact is correct?',
-        explanation: 'A human-authored compatibility explanation.',
+        moreExplanation: 'Additional human-authored teaching notes.',
       });
       expectStatus(question, 201);
       questionId = question.body.id;

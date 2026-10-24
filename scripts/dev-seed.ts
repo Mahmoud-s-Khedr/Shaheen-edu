@@ -780,7 +780,7 @@ class Seed {
           courseId: this.states['course.paid'].id,
           placements: [{ sectionId: this.states.section.id }],
           body: `${MARK} ما الإجابة الصحيحة؟`,
-          explanation: 'الإجابة الأولى صحيحة.',
+          moreExplanation: 'الإجابة الأولى صحيحة.',
         })
       ).body;
     if (question.options.length < 2) {
@@ -841,7 +841,7 @@ class Seed {
             courseId: this.states['course.paid'].id,
             placements: [{ sectionId: this.states.section.id }],
             body: `${MARK} ${marker}`,
-            explanation: 'مثال دورة الحياة.',
+            moreExplanation: 'مثال دورة الحياة.',
           })
         ).body;
       if (finalStatus === 'DRAFT') return item;
