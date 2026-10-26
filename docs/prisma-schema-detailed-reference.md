@@ -862,7 +862,7 @@ For a compact endpoint-family read/write matrix, see
 | courseId | String | Reference ID for course. |
 | type | QuestionType | Business classification from QuestionType. |
 | body | String | Main authored text. |
-| explanation | String? | Teaching/explanatory text. Optional. |
+| moreExplanation | String? | Optional admin-authored teaching text shown alongside the structured explanation. |
 | maxPoints | Int | Maximum available score. |
 | acceptedAnswers | Json? | Structured JSON for accepted answers. Optional. |
 | gradingRubric | String? | Stored string value for grading rubric. Optional. |
@@ -1744,7 +1744,7 @@ For a compact endpoint-family read/write matrix, see
 | sortOrder | Int | Sibling display order. |
 | type | QuestionType | Business classification from QuestionType. |
 | body | String | Main authored text. |
-| explanation | String? | Teaching/explanatory text. Optional. |
+| moreExplanation | String? | Optional admin-authored teaching text shown alongside the structured explanation. |
 | maxPoints | Int | Maximum available score. |
 | acceptedAnswers | Json? | Structured JSON for accepted answers. Optional. |
 | gradingRubric | String? | Stored string value for grading rubric. Optional. |

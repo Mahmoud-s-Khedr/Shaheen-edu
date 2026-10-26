@@ -26,7 +26,7 @@ function setup(
     status,
     type,
     body: 'Question',
-    explanation: 'Explanation',
+    moreExplanation: 'More explanation',
     maxPoints: 1,
     structuredExplanation: { staleAt: new Date('2026-09-01T00:00:00Z') },
     bank: { status: 'PUBLISHED' },
@@ -65,10 +65,13 @@ function setup(
 
 describe('Explanation is optional during submission and publication', () => {
   it.each([undefined, null, '', '   '])(
-    'submits a question with explanation %p',
-    async (explanation) => {
+    'submits a question with moreExplanation %p and no structured explanation',
+    async (moreExplanation) => {
       const { service, tx, question } = setup(QuestionType.SINGLE_CHOICE);
-      Object.assign(question, { explanation });
+      Object.assign(question, {
+        moreExplanation,
+        structuredExplanation: null,
+      });
       await service.submit(actor, question.id);
       expect(tx.question.update).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -79,13 +82,16 @@ describe('Explanation is optional during submission and publication', () => {
   );
 
   it.each([undefined, null, '', '   '])(
-    'publishes an in-review question with explanation %p',
-    async (explanation) => {
+    'publishes an in-review question with moreExplanation %p and no structured explanation',
+    async (moreExplanation) => {
       const { service, tx, question } = setup(
         QuestionType.SINGLE_CHOICE,
         QuestionStatus.IN_REVIEW,
       );
-      Object.assign(question, { explanation });
+      Object.assign(question, {
+        moreExplanation,
+        structuredExplanation: null,
+      });
       await service.publishQuestion(actor, question.id);
       expect(tx.question.update).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -96,10 +102,13 @@ describe('Explanation is optional during submission and publication', () => {
   );
 
   it.each([undefined, null, '', '   '])(
-    'bulk publishes a question with explanation %p',
-    async (explanation) => {
+    'bulk publishes a question with moreExplanation %p and no structured explanation',
+    async (moreExplanation) => {
       const { service, question } = setup(QuestionType.SINGLE_CHOICE);
-      Object.assign(question, { explanation });
+      Object.assign(question, {
+        moreExplanation,
+        structuredExplanation: null,
+      });
       await expect(
         service.bulkPublishQuestions(actor, [question.id]),
       ).resolves.toEqual({ publishedIds: [question.id], failed: [] });

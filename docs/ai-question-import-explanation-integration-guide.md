@@ -2,7 +2,7 @@
 
 For new v7 imports, `POST /api/v1/admin/ai/question-imports/:importId/items/:itemId/accept` creates an **answerless draft**. Import is extraction only: accepted candidates may contain the question body, type, choice options, shared-context links, and reviewed media assignments, but never an answer, rubric, answer provenance, confidence, evidence, explanation, or structured explanation.
 
-For choice questions every created option has `isCorrect: false`. Written questions have no `acceptedAnswers`, and long-answer questions have no rubric. The draft cannot be published until its answer and explanation satisfy the normal publication requirements. An administrator can enter both manually, or supply a verified answer to the separate explanation API and review/apply its output. AI explanation generation is optional.
+For choice questions every created option has `isCorrect: false`. Written questions have no `acceptedAnswers`, and long-answer questions have no rubric. The draft cannot be published until its answer satisfies the normal publication requirements; an explanation is optional (neither `structuredExplanation` nor `moreExplanation` is required). An administrator can enter the answer manually, or supply a verified answer to the separate explanation API and review/apply its output. AI explanation generation is optional.
 
 ```json
 {

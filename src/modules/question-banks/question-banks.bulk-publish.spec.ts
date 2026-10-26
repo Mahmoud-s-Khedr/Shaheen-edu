@@ -222,7 +222,7 @@ describe('QuestionBanksService bulkPublishQuestions', () => {
     (service as any).questionWithClient = jest.fn(() =>
       item('invalid-options', QuestionStatus.DRAFT, {
         body: 'Which option is correct?',
-        explanation: 'Because it is correct.',
+        moreExplanation: 'Because it is correct.',
         maxPoints: 1,
         structuredExplanation: null,
         source: { status: ContentStatus.PUBLISHED },
