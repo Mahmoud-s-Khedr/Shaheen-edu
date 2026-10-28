@@ -30,6 +30,11 @@ import { studentErrorReasonLabel } from '../../common/utils/student-error-reason
 import { QuestionCommunityStatsService } from '../question-banks/question-community-stats.service';
 import { AssessmentsService } from '../assessments/assessments.service';
 import {
+  gradeAssignmentsInclude,
+  studentCourseScope,
+  subjectInGrade,
+} from '../entitlements/student-grade-scope';
+import {
   CompletionService,
   type CompletionContainerType,
 } from '../completion/completion.service';
@@ -657,15 +662,13 @@ export class LearningService {
         source: { status: ContentStatus.PUBLISHED },
         course: {
           status: ContentStatus.PUBLISHED,
-          subject: {
-            status: ContentStatus.PUBLISHED,
-            gradeAssignments: {
-              some: {
-                academicGradeId: student?.academicGradeId ?? '__missing__',
-                academicGrade: { status: ContentStatus.PUBLISHED },
-              },
-            },
-          },
+          subject: { status: ContentStatus.PUBLISHED },
+          AND: [
+            studentCourseScope(
+              studentId,
+              student?.academicGradeId ?? '__missing__',
+            ),
+          ],
         },
       },
       include: {
@@ -696,6 +699,7 @@ export class LearningService {
           orderBy: { sortOrder: 'asc' },
         },
         structuredExplanation: true,
+        course: { include: { subject: { include: gradeAssignmentsInclude } } },
         assets: { include: { asset: true }, orderBy: { sortOrder: 'asc' } },
         videoLink: { include: { videoAsset: { include: { asset: true } } } },
         placements: {
@@ -719,13 +723,23 @@ export class LearningService {
         ? question.placements.filter((p) => this.placementInScope(p, scope))
         : question.placements;
       if (!placements.length) continue;
-      if (await this.questionAccessible(studentId, placements))
+      if (
+        await this.questionAccessible(
+          studentId,
+          placements,
+          subjectInGrade(question.course.subject, student?.academicGradeId),
+        )
+      )
         accessible.push({ ...question, placements });
     }
     return accessible;
   }
 
-  private async questionAccessible(studentId: string, placements: any[]) {
+  private async questionAccessible(
+    studentId: string,
+    placements: any[],
+    inGrade: boolean,
+  ) {
     for (const placement of placements) {
       const nodes = placement.section
         ? [
@@ -743,7 +757,8 @@ export class LearningService {
           : placement.chapter
             ? [placement.chapter, placement.chapter.course]
             : [placement.course];
-      if (await this.access.entitledForNodes(studentId, nodes)) return true;
+      if (await this.access.entitledForNodes(studentId, nodes, { inGrade }))
+        return true;
     }
     return false;
   }
@@ -1095,18 +1110,17 @@ export class LearningService {
         source: { status: ContentStatus.PUBLISHED },
         course: {
           status: ContentStatus.PUBLISHED,
-          subject: {
-            status: ContentStatus.PUBLISHED,
-            gradeAssignments: {
-              some: {
-                academicGradeId: student?.academicGradeId ?? '__missing__',
-                academicGrade: { status: ContentStatus.PUBLISHED },
-              },
-            },
-          },
+          subject: { status: ContentStatus.PUBLISHED },
+          AND: [
+            studentCourseScope(
+              studentId,
+              student?.academicGradeId ?? '__missing__',
+            ),
+          ],
         },
       },
       include: {
+        course: { include: { subject: { include: gradeAssignmentsInclude } } },
         placements: {
           include: {
             course: true,
@@ -1122,7 +1136,13 @@ export class LearningService {
       },
     });
     for (const question of practiceQuestions)
-      if (await this.questionAccessible(studentId, question.placements))
+      if (
+        await this.questionAccessible(
+          studentId,
+          question.placements,
+          subjectInGrade(question.course.subject, student?.academicGradeId),
+        )
+      )
         return this.videos.playback(assetId);
 
     try {

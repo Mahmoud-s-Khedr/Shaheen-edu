@@ -9,6 +9,7 @@ import {
   ContentStatus,
   EntitlementStatus,
 } from '../../common/types/roles.enum';
+import { subjectInGrade } from './student-grade-scope';
 
 @Injectable()
 export class ContentAccessPolicyService {
@@ -163,6 +164,9 @@ export class ContentAccessPolicyService {
     }
     if (nodes.some((node) => node?.status === ContentStatus.DRAFT))
       throw new ForbiddenException('Content is not published');
+    // Outside the student's grade only an entitlement (or archived snapshot)
+    // grants access; PUBLIC/FREE stay scoped to the grade.
+    let outsideGrade = false;
     if (studentUserId) {
       const student = await this.prisma.studentProfile.findUnique({
         where: { userId: studentUserId },
@@ -173,17 +177,8 @@ export class ContentAccessPolicyService {
         placement.chapter?.course ??
         placement.lesson?.chapter?.course ??
         placement.section?.lesson?.chapter?.course;
-      if (
-        !student?.academicGradeId ||
-        !course?.subject.gradeAssignments.some(
-          (assignment: any) =>
-            assignment.academicGradeId === student.academicGradeId &&
-            assignment.academicGrade.status === ContentStatus.PUBLISHED,
-        )
-      )
-        throw new ForbiddenException(
-          'Content is not available for this academic grade',
-        );
+      outsideGrade =
+        !course || !subjectInGrade(course.subject, student?.academicGradeId);
     }
     const archived = hierarchyNodes.find(
       (node) => node.status === ContentStatus.ARCHIVED,
@@ -211,10 +206,12 @@ export class ContentAccessPolicyService {
     const effective = nodes.find(
       (node) => node.accessType && node.accessType !== AccessType.INHERIT,
     )?.accessType as AccessType;
-    if (effective === AccessType.PUBLIC) return item;
-    if (!studentUserId)
-      throw new ForbiddenException('Student authentication is required');
-    if (effective === AccessType.FREE) return item;
+    if (!outsideGrade) {
+      if (effective === AccessType.PUBLIC) return item;
+      if (!studentUserId)
+        throw new ForbiddenException('Student authentication is required');
+      if (effective === AccessType.FREE) return item;
+    }
     const course = nodes.find((node) => node.subjectId)?.id as string;
     const chapterIds = nodes
       .filter((node) => node.courseId)
@@ -233,21 +230,34 @@ export class ContentAccessPolicyService {
       },
     });
     if (!entitlement)
-      throw new ForbiddenException('A valid entitlement is required');
+      throw new ForbiddenException(
+        outsideGrade
+          ? 'Content is not available for this academic grade'
+          : 'A valid entitlement is required',
+      );
     return item;
   }
 
   /** ACTIVE/non-revoked/time-window/course-or-chapter entitlement predicate over an
    * ordered ancestor chain (nearest node first, course last). Shared by any caller
    * that already has its own hierarchy nodes loaded (e.g. LearningService and
-   * AssessmentsService question-placement checks) instead of a ContentItem id. */
-  async entitledForNodes(studentId: string, nodes: any[]): Promise<boolean> {
+   * AssessmentsService question-placement checks) instead of a ContentItem id.
+   * Pass `inGrade: false` for a course outside the student's grade, where only
+   * an entitlement counts and PUBLIC/FREE access does not apply. */
+  async entitledForNodes(
+    studentId: string,
+    nodes: any[],
+    { inGrade = true }: { inGrade?: boolean } = {},
+  ): Promise<boolean> {
     if (nodes.some((node) => node.status !== ContentStatus.PUBLISHED))
       return false;
     const effective = nodes.find(
       (node) => node.accessType && node.accessType !== AccessType.INHERIT,
     )?.accessType;
-    if (effective === AccessType.PUBLIC || effective === AccessType.FREE)
+    if (
+      inGrade &&
+      (effective === AccessType.PUBLIC || effective === AccessType.FREE)
+    )
       return true;
     const now = new Date();
     const course = nodes.at(-1);

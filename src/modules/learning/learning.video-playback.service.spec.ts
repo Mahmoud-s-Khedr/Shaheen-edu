@@ -77,7 +77,11 @@ describe('LearningService video playback access', () => {
   it('checks every question relationship that can contain the requested video', async () => {
     const { service, prisma, assessments, videos } = build();
     prisma.question.findMany.mockResolvedValue([
-      { id: 'question-1', placements: [{ course: { id: 'course-1' } }] },
+      {
+        id: 'question-1',
+        course: { subject: { gradeAssignments: [] } },
+        placements: [{ course: { id: 'course-1' } }],
+      },
     ]);
     jest.spyOn(service as any, 'questionAccessible').mockResolvedValue(true);
 

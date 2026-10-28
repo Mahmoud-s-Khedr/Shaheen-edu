@@ -688,8 +688,14 @@ curl -H "Authorization: Bearer $STUDENT_TOKEN" \
    `/student/library` for a cross-grade “My library” screen, and
    `/student/entitlements` for the underlying active grants.
 
-Common causes of an error are a non-published ID, a hierarchy record belonging
-to another grade, an unsupported `resource`, an invalid cursor, a detached asset
+An active course or chapter entitlement keeps that course or chapter reachable
+through every student catalogue, delivery, practice and assessment route even
+when it is outside the student's current grade (for example after the student
+changes grade). Outside the grade only the entitled course/chapter is visible;
+PUBLIC/FREE content there stays hidden.
+
+Common causes of an error are a non-published ID, an unentitled hierarchy
+record belonging to another grade, an unsupported `resource`, an invalid cursor, a detached asset
 ID, or a missing/expired/revoked entitlement. Treat `403` from a student
 delivery/asset route as a prompt to refresh the catalogue/access state, not as a
 reason to reuse an old signed URL.

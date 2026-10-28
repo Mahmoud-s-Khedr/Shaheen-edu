@@ -132,38 +132,41 @@ describe('Student administration (e2e)', () => {
       payload: { phone: student.phone, password: temporaryPassword },
     });
     expect(login.statusCode).toBe(201);
-    const forcedToken = JSON.parse(login.body).accessToken;
-    expect(JSON.parse(login.body).user.mustChangePassword).toBe(true);
-    const blocked = await app.inject({
+    // Changing the admin-issued password is optional for students.
+    const temporaryToken = JSON.parse(login.body).accessToken;
+    expect(JSON.parse(login.body).user.mustChangePassword).toBe(false);
+    const allowed = await app.inject({
       method: 'GET',
       url: '/api/v1/students/me',
-      headers: { authorization: `Bearer ${forcedToken}` },
+      headers: { authorization: `Bearer ${temporaryToken}` },
     });
-    expect(blocked.statusCode).toBe(403);
-    const forcedRefreshToken = login.cookies.find(
+    expect(allowed.statusCode).toBe(200);
+    const temporaryRefreshToken = login.cookies.find(
       (cookie) => cookie.name === 'app_refresh_token',
     )?.value;
-    if (!forcedRefreshToken)
+    if (!temporaryRefreshToken)
       throw new Error('app_refresh_token cookie not set');
     const refresh = await app.inject({
       method: 'POST',
       url: '/api/v1/auth/refresh',
-      cookies: { app_refresh_token: forcedRefreshToken },
+      headers: { origin: 'https://app.jibal-platform.com' },
+      cookies: { app_refresh_token: temporaryRefreshToken },
     });
-    expect(refresh.statusCode).toBe(401);
+    expect(refresh.statusCode).toBe(201);
+    const refreshedToken = JSON.parse(refresh.body).accessToken;
     const change = await app.inject({
       method: 'POST',
       url: '/api/v1/auth/change-password',
-      headers: { authorization: `Bearer ${forcedToken}` },
+      headers: { authorization: `Bearer ${refreshedToken}` },
       payload: { oldPassword: temporaryPassword, newPassword: 'ChangedP@ss1!' },
     });
     expect(change.statusCode).toBe(201);
-    const forcedSessionAfterChange = await app.inject({
+    const sessionAfterChange = await app.inject({
       method: 'GET',
       url: '/api/v1/auth/me',
-      headers: { authorization: `Bearer ${forcedToken}` },
+      headers: { authorization: `Bearer ${refreshedToken}` },
     });
-    expect(forcedSessionAfterChange.statusCode).toBe(401);
+    expect(sessionAfterChange.statusCode).toBe(401);
     const normalLogin = await app.inject({
       method: 'POST',
       url: '/api/v1/auth/students/login',

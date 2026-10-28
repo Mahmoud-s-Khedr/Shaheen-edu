@@ -58,6 +58,12 @@ import type { AppConfig } from '../../config/configuration';
 import { PrismaService } from '../../database/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { ContentAccessPolicyService } from '../entitlements/content-access-policy.service';
+import {
+  gradeAssignmentsInclude,
+  studentCourseScope,
+  subjectInGrade,
+  subjectInGradeWhere,
+} from '../entitlements/student-grade-scope';
 import { QuestionCommunityStatsService } from '../question-banks/question-community-stats.service';
 import { AssetsService } from '../assets/assets.service';
 import { VideosService } from '../videos/videos.service';
@@ -346,12 +352,17 @@ export class AssessmentsService {
   }
 
   /** `placements` must already be filtered to published-ancestry ones. */
-  private async questionAccessible(studentId: string, placements: any[]) {
+  private async questionAccessible(
+    studentId: string,
+    placements: any[],
+    inGrade: boolean,
+  ) {
     for (const placement of placements)
       if (
         await this.access.entitledForNodes(
           studentId,
           this.placementNodes(placement),
+          { inGrade },
         )
       )
         return true;
@@ -386,7 +397,7 @@ export class AssessmentsService {
 
   /** Published questions whose placements intersect any of the given scopes.
    * When `studentIdForEntitlement` is set, also requires the requesting student's
-   * own entitlement on each matched placement and their own grade to match
+   * own access on each matched placement: in their grade, or entitled outside it
    * (mirrors LearningService.practiceQuestions). Admin generation omits both. */
   private async eligibleQuestions(
     scopes: ScopeRow[],
@@ -429,16 +440,22 @@ export class AssessmentsService {
           subject: {
             status: ContentStatus.PUBLISHED,
             gradeAssignments: {
-              some: {
-                ...(gradeId ? { academicGradeId: gradeId } : {}),
-                academicGrade: { status: ContentStatus.PUBLISHED },
-              },
+              some: { academicGrade: { status: ContentStatus.PUBLISHED } },
             },
           },
+          ...(gradeId
+            ? {
+                AND: [
+                  studentIdForEntitlement
+                    ? studentCourseScope(studentIdForEntitlement, gradeId)
+                    : { subject: subjectInGradeWhere(gradeId) },
+                ],
+              }
+            : {}),
         },
       },
       include: {
-        course: { include: { subject: true } },
+        course: { include: { subject: { include: gradeAssignmentsInclude } } },
         contentBlocks: {
           include: { asset: true },
           orderBy: { sortOrder: 'asc' },
@@ -489,7 +506,11 @@ export class AssessmentsService {
       if (!matching.length) continue;
       if (
         studentIdForEntitlement &&
-        !(await this.questionAccessible(studentIdForEntitlement, matching))
+        !(await this.questionAccessible(
+          studentIdForEntitlement,
+          matching,
+          subjectInGrade(question.course.subject, gradeId),
+        ))
       )
         continue;
       eligible.push(question);
@@ -899,7 +920,14 @@ export class AssessmentsService {
             status: ContentStatus.PUBLISHED,
             subject: {
               status: ContentStatus.PUBLISHED,
-              gradeAssignments: { some: { academicGradeId: gradeId } },
+              OR: [
+                subjectInGradeWhere(gradeId),
+                {
+                  courses: {
+                    some: { AND: [studentCourseScope(studentId, gradeId)] },
+                  },
+                },
+              ],
             },
           },
           select: { id: true, subjectId: true },
@@ -1262,7 +1290,14 @@ export class AssessmentsService {
         status: ContentStatus.PUBLISHED,
         subject: {
           status: ContentStatus.PUBLISHED,
-          gradeAssignments: { some: { academicGradeId: gradeId } },
+          OR: [
+            subjectInGradeWhere(gradeId),
+            {
+              courses: {
+                some: { AND: [studentCourseScope(studentId, gradeId)] },
+              },
+            },
+          ],
         },
       },
     });
@@ -1472,15 +1507,8 @@ export class AssessmentsService {
       source: { status: ContentStatus.PUBLISHED },
       course: {
         status: ContentStatus.PUBLISHED,
-        subject: {
-          status: ContentStatus.PUBLISHED,
-          gradeAssignments: {
-            some: {
-              academicGradeId: gradeId,
-              academicGrade: { status: ContentStatus.PUBLISHED },
-            },
-          },
-        },
+        subject: { status: ContentStatus.PUBLISHED },
+        AND: [studentCourseScope(studentId, gradeId)],
       },
       placements: {
         some: {
@@ -1915,8 +1943,8 @@ export class AssessmentsService {
   }
 
   /** Whether an ADMIN-owned, READY assessment is visible/attemptable by this
-   * student: EVERY one of its scopes must have full published ancestry, match
-   * the student's grade, and grant effective access (PUBLIC/FREE or an active
+   * student: EVERY one of its scopes must have full published ancestry and
+   * grant effective access (PUBLIC/FREE within the student's grade, or an active
    * entitlement on the course or an ancestor chapter) — the frozen snapshot is
    * the UNION of all scopes' questions, so any per-scope failure must hide the
    * whole assessment (fail closed), not just that one scope. */
@@ -1931,15 +1959,14 @@ export class AssessmentsService {
       if (nodes.some((node) => node.status !== ContentStatus.PUBLISHED))
         return false;
       const course = nodes.at(-1);
-      if (
-        !course.subject.gradeAssignments.some(
-          (x: any) =>
-            x.academicGrade.status === ContentStatus.PUBLISHED &&
-            (!gradeId || x.academicGradeId === gradeId),
-        )
-      )
+      const inGrade = course.subject.gradeAssignments.some(
+        (x: any) =>
+          x.academicGrade.status === ContentStatus.PUBLISHED &&
+          (!gradeId || x.academicGradeId === gradeId),
+      );
+      // Outside the grade, only an entitlement makes the assessment visible.
+      if (!(await this.access.entitledForNodes(studentId, nodes, { inGrade })))
         return false;
-      if (!(await this.access.entitledForNodes(studentId, nodes))) return false;
     }
     return true;
   }

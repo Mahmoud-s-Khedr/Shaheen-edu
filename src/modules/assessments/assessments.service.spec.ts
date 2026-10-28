@@ -367,17 +367,21 @@ describe('AssessmentsService', () => {
 
   describe('assessmentVisible', () => {
     const gradeId = 'grade-1';
+    const subject = {
+      gradeAssignments: [
+        {
+          academicGradeId: gradeId,
+          academicGrade: { status: ContentStatus.PUBLISHED },
+        },
+      ],
+    };
     function courseScope(overrides: Partial<any> = {}) {
       return {
         course: {
           id: 'c1',
           status: ContentStatus.PUBLISHED,
           accessType: AccessType.PUBLIC,
-          academicGradeId: gradeId,
-          academicGrade: { status: ContentStatus.PUBLISHED },
-          // A shared subject's legacy primary grade may differ from the
-          // course's canonical grade.
-          subject: { academicGradeId: 'legacy-primary-grade' },
+          subject,
           ...overrides,
         },
       };
@@ -393,12 +397,23 @@ describe('AssessmentsService', () => {
     });
 
     it('is hidden when the scope belongs to a different grade', async () => {
-      const { service } = build();
+      const { service, prisma } = build();
+      prisma.studentEntitlement.findFirst.mockResolvedValue(null);
       await expect(
         (service as any).assessmentVisible(studentUserId, 'grade-2', [
           courseScope(),
         ]),
       ).resolves.toBe(false);
+    });
+
+    it('is visible outside the grade when the student is entitled to the course', async () => {
+      const { service, prisma } = build();
+      prisma.studentEntitlement.findFirst.mockResolvedValue({ id: 'ent-1' });
+      await expect(
+        (service as any).assessmentVisible(studentUserId, 'grade-2', [
+          courseScope(),
+        ]),
+      ).resolves.toBe(true);
     });
 
     it('is visible when the student holds a matching entitlement for a PAID course', async () => {
@@ -431,9 +446,7 @@ describe('AssessmentsService', () => {
           course: {
             id: 'c1',
             status: ContentStatus.PUBLISHED,
-            academicGradeId: gradeId,
-            academicGrade: { status: ContentStatus.PUBLISHED },
-            subject: { academicGradeId: 'legacy-primary-grade' },
+            subject,
           },
           ...overrides,
         },
@@ -528,7 +541,18 @@ describe('AssessmentsService', () => {
           { id: `${id}-a`, body: 'A', isCorrect: true },
           { id: `${id}-b`, body: 'B', isCorrect: false },
         ],
-        course: { subject: { id: 'subject-1', title: 'Subject' } },
+        course: {
+          subject: {
+            id: 'subject-1',
+            title: 'Subject',
+            gradeAssignments: [
+              {
+                academicGradeId: 'grade-1',
+                academicGrade: { status: ContentStatus.PUBLISHED },
+              },
+            ],
+          },
+        },
         placements: [
           {
             courseId: 'c1',

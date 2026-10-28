@@ -59,7 +59,7 @@ describe('StudentsService administration', () => {
         }),
         data: expect.objectContaining({
           passwordHash: 'new-hash',
-          mustChangePassword: true,
+          mustChangePassword: false,
         }),
       }),
     );

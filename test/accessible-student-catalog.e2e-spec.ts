@@ -20,6 +20,8 @@ describe('Accessible student catalog (e2e)', () => {
   let ownerId: string;
   let subjectId: string;
   let gradeId: string;
+  let otherGradeId: string;
+  let governorateId: string;
   type Path = {
     courseId: string;
     chapterId: string;
@@ -56,10 +58,11 @@ describe('Accessible student catalog (e2e)', () => {
       }),
     ).accessToken;
     gradeId = (await seedPublishedAcademicGrade(app, 'accessible-grade')).id;
-    const otherGradeId = (
+    otherGradeId = (
       await seedPublishedAcademicGrade(app, 'accessible-other-grade')
     ).id;
     const governorate = await seedGovernorate(app, 'Cairo');
+    governorateId = governorate.id;
     const registration = await app.inject({
       method: 'POST',
       url: '/api/v1/auth/students/register',
@@ -670,5 +673,119 @@ describe('Accessible student catalog (e2e)', () => {
         data: { accessType: 'INHERIT' },
       });
     }
+  });
+  it('keeps entitled courses and chapters reachable outside the student grade', async () => {
+    const registration = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/students/register',
+      payload: {
+        fullName: 'Other Grade Student',
+        nationalId: '29903030322345',
+        phone: '01099990002',
+        parentPhone: '01088880002',
+        governorateId,
+        academicGradeId: otherGradeId,
+        password: 'StudentP@ss1!',
+      },
+    });
+    expect(registration.statusCode).toBe(201);
+    const outsider = json<{ user: { id: string }; accessToken: string }>(
+      registration,
+    );
+    await prisma.studentEntitlement.createMany({
+      data: [
+        {
+          studentUserId: outsider.user.id,
+          courseId: paths['course-grant'].courseId,
+          grantedById: ownerId,
+        },
+        {
+          studentUserId: outsider.user.id,
+          chapterId: paths['chapter-grant'].chapterId,
+          grantedById: ownerId,
+        },
+      ],
+    });
+    const item = await prisma.contentItem.create({
+      data: {
+        createdById: ownerId,
+        updatedById: ownerId,
+        type: 'TEXT',
+        title: 'Granted paid item',
+        textBody: 'Paid body',
+        status: 'PUBLISHED',
+        placement: {
+          create: {
+            lessonId: paths['course-grant'].lessonId,
+            subjectId,
+            resolvedCourseId: paths['course-grant'].courseId,
+            resolvedChapterId: paths['course-grant'].chapterId,
+            resolvedLessonId: paths['course-grant'].lessonId,
+            sortOrder: 1,
+          },
+        },
+      },
+    });
+    const as = (resource: string, query = '') =>
+      read(resource, query, outsider.accessToken);
+    const ids = (response: { body: string }) =>
+      json<{ data: { id: string }[] }>(response).data.map((row) => row.id);
+
+    const course = await as(`courses/${paths['course-grant'].courseId}`);
+    expect(course.statusCode).toBe(200);
+    expect(json(course)).toMatchObject({ access: { state: 'ENTITLED' } });
+    const chapters = await as(
+      `courses/${paths['course-grant'].courseId}/chapters`,
+    );
+    expect(chapters.statusCode).toBe(200);
+    expect(ids(chapters)).toEqual([paths['course-grant'].chapterId]);
+    expect(
+      (await as(`chapters/${paths['course-grant'].chapterId}/lessons`))
+        .statusCode,
+    ).toBe(200);
+    expect(
+      (await as(`lessons/${paths['course-grant'].lessonId}/sections`))
+        .statusCode,
+    ).toBe(200);
+    expect(
+      (await as(`lessons/${paths['course-grant'].lessonId}/content-items`))
+        .statusCode,
+    ).toBe(200);
+    const delivery = await app.inject({
+      method: 'GET',
+      url: `/api/v1/student/content-items/${item.id}`,
+      headers: { authorization: `Bearer ${outsider.accessToken}` },
+    });
+    expect(delivery.statusCode).toBe(200);
+    expect(json<{ textBody: string }>(delivery).textBody).toBe('Paid body');
+
+    // A chapter grant exposes only that chapter of an out-of-grade course.
+    const grantedChapters = await as(
+      `courses/${paths['chapter-grant'].courseId}/chapters`,
+    );
+    expect(grantedChapters.statusCode).toBe(200);
+    expect(ids(grantedChapters)).toEqual([paths['chapter-grant'].chapterId]);
+
+    // Open (PUBLIC/FREE) and ungranted content outside the grade stays hidden.
+    for (const name of ['public', 'free', 'locked'])
+      expect(
+        (await as(`courses/${paths[name].courseId}/chapters`)).statusCode,
+      ).toBe(404);
+    const subjectCourses = await as(`subjects/${subjectId}/courses`);
+    expect(subjectCourses.statusCode).toBe(200);
+    expect(ids(subjectCourses).sort()).toEqual(
+      [paths['course-grant'].courseId, paths['chapter-grant'].courseId].sort(),
+    );
+    // Entitled lessons from the other grade, plus open content in the
+    // student's own grade.
+    const lessons = await as('lessons');
+    expect(lessons.statusCode).toBe(200);
+    expect(ids(lessons).sort()).toEqual(
+      [
+        paths['course-grant'].lessonId,
+        paths['chapter-grant'].lessonId,
+        paths['other-grade'].lessonId,
+      ].sort(),
+    );
   });
 });

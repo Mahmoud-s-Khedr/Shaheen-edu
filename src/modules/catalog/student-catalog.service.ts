@@ -41,6 +41,10 @@ import {
 } from '../completion/completion.service';
 import { ObservabilityService } from '../../common/logging/observability.service';
 import {
+  studentChapterScope,
+  studentCourseScope,
+} from '../entitlements/student-grade-scope';
+import {
   AccessibleLessonsQueryDto,
   AccessibleSectionsQueryDto,
 } from './dto/accessible-catalog-query.dto';
@@ -199,12 +203,9 @@ export class StudentCatalogService {
   ) {
     const grade = await this.gradeFor(studentUserId);
     const subject = await this.prisma.subject.findFirst({
-      where: {
-        id: subjectId,
-        status: published,
-        gradeAssignments: { some: { academicGradeId: grade.id } },
-      },
+      where: { id: subjectId, status: published },
       include: {
+        gradeAssignments: { select: { academicGradeId: true } },
         coverAsset: { select: { filename: true } },
         _count: {
           select: {
@@ -216,18 +217,45 @@ export class StudentCatalogService {
       },
     });
     if (!subject) throw new NotFoundException('Published subject not found');
+    // Outside the grade, only courses the student is entitled to are listed.
+    const entitledCourseIds = subject.gradeAssignments.some(
+      (assignment) => assignment.academicGradeId === grade.id,
+    )
+      ? undefined
+      : (
+          await this.prisma.course.findMany({
+            where: {
+              subjectId,
+              status: published,
+              AND: [studentCourseScope(studentUserId, grade.id)],
+            },
+            select: { id: true },
+          })
+        ).map((course) => course.id);
+    if (entitledCourseIds?.length === 0)
+      throw new NotFoundException('Published subject not found');
     const [grants, publishedCoursesBeforeGradeFilter] = await Promise.all([
       this.activeGrants(studentUserId),
       this.prisma.course.count({ where: { subjectId, status: published } }),
     ]);
-    const where = { subjectId, status: published };
+    const where = {
+      subjectId,
+      status: published,
+      ...(entitledCourseIds ? { id: { in: entitledCourseIds } } : {}),
+    };
     const { data, total } = await paginateArabicSearch({
       prisma: this.prisma,
       delegate: this.prisma.course,
       target: 'course',
       q: query.q,
       scope: {
-        where: sqlAnd(publishedScope, Prisma.sql`t."subjectId" = ${subjectId}`),
+        where: sqlAnd(
+          publishedScope,
+          Prisma.sql`t."subjectId" = ${subjectId}`,
+          entitledCourseIds
+            ? Prisma.sql`t.id IN (${Prisma.join(entitledCourseIds)})`
+            : undefined,
+        ),
       },
       orderBySql: sortOrderSql,
       orderBy: order,
@@ -667,19 +695,13 @@ export class StudentCatalogService {
 
   async course(studentUserId: string, courseId: string) {
     const grade = await this.gradeFor(studentUserId);
+    const chapterScope = studentChapterScope(studentUserId, grade.id);
     const course = await this.prisma.course.findFirst({
       where: {
         id: courseId,
         status: published,
-        subject: {
-          status: published,
-          gradeAssignments: {
-            some: {
-              academicGradeId: grade.id,
-              academicGrade: { status: published },
-            },
-          },
-        },
+        subject: { status: published },
+        AND: [studentCourseScope(studentUserId, grade.id)],
       },
       include: {
         coverAsset: { select: { filename: true } },
@@ -700,12 +722,20 @@ export class StudentCatalogService {
           { id: course.id, type: 'course' },
         ]),
         this.prisma.chapter.count({
-          where: { courseId: course.id, status: published },
+          where: {
+            courseId: course.id,
+            status: published,
+            AND: [chapterScope],
+          },
         }),
         this.prisma.lesson.count({
           where: {
             status: published,
-            chapter: { courseId: course.id, status: published },
+            chapter: {
+              courseId: course.id,
+              status: published,
+              AND: [chapterScope],
+            },
           },
         }),
         this.prisma.section.count({
@@ -713,7 +743,11 @@ export class StudentCatalogService {
             status: published,
             lesson: {
               status: published,
-              chapter: { courseId: course.id, status: published },
+              chapter: {
+                courseId: course.id,
+                status: published,
+                AND: [chapterScope],
+              },
             },
           },
         }),
@@ -748,15 +782,8 @@ export class StudentCatalogService {
       where: {
         id: courseId,
         status: published,
-        subject: {
-          status: published,
-          gradeAssignments: {
-            some: {
-              academicGradeId: grade.id,
-              academicGrade: { status: published },
-            },
-          },
-        },
+        subject: { status: published },
+        AND: [studentCourseScope(studentUserId, grade.id)],
       },
       include: {
         coverAsset: { select: { filename: true } },
@@ -772,6 +799,7 @@ export class StudentCatalogService {
       where: {
         courseId,
         status: published,
+        AND: [studentChapterScope(studentUserId, grade.id)],
         ...(ids ? { id: { in: ids } } : {}),
         ...this.after(query.cursor, query.q),
       },
@@ -931,8 +959,9 @@ export class StudentCatalogService {
       Prisma.sql`h.status = ${published}::"ContentStatus"
         AND c.status = ${published}::"ContentStatus"
         AND s.status = ${published}::"ContentStatus"
-        AND EXISTS (SELECT 1 FROM "SubjectGrade" sg
-          WHERE sg."subjectId" = s.id AND sg."academicGradeId" = ${grade.id})`,
+        AND (EXISTS (SELECT 1 FROM "SubjectGrade" sg
+          WHERE sg."subjectId" = s.id AND sg."academicGradeId" = ${grade.id})
+          OR ${entitled})`,
       query.subjectId ? Prisma.sql`s.id = ${query.subjectId}` : undefined,
       query.courseId ? Prisma.sql`c.id = ${query.courseId}` : undefined,
       query.chapterIds
@@ -958,14 +987,9 @@ export class StudentCatalogService {
         subject: {
           status: published,
           ...(query.subjectId ? { id: query.subjectId } : {}),
-          gradeAssignments: {
-            some: {
-              academicGradeId: grade.id,
-              academicGrade: { status: published },
-            },
-          },
         },
       },
+      AND: [studentChapterScope(studentUserId, grade.id)],
     };
     const lessonWhere: Prisma.LessonWhereInput = {
       status: published,
@@ -1103,18 +1127,8 @@ export class StudentCatalogService {
       where: {
         id: chapterId,
         status: published,
-        course: {
-          status: published,
-          subject: {
-            status: published,
-            gradeAssignments: {
-              some: {
-                academicGradeId: grade.id,
-                academicGrade: { status: published },
-              },
-            },
-          },
-        },
+        course: { status: published, subject: { status: published } },
+        AND: [studentChapterScope(studentUserId, grade.id)],
       },
       include: {
         course: true,
@@ -1185,18 +1199,8 @@ export class StudentCatalogService {
         status: published,
         chapter: {
           status: published,
-          course: {
-            status: published,
-            subject: {
-              status: published,
-              gradeAssignments: {
-                some: {
-                  academicGradeId: grade.id,
-                  academicGrade: { status: published },
-                },
-              },
-            },
-          },
+          course: { status: published, subject: { status: published } },
+          AND: [studentChapterScope(studentUserId, grade.id)],
         },
       },
       include: {
@@ -1279,15 +1283,8 @@ export class StudentCatalogService {
         accesses: (x: any) => [x.accessType],
         pricing: (x: any) => x,
         where: {
-          subject: {
-            status: published,
-            gradeAssignments: {
-              some: {
-                academicGradeId: grade.id,
-                academicGrade: { status: published },
-              },
-            },
-          },
+          subject: { status: published },
+          AND: [studentCourseScope(studentUserId, grade.id)],
         },
       },
       chapters: {
@@ -1302,18 +1299,8 @@ export class StudentCatalogService {
         accesses: (x: any) => [x.accessType, x.course.accessType],
         pricing: (x: any) => this.chapterPricing(x, x.course),
         where: {
-          course: {
-            status: published,
-            subject: {
-              status: published,
-              gradeAssignments: {
-                some: {
-                  academicGradeId: grade.id,
-                  academicGrade: { status: published },
-                },
-              },
-            },
-          },
+          course: { status: published, subject: { status: published } },
+          AND: [studentChapterScope(studentUserId, grade.id)],
         },
       },
       lessons: {
@@ -1334,18 +1321,8 @@ export class StudentCatalogService {
         where: {
           chapter: {
             status: published,
-            course: {
-              status: published,
-              subject: {
-                status: published,
-                gradeAssignments: {
-                  some: {
-                    academicGradeId: grade.id,
-                    academicGrade: { status: published },
-                  },
-                },
-              },
-            },
+            course: { status: published, subject: { status: published } },
+            AND: [studentChapterScope(studentUserId, grade.id)],
           },
         },
       },
@@ -1370,18 +1347,8 @@ export class StudentCatalogService {
             status: published,
             chapter: {
               status: published,
-              course: {
-                status: published,
-                subject: {
-                  status: published,
-                  gradeAssignments: {
-                    some: {
-                      academicGradeId: grade.id,
-                      academicGrade: { status: published },
-                    },
-                  },
-                },
-              },
+              course: { status: published, subject: { status: published } },
+              AND: [studentChapterScope(studentUserId, grade.id)],
             },
           },
         },

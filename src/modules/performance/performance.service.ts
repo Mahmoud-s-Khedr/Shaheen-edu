@@ -22,6 +22,11 @@ import type { AppConfig } from '../../config/configuration';
 import { PrismaService } from '../../database/prisma.service';
 import { ContentAccessPolicyService } from '../entitlements/content-access-policy.service';
 import {
+  gradeAssignmentsInclude,
+  studentCourseScope,
+  subjectInGrade,
+} from '../entitlements/student-grade-scope';
+import {
   allStudentErrorReasonLabels,
   studentErrorReasonLabel,
 } from '../../common/utils/student-error-reason';
@@ -153,18 +158,17 @@ export class PerformanceService {
         source: { status: ContentStatus.PUBLISHED },
         course: {
           status: ContentStatus.PUBLISHED,
-          subject: {
-            status: ContentStatus.PUBLISHED,
-            gradeAssignments: {
-              some: {
-                academicGradeId: student.academicGradeId ?? '__missing__',
-                academicGrade: { status: ContentStatus.PUBLISHED },
-              },
-            },
-          },
+          subject: { status: ContentStatus.PUBLISHED },
+          AND: [
+            studentCourseScope(
+              studentId,
+              student.academicGradeId ?? '__missing__',
+            ),
+          ],
         },
       },
       include: {
+        course: { include: { subject: { include: gradeAssignmentsInclude } } },
         placements: {
           include: {
             course: true,
@@ -180,7 +184,11 @@ export class PerformanceService {
       },
     });
     const ids: string[] = [];
-    for (const question of questions)
+    for (const question of questions) {
+      const inGrade = subjectInGrade(
+        question.course.subject,
+        student.academicGradeId,
+      );
       for (const placement of question.placements) {
         const nodes = placement.section
           ? [
@@ -202,12 +210,13 @@ export class PerformanceService {
                 : [];
         if (
           nodes.length &&
-          (await this.access.entitledForNodes(studentId, nodes))
+          (await this.access.entitledForNodes(studentId, nodes, { inGrade }))
         ) {
           ids.push(question.id);
           break;
         }
       }
+    }
     return ids;
   }
 

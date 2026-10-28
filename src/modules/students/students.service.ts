@@ -701,13 +701,14 @@ export class StudentsService {
     const passwordHash = await this.passwordService.hash(temporaryPassword);
     const passwordResetAt = new Date();
     await this.prisma.$transaction(async (tx) => {
+      // Students may keep the admin-issued password; changing it is optional.
       const reset = await tx.user.updateMany({
         where: {
           id: targetId,
           role: Role.STUDENT,
           status: AccountStatus.ACTIVE,
         },
-        data: { passwordHash, mustChangePassword: true, passwordResetAt },
+        data: { passwordHash, mustChangePassword: false, passwordResetAt },
       });
       if (reset.count !== 1) {
         throw new ConflictException('Student state changed; try again');
