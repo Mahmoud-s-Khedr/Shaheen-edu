@@ -24,6 +24,7 @@ import {
 } from '../../../common/utils/phone.util';
 import type { RegisterStudentDto } from '../dto/register-student.dto';
 import type { User } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 
 export interface UserSummary {
   id: string;
@@ -168,20 +169,6 @@ export class AuthService {
 
     const nationalIdHash = this.nationalIdService.hash(normalizedNationalId);
 
-    const existingByPhone = await this.prisma.user.findUnique({
-      where: { loginIdentifier: normalizedPhone },
-    });
-    if (existingByPhone) {
-      throw new ConflictException('Phone number already registered');
-    }
-
-    const existingByNationalId = await this.prisma.studentProfile.findUnique({
-      where: { nationalIdHash },
-    });
-    if (existingByNationalId) {
-      throw new ConflictException('National ID already registered');
-    }
-
     {
       const academicGrade = await this.prisma.academicGrade.findFirst({
         where: {
@@ -213,32 +200,98 @@ export class AuthService {
       this.nationalIdService.encrypt(normalizedNationalId);
     const nationalIdLast4 = this.nationalIdService.last4(normalizedNationalId);
 
-    const user = await this.prisma.$transaction(async (tx) => {
-      const created = await tx.user.create({
-        data: {
-          role: Role.STUDENT,
-          status: AccountStatus.ACTIVE,
-          loginIdentifier: normalizedPhone,
-          passwordHash,
-        },
+    let user: User;
+    try {
+      user = await this.prisma.$transaction(async (tx) => {
+        // Release identifiers held by students deleted before identifier release
+        // was introduced. The conditional updates never affect live accounts.
+        const phoneOwner = await tx.user.findUnique({
+          where: { loginIdentifier: normalizedPhone },
+        });
+        if (phoneOwner) {
+          if (
+            phoneOwner.role !== Role.STUDENT ||
+            phoneOwner.status !== AccountStatus.DISABLED ||
+            !phoneOwner.deletedAt
+          ) {
+            throw new ConflictException('Phone number already registered');
+          }
+          await tx.user.updateMany({
+            where: {
+              id: phoneOwner.id,
+              role: Role.STUDENT,
+              status: AccountStatus.DISABLED,
+              deletedAt: { not: null },
+              loginIdentifier: normalizedPhone,
+            },
+            data: { loginIdentifier: `deleted-student:${phoneOwner.id}` },
+          });
+        }
+        const idOwner = await tx.studentProfile.findUnique({
+          where: { nationalIdHash },
+          include: { user: true },
+        });
+        if (idOwner) {
+          if (
+            idOwner.user.role !== Role.STUDENT ||
+            idOwner.user.status !== AccountStatus.DISABLED ||
+            !idOwner.user.deletedAt
+          ) {
+            throw new ConflictException('National ID already registered');
+          }
+          await tx.studentProfile.updateMany({
+            where: {
+              userId: idOwner.userId,
+              nationalIdHash,
+              user: {
+                role: Role.STUDENT,
+                status: AccountStatus.DISABLED,
+                deletedAt: { not: null },
+              },
+            },
+            data: { nationalIdHash: `deleted-student:${idOwner.userId}` },
+          });
+        }
+        const created = await tx.user.create({
+          data: {
+            role: Role.STUDENT,
+            status: AccountStatus.ACTIVE,
+            loginIdentifier: normalizedPhone,
+            passwordHash,
+          },
+        });
+        await tx.studentProfile.create({
+          data: {
+            userId: created.id,
+            fullName: dto.fullName,
+            nationalIdHash,
+            nationalIdEncrypted,
+            nationalIdLast4,
+            academicGradeId: dto.academicGradeId,
+            governorate: governorate.nameAr,
+            center: center?.nameAr,
+            governorateId: governorate.id,
+            centerId: center?.id,
+            parentPhoneNormalized: normalizedParentPhone,
+          },
+        });
+        return created;
       });
-      await tx.studentProfile.create({
-        data: {
-          userId: created.id,
-          fullName: dto.fullName,
-          nationalIdHash,
-          nationalIdEncrypted,
-          nationalIdLast4,
-          academicGradeId: dto.academicGradeId,
-          governorate: governorate.nameAr,
-          center: center?.nameAr,
-          governorateId: governorate.id,
-          centerId: center?.id,
-          parentPhoneNormalized: normalizedParentPhone,
-        },
-      });
-      return created;
-    });
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
+        const fields = Array.isArray(error.meta?.target)
+          ? error.meta.target
+          : [];
+        if (fields.includes('loginIdentifier'))
+          throw new ConflictException('Phone number already registered');
+        if (fields.includes('nationalIdHash'))
+          throw new ConflictException('National ID already registered');
+      }
+      throw error;
+    }
 
     const { accessToken, refreshToken } =
       await this.sessionService.createSession({

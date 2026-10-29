@@ -31,8 +31,9 @@ never returned or included in the audit event. Existing account IDs, profiles,
 and linked records are preserved.
 
 Clients must now send `password`; requests without it return HTTP 400. The
-response no longer includes `temporaryPassword` or `passwordResetAt`. Student
-and administrator password-reset endpoints retain their existing contracts.
+response no longer includes `temporaryPassword` or `passwordResetAt`. The student
+password-reset endpoint also accepts an admin-chosen password; the administrator
+password-reset endpoint retains its generated-password contract.
 
 Errors: 400 for an invalid or missing password, 401 for unauthenticated requests,
 403 for unauthorized roles, 404 for a missing or non-partner account, and 409 for

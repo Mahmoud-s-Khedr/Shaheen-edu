@@ -25,15 +25,18 @@ import { StudentsService } from './students.service';
 import { UpdateStudentDto } from './dto/update-student.dto';
 import type { RequestUser } from '../../common/types/request-with-user.types';
 import { ApiStandardErrors } from '../../common/decorators/api-standard-errors.decorator';
-import { StudentProfileDto } from '../../common/dto/api-response.dto';
+import {
+  StudentProfileDto,
+  SuccessResponseDto,
+} from '../../common/dto/api-response.dto';
 import {
   AdminStudentDetailDto,
   AdminStudentSummaryDto,
   PaginatedAdminStudentResponseDto,
-  PasswordResetResponseDto,
 } from '../../common/dto/api-response.dto';
 import { QueryAdminStudentsDto } from './dto/query-admin-students.dto';
 import { DeleteStudentDto } from './dto/delete-student.dto';
+import { ResetStudentPasswordDto } from './dto/reset-student-password.dto';
 import { Student360PaginationQueryDto } from './dto/student-360-pagination-query.dto';
 
 @ApiTags('students')
@@ -195,10 +198,14 @@ export class AdminStudentsController {
   @Post(':id/reset-password')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Reset a student password' })
-  @ApiOkResponse({ type: PasswordResetResponseDto })
-  @ApiStandardErrors(401, 403, 404, 409)
-  resetPassword(@CurrentUser() actor: RequestUser, @Param('id') id: string) {
-    return this.studentsService.resetPassword(actor, id);
+  @ApiOkResponse({ type: SuccessResponseDto })
+  @ApiStandardErrors(400, 401, 403, 404, 409)
+  resetPassword(
+    @CurrentUser() actor: RequestUser,
+    @Param('id') id: string,
+    @Body() dto: ResetStudentPasswordDto,
+  ) {
+    return this.studentsService.resetPassword(actor, id, dto);
   }
 
   @Post(':id/reset-session')

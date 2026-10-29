@@ -6958,18 +6958,23 @@ Returns the reactivated student summary.
 
 ### `POST /api/v1/admin/students/{id}/reset-password`
 
-**Authorization:** Bearer token; role must be `ADMIN` or `SUPER_ADMIN`
+**Authorization:** Bearer token; role must be `SUPER_ADMIN`
 
 **Request**
 
 - path `id` (required)
 
-**Success response — HTTP 200 (PasswordResetResponseDto)**
+```json
+{ "password": "01000001010" }
+```
+
+The password is required and must be 8–128 characters. Existing student sessions are revoked.
+
+**Success response — HTTP 200**
 
 ```json
 {
-  "temporaryPassword": "string",
-  "passwordResetAt": "ISO-8601 date-time"
+  "success": true
 }
 ```
 

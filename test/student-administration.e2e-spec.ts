@@ -105,15 +105,23 @@ describe('Student administration (e2e)', () => {
     });
   });
 
-  it('resets a student password and forces a password change', async () => {
+  it('sets a student password and allows login without forcing a password change', async () => {
+    const temporaryPassword = '01000001010';
+    const invalid = await app.inject({
+      method: 'POST',
+      url: `/api/v1/admin/students/${studentId}/reset-password`,
+      headers: { authorization: `Bearer ${superAdminToken}` },
+      payload: { password: 'short' },
+    });
+    expect(invalid.statusCode).toBe(400);
     const reset = await app.inject({
       method: 'POST',
       url: `/api/v1/admin/students/${studentId}/reset-password`,
       headers: { authorization: `Bearer ${superAdminToken}` },
+      payload: { password: temporaryPassword },
     });
     expect(reset.statusCode).toBe(200);
-    const temporaryPassword = JSON.parse(reset.body).temporaryPassword;
-    expect(temporaryPassword).toBeTruthy();
+    expect(JSON.parse(reset.body)).toEqual({ success: true });
     const originalSession = await app.inject({
       method: 'GET',
       url: '/api/v1/students/me',
@@ -286,8 +294,56 @@ describe('Student administration (e2e)', () => {
       method: 'POST',
       url: `/api/v1/admin/students/${studentId}/reset-password`,
       headers: { authorization: `Bearer ${superAdminToken}` },
+      payload: { password: '01000001010' },
     });
     expect(cannotResetPassword.statusCode).toBe(409);
+  });
+
+  it('allows a deleted student to register again, including legacy deleted accounts', async () => {
+    const register = () =>
+      app.inject({
+        method: 'POST',
+        url: '/api/v1/auth/students/register',
+        payload: { ...student, academicGradeId: gradeId, governorateId },
+      });
+    const fresh = await register();
+    expect(fresh.statusCode).toBe(201);
+    const freshId = JSON.parse(fresh.body).user.id;
+    expect(freshId).not.toBe(studentId);
+    expect((await register()).statusCode).toBe(409);
+    const prisma = app.get(PrismaService);
+    expect(
+      (await prisma.user.findUniqueOrThrow({ where: { id: studentId } }))
+        .status,
+    ).toBe('DISABLED');
+
+    const originalHash = (
+      await prisma.studentProfile.findUniqueOrThrow({
+        where: { userId: freshId },
+      })
+    ).nationalIdHash;
+    const deleted = await app.inject({
+      method: 'DELETE',
+      url: `/api/v1/admin/students/${freshId}`,
+      headers: { authorization: `Bearer ${superAdminToken}` },
+      payload: { deletionReason: 'Test legacy deletion' },
+    });
+    expect(deleted.statusCode).toBe(200);
+    // Recreate the state of an account deleted before this change.
+    await prisma.user.update({
+      where: { id: freshId },
+      data: { loginIdentifier: student.phone },
+    });
+    await prisma.studentProfile.update({
+      where: { userId: freshId },
+      data: { nationalIdHash: originalHash },
+    });
+    const legacy = await register();
+    expect(legacy.statusCode).toBe(201);
+    expect(JSON.parse(legacy.body).user.id).not.toBe(freshId);
+    expect(
+      (await prisma.user.findUniqueOrThrow({ where: { id: freshId } })).status,
+    ).toBe('DISABLED');
   });
 
   it('allows only a super admin to reset an administrator password', async () => {

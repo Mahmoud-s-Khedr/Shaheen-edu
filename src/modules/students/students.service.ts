@@ -5,7 +5,6 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { randomBytes } from 'crypto';
 import { PrismaService } from '../../database/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { PasswordService } from '../auth/services/password.service';
@@ -17,6 +16,7 @@ import {
 import type { UpdateStudentDto } from './dto/update-student.dto';
 import type { QueryAdminStudentsDto } from './dto/query-admin-students.dto';
 import type { DeleteStudentDto } from './dto/delete-student.dto';
+import type { ResetStudentPasswordDto } from './dto/reset-student-password.dto';
 import type { RequestUser } from '../../common/types/request-with-user.types';
 import {
   toPaginationMeta,
@@ -664,6 +664,7 @@ export class StudentsService {
         },
         data: {
           status: AccountStatus.DISABLED,
+          loginIdentifier: `deleted-student:${targetId}`,
           deletedAt,
           deletedById: actor.id,
           deletionReason,
@@ -672,6 +673,10 @@ export class StudentsService {
       if (transition.count !== 1) {
         throw new ConflictException('Student state changed; try again');
       }
+      await tx.studentProfile.updateMany({
+        where: { userId: targetId },
+        data: { nationalIdHash: `deleted-student:${targetId}` },
+      });
       await tx.authSession.updateMany({
         where: { userId: targetId, revoked: false },
         data: { revoked: true, revokedAt: deletedAt },
@@ -691,14 +696,17 @@ export class StudentsService {
     return { id: targetId, deleted: true };
   }
 
-  async resetPassword(actor: RequestUser, targetId: string) {
+  async resetPassword(
+    actor: RequestUser,
+    targetId: string,
+    dto: ResetStudentPasswordDto,
+  ) {
     this.assertAdmin(actor);
     const target = await this.getStudentOrThrow(targetId);
     if (target.status !== AccountStatus.ACTIVE) {
       throw new ConflictException('Only active students can be reset');
     }
-    const temporaryPassword = this.generateTemporaryPassword();
-    const passwordHash = await this.passwordService.hash(temporaryPassword);
+    const passwordHash = await this.passwordService.hash(dto.password);
     const passwordResetAt = new Date();
     await this.prisma.$transaction(async (tx) => {
       // Students may keep the admin-issued password; changing it is optional.
@@ -724,7 +732,7 @@ export class StudentsService {
         targetId,
       });
     });
-    return { temporaryPassword, passwordResetAt };
+    return { success: true };
   }
 
   async resetSession(actor: RequestUser, targetId: string) {
@@ -777,10 +785,6 @@ export class StudentsService {
       throw new ConflictException('Deleted students cannot be suspended');
     }
     return target;
-  }
-
-  private generateTemporaryPassword() {
-    return randomBytes(24).toString('base64url');
   }
 
   private parseStudent360Sections(

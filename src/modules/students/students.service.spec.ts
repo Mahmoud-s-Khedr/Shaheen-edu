@@ -33,7 +33,9 @@ describe('StudentsService administration', () => {
 
   it('rejects student-administration operations by non-admin actors', async () => {
     await expect(
-      service.resetPassword({ ...actor, role: Role.STUDENT }, 'student-1'),
+      service.resetPassword({ ...actor, role: Role.STUDENT }, 'student-1', {
+        password: '01000001010',
+      }),
     ).rejects.toBeInstanceOf(ForbiddenException);
   });
 
@@ -47,9 +49,12 @@ describe('StudentsService administration', () => {
     tx.user.updateMany.mockResolvedValue({ count: 1 });
     tx.authSession.updateMany.mockResolvedValue({ count: 2 });
 
-    const result = await service.resetPassword(actor, 'student-1');
+    const result = await service.resetPassword(actor, 'student-1', {
+      password: '01000001010',
+    });
 
-    expect(passwordService.hash).toHaveBeenCalledWith(result.temporaryPassword);
+    expect(result).toEqual({ success: true });
+    expect(passwordService.hash).toHaveBeenCalledWith('01000001010');
     expect(tx.user.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
@@ -88,7 +93,7 @@ describe('StudentsService administration', () => {
     tx.user.updateMany.mockResolvedValue({ count: 0 });
 
     await expect(
-      service.resetPassword(actor, 'student-1'),
+      service.resetPassword(actor, 'student-1', { password: '01000001010' }),
     ).rejects.toBeInstanceOf(ConflictException);
     expect(tx.authSession.updateMany).not.toHaveBeenCalled();
   });
