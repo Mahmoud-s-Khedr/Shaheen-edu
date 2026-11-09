@@ -28,6 +28,7 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 import { Role } from '../../common/types/roles.enum';
 import type { RequestUser } from '../../common/types/request-with-user.types';
 import { StudentCatalogService } from './student-catalog.service';
+import { AssessmentsService } from '../assessments/assessments.service';
 import { StudentCatalogSearchDto } from './dto/student-catalog-search.dto';
 import {
   AccessibleLessonsQueryDto,
@@ -40,7 +41,42 @@ import {
 @Roles(Role.STUDENT)
 @Controller({ path: 'student', version: '1' })
 export class StudentCatalogController {
-  constructor(private readonly catalog: StudentCatalogService) {}
+  constructor(
+    private readonly catalog: StudentCatalogService,
+    private readonly assessments: AssessmentsService,
+  ) {}
+
+  private async withQuestionCounts(
+    studentId: string,
+    result: Promise<any>,
+    type: 'subject' | 'course' | 'chapter' | 'lesson' | 'section',
+    parentType?: 'course' | 'chapter' | 'lesson',
+  ) {
+    const page = await result;
+    const nodes = page.data.map(({ id }: { id: string }) => ({ type, id }));
+    if (page.parent && parentType)
+      nodes.push({ type: parentType, id: page.parent.id });
+    const counts = await this.assessments.catalogQuestionCounts(
+      studentId,
+      nodes,
+    );
+    return {
+      ...page,
+      ...(page.parent && parentType
+        ? {
+            parent: {
+              ...page.parent,
+              availableQuestionCount:
+                counts.get(`${parentType}:${page.parent.id}`) ?? 0,
+            },
+          }
+        : {}),
+      data: page.data.map((node: { id: string }) => ({
+        ...node,
+        availableQuestionCount: counts.get(`${type}:${node.id}`) ?? 0,
+      })),
+    };
+  }
 
   @Get('catalog')
   @ApiOperation({ summary: 'Get the authenticated student catalogue summary' })
@@ -56,7 +92,11 @@ export class StudentCatalogController {
     @CurrentUser() user: RequestUser,
     @Query() query: SearchPaginationQueryDto,
   ) {
-    return this.catalog.subjects(user.id, query);
+    return this.withQuestionCounts(
+      user.id,
+      this.catalog.subjects(user.id, query),
+      'subject',
+    );
   }
 
   @Get('catalog/subjects/:subjectId/courses')
@@ -67,7 +107,11 @@ export class StudentCatalogController {
     @Param('subjectId') subjectId: string,
     @Query() query: SearchPaginationQueryDto,
   ) {
-    return this.catalog.courses(user.id, subjectId, query);
+    return this.withQuestionCounts(
+      user.id,
+      this.catalog.courses(user.id, subjectId, query),
+      'course',
+    );
   }
 
   @Get('catalog/search')
@@ -86,11 +130,23 @@ export class StudentCatalogController {
   @Get('catalog/courses/:courseId')
   @ApiOperation({ summary: 'Get a grade-scoped course' })
   @ApiOkResponse({ type: StudentCatalogCourseDetailResponseDto })
-  course(
+  async course(
     @CurrentUser() user: RequestUser,
     @Param('courseId') courseId: string,
   ) {
-    return this.catalog.course(user.id, courseId);
+    const course = await this.catalog.course(user.id, courseId);
+    const counts = await this.assessments.catalogQuestionCounts(user.id, [
+      { type: 'course', id: courseId },
+      { type: 'subject', id: course.subject.id },
+    ]);
+    return {
+      ...course,
+      availableQuestionCount: counts.get(`course:${courseId}`) ?? 0,
+      subject: {
+        ...course.subject,
+        availableQuestionCount: counts.get(`subject:${course.subject.id}`) ?? 0,
+      },
+    };
   }
 
   @Get('catalog/courses/:courseId/chapters')
@@ -101,7 +157,12 @@ export class StudentCatalogController {
     @Param('courseId') courseId: string,
     @Query() query: SearchCursorPaginationQueryDto,
   ) {
-    return this.catalog.chapters(user.id, courseId, query);
+    return this.withQuestionCounts(
+      user.id,
+      this.catalog.chapters(user.id, courseId, query),
+      'chapter',
+      'course',
+    );
   }
 
   @Get('catalog/chapters/:chapterId/lessons')
@@ -112,7 +173,12 @@ export class StudentCatalogController {
     @Param('chapterId') chapterId: string,
     @Query() query: SearchCursorPaginationQueryDto,
   ) {
-    return this.catalog.lessons(user.id, chapterId, query);
+    return this.withQuestionCounts(
+      user.id,
+      this.catalog.lessons(user.id, chapterId, query),
+      'lesson',
+      'chapter',
+    );
   }
 
   @Get('catalog/lessons')
@@ -124,7 +190,11 @@ export class StudentCatalogController {
     @CurrentUser() user: RequestUser,
     @Query() query: AccessibleLessonsQueryDto,
   ) {
-    return this.catalog.accessibleLessons(user.id, query);
+    return this.withQuestionCounts(
+      user.id,
+      this.catalog.accessibleLessons(user.id, query),
+      'lesson',
+    );
   }
 
   @Get('catalog/sections')
@@ -136,7 +206,11 @@ export class StudentCatalogController {
     @CurrentUser() user: RequestUser,
     @Query() query: AccessibleSectionsQueryDto,
   ) {
-    return this.catalog.accessibleSections(user.id, query);
+    return this.withQuestionCounts(
+      user.id,
+      this.catalog.accessibleSections(user.id, query),
+      'section',
+    );
   }
 
   @Get('catalog/lessons/:lessonId/sections')
@@ -147,7 +221,12 @@ export class StudentCatalogController {
     @Param('lessonId') lessonId: string,
     @Query() query: SearchCursorPaginationQueryDto,
   ) {
-    return this.catalog.sections(user.id, lessonId, query);
+    return this.withQuestionCounts(
+      user.id,
+      this.catalog.sections(user.id, lessonId, query),
+      'section',
+      'lesson',
+    );
   }
 
   @Get('catalog/:resource/:id/content-items')

@@ -1,6 +1,7 @@
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import { AccessType, ContentStatus } from '@prisma/client';
 import { PrismaService } from '../src/database/prisma.service';
+import { AssessmentsService } from '../src/modules/assessments/assessments.service';
 import type { CursorAccessibleCatalogResponseDto } from '../src/modules/catalog/dto/student-catalog-response.dto';
 import { createTestApp } from './utils/create-test-app';
 import {
@@ -297,6 +298,73 @@ describe('Accessible student catalog (e2e)', () => {
 
   afterAll(async () => {
     await app?.close();
+  });
+
+  it('aggregates distinct accessible questions across catalog nodes', async () => {
+    const audit = { createdById: ownerId, updatedById: ownerId };
+    const bank = await prisma.questionBank.create({
+      data: { ...audit, subjectId, title: 'Count bank', status: 'PUBLISHED' },
+    });
+    const source = await prisma.questionSource.create({
+      data: {
+        ...audit,
+        type: 'PLATFORM',
+        titleAr: 'Source',
+        status: 'PUBLISHED',
+      },
+    });
+    const createQuestion = (
+      courseId: string,
+      placements: any[],
+      extra: any = {},
+    ) =>
+      prisma.question.create({
+        data: {
+          ...audit,
+          bankId: bank.id,
+          sourceId: source.id,
+          courseId,
+          body: 'Question',
+          status: 'PUBLISHED',
+          placements: { create: placements },
+          ...extra,
+        },
+      });
+    const open = paths.public;
+    await createQuestion(open.courseId, [
+      { sectionId: open.sectionId },
+      { lessonId: open.lessonId },
+    ]);
+    await createQuestion(open.courseId, [{ sectionId: open.sectionId }], {
+      type: 'LONG_ANSWER',
+      gradingRubric: '  \n ',
+    });
+    await createQuestion(paths.locked.courseId, [
+      { sectionId: paths.locked.sectionId },
+    ]);
+    await createQuestion(paths['chapter-grant'].courseId, [
+      { sectionId: paths['chapter-grant'].sectionId },
+    ]);
+    const counts = await app
+      .get(AssessmentsService)
+      .catalogQuestionCounts(studentId, [
+        { type: 'subject', id: subjectId },
+        { type: 'course', id: open.courseId },
+        { type: 'chapter', id: open.chapterId },
+        { type: 'lesson', id: open.lessonId },
+        { type: 'section', id: open.sectionId },
+        { type: 'course', id: paths.locked.courseId },
+        { type: 'chapter', id: paths['chapter-grant'].chapterId },
+      ]);
+    expect(Object.fromEntries(counts)).toEqual({
+      [`subject:${subjectId}`]: 2,
+      [`course:${open.courseId}`]: 1,
+      [`chapter:${open.chapterId}`]: 1,
+      [`lesson:${open.lessonId}`]: 1,
+      [`section:${open.sectionId}`]: 1,
+      [`course:${paths.locked.courseId}`]: 0,
+      [`chapter:${paths['chapter-grant'].chapterId}`]: 1,
+    });
   });
 
   describe.each(['lessons', 'sections'])('%s', (resource) => {

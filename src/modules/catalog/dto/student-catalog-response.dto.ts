@@ -47,6 +47,11 @@ export class CursorPageInfoDto {
 }
 
 export class CatalogNodeDto {
+  @ApiPropertyOptional({
+    description:
+      'Distinct questions available to this student in this content and its descendants, before assessment filters.',
+  })
+  availableQuestionCount?: number;
   @ApiProperty()
   id!: string;
 

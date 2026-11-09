@@ -189,6 +189,83 @@ export class AssessmentsService {
     return profile.academicGradeId;
   }
 
+  /** Counts distinct questions using the same placement and access rules as generation. */
+  async catalogQuestionCounts(
+    studentId: string,
+    nodes: Array<{
+      type: 'subject' | 'course' | 'chapter' | 'lesson' | 'section';
+      id: string;
+    }>,
+  ) {
+    const counts = new Map(nodes.map((node) => [`${node.type}:${node.id}`, 0]));
+    if (!nodes.length) return counts;
+    const gradeId = await this.studentGrade(studentId);
+    const requested = Prisma.join(
+      nodes.map((node) => Prisma.sql`(${node.type}::text, ${node.id}::text)`),
+    );
+    // Aggregate in PostgreSQL so a page does not materialize every question
+    // and placement under its parent in the application process.
+    const rows = await this.prisma.$queryRaw<
+      Array<{ type: string; id: string; count: bigint }>
+    >`WITH requested(type, id) AS (VALUES ${requested}),
+      grants AS (
+        SELECT "courseId", "chapterId" FROM "StudentEntitlement"
+        WHERE "studentUserId" = ${studentId} AND status = 'ACTIVE'
+          AND "revokedAt" IS NULL AND "startsAt" <= CURRENT_TIMESTAMP
+          AND ("expiresAt" IS NULL OR "expiresAt" > CURRENT_TIMESTAMP)
+      ), eligible AS (
+        SELECT q.id, qc."subjectId", q."courseId",
+          EXISTS (SELECT 1 FROM "SubjectGrade" sg
+            JOIN "AcademicGrade" ag ON ag.id = sg."academicGradeId"
+            WHERE sg."subjectId" = qc."subjectId"
+              AND sg."academicGradeId" = ${gradeId} AND ag.status = 'PUBLISHED') AS in_grade
+        FROM "Question" q
+        JOIN "QuestionBank" b ON b.id = q."bankId" AND b.status = 'PUBLISHED'
+        JOIN "QuestionSource" src ON src.id = q."sourceId" AND src.status = 'PUBLISHED'
+        JOIN "Course" qc ON qc.id = q."courseId" AND qc.status = 'PUBLISHED'
+        JOIN "Subject" s ON s.id = qc."subjectId" AND s.status = 'PUBLISHED'
+        WHERE q.status = 'PUBLISHED'
+          AND (q.type <> 'LONG_ANSWER' OR
+            (q."gradingRubric" IS NOT NULL AND q."gradingRubric" ~ '[^[:space:]]'))
+          AND EXISTS (SELECT 1 FROM "SubjectGrade" sg
+            JOIN "AcademicGrade" ag ON ag.id = sg."academicGradeId"
+            WHERE sg."subjectId" = s.id AND ag.status = 'PUBLISHED')
+          AND (EXISTS (SELECT 1 FROM "SubjectGrade" sg
+            JOIN "AcademicGrade" ag ON ag.id = sg."academicGradeId"
+            WHERE sg."subjectId" = s.id AND sg."academicGradeId" = ${gradeId}
+              AND ag.status = 'PUBLISHED')
+            OR EXISTS (SELECT 1 FROM grants g
+              LEFT JOIN "Chapter" gc ON gc.id = g."chapterId"
+              WHERE g."courseId" = qc.id OR gc."courseId" = qc.id))
+      )
+      SELECT r.type, r.id, COUNT(DISTINCT q.id) AS count
+      FROM "QuestionPlacement" p
+      JOIN eligible q ON q.id = p."questionId"
+      LEFT JOIN "Section" sec ON sec.id = p."sectionId"
+      LEFT JOIN "Lesson" les ON les.id = COALESCE(sec."lessonId", p."lessonId")
+      LEFT JOIN "Chapter" ch ON ch.id = COALESCE(les."chapterId", p."chapterId")
+      JOIN "Course" c ON c.id = COALESCE(ch."courseId", p."courseId")
+      JOIN requested r ON (r.type = 'subject' AND r.id = c."subjectId")
+        OR (r.type = 'course' AND r.id = c.id)
+        OR (r.type = 'chapter' AND r.id = ch.id)
+        OR (r.type = 'lesson' AND r.id = les.id)
+        OR (r.type = 'section' AND r.id = sec.id)
+      WHERE c.status = 'PUBLISHED'
+        AND (ch.id IS NULL OR ch.status = 'PUBLISHED')
+        AND (les.id IS NULL OR les.status = 'PUBLISHED')
+        AND (sec.id IS NULL OR sec.status = 'PUBLISHED')
+        AND ((q.in_grade AND COALESCE(NULLIF(sec."accessType"::text, 'INHERIT'),
+          NULLIF(les."accessType"::text, 'INHERIT'),
+          NULLIF(ch."accessType"::text, 'INHERIT'),
+          NULLIF(c."accessType"::text, 'INHERIT')) IN ('PUBLIC', 'FREE'))
+          OR EXISTS (SELECT 1 FROM grants g WHERE g."courseId" = c.id
+            OR g."chapterId" = ch.id))
+      GROUP BY r.type, r.id`;
+    for (const row of rows)
+      counts.set(`${row.type}:${row.id}`, Number(row.count));
+    return counts;
+  }
+
   // --- Scope resolution -------------------------------------------------
 
   private async resolveScopes(dtos: AssessmentScopeDto[]): Promise<ScopeRow[]> {

@@ -37,7 +37,10 @@ describe('AssessmentsService', () => {
         findMany: jest.fn().mockResolvedValue([]),
         findFirst: jest.fn(),
       },
-      studentEntitlement: { findFirst: jest.fn().mockResolvedValue(null) },
+      studentEntitlement: {
+        findFirst: jest.fn().mockResolvedValue(null),
+        findMany: jest.fn().mockResolvedValue([]),
+      },
       assessment: {
         findUnique: jest.fn(),
         findMany: jest.fn(),
@@ -120,6 +123,30 @@ describe('AssessmentsService', () => {
       ai,
     };
   }
+
+  it('maps database question counts and preserves zero-count nodes', async () => {
+    const { service, prisma } = build();
+    prisma.$queryRaw.mockResolvedValue([
+      { type: 'course', id: 'c', count: 2n },
+    ]);
+    const counts = await service.catalogQuestionCounts(studentUserId, [
+      { type: 'course', id: 'c' },
+      { type: 'lesson', id: 'l' },
+    ]);
+    expect(Object.fromEntries(counts)).toEqual({
+      'course:c': 2,
+      'lesson:l': 0,
+    });
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not query the database for an empty catalog page', async () => {
+    const { service, prisma } = build();
+    expect(await service.catalogQuestionCounts(studentUserId, [])).toEqual(
+      new Map(),
+    );
+    expect(prisma.$queryRaw).not.toHaveBeenCalled();
+  });
 
   it('renders NOT_STARTED when no assessment attempt exists', () => {
     const { service } = build();
