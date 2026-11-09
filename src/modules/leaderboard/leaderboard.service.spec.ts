@@ -78,6 +78,7 @@ describe('LeaderboardService', () => {
                 in: expect.arrayContaining([
                   AssessmentQuestionOutcome.PENDING_GRADING,
                   AssessmentQuestionOutcome.PENDING_AI_GRADING,
+                  AssessmentQuestionOutcome.SELF_REVIEW,
                 ]),
               }),
             }),

@@ -58,14 +58,14 @@ export class LeaderboardService {
         student: {
           user: { role: Role.STUDENT, deletedAt: null, status: 'ACTIVE' },
         },
-        // A score that is still awaiting a human or AI grade cannot fairly be
-        // ranked. It becomes eligible once every answer has a final outcome.
+        // An ungraded answer cannot fairly contribute to a ranking.
         answers: {
           none: {
             outcome: {
               in: [
                 AssessmentQuestionOutcome.PENDING_GRADING,
                 AssessmentQuestionOutcome.PENDING_AI_GRADING,
+                AssessmentQuestionOutcome.SELF_REVIEW,
               ],
             },
           },

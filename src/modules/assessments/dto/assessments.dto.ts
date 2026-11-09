@@ -558,6 +558,10 @@ export class AssessmentAttemptQuestionDto {
   structuredExplanationFormat!: string | null;
   @ApiPropertyOptional({ type: String, nullable: true }) outcome!:
     string | null;
+  @ApiPropertyOptional({ type: [String], nullable: true }) acceptedAnswers!:
+    string[] | null;
+  @ApiPropertyOptional({ type: String, nullable: true }) gradingRubric!:
+    string | null;
   @ApiPropertyOptional({ type: String, nullable: true }) graderFeedback!:
     string | null;
   @ApiPropertyOptional({ type: Object, nullable: true }) aiGrading!:
@@ -594,6 +598,7 @@ export class AssessmentResultDto {
   @ApiProperty() omittedCount!: number;
   @ApiProperty() pendingGradingCount!: number;
   @ApiProperty() pendingAiGradingCount!: number;
+  @ApiProperty() selfReviewCount!: number;
   @ApiProperty() answeredCount!: number;
   @ApiPropertyOptional({ type: String, format: 'date-time', nullable: true })
   submittedAt!: Date | null;

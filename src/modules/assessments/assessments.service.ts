@@ -2624,7 +2624,10 @@ export class AssessmentsService {
         const outcome = !hasResponse
           ? AssessmentQuestionOutcome.OMITTED
           : written
-            ? AssessmentQuestionOutcome.PENDING_AI_GRADING
+            ? this.config.get('ai.answerGradingEnabled', { infer: true }) ===
+              true
+              ? AssessmentQuestionOutcome.PENDING_AI_GRADING
+              : AssessmentQuestionOutcome.SELF_REVIEW
             : answer?.isCorrect
               ? AssessmentQuestionOutcome.CORRECT
               : AssessmentQuestionOutcome.INCORRECT;
@@ -2638,7 +2641,8 @@ export class AssessmentsService {
             data: {
               outcome,
               awardedPoints:
-                outcome === AssessmentQuestionOutcome.PENDING_AI_GRADING
+                outcome === AssessmentQuestionOutcome.PENDING_AI_GRADING ||
+                outcome === AssessmentQuestionOutcome.SELF_REVIEW
                   ? null
                   : awardedPoints,
             },
@@ -2780,6 +2784,8 @@ export class AssessmentsService {
     attemptId: string,
     onlyAnswerId?: string,
   ) {
+    if (this.config.get('ai.answerGradingEnabled', { infer: true }) !== true)
+      return false;
     const answers = await this.prisma.assessmentAttemptAnswer.findMany({
       where: {
         attemptId,
@@ -3031,7 +3037,15 @@ export class AssessmentsService {
             answer &&
             (answer.selectedOptionIds.length || answer.responseText?.trim()),
           ),
-          isCorrect: showAnswer ? (answer?.isCorrect ?? false) : null,
+          isCorrect: showAnswer ? (answer?.isCorrect ?? null) : null,
+          acceptedAnswers:
+            showAnswer && this.writtenQuestion(q.type)
+              ? (q.acceptedAnswers ?? null)
+              : null,
+          gradingRubric:
+            showAnswer && this.writtenQuestion(q.type)
+              ? (q.gradingRubric ?? null)
+              : null,
           outcome:
             revealAnswers || assessment.mode === AssessmentMode.TUTOR
               ? (answer?.outcome ?? AssessmentQuestionOutcome.OMITTED)
@@ -3140,7 +3154,9 @@ export class AssessmentsService {
         correct.every((id, index) => id === selected[index]);
     const writtenOutcome = !responseText
       ? AssessmentQuestionOutcome.OMITTED
-      : AssessmentQuestionOutcome.PENDING_AI_GRADING;
+      : this.config.get('ai.answerGradingEnabled', { infer: true }) === true
+        ? AssessmentQuestionOutcome.PENDING_AI_GRADING
+        : AssessmentQuestionOutcome.SELF_REVIEW;
     let savedAnswer: any;
     let changed = false;
     await this.prisma.$transaction(async (tx) => {
@@ -3303,6 +3319,14 @@ export class AssessmentsService {
                   : null,
             }
           : null,
+      acceptedAnswers:
+        assessment.mode === AssessmentMode.TUTOR && written
+          ? (question.acceptedAnswers ?? null)
+          : null,
+      gradingRubric:
+        assessment.mode === AssessmentMode.TUTOR && written
+          ? (question.gradingRubric ?? null)
+          : null,
       correctOptionIds:
         assessment.mode === AssessmentMode.TUTOR ? correct : null,
       moreExplanation:
@@ -3355,6 +3379,8 @@ export class AssessmentsService {
    * records remain immutable audit evidence; this creates a fresh run. */
   async retryAiGrade(actor: RequestUser, answerId: string) {
     this.assertAdmin(actor);
+    if (this.config.get('ai.answerGradingEnabled', { infer: true }) !== true)
+      throw new ConflictException('AI answer grading is disabled');
     const answer = await this.prisma.assessmentAttemptAnswer.findUnique({
       where: { id: answerId },
       include: { assessmentQuestion: true },
@@ -3729,6 +3755,9 @@ export class AssessmentsService {
       omittedCount,
       pendingGradingCount,
       pendingAiGradingCount,
+      selfReviewCount: outcomes.filter(
+        (outcome) => outcome === AssessmentQuestionOutcome.SELF_REVIEW,
+      ).length,
       answeredCount,
       submittedAt: attempt.submittedAt,
       answerChanges: answerChangeSummary,
@@ -3773,7 +3802,13 @@ export class AssessmentsService {
           responseText: answer?.responseText ?? null,
           maxPoints: q.maxPoints,
           awardedPoints: answer?.awardedPoints ?? null,
-          isCorrect: answer?.isCorrect ?? false,
+          isCorrect: answer?.isCorrect ?? null,
+          acceptedAnswers: this.writtenQuestion(q.type)
+            ? (q.acceptedAnswers ?? null)
+            : null,
+          gradingRubric: this.writtenQuestion(q.type)
+            ? (q.gradingRubric ?? null)
+            : null,
           answered: Boolean(
             answer &&
             (answer.selectedOptionIds.length || answer.responseText?.trim()),

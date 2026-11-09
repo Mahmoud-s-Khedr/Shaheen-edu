@@ -93,6 +93,7 @@ export interface AppConfig {
     questionExplanationModel: string;
     quizPlanningModel: string;
     answerGradingModel: string;
+    answerGradingEnabled: boolean;
     speechToTextModel: string;
     speechToTextMaxBytes: number;
     pdfTranscriptionModel: string;
@@ -308,6 +309,8 @@ export default (): AppConfig => ({
       process.env.AI_QUESTION_EXPLANATION_MODEL ??
       process.env.AI_QUESTION_IMPORT_MODEL ??
       '',
+    answerGradingEnabled:
+      (process.env.AI_ANSWER_GRADING_ENABLED ?? 'false') === 'true',
     answerGradingModel:
       process.env.AI_ANSWER_GRADING_MODEL ??
       process.env.AI_QUESTION_EXPLANATION_MODEL ??

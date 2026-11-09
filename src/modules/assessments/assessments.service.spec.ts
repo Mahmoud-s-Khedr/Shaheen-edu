@@ -101,7 +101,11 @@ describe('AssessmentsService', () => {
       recordResponse: jest.fn().mockResolvedValue(undefined),
     };
     const access = new ContentAccessPolicyService(prisma);
-    const config = { get: jest.fn().mockReturnValue(10) };
+    const config = {
+      get: jest.fn((key: string): boolean | number =>
+        key === 'ai.answerGradingEnabled' ? true : 10,
+      ),
+    };
     const assets = { getReady: jest.fn(), protectedAccess: jest.fn() };
     const videos = { playback: jest.fn() };
     const ai = { planQuiz: jest.fn(), gradeAnswer: jest.fn() };
@@ -118,6 +122,7 @@ describe('AssessmentsService', () => {
       ),
       prisma,
       communityStats,
+      config,
       assets,
       videos,
       ai,
@@ -1092,6 +1097,48 @@ describe('AssessmentsService', () => {
         expect.objectContaining({
           create: expect.objectContaining({ outcome: 'PENDING_AI_GRADING' }),
         }),
+      );
+    });
+
+    it('uses self-review without calling AI when grading is disabled', async () => {
+      const { service, prisma, ai, config } = build();
+      config.get.mockImplementation((key: string) =>
+        key === 'ai.answerGradingEnabled' ? false : 10,
+      );
+      prisma.assessment.findUnique.mockResolvedValue({
+        id: 'assessment-1',
+        mode: AssessmentMode.TUTOR,
+      });
+      prisma.assessmentAttempt.findUnique.mockResolvedValue({
+        id: 'attempt-1',
+        status: 'SUSPENDED',
+        expiresAt: null,
+      });
+      prisma.assessmentQuestion.findFirst.mockResolvedValue({
+        id: 'q1',
+        type: QuestionType.SHORT_ANSWER,
+        acceptedAnswers: ['Cairo'],
+        options: [],
+      });
+      const result = await service.autosaveAnswer(
+        studentUserId,
+        'assessment-1',
+        'q1',
+        { responseText: 'Cairo' },
+      );
+      expect(ai.gradeAnswer).not.toHaveBeenCalled();
+      expect(prisma.assessmentAttemptAnswer.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          create: expect.objectContaining({
+            outcome: 'SELF_REVIEW',
+            awardedPoints: null,
+            isCorrect: null,
+          }),
+        }),
+      );
+      expect(result.acceptedAnswers).toEqual(['Cairo']);
+      expect(await (service as any).gradePendingAiAnswers('attempt-1')).toBe(
+        false,
       );
     });
 

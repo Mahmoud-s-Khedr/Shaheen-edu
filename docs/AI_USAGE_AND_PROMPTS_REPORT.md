@@ -41,7 +41,7 @@ All AI calls use `OPENROUTER_API_KEY`. Model choices are configured in
 - **Student AI-planned quiz:**
   `POST /api/v1/student/assessments/ai-prompt` in
   `src/modules/assessments/assessments.controller.ts:79`.
-- **Student written-answer grading:** Runs after an eligible short-answer,
+- **Student written-answer grading (optional):** Disabled by default; set `AI_ANSWER_GRADING_ENABLED=true` to enable it. When enabled, it runs after an eligible short-answer,
   fill-in-the-blank, or long-answer assessment response is submitted. The
   grading flow starts in `src/modules/assessments/assessments.service.ts:2322`.
 - **Student voice transcription:**
@@ -254,3 +254,7 @@ There is **no textual prompt** for voice transcription. The system sends the
 audio data, its format, an optional language code, and the configured model to
 OpenRouter's `/audio/transcriptions` endpoint. See
 `src/modules/assessments/assessment-ai.client.ts:139`.
+
+## Written-answer self-review
+
+By default, answered written questions have outcome `SELF_REVIEW`, with null correctness and awarded points. Students can compare their response with `acceptedAnswers` or `gradingRubric` and the explanation in tutor mode after answering, or after submitting an exam. These reference fields are hidden before exam submission. Results include `selfReviewCount`. The existing score and percentage include only awarded points, so they do not represent a final grade for self-review answers. Existing pending AI answers remain pending while grading is disabled; enabling the flag permits their normal retry.

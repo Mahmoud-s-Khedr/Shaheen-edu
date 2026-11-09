@@ -191,6 +191,7 @@ export const envValidationSchema = Joi.object({
   AI_QUESTION_IMPORT_MODEL: Joi.string().min(1).optional(),
   AI_QUESTION_EXPLANATION_MODEL: Joi.string().min(1).optional(),
   AI_QUIZ_PLANNING_MODEL: Joi.string().min(1).optional(),
+  AI_ANSWER_GRADING_ENABLED: Joi.boolean().default(false),
   AI_ANSWER_GRADING_MODEL: Joi.string().min(1).optional(),
   AI_SPEECH_TO_TEXT_MODEL: Joi.string()
     .min(1)

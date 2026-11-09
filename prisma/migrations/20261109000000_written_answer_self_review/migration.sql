@@ -1,0 +1,1 @@
+ALTER TYPE "AssessmentQuestionOutcome" ADD VALUE IF NOT EXISTS 'SELF_REVIEW';
