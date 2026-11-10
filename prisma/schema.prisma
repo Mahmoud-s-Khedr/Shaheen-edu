@@ -63,6 +63,7 @@ enum EntitlementStatus {
 enum CommerceTargetType {
   COURSE
   CHAPTER
+  BUNDLE
 }
 
 enum OrderStatus {
@@ -72,6 +73,7 @@ enum OrderStatus {
   REJECTED
   CANCELLED
   EXPIRED
+  PAYMENT_REVIEW
 }
 
 enum PaymentChannel {
@@ -865,6 +867,8 @@ model Course {
   coverAsset          Asset?                   @relation("CourseCover", fields: [coverAssetId], references: [id], onDelete: Restrict)
   coverAssetId        String?
 
+  salesOfferItems SalesOfferItem[] @relation("SalesOfferItemCourse")
+
   @@unique([subjectId, slug])
   @@unique([subjectId, sortOrder])
   @@index([subjectId, status, sortOrder, id])
@@ -908,6 +912,8 @@ model Chapter {
   assessmentScopes    AssessmentScope[]        @relation("AssessmentScopeChapter")
   coverAsset          Asset?                   @relation("ChapterCover", fields: [coverAssetId], references: [id], onDelete: Restrict)
   coverAssetId        String?
+
+  salesOfferItems SalesOfferItem[] @relation("SalesOfferItemChapter")
 
   @@unique([courseId, slug])
   @@unique([courseId, sortOrder])
@@ -1042,6 +1048,7 @@ model Asset {
   subjectCovers                Subject[]                     @relation("SubjectCover")
   courseCovers                 Course[]                      @relation("CourseCover")
   chapterCovers                Chapter[]                     @relation("ChapterCover")
+  salesOfferCovers             SalesOffer[]                  @relation("SalesOfferCover")
   lessonCovers                 Lesson[]                      @relation("LessonCover")
   sectionCovers                Section[]                     @relation("SectionCover")
   video                        VideoAsset?
@@ -1060,23 +1067,23 @@ model Asset {
 /// A hand-curated public review. A testimonial can be written, a screenshot,
 /// or both; screenshots never include a reviewer profile photo.
 model Testimonial {
-  id                  String        @id @default(cuid())
-  reviewText          String?       @db.Text
-  reviewerName        String?
-  screenshotAltText   String?       @db.Text
-  screenshotAssetId   String?       @unique
-  status              ContentStatus @default(DRAFT)
-  sortOrder           Int
-  createdAt           DateTime      @default(now())
-  updatedAt           DateTime      @updatedAt
-  publishedAt         DateTime?
-  archivedAt          DateTime?
-  createdById         String
-  updatedById         String
+  id                String        @id @default(cuid())
+  reviewText        String?       @db.Text
+  reviewerName      String?
+  screenshotAltText String?       @db.Text
+  screenshotAssetId String?       @unique
+  status            ContentStatus @default(DRAFT)
+  sortOrder         Int
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  publishedAt       DateTime?
+  archivedAt        DateTime?
+  createdById       String
+  updatedById       String
 
   screenshotAsset Asset? @relation("TestimonialScreenshot", fields: [screenshotAssetId], references: [id], onDelete: Restrict)
-  createdBy      User   @relation("TestimonialCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
-  updatedBy      User   @relation("TestimonialUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
+  createdBy       User   @relation("TestimonialCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  updatedBy       User   @relation("TestimonialUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
 
   @@index([status, sortOrder, id])
 }
@@ -2460,15 +2467,15 @@ model StudentContentStudyState {
 
 /// Every submission is retained, including wrong answers and retries.
 model StudentQuestionAttempt {
-  id            String                         @id @default(cuid())
-  studentUserId String
-  questionId    String
-  attemptNumber Int
-  isCorrect     Boolean
-  submittedAt   DateTime                       @default(now())
-  student       StudentProfile                 @relation(fields: [studentUserId], references: [userId], onDelete: Cascade)
-  question      Question                       @relation(fields: [questionId], references: [id], onDelete: Restrict)
-  answers       StudentQuestionAttemptAnswer[]
+  id              String                         @id @default(cuid())
+  studentUserId   String
+  questionId      String
+  attemptNumber   Int
+  isCorrect       Boolean
+  submittedAt     DateTime                       @default(now())
+  student         StudentProfile                 @relation(fields: [studentUserId], references: [userId], onDelete: Cascade)
+  question        Question                       @relation(fields: [questionId], references: [id], onDelete: Restrict)
+  answers         StudentQuestionAttemptAnswer[]
   errorReflection StudentErrorReflection?
 
   @@unique([studentUserId, questionId, attemptNumber])
@@ -2479,16 +2486,16 @@ model StudentQuestionAttempt {
 /// A reflection belongs to exactly one reviewed answer. The database check
 /// constraint in the matching migration enforces the exclusive parent choice.
 model StudentErrorReflection {
-  id                        String                  @id @default(cuid())
+  id                        String                   @id @default(cuid())
   studentUserId             String
-  student                   StudentProfile          @relation(fields: [studentUserId], references: [userId], onDelete: Cascade)
+  student                   StudentProfile           @relation(fields: [studentUserId], references: [userId], onDelete: Cascade)
   reason                    StudentErrorReason
-  practiceAttemptId         String?                 @unique
-  practiceAttempt           StudentQuestionAttempt? @relation(fields: [practiceAttemptId], references: [id], onDelete: Cascade)
-  assessmentAttemptAnswerId String?                 @unique
+  practiceAttemptId         String?                  @unique
+  practiceAttempt           StudentQuestionAttempt?  @relation(fields: [practiceAttemptId], references: [id], onDelete: Cascade)
+  assessmentAttemptAnswerId String?                  @unique
   assessmentAttemptAnswer   AssessmentAttemptAnswer? @relation(fields: [assessmentAttemptAnswerId], references: [id], onDelete: Cascade)
-  createdAt                 DateTime                @default(now())
-  updatedAt                 DateTime                @updatedAt
+  createdAt                 DateTime                 @default(now())
+  updatedAt                 DateTime                 @updatedAt
 
   @@index([studentUserId, createdAt])
   @@index([reason])
@@ -2563,6 +2570,41 @@ model Cart {
   updatedAt     DateTime       @updatedAt
 }
 
+model SalesOffer {
+  id            String           @id @default(cuid())
+  name          String
+  description   String?
+  marketingCopy String?
+  coverAssetId  String?
+  coverAsset    Asset?           @relation("SalesOfferCover", fields: [coverAssetId], references: [id], onDelete: Restrict)
+  priceMinor    Int
+  startsAt      DateTime
+  endsAt        DateTime
+  purchaseLimit Int?
+  status        String           @default("ACTIVE")
+  items         SalesOfferItem[]
+  cartItems     CartItem[]
+  purchases     SalesOfferPurchase[]
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  @@index([status, startsAt, endsAt])
+}
+
+model SalesOfferItem {
+  id         String             @id @default(cuid())
+  offerId    String
+  offer      SalesOffer         @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  targetType CommerceTargetType
+  targetId   String
+  courseId   String?
+  course     Course?            @relation("SalesOfferItemCourse", fields: [courseId], references: [id], onDelete: Restrict)
+  chapterId  String?
+  chapter    Chapter?           @relation("SalesOfferItemChapter", fields: [chapterId], references: [id], onDelete: Restrict)
+
+  @@unique([offerId, targetType, targetId])
+}
+
 model CartItem {
   id         String             @id @default(cuid())
   cartId     String
@@ -2572,10 +2614,13 @@ model CartItem {
   course     Course?            @relation("CartItemCourse", fields: [courseId], references: [id], onDelete: Restrict)
   chapterId  String?
   chapter    Chapter?           @relation("CartItemChapter", fields: [chapterId], references: [id], onDelete: Restrict)
+  salesOfferId String?
+  salesOffer SalesOffer? @relation(fields: [salesOfferId], references: [id], onDelete: Restrict)
   createdAt  DateTime           @default(now())
 
   @@unique([cartId, courseId])
   @@unique([cartId, chapterId])
+  @@unique([cartId, salesOfferId])
   @@index([cartId, createdAt])
 }
 
@@ -2611,6 +2656,9 @@ model Order {
   currency              String
   status                OrderStatus                         @default(AWAITING_PAYMENT)
   items                 OrderItem[]
+  salesOfferPurchases   SalesOfferPurchase[]
+  paymentAttentionReason String?
+  externalRefundReference String?
   submissions           ManualPaymentSubmission[]
   paymentAttempts       PaymentAttempt[]
   couponReservation     CouponReservation?
@@ -2635,6 +2683,8 @@ model OrderItem {
   id                          String                      @id @default(cuid())
   orderId                     String
   order                       Order                       @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  salesOfferPurchaseId        String?
+  salesOfferPurchase          SalesOfferPurchase? @relation(fields: [salesOfferPurchaseId], references: [id], onDelete: Restrict)
   targetType                  CommerceTargetType
   courseId                    String?
   course                      Course?                     @relation("OrderItemCourse", fields: [courseId], references: [id], onDelete: Restrict)
@@ -2655,6 +2705,25 @@ model OrderItem {
   @@index([orderId])
   @@index([courseId])
   @@index([chapterId])
+  @@index([salesOfferPurchaseId])
+}
+
+model SalesOfferPurchase {
+  id            String   @id @default(cuid())
+  salesOfferId  String
+  salesOffer    SalesOffer @relation(fields: [salesOfferId], references: [id], onDelete: Restrict)
+  orderId       String
+  order         Order @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  studentUserId String
+  snapshot      Json
+  allocatedAt   DateTime?
+  releasedAt    DateTime?
+  items         OrderItem[]
+  createdAt     DateTime @default(now())
+
+  @@unique([orderId, salesOfferId])
+  @@index([salesOfferId, allocatedAt, releasedAt])
+  @@index([salesOfferId, studentUserId, allocatedAt, releasedAt])
 }
 
 model PaymentAttempt {

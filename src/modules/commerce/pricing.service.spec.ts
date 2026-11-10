@@ -161,4 +161,112 @@ describe('PricingService', () => {
       campaignId: 'campaign-a',
     });
   });
+
+  it('does not apply campaigns or capped coupon remainders to bundles', async () => {
+    const now = Date.now();
+    const coupon = {
+      id: 'coupon',
+      code: 'MIXED',
+      name: 'Mixed',
+      kind: 'PERCENTAGE',
+      amount: 3333,
+      priority: 5,
+      startsAt: new Date(now - 1000),
+      endsAt: new Date(now + 60_000),
+      isActive: true,
+      appliesToAll: true,
+      minimumOrderMinor: 0,
+      maximumDiscountMinor: 1000,
+      usageLimit: null,
+      perStudentUsageLimit: null,
+      targets: [],
+    };
+    const campaign = {
+      id: 'campaign',
+      name: 'All',
+      kind: 'PERCENTAGE',
+      amount: 1000,
+      priority: 1,
+      appliesToAll: true,
+      targets: [],
+    };
+    const bundle = {
+      targetType: 'BUNDLE' as const,
+      salesOfferId: 'offer',
+      title: 'Bundle',
+      basePriceMinor: 701,
+      currency: 'EGP',
+    };
+    const quote = await service({ coupon, campaigns: [campaign] }).quote(
+      [target, bundle],
+      'MIXED',
+    );
+    expect(quote.items[0].discountMinor).toBe(1000);
+    expect(quote.items[1]).toMatchObject({
+      discountMinor: 0,
+      finalPriceMinor: 701,
+      promotionSnapshot: null,
+    });
+    await expect(service({ coupon }).quote([bundle], 'MIXED')).rejects.toThrow(
+      'Coupon does not apply',
+    );
+  });
+
+  it('splits a capped total discount without negative item prices', async () => {
+    const now = Date.now();
+    const coupon = {
+      id: 'coupon',
+      code: 'CAP',
+      name: 'Cap',
+      kind: 'PERCENTAGE',
+      amount: 10_000,
+      priority: 0,
+      startsAt: new Date(now - 1000),
+      endsAt: new Date(now + 60_000),
+      isActive: true,
+      appliesToAll: true,
+      minimumOrderMinor: 0,
+      maximumDiscountMinor: 2,
+      usageLimit: null,
+      perStudentUsageLimit: null,
+      targets: [],
+    };
+    const items = [1, 2, 3].map((id) => ({
+      ...target,
+      courseId: `course-${id}`,
+      basePriceMinor: 1,
+    }));
+    const quote = await service({ coupon }).quote(items, 'CAP');
+    expect(quote.discountMinor).toBe(2);
+    expect(quote.totalMinor).toBe(1);
+    expect(quote.items.map((item) => item.discountMinor)).toEqual([1, 1, 0]);
+    expect(quote.items.every((item) => item.finalPriceMinor >= 0)).toBe(true);
+  });
+
+  it('applies a fixed coupon once to the eligible total and weights its shares by price', async () => {
+    const now = Date.now();
+    const coupon = {
+      id: 'coupon',
+      code: 'FIXED',
+      name: 'Fixed',
+      kind: 'FIXED',
+      amount: 4000,
+      priority: 0,
+      startsAt: new Date(now - 1000),
+      endsAt: new Date(now + 60_000),
+      isActive: true,
+      appliesToAll: true,
+      minimumOrderMinor: 0,
+      maximumDiscountMinor: null,
+      usageLimit: null,
+      perStudentUsageLimit: null,
+      targets: [],
+    };
+    const quote = await service({ coupon }).quote(
+      [target, { ...target, courseId: 'course-2', basePriceMinor: 30_000 }],
+      'FIXED',
+    );
+    expect(quote.items.map((item) => item.discountMinor)).toEqual([1000, 3000]);
+    expect(quote.totalMinor).toBe(36_000);
+  });
 });

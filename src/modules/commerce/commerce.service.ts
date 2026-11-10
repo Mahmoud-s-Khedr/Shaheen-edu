@@ -5,14 +5,17 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { ConfigService } from '@nestjs/config';
 import { createHash } from 'node:crypto';
+import { setTimeout as delay } from 'node:timers/promises';
 import {
   AssetKind,
   AccessType,
   CommerceTargetType,
+  CouponReservationStatus,
   ContentStatus,
   EntitlementStatus,
   ManualPaymentSubmissionStatus,
@@ -49,7 +52,13 @@ import type {
 import type { AppConfig } from '../../config/configuration';
 import { PricingService, type PricedTarget } from './pricing.service';
 import { XPayService } from './xpay.service';
-import { FulfilmentService } from './fulfilment.service';
+import {
+  FulfilmentService,
+  SalesOfferUnavailableError,
+} from './fulfilment.service';
+import { SalesOffersService } from './sales-offers.service';
+import { allocateBundleRevenue } from './bundle-allocation';
+import { purchasablePrice } from './purchasable-price';
 
 type Target = PricedTarget & {
   targetType: CommerceTargetType;
@@ -69,6 +78,7 @@ export class CommerceService {
     private readonly xpay?: XPayService,
     private readonly fulfilment?: FulfilmentService,
     config?: ConfigService<AppConfig, true>,
+    @Optional() private readonly salesOffers?: SalesOffersService,
   ) {
     this.commerceConfig = config?.get('commerce', { infer: true }) ?? {
       xpayApiBaseUrl: '',
@@ -113,6 +123,22 @@ export class CommerceService {
     dto: CartTargetDto,
     client: any = this.prisma,
   ): Promise<Target> {
+    if (dto.targetType === CommerceTargetType.BUNDLE) {
+      const offer = await this.salesOffers!.studentOffer(
+        studentUserId,
+        dto.targetId,
+        client,
+      );
+      return {
+        targetType: CommerceTargetType.BUNDLE,
+        salesOfferId: offer.id,
+        title: offer.name,
+        basePriceMinor: offer.priceMinor,
+        currency: 'EGP',
+        courseForCoverage: '',
+        bundleSnapshot: offer,
+      };
+    }
     const gradeId = await this.studentGrade(studentUserId, client);
     if (dto.targetType === CommerceTargetType.COURSE) {
       const course = await client.course.findFirst({
@@ -143,18 +169,15 @@ export class CommerceService {
           currency: 'EGP',
           courseForCoverage: course.id,
         };
-      if (
-        !course.isPurchasable ||
-        course.currency !== 'EGP' ||
-        course.priceMinor === null
-      )
+      const price = purchasablePrice(CommerceTargetType.COURSE, course);
+      if (price === null)
         throw new ConflictException('Course is not purchasable');
       return {
         targetType: dto.targetType,
         courseId: course.id,
         title: course.title,
-        basePriceMinor: course.priceMinor,
-        currency: course.currency,
+        basePriceMinor: price,
+        currency: 'EGP',
         courseForCoverage: course.id,
       };
     }
@@ -186,18 +209,15 @@ export class CommerceService {
         'An inherited chapter is not sold separately',
       );
     const pricing = chapter;
-    if (
-      !pricing.isPurchasable ||
-      pricing.currency !== 'EGP' ||
-      pricing.priceMinor === null
-    )
+    const price = purchasablePrice(CommerceTargetType.CHAPTER, pricing);
+    if (price === null)
       throw new ConflictException('Chapter is not purchasable');
     return {
       targetType: dto.targetType,
       chapterId: chapter.id,
       title: chapter.title,
-      basePriceMinor: pricing.priceMinor,
-      currency: pricing.currency,
+      basePriceMinor: price,
+      currency: 'EGP',
       courseForCoverage: chapter.courseId,
     };
   }
@@ -206,6 +226,7 @@ export class CommerceService {
     target: Target,
     client: any = this.prisma,
   ) {
+    if (target.targetType === CommerceTargetType.BUNDLE) return;
     const now = new Date();
     const grant = await client.studentEntitlement.findFirst({
       where: {
@@ -230,7 +251,7 @@ export class CommerceService {
     return {
       id: item.id,
       targetType: quote.targetType,
-      targetId: quote.courseId ?? quote.chapterId,
+      targetId: quote.courseId ?? quote.chapterId ?? quote.salesOfferId,
       targetName: quote.title,
       title: quote.title,
       price: { amountMinor: quote.finalPriceMinor, currency: quote.currency },
@@ -240,6 +261,7 @@ export class CommerceService {
       },
       discount: { amountMinor: quote.discountMinor, currency: quote.currency },
       promotion: quote.promotionSnapshot,
+      ...(quote.bundleSnapshot ? { bundle: quote.bundleSnapshot } : {}),
     };
   }
   private async paymentProof(studentUserId: string, assetId: string) {
@@ -307,7 +329,11 @@ export class CommerceService {
       studentUserId,
     );
     const referral = dto.referralCode
-      ? await this.resolveReferral(dto.referralCode, studentUserId, targets)
+      ? await this.resolveReferral(
+          dto.referralCode,
+          studentUserId,
+          this.referralTargets(targets),
+        )
       : null;
     return {
       ...quote,
@@ -315,6 +341,28 @@ export class CommerceService {
         ? { code: referral.code, programId: referral.programId }
         : null,
     };
+  }
+
+  private referralTargets(targets: Target[]): Target[] {
+    return targets.flatMap((target) =>
+      target.bundleSnapshot
+        ? target.bundleSnapshot.items.map((item: any) => ({
+            targetType: item.targetType,
+            courseId:
+              item.targetType === CommerceTargetType.COURSE
+                ? item.targetId
+                : undefined,
+            chapterId:
+              item.targetType === CommerceTargetType.CHAPTER
+                ? item.targetId
+                : undefined,
+            courseForCoverage: item.courseId,
+            title: item.title,
+            basePriceMinor: item.weightMinor,
+            currency: 'EGP',
+          }))
+        : [target],
+    );
   }
 
   private async resolveReferral(
@@ -483,12 +531,15 @@ export class CommerceService {
       return [
         'Purchasable course not found',
         'Purchasable chapter not found',
+        'Offer not found',
+        'Offer content is unavailable',
       ].includes(error.message);
     if (error instanceof ConflictException)
       return [
         'Course is not purchasable',
         'Chapter is not purchasable',
         'An inherited chapter is not sold separately',
+        'Offer is not available for purchase',
       ].includes(error.message);
     return false;
   }
@@ -504,9 +555,11 @@ export class CommerceService {
     const resolved = await Promise.all(
       items.map(async (item: any) => {
         const targetId =
-          item.targetType === CommerceTargetType.COURSE
-            ? item.courseId
-            : item.chapterId;
+          item.targetType === CommerceTargetType.BUNDLE
+            ? item.salesOfferId
+            : item.targetType === CommerceTargetType.COURSE
+              ? item.courseId
+              : item.chapterId;
         // A valid CartItem always has the identifier that matches its target
         // type. Treat historical malformed rows as unavailable shopping intent.
         if (!targetId) return { item, target: null };
@@ -574,11 +627,13 @@ export class CommerceService {
             if (
               existing.some(
                 (existingTarget) =>
-                  (target.courseId &&
+                  target.targetType !== CommerceTargetType.BUNDLE &&
+                  existingTarget.targetType !== CommerceTargetType.BUNDLE &&
+                  ((target.courseId &&
                     existingTarget.courseForCoverage === target.courseId) ||
-                  (target.chapterId &&
-                    (existingTarget.chapterId === target.chapterId ||
-                      existingTarget.courseId === target.courseForCoverage)),
+                    (target.chapterId &&
+                      (existingTarget.chapterId === target.chapterId ||
+                        existingTarget.courseId === target.courseForCoverage))),
               )
             )
               throw new ConflictException(
@@ -591,6 +646,7 @@ export class CommerceService {
                   targetType: target.targetType,
                   courseId: target.courseId,
                   chapterId: target.chapterId,
+                  salesOfferId: target.salesOfferId,
                 },
               });
               const quote = await this.pricing!.quote(
@@ -650,144 +706,248 @@ export class CommerceService {
       targets.map((x) => this.assertNotEntitled(studentUserId, x)),
     );
     try {
-      const order = await this.prisma.$transaction(
-        async (tx) => {
-          const quote = await this.pricing!.quote(
-            targets,
-            dto.couponCode,
-            studentUserId,
-            tx,
-          );
-          // The server-calculated total, rather than a client-selected method,
-          // determines whether this order requires payment. Keep this before
-          // all paid-channel validation so a free enrolment has no dependency
-          // on an active manual method or XPay configuration.
-          const isZeroTotal = quote.totalMinor === 0;
-          if (
-            requestedPaymentChannel !== PaymentChannel.MANUAL &&
-            requestedPaymentChannel !== PaymentChannel.XPAY
-          )
-            throw new BadRequestException(
-              'ZERO_TOTAL is assigned automatically for zero-total orders',
+      const createOrder = () =>
+        this.prisma.$transaction(
+          async (tx) => {
+            const targets = await Promise.all(
+              cartItems.map((item: any) =>
+                this.target(
+                  studentUserId,
+                  {
+                    targetType: item.targetType,
+                    targetId:
+                      item.salesOfferId ?? item.courseId ?? item.chapterId,
+                  },
+                  tx,
+                ),
+              ),
             );
-          // A client can have a selected manual method while a coupon or free
-          // course reduces its server-calculated total to zero.  Payment input
-          // is irrelevant in that case, so deliberately ignore it instead of
-          // making the student change an already-valid cart selection.
-          const paymentChannel = isZeroTotal
-            ? PaymentChannel.ZERO_TOTAL
-            : requestedPaymentChannel;
-          const method =
-            paymentChannel === PaymentChannel.MANUAL
-              ? await tx.manualPaymentMethod.findFirst({
-                  where: { id: dto.manualPaymentMethodId, isActive: true },
-                })
-              : null;
-          if (paymentChannel === PaymentChannel.MANUAL && !method)
-            throw new NotFoundException('Active payment method not found');
-          const referral = dto.referralCode
-            ? await this.resolveReferral(
-                dto.referralCode,
-                studentUserId,
-                targets,
-                tx,
-              )
-            : null;
-          const paymentExpiresAt = isZeroTotal
-            ? null
-            : new Date(
-                Date.now() +
-                  (paymentChannel === PaymentChannel.XPAY
-                    ? this.commerceConfig.xpayOrderExpirySeconds
-                    : this.commerceConfig.manualOrderExpirySeconds) *
-                    1000,
-              );
-          const created = await tx.order.create({
-            data: {
+            await Promise.all(
+              targets.map((target) =>
+                this.assertNotEntitled(studentUserId, target, tx),
+              ),
+            );
+            const quote = await this.pricing!.quote(
+              targets,
+              dto.couponCode,
               studentUserId,
-              manualPaymentMethodId: method?.id,
-              paymentChannel,
-              paymentMethodSnapshot: method
-                ? this.snapshot(method)
-                : isZeroTotal
-                  ? { provider: 'ZERO_TOTAL', checkout: 'NONE' }
-                  : { provider: 'XPAY', checkout: 'HOSTED_REDIRECT' },
-              subtotalMinor: quote.subtotalMinor,
-              discountMinor: quote.discountMinor,
-              totalMinor: quote.totalMinor,
-              currency: 'EGP',
-              paymentExpiresAt,
-              items: {
-                create: quote.items.map((x) => ({
-                  targetType: x.targetType,
-                  courseId: x.courseId,
-                  chapterId: x.chapterId,
-                  titleSnapshot: x.title,
-                  basePriceMinor: x.basePriceMinor,
-                  discountMinor: x.discountMinor,
-                  priceMinor: x.finalPriceMinor,
-                  currency: x.currency,
-                  appliedPromotionSnapshot: x.promotionSnapshot ?? undefined,
-                })),
+              tx,
+            );
+            // The server-calculated total, rather than a client-selected method,
+            // determines whether this order requires payment. Keep this before
+            // all paid-channel validation so a free enrolment has no dependency
+            // on an active manual method or XPay configuration.
+            const isZeroTotal = quote.totalMinor === 0;
+            if (
+              requestedPaymentChannel !== PaymentChannel.MANUAL &&
+              requestedPaymentChannel !== PaymentChannel.XPAY
+            )
+              throw new BadRequestException(
+                'ZERO_TOTAL is assigned automatically for zero-total orders',
+              );
+            // A client can have a selected manual method while a coupon or free
+            // course reduces its server-calculated total to zero.  Payment input
+            // is irrelevant in that case, so deliberately ignore it instead of
+            // making the student change an already-valid cart selection.
+            const paymentChannel = isZeroTotal
+              ? PaymentChannel.ZERO_TOTAL
+              : requestedPaymentChannel;
+            const method =
+              paymentChannel === PaymentChannel.MANUAL
+                ? await tx.manualPaymentMethod.findFirst({
+                    where: { id: dto.manualPaymentMethodId, isActive: true },
+                  })
+                : null;
+            if (paymentChannel === PaymentChannel.MANUAL && !method)
+              throw new NotFoundException('Active payment method not found');
+            const referral = dto.referralCode
+              ? await this.resolveReferral(
+                  dto.referralCode,
+                  studentUserId,
+                  this.referralTargets(targets),
+                  tx,
+                )
+              : null;
+            const paymentExpiresAt = isZeroTotal
+              ? null
+              : new Date(
+                  Date.now() +
+                    (paymentChannel === PaymentChannel.XPAY
+                      ? this.commerceConfig.xpayOrderExpirySeconds
+                      : this.commerceConfig.manualOrderExpirySeconds) *
+                      1000,
+                );
+            const created = await tx.order.create({
+              data: {
+                studentUserId,
+                manualPaymentMethodId: method?.id,
+                paymentChannel,
+                paymentMethodSnapshot: method
+                  ? this.snapshot(method)
+                  : isZeroTotal
+                    ? { provider: 'ZERO_TOTAL', checkout: 'NONE' }
+                    : { provider: 'XPAY', checkout: 'HOSTED_REDIRECT' },
+                subtotalMinor: quote.subtotalMinor,
+                discountMinor: quote.discountMinor,
+                totalMinor: quote.totalMinor,
+                currency: 'EGP',
+                paymentExpiresAt,
+                items: {
+                  create: quote.items
+                    .filter((x) => x.targetType !== CommerceTargetType.BUNDLE)
+                    .map((x) => ({
+                      targetType: x.targetType,
+                      courseId: x.courseId,
+                      chapterId: x.chapterId,
+                      titleSnapshot: x.title,
+                      basePriceMinor: x.basePriceMinor,
+                      discountMinor: x.discountMinor,
+                      priceMinor: x.finalPriceMinor,
+                      currency: x.currency,
+                      appliedPromotionSnapshot:
+                        x.promotionSnapshot ?? undefined,
+                    })),
+                },
+                couponReservation: quote.coupon
+                  ? {
+                      create: {
+                        couponId: quote.coupon.id,
+                        studentUserId,
+                        discountMinor: quote.coupon.discountMinor,
+                        snapshot: quote.coupon.snapshot,
+                      },
+                    }
+                  : undefined,
+                referralAttribution: referral
+                  ? {
+                      create: {
+                        studentUserId,
+                        referralCodeId: referral.codeId,
+                        referralProgramId: referral.programId,
+                        ruleId: referral.rule.id,
+                        snapshot: referral.snapshot,
+                        ...(referral.reviewFlags.length
+                          ? { reviewFlags: { create: referral.reviewFlags } }
+                          : {}),
+                      },
+                    }
+                  : undefined,
               },
-              couponReservation: quote.coupon
-                ? {
-                    create: {
-                      couponId: quote.coupon.id,
-                      studentUserId,
-                      discountMinor: quote.coupon.discountMinor,
-                      snapshot: quote.coupon.snapshot,
+              include: {
+                items: true,
+                referralAttribution: {
+                  include: {
+                    reviewFlags: {
+                      select: { id: true, type: true, action: true },
                     },
-                  }
-                : undefined,
-              referralAttribution: referral
-                ? {
-                    create: {
-                      studentUserId,
-                      referralCodeId: referral.codeId,
-                      referralProgramId: referral.programId,
-                      ruleId: referral.rule.id,
-                      snapshot: referral.snapshot,
-                      ...(referral.reviewFlags.length
-                        ? { reviewFlags: { create: referral.reviewFlags } }
-                        : {}),
-                    },
-                  }
-                : undefined,
-            },
-            include: {
-              items: true,
-              referralAttribution: {
-                include: {
-                  reviewFlags: {
-                    select: { id: true, type: true, action: true },
                   },
                 },
               },
-            },
-          });
-          // Remove only the snapshot that was purchased. A concurrently added
-          // cart item must survive this checkout.
-          await tx.cartItem.deleteMany({
-            where: { id: { in: cartItems.map((item) => item.id) } },
-          });
-          await tx.commerceIdempotencyKey.create({
-            data: {
-              studentUserId,
-              operation: 'CHECKOUT',
-              key,
-              resourceId: created.id,
-            },
-          });
-          if (isZeroTotal)
-            await this.fulfilment!.fulfil(tx, {
-              orderId: created.id,
-              actorUserId: studentUserId,
             });
-          return created;
-        },
-        { isolationLevel: 'Serializable' },
-      );
+            for (const bundle of quote.items.filter(
+              (item) => item.targetType === CommerceTargetType.BUNDLE,
+            )) {
+              const snapshot = bundle.bundleSnapshot;
+              const purchase = await tx.salesOfferPurchase.create({
+                data: {
+                  salesOfferId: bundle.salesOfferId!,
+                  orderId: created.id,
+                  studentUserId,
+                  snapshot: JSON.parse(JSON.stringify(snapshot)),
+                },
+              });
+              const shares = allocateBundleRevenue(
+                bundle.finalPriceMinor,
+                snapshot.items.map((item: any) => ({
+                  key: `${item.targetType}:${item.targetId}`,
+                  weightMinor: item.weightMinor,
+                })),
+              );
+              await tx.orderItem.createMany({
+                data: snapshot.items.map((item: any) => ({
+                  orderId: created.id,
+                  salesOfferPurchaseId: purchase.id,
+                  targetType: item.targetType,
+                  courseId:
+                    item.targetType === CommerceTargetType.COURSE
+                      ? item.targetId
+                      : null,
+                  chapterId:
+                    item.targetType === CommerceTargetType.CHAPTER
+                      ? item.targetId
+                      : null,
+                  titleSnapshot: item.title,
+                  basePriceMinor: shares.get(
+                    `${item.targetType}:${item.targetId}`,
+                  )!,
+                  priceMinor: shares.get(
+                    `${item.targetType}:${item.targetId}`,
+                  )!,
+                  discountMinor: 0,
+                  currency: 'EGP',
+                })),
+              });
+              await this.audit.recordWithClient(tx, {
+                actorUserId: studentUserId,
+                action: 'SALES_OFFER_CHECKOUT_SNAPSHOTTED',
+                targetType: 'SalesOfferPurchase',
+                targetId: purchase.id,
+                metadata: {
+                  orderId: created.id,
+                  salesOfferId: bundle.salesOfferId!,
+                  snapshot: JSON.parse(JSON.stringify(snapshot)),
+                },
+              });
+            }
+            // Remove only the snapshot that was purchased. A concurrently added
+            // cart item must survive this checkout.
+            await tx.cartItem.deleteMany({
+              where: { id: { in: cartItems.map((item) => item.id) } },
+            });
+            await tx.commerceIdempotencyKey.create({
+              data: {
+                studentUserId,
+                operation: 'CHECKOUT',
+                key,
+                resourceId: created.id,
+              },
+            });
+            if (isZeroTotal)
+              await this.fulfilment!.fulfil(tx, {
+                orderId: created.id,
+                actorUserId: studentUserId,
+              });
+            return created;
+          },
+          { isolationLevel: 'Serializable' },
+        );
+      let order: Awaited<ReturnType<typeof createOrder>>;
+      // Retry only the rolled-back transaction, retaining the original cart
+      // snapshot and key. Re-read pricing and availability inside each attempt.
+      for (let attempt = 0; ; attempt++) {
+        try {
+          order = await createOrder();
+          break;
+        } catch (error: unknown) {
+          if (
+            !(error instanceof Prisma.PrismaClientKnownRequestError) ||
+            error.code !== 'P2034' ||
+            attempt >= 4
+          )
+            throw error;
+          const saved = await this.prisma.commerceIdempotencyKey.findUnique({
+            where: {
+              studentUserId_operation_key: {
+                studentUserId,
+                operation: 'CHECKOUT',
+                key,
+              },
+            },
+          });
+          if (saved) return this.order(studentUserId, saved.resourceId);
+          await delay(20 * 2 ** attempt + Math.floor(Math.random() * 20));
+        }
+      }
       await this.audit.record({
         actorUserId: studentUserId,
         action: 'ORDER_CREATED',
@@ -845,6 +1005,14 @@ export class CommerceService {
       cancelledAt: order.cancelledAt,
       paymentExpiresAt: order.paymentExpiresAt,
       receiptReference: order.receipt?.reference ?? null,
+      paymentAttentionReason: order.paymentAttentionReason ?? null,
+      bundles: (order.salesOfferPurchases ?? []).map((purchase: any) => ({
+        id: purchase.id,
+        offerId: purchase.salesOfferId,
+        snapshot: purchase.snapshot,
+        allocatedAt: purchase.allocatedAt,
+        releasedAt: purchase.releasedAt,
+      })),
       items: order.items.map((x: any) => ({
         id: x.id,
         targetType: x.targetType,
@@ -855,6 +1023,7 @@ export class CommerceService {
         discount: { amountMinor: x.discountMinor, currency: x.currency },
         price: { amountMinor: x.priceMinor, currency: x.currency },
         promotion: x.appliedPromotionSnapshot,
+        salesOfferPurchaseId: x.salesOfferPurchaseId ?? null,
       })),
       submissions:
         order.submissions?.map((x: any) => ({
@@ -875,6 +1044,7 @@ export class CommerceService {
         where,
         include: {
           items: true,
+          salesOfferPurchases: true,
           receipt: true,
           submissions: { orderBy: { createdAt: 'desc' } },
         },
@@ -894,6 +1064,7 @@ export class CommerceService {
       where: { id, studentUserId },
       include: {
         items: true,
+        salesOfferPurchases: true,
         receipt: true,
         submissions: { orderBy: { createdAt: 'desc' } },
       },
@@ -915,6 +1086,7 @@ export class CommerceService {
         order: {
           include: {
             items: true,
+            salesOfferPurchases: true,
             receipt: true,
             submissions: { orderBy: { createdAt: 'desc' } },
           },
@@ -1332,7 +1504,10 @@ export class CommerceService {
     this.admin(actor);
     const item = await this.prisma.manualPaymentSubmission.findUnique({
       where: { id },
-      include: { proofAsset: true, order: { include: { items: true } } },
+      include: {
+        proofAsset: true,
+        order: { include: { items: true, salesOfferPurchases: true } },
+      },
     });
     if (!item) throw new NotFoundException('Payment submission not found');
     return {
@@ -1388,7 +1563,7 @@ export class CommerceService {
         });
         return submission;
       },
-      { isolationLevel: 'Serializable' },
+      { isolationLevel: 'ReadCommitted' },
     );
     return { id, status: ManualPaymentSubmissionStatus.APPROVED };
   }
@@ -1585,29 +1760,37 @@ export class CommerceService {
       if (error.code === 'P2002') {
         const existing = await this.prisma.xPayWebhookEvent.findUnique({
           where: { externalEventId },
-          select: { verified: true },
+          select: { verified: true, processedAt: true },
         });
-        return { accepted: existing?.verified ?? false, duplicate: true };
+        if (!existing?.verified || existing.processedAt)
+          return { accepted: existing?.verified ?? false, duplicate: true };
+      } else {
+        throw error;
       }
-      throw error;
     }
     if (!verified) return { accepted: false, duplicate: false };
     try {
       const result = await this.prisma.$transaction(
         async (tx) => {
+          await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`xpay-event:${externalEventId}`}))`;
           const event = await tx.xPayWebhookEvent.findUnique({
             where: { externalEventId },
           });
+          if (event?.processedAt) return { success: false, orderId: undefined };
           if (
             payload.type !== 'checkout.session.completed' &&
             payload.type !== 'checkout.session.async_payment_succeeded'
           ) {
             await tx.xPayWebhookEvent.update({
               where: { id: event!.id },
-              data: { processedAt: new Date() },
+              data: { processedAt: new Date(), processingError: null },
             });
             return { success: false, orderId: undefined };
           }
+          // Different events for one session must observe each other's payment
+          // state before deciding whether a pending update is still allowed.
+          if (checkoutSessionId)
+            await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`xpay-session:${checkoutSessionId}`}))`;
           const attempt = checkoutSessionId
             ? await tx.paymentAttempt.findFirst({
                 where: { providerOrderId: checkoutSessionId },
@@ -1617,6 +1800,13 @@ export class CommerceService {
           if (!attempt)
             throw new NotFoundException('XPay payment attempt not found');
           const success = session?.paymentStatus === 'paid';
+          if (!success && attempt.status === PaymentAttemptStatus.PAID) {
+            await tx.xPayWebhookEvent.update({
+              where: { id: event!.id },
+              data: { processedAt: new Date(), processingError: null },
+            });
+            return { success: false, orderId: attempt.orderId };
+          }
           const status = success
             ? PaymentAttemptStatus.PAID
             : PaymentAttemptStatus.PENDING;
@@ -1645,18 +1835,47 @@ export class CommerceService {
               },
             },
           });
-          if (success)
-            await this.fulfilment!.fulfil(tx, {
-              orderId: attempt.orderId,
-              paymentAttemptId: attempt.id,
-            });
+          if (
+            success &&
+            attempt.order.status !== OrderStatus.PAYMENT_REVIEW &&
+            !(
+              attempt.order.status === OrderStatus.CANCELLED &&
+              attempt.order.externalRefundReference
+            )
+          ) {
+            try {
+              await this.fulfilment!.fulfil(tx, {
+                orderId: attempt.orderId,
+                paymentAttemptId: attempt.id,
+              });
+            } catch (error) {
+              if (!(error instanceof SalesOfferUnavailableError)) throw error;
+              await tx.order.update({
+                where: { id: attempt.orderId },
+                data: {
+                  status: OrderStatus.PAYMENT_REVIEW,
+                  paymentAttentionReason: 'OFFER_UNAVAILABLE_AFTER_PAYMENT',
+                },
+              });
+              await this.audit.recordWithClient(tx, {
+                actorUserId: attempt.order.studentUserId,
+                action: 'XPAY_OFFER_PAYMENT_REVIEW',
+                targetType: 'Order',
+                targetId: attempt.orderId,
+                metadata: {
+                  paymentAttemptId: attempt.id,
+                  reason: 'OFFER_UNAVAILABLE_AFTER_PAYMENT',
+                },
+              });
+            }
+          }
           await tx.xPayWebhookEvent.update({
             where: { id: event!.id },
-            data: { processedAt: new Date() },
+            data: { processedAt: new Date(), processingError: null },
           });
           return { success, orderId: attempt.orderId };
         },
-        { isolationLevel: 'Serializable' },
+        { isolationLevel: 'ReadCommitted' },
       );
       return { accepted: true, duplicate: false, ...result };
     } catch (error) {
@@ -1671,6 +1890,73 @@ export class CommerceService {
       });
       throw error;
     }
+  }
+
+  async recordOfferPaymentRefund(
+    actor: RequestUser,
+    orderId: string,
+    reference: string,
+  ) {
+    this.admin(actor);
+    const value = reference.trim();
+    if (!value)
+      throw new BadRequestException('External refund reference is required');
+    return this.prisma.$transaction(async (tx) => {
+      const claimed = await tx.order.updateMany({
+        where: {
+          id: orderId,
+          status: OrderStatus.PAYMENT_REVIEW,
+          paymentAttentionReason: 'OFFER_UNAVAILABLE_AFTER_PAYMENT',
+          externalRefundReference: null,
+        },
+        data: {
+          status: OrderStatus.CANCELLED,
+          cancelledAt: new Date(),
+          externalRefundReference: value,
+        },
+      });
+      if (claimed.count !== 1)
+        throw new ConflictException(
+          'Order is not awaiting an external offer refund',
+        );
+      await tx.couponReservation.updateMany({
+        where: { orderId, status: CouponReservationStatus.RESERVED },
+        data: {
+          status: CouponReservationStatus.RELEASED,
+          releasedAt: new Date(),
+        },
+      });
+      await this.audit.recordWithClient(tx, {
+        actorUserId: actor.id,
+        action: 'XPAY_OFFER_EXTERNAL_REFUND_RECORDED',
+        targetType: 'Order',
+        targetId: orderId,
+        metadata: { reference: value },
+      });
+      return {
+        id: orderId,
+        status: OrderStatus.CANCELLED,
+        externalRefundReference: value,
+      };
+    });
+  }
+
+  async offerPaymentReviews(actor: RequestUser) {
+    this.admin(actor);
+    return {
+      data: await this.prisma.order.findMany({
+        where: {
+          status: OrderStatus.PAYMENT_REVIEW,
+          paymentAttentionReason: 'OFFER_UNAVAILABLE_AFTER_PAYMENT',
+        },
+        include: {
+          paymentAttempts: true,
+          salesOfferPurchases: true,
+          items: true,
+        },
+        orderBy: { createdAt: 'desc' },
+      }),
+    };
   }
 
   private async validatePromotionTargets(

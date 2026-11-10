@@ -122,7 +122,7 @@ export class RefundsService {
             include: { items: { include: { refundRequestItem: true } } },
           });
           if (!order) throw new NotFoundException('Approved order not found');
-          const requestedIds = dto.orderItemIds
+          let requestedIds = dto.orderItemIds
             ? [...new Set(dto.orderItemIds)]
             : order.items.map((item: any) => item.id);
           if (
@@ -132,6 +132,24 @@ export class RefundsService {
             throw new BadRequestException(
               'Each order item can be requested only once',
             );
+          const selectedBundleIds = new Set(
+            order.items
+              .filter(
+                (item: any) =>
+                  requestedIds.includes(item.id) && item.salesOfferPurchaseId,
+              )
+              .map((item: any) => item.salesOfferPurchaseId),
+          );
+          requestedIds = [
+            ...new Set([
+              ...requestedIds,
+              ...order.items
+                .filter((item: any) =>
+                  selectedBundleIds.has(item.salesOfferPurchaseId),
+                )
+                .map((item: any) => item.id),
+            ]),
+          ];
           const items = order.items.filter((item: any) =>
             requestedIds.includes(item.id),
           );
@@ -331,6 +349,22 @@ export class RefundsService {
           },
         });
         if (!request) throw new NotFoundException('Refund request not found');
+        const purchaseIds = [
+          ...new Set(
+            request.items
+              .map((item: any) => item.orderItem.salesOfferPurchaseId)
+              .filter(Boolean),
+          ),
+        ] as string[];
+        const purchases = purchaseIds.length
+          ? await tx.salesOfferPurchase.findMany({
+              where: { id: { in: purchaseIds } },
+              include: { salesOffer: true },
+              orderBy: { salesOfferId: 'asc' },
+            })
+          : [];
+        for (const purchase of purchases)
+          await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`sales-offer:${purchase.salesOfferId}`}))`;
         const claimed = await tx.refundRequest.updateMany({
           where: { id: refundId, status: RefundRequestStatus.PENDING },
           data: {
@@ -358,6 +392,24 @@ export class RefundsService {
             revokedById: actor.id,
           },
         });
+        for (const purchase of purchases) {
+          const offer = await tx.salesOffer.findUniqueOrThrow({
+            where: { id: purchase.salesOfferId },
+          });
+          if (
+            offer.status === 'ACTIVE' &&
+            offer.startsAt <= now &&
+            offer.endsAt > now
+          )
+            await tx.salesOfferPurchase.updateMany({
+              where: {
+                id: purchase.id,
+                allocatedAt: { not: null },
+                releasedAt: null,
+              },
+              data: { releasedAt: now },
+            });
+        }
         for (const refundItem of request.items) {
           for (const allocation of refundItem.orderItem.allocations.filter(
             (row: any) => row.state !== PartnerAllocationState.REVERSED,
@@ -400,7 +452,7 @@ export class RefundsService {
           },
         });
       },
-      { isolationLevel: 'Serializable' },
+      { isolationLevel: 'ReadCommitted' },
     );
     await this.audit.record({
       actorUserId: actor.id,

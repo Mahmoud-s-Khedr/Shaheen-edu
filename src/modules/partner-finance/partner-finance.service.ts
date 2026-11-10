@@ -16,6 +16,7 @@ import type { RequestUser } from '../../common/types/request-with-user.types';
 import { PrismaService } from '../../database/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { PublisherUsageRollupsService } from '../partner-analytics/publisher-usage-rollups.service';
+import { allocateBundleReferral } from '../commerce/bundle-allocation';
 import type {
   AdminAllocationsQueryDto,
   AssignReconciliationDiscrepancyDto,
@@ -308,11 +309,17 @@ export class PartnerFinanceService {
       : null;
   }
 
-  private referralExpected(item: any, attribution: any) {
+  private referralExpected(item: any, attribution: any, orderItems: any[]) {
     if (!attribution) return null;
     const terms = attribution.snapshot;
-    const amount =
-      terms.kind === 'FIXED_PER_SALE'
+    const amount = item.salesOfferPurchaseId
+      ? (allocateBundleReferral(
+          orderItems.filter(
+            (entry) => entry.salesOfferPurchaseId === item.salesOfferPurchaseId,
+          ),
+          terms,
+        ).get(item.id) ?? 0)
+      : terms.kind === 'FIXED_PER_SALE'
         ? (terms.fixedCommissionMinor ?? 0)
         : terms.kind === 'PERCENTAGE_CAPPED'
           ? Math.min(
@@ -356,6 +363,7 @@ export class PartnerFinanceService {
                     id: true,
                     status: true,
                     merchantReference: true,
+                    providerOrderId: true,
                     providerTransactionId: true,
                   },
                 },
@@ -569,7 +577,7 @@ export class PartnerFinanceService {
         );
         const expected = [
           this.publisherExpected(item, applicable),
-          this.referralExpected(item, order.referralAttribution),
+          this.referralExpected(item, order.referralAttribution, order.items),
         ].filter(Boolean) as any[];
         for (const expectation of expected) {
           const matching = item.allocations.filter(

@@ -13,6 +13,7 @@ import {
   ReferralCommissionKind,
 } from '../../common/types/roles.enum';
 import { AuditService } from '../audit/audit.service';
+import { allocateBundleReferral } from './bundle-allocation';
 
 function agreementSpecificity(agreement: {
   courseId: string | null;
@@ -23,6 +24,12 @@ function agreementSpecificity(agreement: {
   if (agreement.chapterId) return 2;
   if (agreement.courseId) return 1;
   return 0;
+}
+
+export class SalesOfferUnavailableError extends ConflictException {
+  constructor() {
+    super('Offer is sold out or already purchased');
+  }
 }
 
 @Injectable()
@@ -37,11 +44,13 @@ export class FulfilmentService {
       paymentAttemptId?: string | null;
     },
   ) {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`order-fulfilment:${input.orderId}`}))`;
     const order = await tx.order.findUnique({
       where: { id: input.orderId },
       include: {
         items: { include: { chapter: { select: { courseId: true } } } },
         couponReservation: true,
+        salesOfferPurchases: true,
         receipt: true,
         referralAttribution: {
           include: { rule: { include: { program: true } }, referralCode: true },
@@ -50,6 +59,38 @@ export class FulfilmentService {
     });
     if (!order) throw new NotFoundException('Order not found');
     if (order.status === OrderStatus.APPROVED) return order;
+    if (
+      input.paymentAttemptId &&
+      (order.status === OrderStatus.PAYMENT_REVIEW ||
+        (order.status === OrderStatus.CANCELLED &&
+          order.externalRefundReference))
+    )
+      return order;
+    const purchases = [...(order.salesOfferPurchases ?? [])].sort(
+      (a: any, b: any) => a.salesOfferId.localeCompare(b.salesOfferId),
+    );
+    for (const purchase of purchases) {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`sales-offer:${purchase.salesOfferId}`}))`;
+      const offer = await tx.salesOffer.findUniqueOrThrow({
+        where: { id: purchase.salesOfferId },
+      });
+      const where = {
+        salesOfferId: offer.id,
+        allocatedAt: { not: null },
+        releasedAt: null,
+      };
+      const [sold, alreadyPurchased] = await Promise.all([
+        tx.salesOfferPurchase.count({ where }),
+        tx.salesOfferPurchase.count({
+          where: { ...where, studentUserId: order.studentUserId },
+        }),
+      ]);
+      if (
+        alreadyPurchased ||
+        (offer.purchaseLimit != null && sold >= offer.purchaseLimit)
+      )
+        throw new SalesOfferUnavailableError();
+    }
     await this.assertReferralUsageAvailable(tx, order.referralAttribution);
     const claimed = await tx.order.updateMany({
       where: {
@@ -61,6 +102,25 @@ export class FulfilmentService {
     if (claimed.count !== 1)
       throw new ConflictException('Order cannot be fulfilled');
     const now = new Date();
+    if (purchases.length)
+      await tx.salesOfferPurchase.updateMany({
+        where: {
+          id: { in: purchases.map((purchase: any) => purchase.id) },
+          allocatedAt: null,
+        },
+        data: { allocatedAt: now },
+      });
+    const bundleReferralShares = new Map<string, number>();
+    if (order.referralAttribution) {
+      const terms = order.referralAttribution.snapshot as any;
+      for (const purchase of purchases) {
+        const items = order.items.filter(
+          (item: any) => item.salesOfferPurchaseId === purchase.id,
+        );
+        for (const [key, share] of allocateBundleReferral(items, terms))
+          bundleReferralShares.set(key, share);
+      }
+    }
     // Allocations are created only after the order status claim succeeds, in
     // this transaction. The unique order-item/kind key makes webhook and
     // manual-approval retries harmless.
@@ -135,8 +195,9 @@ export class FulfilmentService {
           fixedCommissionMinor?: number | null;
           maximumCommissionMinor?: number | null;
         };
-        const amount =
-          terms.kind === ReferralCommissionKind.FIXED_PER_SALE
+        const amount = item.salesOfferPurchaseId
+          ? (bundleReferralShares.get(item.id) ?? 0)
+          : terms.kind === ReferralCommissionKind.FIXED_PER_SALE
             ? (terms.fixedCommissionMinor ?? 0)
             : terms.kind === ReferralCommissionKind.PERCENTAGE_CAPPED
               ? Math.min(
@@ -221,6 +282,12 @@ export class FulfilmentService {
               discountMinor: item.discountMinor,
               totalMinor: item.priceMinor,
               appliedPromotion: item.appliedPromotionSnapshot,
+              salesOfferPurchaseId: item.salesOfferPurchaseId,
+            })),
+            bundles: purchases.map((purchase: any) => ({
+              id: purchase.id,
+              offerId: purchase.salesOfferId,
+              snapshot: purchase.snapshot,
             })),
           },
         },
@@ -234,6 +301,7 @@ export class FulfilmentService {
       metadata: {
         paymentAttemptId: input.paymentAttemptId ?? null,
         channel: order.paymentChannel,
+        salesOfferPurchaseIds: purchases.map((purchase: any) => purchase.id),
       },
     });
     return tx.order.findUnique({

@@ -39,6 +39,34 @@ const statusTitles: Record<number, LocalizedMessage> = {
 };
 
 const translations: Record<string, string> = {
+  'Offer not found': 'لم يتم العثور على العرض',
+  'Offer content is unavailable': 'محتوى العرض غير متاح',
+  'Offer is not available for purchase': 'العرض غير متاح للشراء',
+  'Offer is sold out or already purchased':
+    'نفدت أماكن العرض أو تم شراؤه بالفعل',
+  'Offer cover not found': 'لم يتم العثور على صورة العرض',
+  'Select at least one course or chapter':
+    'اختر دورة أو فصلاً واحداً على الأقل',
+  'Offer end must be after its start':
+    'يجب أن يكون موعد انتهاء العرض بعد بدايته',
+  'Duplicate offer item': 'لا يمكن تكرار عنصر في العرض',
+  'Offer cover must be an image': 'يجب أن يكون غلاف العرض صورة',
+  'Offer content not found': 'لم يتم العثور على محتوى العرض',
+  'An offer cannot contain a course and its chapter':
+    'لا يمكن أن يتضمن العرض دورة وفصلاً منها',
+  'Each offer item must have a positive EGP price':
+    'يجب أن يكون لكل عنصر في العرض سعر موجب بالجنيه المصري',
+  'Each offer item must be purchasable':
+    'يجب أن يكون كل عنصر في العرض متاحاً للشراء',
+  'A paid offer must include an item with a positive price':
+    'يجب أن يتضمن العرض المدفوع عنصراً بسعر موجب',
+  'Ended offers cannot be edited': 'لا يمكن تعديل العروض المنتهية',
+  'Ended offers cannot be resumed': 'لا يمكن استئناف العروض المنتهية',
+  'Purchase limit cannot be below allocated purchases':
+    'لا يمكن أن يقل حد الشراء عن عدد المشتريات المخصصة',
+  'External refund reference is required': 'مرجع الاسترداد الخارجي مطلوب',
+  'Order is not awaiting an external offer refund':
+    'الطلب لا ينتظر تسجيل استرداد خارجي للعرض',
   'Form not found': 'لم يتم العثور على النموذج',
   'Only draft forms can be edited, deleted, or activated':
     'يمكن تعديل النماذج أو حذفها أو تفعيلها فقط عندما تكون مسودات',

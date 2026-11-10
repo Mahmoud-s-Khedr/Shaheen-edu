@@ -71,7 +71,7 @@ describe('FulfilmentService partner allocations and referral limits', () => {
         orderId: 'order-1',
       }),
     ).rejects.toBeInstanceOf(BadRequestException);
-    expect(tx.$executeRaw).toHaveBeenCalledTimes(2);
+    expect(tx.$executeRaw).toHaveBeenCalledTimes(3);
     expect(tx.order.updateMany).not.toHaveBeenCalled();
   });
 

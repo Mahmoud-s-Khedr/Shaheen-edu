@@ -51,6 +51,51 @@ describe('ReportsService export lifecycle', () => {
     };
   }
 
+  it('exports bundle price weights without the student ownership indicators', async () => {
+    const { prisma, service } = build();
+    prisma.order.findMany.mockResolvedValue([
+      {
+        status: 'APPROVED',
+        salesOfferPurchases: [
+          {
+            salesOfferId: 'offer-1',
+            snapshot: {
+              name: 'Bundle',
+              priceMinor: 700,
+              currency: 'EGP',
+              items: [
+                {
+                  targetType: 'COURSE',
+                  targetId: 'course-1',
+                  title: 'Course',
+                  weightMinor: 1000,
+                  owned: true,
+                },
+              ],
+            },
+          },
+        ],
+      },
+    ]);
+    const rows = await (service as any).rowsFor('COMMERCE', {}, {});
+    expect(JSON.parse(rows[0].bundleSnapshots)).toEqual([
+      {
+        offerId: 'offer-1',
+        name: 'Bundle',
+        priceMinor: 700,
+        currency: 'EGP',
+        items: [
+          {
+            targetType: 'COURSE',
+            targetId: 'course-1',
+            title: 'Course',
+            weightMinor: 1000,
+          },
+        ],
+      },
+    ]);
+  });
+
   it('uses a conditional update so a completed export cannot be cancelled afterwards', async () => {
     const { prisma, service } = build();
     prisma.reportExportJob.findUnique.mockResolvedValue({

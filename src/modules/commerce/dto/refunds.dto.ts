@@ -18,7 +18,7 @@ export class CreateRefundRequestDto {
   @ApiPropertyOptional({
     type: [String],
     description:
-      'Omit to request refunds for every item in the approved order.',
+      'Omit to request all items. Selecting any item in a bundle automatically includes all items in that bundle.',
   })
   @IsOptional()
   @IsArray()

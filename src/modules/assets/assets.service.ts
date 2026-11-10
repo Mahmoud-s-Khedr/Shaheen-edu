@@ -7,6 +7,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import type { Prisma } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
 import {
   AssetKind,
@@ -316,15 +317,17 @@ export class AssetsService {
   }
   async archive(actor: RequestUser, id: string) {
     this.assertAdmin(actor);
-    const asset = await this.getReadyOrAny(id);
-    if (asset.kind === AssetKind.PAYMENT_PROOF)
-      throw new NotFoundException('Asset not found');
-    const used = await this.isReferenced(id);
-    if (used)
-      throw new ConflictException('Referenced assets cannot be archived');
-    const updated = await this.prisma.asset.update({
-      where: { id },
-      data: { status: AssetStatus.ARCHIVED, archivedAt: new Date() },
+    const updated = await this.prisma.$transaction(async (tx) => {
+      await this.lockForReference(tx, id);
+      const asset = await this.getReadyOrAny(id, tx);
+      if (asset.kind === AssetKind.PAYMENT_PROOF)
+        throw new NotFoundException('Asset not found');
+      if (await this.isReferenced(id, tx))
+        throw new ConflictException('Referenced assets cannot be archived');
+      return tx.asset.update({
+        where: { id },
+        data: { status: AssetStatus.ARCHIVED, archivedAt: new Date() },
+      });
     });
     await this.audit.record({
       actorUserId: actor.id,
@@ -374,18 +377,23 @@ export class AssetsService {
   }
   /** Archives an asset displaced by a replacement, but only once nothing else references it. */
   async archiveIfUnreferenced(actor: Pick<RequestUser, 'id'>, id: string) {
-    const asset = await this.prisma.asset.findUnique({ where: { id } });
-    if (
-      !asset ||
-      asset.kind === AssetKind.PAYMENT_PROOF ||
-      asset.status === AssetStatus.ARCHIVED
-    )
-      return;
-    if (await this.isReferenced(id)) return;
-    await this.prisma.asset.update({
-      where: { id },
-      data: { status: AssetStatus.ARCHIVED, archivedAt: new Date() },
+    const archived = await this.prisma.$transaction(async (tx) => {
+      await this.lockForReference(tx, id);
+      const asset = await tx.asset.findUnique({ where: { id } });
+      if (
+        !asset ||
+        asset.kind === AssetKind.PAYMENT_PROOF ||
+        asset.status === AssetStatus.ARCHIVED ||
+        (await this.isReferenced(id, tx))
+      )
+        return false;
+      await tx.asset.update({
+        where: { id },
+        data: { status: AssetStatus.ARCHIVED, archivedAt: new Date() },
+      });
+      return true;
     });
+    if (!archived) return;
     await this.audit.record({
       actorUserId: actor.id,
       action: 'ASSET_REPLACED',
@@ -393,18 +401,56 @@ export class AssetsService {
       targetId: id,
     });
   }
-  async getReady(id: string) {
-    const asset = await this.getReadyOrAny(id);
+  /** Hold until commit when assigning a reference or deciding to archive. */
+  async lockForReference(client: Prisma.TransactionClient, id: string) {
+    await client.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`asset-reference:${id}`}))`;
+  }
+  async getReady(id: string, client: Prisma.TransactionClient = this.prisma) {
+    const asset = await this.getReadyOrAny(id, client);
     if (asset.status !== AssetStatus.READY)
       throw new ConflictException('Asset is not ready');
     return asset;
   }
-  async getReadyOrAny(id: string) {
-    const asset = await this.prisma.asset.findUnique({ where: { id } });
+  async getReadyOrAny(
+    id: string,
+    client: Prisma.TransactionClient = this.prisma,
+  ) {
+    const asset = await client.asset.findUnique({ where: { id } });
     if (!asset) throw new NotFoundException('Asset not found');
     return asset;
   }
-  async isReferenced(id: string) {
+  async isReferenced(id: string, client?: Prisma.TransactionClient) {
+    const db = client ?? this.prisma;
+    const queries = [
+      db.contentItem.count({ where: { primaryAssetId: id } }),
+      db.assetReference.count({ where: { assetId: id } }),
+      db.academicGrade.count({ where: { coverAssetId: id } }),
+      db.subject.count({ where: { coverAssetId: id } }),
+      db.course.count({ where: { coverAssetId: id } }),
+      db.chapter.count({ where: { coverAssetId: id } }),
+      db.lesson.count({ where: { coverAssetId: id } }),
+      db.section.count({ where: { coverAssetId: id } }),
+      db.questionAsset.count({ where: { assetId: id } }),
+      db.questionContentBlock.count({ where: { assetId: id } }),
+      db.questionOptionContentBlock.count({ where: { assetId: id } }),
+      db.questionContextContentBlock.count({ where: { assetId: id } }),
+      db.questionVideoLink.count({ where: { videoAssetId: id } }),
+      db.assessmentQuestion.count({ where: { videoAssetId: id } }),
+      db.assessmentQuestionAsset.count({ where: { assetId: id } }),
+      db.assessmentQuestionContentBlock.count({
+        where: { assetId: id },
+      }),
+      db.assessmentQuestionOptionContentBlock.count({
+        where: { assetId: id },
+      }),
+      db.assessmentContextContentBlock.count({
+        where: { assetId: id },
+      }),
+      db.questionImportMedia.count({ where: { assetId: id } }),
+      db.testimonial.count({ where: { screenshotAssetId: id } }),
+      db.questionImportBatch.count({ where: { sourceAssetId: id } }),
+      db.salesOffer.count({ where: { coverAssetId: id } }),
+    ];
     const [
       content,
       refs,
@@ -427,36 +473,11 @@ export class AssetsService {
       questionImportMedia,
       testimonials,
       questionImportBatches = 0,
-    ] = await this.prisma.$transaction([
-      this.prisma.contentItem.count({ where: { primaryAssetId: id } }),
-      this.prisma.assetReference.count({ where: { assetId: id } }),
-      this.prisma.academicGrade.count({ where: { coverAssetId: id } }),
-      this.prisma.subject.count({ where: { coverAssetId: id } }),
-      this.prisma.course.count({ where: { coverAssetId: id } }),
-      this.prisma.chapter.count({ where: { coverAssetId: id } }),
-      this.prisma.lesson.count({ where: { coverAssetId: id } }),
-      this.prisma.section.count({ where: { coverAssetId: id } }),
-      this.prisma.questionAsset.count({ where: { assetId: id } }),
-      this.prisma.questionContentBlock.count({ where: { assetId: id } }),
-      this.prisma.questionOptionContentBlock.count({ where: { assetId: id } }),
-      this.prisma.questionContextContentBlock.count({ where: { assetId: id } }),
-      this.prisma.questionVideoLink.count({ where: { videoAssetId: id } }),
-      this.prisma.assessmentQuestion.count({ where: { videoAssetId: id } }),
-      this.prisma.assessmentQuestionAsset.count({ where: { assetId: id } }),
-      this.prisma.assessmentQuestionContentBlock.count({
-        where: { assetId: id },
-      }),
-      this.prisma.assessmentQuestionOptionContentBlock.count({
-        where: { assetId: id },
-      }),
-      this.prisma.assessmentContextContentBlock.count({
-        where: { assetId: id },
-      }),
-      this.prisma.questionImportMedia.count({ where: { assetId: id } }),
-      this.prisma.testimonial.count({ where: { screenshotAssetId: id } }),
-      this.prisma.questionImportBatch.count({ where: { sourceAssetId: id } }),
-    ]);
-    const paymentProofs = await this.prisma.manualPaymentSubmission.count({
+      salesOfferCovers = 0,
+    ] = client
+      ? await Promise.all(queries)
+      : await this.prisma.$transaction(queries);
+    const paymentProofs = await db.manualPaymentSubmission.count({
       where: { proofAssetId: id },
     });
     return (
@@ -481,6 +502,7 @@ export class AssetsService {
         questionImportMedia +
         testimonials +
         questionImportBatches +
+        salesOfferCovers +
         paymentProofs >
       0
     );

@@ -47,11 +47,16 @@ export async function cleanDatabase(
   // Asset (payment proofs), StudentProfile (orders), and User (payment methods),
   // so the whole chain must go before all four.
   await prisma.manualPaymentSubmission.deleteMany();
+  await prisma.refundRequestItem.deleteMany();
+  await prisma.refundRequest.deleteMany();
   await prisma.orderItem.deleteMany();
+  await prisma.salesOfferPurchase.deleteMany();
   await prisma.order.deleteMany();
   await prisma.commerceIdempotencyKey.deleteMany();
   await prisma.cartItem.deleteMany();
   await prisma.cart.deleteMany();
+  await prisma.salesOfferItem.deleteMany();
+  await prisma.salesOffer.deleteMany();
   await prisma.manualPaymentMethod.deleteMany();
   await prisma.publisherAgreement.deleteMany();
   await prisma.referralCommissionRule.deleteMany();

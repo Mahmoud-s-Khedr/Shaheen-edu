@@ -14,6 +14,7 @@ import {
   Role,
 } from '../../common/types/roles.enum';
 import { CommerceService } from './commerce.service';
+import { Prisma } from '@prisma/client';
 
 describe('CommerceService payment proofs', () => {
   const studentUserId = 'student-1';
@@ -334,6 +335,7 @@ describe('CommerceService XPay webhooks', () => {
   function buildWebhookService(amountTotal = 10_000) {
     const event = { id: 'local-event-1' };
     const tx: any = {
+      $executeRaw: jest.fn().mockResolvedValue(1),
       xPayWebhookEvent: {
         findUnique: jest.fn().mockResolvedValue(event),
         update: jest.fn().mockResolvedValue(event),
@@ -475,6 +477,9 @@ describe('CommerceService zero-total checkout', () => {
       $transaction: jest.fn((callback) => callback(tx)),
     };
     const fulfilment = { fulfil: jest.fn().mockResolvedValue(zeroTotalOrder) };
+    tx.studentProfile = prisma.studentProfile;
+    tx.course = prisma.course;
+    tx.studentEntitlement = prisma.studentEntitlement;
     const pricing = {
       quote: jest.fn().mockResolvedValue({
         subtotalMinor: 0,
@@ -543,6 +548,76 @@ describe('CommerceService zero-total checkout', () => {
       orderId: zeroTotalOrder.id,
       actorUserId: studentUserId,
     });
+  });
+
+  it('retries serialization failures with the original checkout key', async () => {
+    const { service, prisma, tx } = build();
+    const conflict = new Prisma.PrismaClientKnownRequestError('Retry', {
+      code: 'P2034',
+      clientVersion: 'test',
+    });
+    prisma.$transaction
+      .mockRejectedValueOnce(conflict)
+      .mockRejectedValueOnce(conflict);
+
+    await expect(
+      service.checkout(studentUserId, {}, 'retry-conflict'),
+    ).resolves.toMatchObject({
+      id: zeroTotalOrder.id,
+      status: OrderStatus.APPROVED,
+    });
+    expect(prisma.$transaction).toHaveBeenCalledTimes(3);
+    expect(prisma.cart.findUnique).toHaveBeenCalledTimes(1);
+    expect(tx.commerceIdempotencyKey.create).toHaveBeenCalledWith({
+      data: {
+        studentUserId,
+        operation: 'CHECKOUT',
+        key: 'retry-conflict',
+        resourceId: zeroTotalOrder.id,
+      },
+    });
+  });
+
+  it('bounds serialization retries and does not retry other failures', async () => {
+    const { service, prisma } = build();
+    const conflict = new Prisma.PrismaClientKnownRequestError('Retry', {
+      code: 'P2034',
+      clientVersion: 'test',
+    });
+    prisma.$transaction.mockRejectedValue(conflict);
+    await expect(
+      service.checkout(studentUserId, {}, 'retry-exhausted'),
+    ).rejects.toBe(conflict);
+    expect(prisma.$transaction).toHaveBeenCalledTimes(5);
+
+    prisma.$transaction.mockClear();
+    const unavailable = new ConflictException(
+      'Offer is not available for purchase',
+    );
+    prisma.$transaction.mockRejectedValue(unavailable);
+    await expect(
+      service.checkout(studentUserId, {}, 'unavailable'),
+    ).rejects.toBe(unavailable);
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+  });
+
+  it('recovers a concurrently committed checkout instead of creating a second order', async () => {
+    const { service, prisma, tx, fulfilment } = build();
+    prisma.$transaction.mockRejectedValueOnce(
+      new Prisma.PrismaClientKnownRequestError('Retry', {
+        code: 'P2034',
+        clientVersion: 'test',
+      }),
+    );
+    prisma.commerceIdempotencyKey.findUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ resourceId: zeroTotalOrder.id });
+    await expect(
+      service.checkout(studentUserId, {}, 'concurrent-same-key'),
+    ).resolves.toMatchObject({ id: zeroTotalOrder.id });
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(tx.order.create).not.toHaveBeenCalled();
+    expect(fulfilment.fulfil).not.toHaveBeenCalled();
   });
 
   it('ignores a manual payment method for a zero-total order', async () => {

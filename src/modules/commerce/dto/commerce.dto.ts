@@ -30,6 +30,9 @@ export class CartTargetDto {
   targetType!: CommerceTargetType;
   @ApiProperty() @IsString() targetId!: string;
 }
+export class ExternalOfferRefundDto {
+  @ApiProperty() @IsString() @MinLength(1) @MaxLength(200) reference!: string;
+}
 export class PricePreviewDto {
   @ApiProperty({ type: [CartTargetDto] })
   @ValidateNested({ each: true })
@@ -334,6 +337,12 @@ export class CartItemDto {
   @ApiProperty({ example: 'Physics course' }) targetName!: string;
   @ApiProperty({ example: 'Physics course' }) title!: string;
   @ApiProperty({ type: MoneyDto }) price!: MoneyDto;
+  @ApiPropertyOptional({
+    type: Object,
+    description:
+      'Offer contents, availability, and ownership for a BUNDLE cart item',
+  })
+  bundle?: object;
 }
 
 export class CartResponseDto {
@@ -363,6 +372,27 @@ export class OrderItemDto {
   @ApiProperty({ example: 'Physics course' }) targetName!: string;
   @ApiProperty({ example: 'Physics course' }) title!: string;
   @ApiProperty({ type: MoneyDto }) price!: MoneyDto;
+  @ApiPropertyOptional({
+    type: String,
+    nullable: true,
+    description: 'Items sharing this ID belong to one refundable bundle',
+  })
+  salesOfferPurchaseId?: string | null;
+}
+
+export class OrderBundleDto {
+  @ApiProperty() id!: string;
+  @ApiProperty() offerId!: string;
+  @ApiProperty({
+    type: Object,
+    description:
+      'Immutable offer price and included content, including individual price weights',
+  })
+  snapshot!: object;
+  @ApiPropertyOptional({ type: String, format: 'date-time', nullable: true })
+  allocatedAt?: Date | null;
+  @ApiPropertyOptional({ type: String, format: 'date-time', nullable: true })
+  releasedAt?: Date | null;
 }
 
 export class PaymentSubmissionSummaryDto {
@@ -421,6 +451,9 @@ export class OrderDto {
   })
   cancelledAt!: Date | null;
   @ApiProperty({ type: [OrderItemDto] }) items!: OrderItemDto[];
+  @ApiProperty({ type: [OrderBundleDto] }) bundles!: OrderBundleDto[];
+  @ApiPropertyOptional({ type: String, nullable: true })
+  paymentAttentionReason?: string | null;
   @ApiProperty({ type: [PaymentSubmissionSummaryDto] })
   submissions!: PaymentSubmissionSummaryDto[];
   @ApiPropertyOptional({ enum: PaymentChannel })

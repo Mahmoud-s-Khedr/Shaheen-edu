@@ -37,6 +37,7 @@ import { Role } from '../../common/types/roles.enum';
 import type { RequestUser } from '../../common/types/request-with-user.types';
 import {
   CartTargetDto,
+  ExternalOfferRefundDto,
   CheckoutDto,
   CreateCouponDto,
   CreateDiscountCampaignDto,
@@ -51,6 +52,10 @@ import {
   UpdatePaymentMethodDto,
 } from './dto/commerce.dto';
 import { CommerceService } from './commerce.service';
+import {
+  RecordedOfferRefundDto,
+  SalesOfferPaymentReviewsResponseDto,
+} from './dto/sales-offer-payment-review.dto';
 import { ApiStandardErrors } from '../../common/decorators/api-standard-errors.decorator';
 import {
   CartResponseDto,
@@ -325,6 +330,27 @@ export class CommerceController {
 @Controller({ path: 'admin', version: '1' })
 export class ManualPaymentAdminController {
   constructor(private readonly commerce: CommerceService) {}
+  @Get('sales-offer-payment-reviews')
+  @ApiOperation({
+    summary: 'List paid orders requiring an external offer refund',
+  })
+  @ApiOkResponse({ type: SalesOfferPaymentReviewsResponseDto })
+  offerPaymentReviews(@CurrentUser() user: RequestUser) {
+    return this.commerce.offerPaymentReviews(user);
+  }
+
+  @Post('sales-offer-payment-reviews/:id/refund')
+  @ApiOperation({
+    summary: 'Record the external refund for an unavailable offer payment',
+  })
+  @ApiCreatedResponse({ type: RecordedOfferRefundDto })
+  recordOfferRefund(
+    @CurrentUser() user: RequestUser,
+    @Param('id') id: string,
+    @Body() dto: ExternalOfferRefundDto,
+  ) {
+    return this.commerce.recordOfferPaymentRefund(user, id, dto.reference);
+  }
   @Get('manual-payment-methods')
   @ApiOperation({ summary: 'List all manual payment methods' })
   @ApiOkResponse({ type: PaginatedManualPaymentMethodsResponseDto })

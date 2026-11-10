@@ -16,6 +16,11 @@ import {
   StudentRefundsController,
 } from './refunds.controller';
 import { RefundsService } from './refunds.service';
+import {
+  SalesOffersController,
+  StudentSalesOffersController,
+} from './sales-offers.controller';
+import { SalesOffersService } from './sales-offers.service';
 
 @Module({
   imports: [AssetsModule, AuditModule],
@@ -25,6 +30,8 @@ import { RefundsService } from './refunds.service';
     XPayWebhookController,
     StudentRefundsController,
     AdminRefundsController,
+    SalesOffersController,
+    StudentSalesOffersController,
   ],
   providers: [
     CommerceService,
@@ -33,6 +40,7 @@ import { RefundsService } from './refunds.service';
     FulfilmentService,
     CommerceExpiryService,
     RefundsService,
+    SalesOffersService,
   ],
   exports: [PricingService],
 })

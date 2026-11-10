@@ -71,6 +71,7 @@ export const REPORT_EXPORT_POLICIES: Record<ReportType, ReportExportPolicy> = {
       'discountMinor',
       'totalMinor',
       'currency',
+      'bundleSnapshots',
     ],
     roles: [Role.SUPER_ADMIN],
     privileged: true,
@@ -87,6 +88,7 @@ export const REPORT_EXPORT_POLICIES: Record<ReportType, ReportExportPolicy> = {
       'discountMinor',
       'totalMinor',
       'currency',
+      'bundleSnapshots',
     ],
     roles: [Role.SUPER_ADMIN],
     privileged: true,
@@ -1081,14 +1083,38 @@ export class ReportsService {
     return `CONFIDENTIAL EXPORT | ${classification} | job=${jobId} | requester=${requestedById}`;
   }
 
+  private withBundleSnapshots(row: any) {
+    const { salesOfferPurchases = [], ...values } = row;
+    return {
+      ...values,
+      bundleSnapshots: JSON.stringify(
+        salesOfferPurchases.map((purchase: any) => {
+          const snapshot = purchase.snapshot ?? {};
+          return {
+            offerId: purchase.salesOfferId,
+            name: snapshot.name,
+            priceMinor: snapshot.priceMinor,
+            currency: snapshot.currency,
+            items: (snapshot.items ?? []).map((item: any) => ({
+              targetType: item.targetType,
+              targetId: item.targetId,
+              title: item.title,
+              weightMinor: item.weightMinor,
+            })),
+          };
+        }),
+      ),
+    };
+  }
+
   private async rowsFor(
     reportType: string,
     filters: PlatformReportQueryDto,
     createdAt: { gte?: Date; lt?: Date },
   ): Promise<Array<Record<string, unknown>>> {
     const dateFilter = Object.keys(createdAt).length ? { createdAt } : {};
-    if (reportType === 'PLATFORM_REVENUE')
-      return this.prisma.order.findMany({
+    if (reportType === 'PLATFORM_REVENUE') {
+      const rows = await this.prisma.order.findMany({
         where: this.orderWhere(filters, 'approvedAt', createdAt),
         take: MAX_EXPORT_ROWS + 1,
         select: {
@@ -1099,8 +1125,13 @@ export class ReportsService {
           discountMinor: true,
           totalMinor: true,
           currency: true,
+          salesOfferPurchases: {
+            select: { salesOfferId: true, snapshot: true },
+          },
         },
       });
+      return rows.map((row) => this.withBundleSnapshots(row));
+    }
     if (reportType === 'REFUNDS') {
       const rows = await this.prisma.refundRequest.findMany({
         where: {
@@ -1173,8 +1204,8 @@ export class ReportsService {
           revokedAt: true,
         },
       });
-    if (reportType === 'COMMERCE')
-      return this.prisma.order.findMany({
+    if (reportType === 'COMMERCE') {
+      const rows = await this.prisma.order.findMany({
         where: this.orderWhere(filters, 'createdAt', createdAt),
         take: MAX_EXPORT_ROWS + 1,
         select: {
@@ -1185,8 +1216,13 @@ export class ReportsService {
           discountMinor: true,
           totalMinor: true,
           currency: true,
+          salesOfferPurchases: {
+            select: { salesOfferId: true, snapshot: true },
+          },
         },
       });
+      return rows.map((row) => this.withBundleSnapshots(row));
+    }
     if (reportType === 'PARTNER_OBLIGATIONS')
       return this.prisma.partnerAllocation.findMany({
         where: {

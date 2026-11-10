@@ -8,11 +8,14 @@ import {
   PromotionKind,
 } from '../../common/types/roles.enum';
 import { PrismaService } from '../../database/prisma.service';
+import { allocateBundleRevenue } from './bundle-allocation';
 
 export type PricedTarget = {
-  targetType: 'COURSE' | 'CHAPTER';
+  targetType: 'COURSE' | 'CHAPTER' | 'BUNDLE';
   courseId?: string;
   chapterId?: string;
+  salesOfferId?: string;
+  bundleSnapshot?: any;
   title: string;
   basePriceMinor: number;
   currency: string;
@@ -57,6 +60,7 @@ export class PricingService {
       targets: Array<{ courseId: string | null; chapterId: string | null }>;
     },
   ) {
+    if (target.targetType === 'BUNDLE') return false;
     return (
       promotion.appliesToAll ||
       promotion.targets.some(
@@ -155,31 +159,30 @@ export class PricingService {
         );
       return candidates[0] ?? null;
     });
-    const rawCouponDiscounts = coupon
-      ? targets.map((target) =>
-          this.matches(target, coupon)
-            ? this.discount(coupon.kind, coupon.amount, target.basePriceMinor)
-            : 0,
+    const eligibleItems = coupon
+      ? targets.flatMap((target, index) =>
+          this.matches(target, coupon) && target.basePriceMinor > 0
+            ? [{ key: String(index), weightMinor: target.basePriceMinor }]
+            : [],
         )
-      : targets.map(() => 0);
-    const rawCouponTotal = rawCouponDiscounts.reduce(
-      (sum, amount) => sum + amount,
+      : [];
+    const eligibleSubtotal = eligibleItems.reduce(
+      (sum, item) => sum + item.weightMinor,
       0,
     );
-    const cappedCouponTotal = coupon?.maximumDiscountMinor
-      ? Math.min(rawCouponTotal, coupon.maximumDiscountMinor)
-      : rawCouponTotal;
-    const couponDiscounts = rawCouponTotal
-      ? rawCouponDiscounts.map((amount, index) =>
-          index === rawCouponDiscounts.length - 1
-            ? 0
-            : Math.floor((amount * cappedCouponTotal) / rawCouponTotal),
-        )
-      : rawCouponDiscounts;
-    if (rawCouponTotal)
-      couponDiscounts[couponDiscounts.length - 1] =
-        cappedCouponTotal -
-        couponDiscounts.slice(0, -1).reduce((sum, amount) => sum + amount, 0);
+    const rawCouponTotal = coupon
+      ? this.discount(coupon.kind, coupon.amount, eligibleSubtotal)
+      : 0;
+    const cappedCouponTotal =
+      coupon?.maximumDiscountMinor != null
+        ? Math.min(rawCouponTotal, coupon.maximumDiscountMinor)
+        : rawCouponTotal;
+    const couponShares = eligibleItems.length
+      ? allocateBundleRevenue(cappedCouponTotal, eligibleItems)
+      : new Map<string, number>();
+    const couponDiscounts = targets.map(
+      (_, index) => couponShares.get(String(index)) ?? 0,
+    );
 
     const items = targets.map((target, index) => {
       const campaign = campaignDiscounts[index];

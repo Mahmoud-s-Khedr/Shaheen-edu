@@ -10,6 +10,31 @@ The OpenAPI document in `docs-json.json` is the authoritative schema. The
 following recently added operations are listed here to keep this reference's
 operation inventory aligned with that document.
 
+The [sales offers guide](sales-offers-api.md) describes bundle creation,
+availability, checkout snapshots, payment review, and whole-bundle refunds.
+
+### `GET /api/v1/admin/sales-offer-payment-reviews`
+
+### `GET /api/v1/admin/sales-offers`
+
+### `GET /api/v1/student/sales-offers`
+
+### `GET /api/v1/student/sales-offers/{id}`
+
+### `GET /api/v1/student/sales-offers/{id}/cover`
+
+### `POST /api/v1/admin/sales-offer-payment-reviews/{id}/refund`
+
+### `POST /api/v1/admin/sales-offers`
+
+### `POST /api/v1/admin/sales-offers/{id}/end`
+
+### `POST /api/v1/admin/sales-offers/{id}/pause`
+
+### `POST /api/v1/admin/sales-offers/{id}/resume`
+
+### `PUT /api/v1/admin/sales-offers/{id}`
+
 ### `GET /api/v1/admin/partner-finance/allocations`
 
 ### `GET /api/v1/admin/partner-finance/reconciliation-runs`

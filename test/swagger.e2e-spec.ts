@@ -15,6 +15,65 @@ describe('Swagger (e2e)', () => {
     await app.close();
   });
 
+  it('documents sales-offer cover access and the administrator payment-review responses', async () => {
+    const response = await app.inject({ method: 'GET', url: '/api/docs-json' });
+    const document = JSON.parse(response.body);
+    const expected = [
+      [
+        '/api/v1/student/sales-offers/{id}/cover',
+        'get',
+        '200',
+        'SalesOfferCoverAccessDto',
+      ],
+      [
+        '/api/v1/admin/sales-offer-payment-reviews',
+        'get',
+        '200',
+        'SalesOfferPaymentReviewsResponseDto',
+      ],
+      [
+        '/api/v1/admin/sales-offer-payment-reviews/{id}/refund',
+        'post',
+        '201',
+        'RecordedOfferRefundDto',
+      ],
+    ];
+    for (const [path, method, status, name] of expected) {
+      expect(
+        document.paths[path][method].responses[status].content[
+          'application/json'
+        ].schema,
+      ).toEqual({
+        $ref: `#/components/schemas/${name}`,
+      });
+    }
+    const schemas = document.components.schemas;
+    expect(schemas.SalesOfferCoverAccessDto.properties).toMatchObject({
+      url: { type: 'string' },
+      expiresAt: { format: 'date-time' },
+    });
+    expect(schemas.SalesOfferPaymentReviewDto.properties).toMatchObject({
+      totalMinor: { type: 'number' },
+      paymentAttempts: {
+        type: 'array',
+        items: {
+          $ref: '#/components/schemas/SalesOfferReviewPaymentAttemptDto',
+        },
+      },
+      items: {
+        type: 'array',
+        items: { $ref: '#/components/schemas/SalesOfferReviewItemDto' },
+      },
+      salesOfferPurchases: {
+        type: 'array',
+        items: { $ref: '#/components/schemas/SalesOfferReviewPurchaseDto' },
+      },
+    });
+    expect(
+      schemas.RecordedOfferRefundDto.properties.externalRefundReference.type,
+    ).toBe('string');
+  });
+
   it('documents forms, respondent authentication, and typed answers/results', async () => {
     const response = await app.inject({ method: 'GET', url: '/api/docs-json' });
     const document = JSON.parse(response.body);
