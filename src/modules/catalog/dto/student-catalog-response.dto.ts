@@ -326,6 +326,13 @@ export class PaginatedMySubjectsResponseDto {
 }
 
 export class StudentEntitlementDto {
+  @ApiProperty({
+    minimum: 0,
+    description:
+      'Distinct questions available to this student in the entitled course or chapter and its descendants, before assessment filters.',
+  })
+  availableQuestionCount!: number;
+
   @ApiProperty()
   id!: string;
 

@@ -272,10 +272,26 @@ export class StudentCatalogController {
     summary: 'List the authenticated student active entitlements',
   })
   @ApiOkResponse({ type: PaginatedStudentEntitlementResponseDto })
-  entitlements(
+  async entitlements(
     @CurrentUser() user: RequestUser,
     @Query() query: PaginationQueryDto,
   ) {
-    return this.catalog.entitlements(user.id, query);
+    const page = await this.catalog.entitlements(user.id, query);
+    const nodes = page.data.map((entitlement) => ({
+      type:
+        entitlement.targetType === 'COURSE'
+          ? ('course' as const)
+          : ('chapter' as const),
+      id: entitlement.targetId!,
+    }));
+    const counts = await this.assessments.catalogQuestionCounts(user.id, nodes);
+    return {
+      ...page,
+      data: page.data.map((entitlement, index) => ({
+        ...entitlement,
+        availableQuestionCount:
+          counts.get(`${nodes[index].type}:${nodes[index].id}`) ?? 0,
+      })),
+    };
   }
 }
