@@ -47,6 +47,15 @@ export async function cleanDatabase(
   // Asset (payment proofs), StudentProfile (orders), and User (payment methods),
   // so the whole chain must go before all four.
   await prisma.manualPaymentSubmission.deleteMany();
+  await prisma.studentCreditAllocation.deleteMany();
+  await prisma.studentCreditReservation.deleteMany();
+  await prisma.studentCreditEntry.deleteMany();
+  await prisma.studentRewardAward.deleteMany();
+  await prisma.studentCreditGrant.deleteMany();
+  await prisma.studentCreditAccount.deleteMany();
+  await prisma.studentReferral.deleteMany();
+  await prisma.studentInviteCode.deleteMany();
+  await prisma.studentRewardsSettings.deleteMany();
   await prisma.refundRequestItem.deleteMany();
   await prisma.refundRequest.deleteMany();
   await prisma.orderItem.deleteMany();

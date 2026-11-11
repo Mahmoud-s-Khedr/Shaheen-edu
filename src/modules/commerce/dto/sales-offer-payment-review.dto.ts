@@ -9,6 +9,7 @@ import { StudentSalesOfferDto } from './sales-offer.dto';
 
 /** Raw order-line fields returned by the administrator review queue. */
 export class SalesOfferReviewItemDto {
+  @ApiProperty() creditAppliedMinor!: number;
   @ApiProperty() id!: string;
   @ApiProperty() orderId!: string;
   @ApiProperty({ type: String, nullable: true }) salesOfferPurchaseId!:
@@ -66,6 +67,7 @@ export class SalesOfferReviewPaymentAttemptDto {
 
 /** This queue retains raw minor-unit fields rather than the student OrderDto. */
 export class SalesOfferPaymentReviewDto {
+  @ApiProperty() creditAppliedMinor!: number;
   @ApiProperty() id!: string;
   @ApiProperty() studentUserId!: string;
   @ApiProperty({ type: String, nullable: true }) manualPaymentMethodId!:

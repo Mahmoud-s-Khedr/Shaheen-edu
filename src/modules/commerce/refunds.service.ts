@@ -1,9 +1,11 @@
+import { StudentRewardsService } from '../student-rewards/student-rewards.service';
 import { assertSuperAdmin } from '../../common/authorization/admin-authorization';
 import {
   BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import {
   ContentStatus,
@@ -30,6 +32,7 @@ export class RefundsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    @Optional() private readonly studentRewards?: StudentRewardsService,
   ) {}
 
   private admin(actor: RequestUser) {
@@ -100,6 +103,7 @@ export class RefundsService {
         id: item.id,
         orderItemId: item.orderItemId,
         amountMinor: item.amountMinor,
+        creditReturnMinor: item.creditReturnMinor ?? 0,
         currency: item.currency,
         targetType: item.orderItem?.targetType,
         targetId: item.orderItem?.courseId ?? item.orderItem?.chapterId,
@@ -203,7 +207,8 @@ export class RefundsService {
               items: {
                 create: items.map((item: any) => ({
                   orderItemId: item.id,
-                  amountMinor: item.priceMinor,
+                  amountMinor: item.priceMinor - (item.creditAppliedMinor ?? 0),
+                  creditReturnMinor: item.creditAppliedMinor ?? 0,
                   currency: item.currency,
                 })),
               },
@@ -349,6 +354,8 @@ export class RefundsService {
           },
         });
         if (!request) throw new NotFoundException('Refund request not found');
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`order-fulfilment:${request.orderId}`}))`;
+        if (this.studentRewards) await this.studentRewards.lock(tx);
         const purchaseIds = [
           ...new Set(
             request.items
@@ -379,6 +386,7 @@ export class RefundsService {
           throw new ConflictException(
             'Only pending refund requests can be approved',
           );
+        if (this.studentRewards) await this.studentRewards.refund(tx, request);
         const orderItemIds = request.items.map((item: any) => item.orderItemId);
         await tx.studentEntitlement.updateMany({
           where: {

@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { StudentRewardsModule } from '../student-rewards/student-rewards.module';
 import { AssetsModule } from '../assets/assets.module';
 import { AuditModule } from '../audit/audit.module';
 import {
@@ -23,7 +24,7 @@ import {
 import { SalesOffersService } from './sales-offers.service';
 
 @Module({
-  imports: [AssetsModule, AuditModule],
+  imports: [AssetsModule, AuditModule, StudentRewardsModule],
   controllers: [
     CommerceController,
     ManualPaymentAdminController,

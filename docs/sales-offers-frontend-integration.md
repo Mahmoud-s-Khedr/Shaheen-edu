@@ -1,6 +1,6 @@
 # Sales offers frontend integration guide
 
-This guide covers the sales offers update: student offer browsing, bundles in the cart, checkout, order history, refunds, super-admin offer management, payment reviews, and reporting. It describes the current backend implementation. Credit and first-purchase rewards are outside this update.
+This guide covers the sales offers update: student offer browsing, bundles in the cart, checkout, order history, refunds, super-admin offer management, payment reviews, and reporting. It describes the current backend implementation. For the newer credit and rewards extension, see the [frontend integration guide](student-credit-and-rewards-frontend-integration.md) and [API guide](student-credit-and-rewards-api.md).
 
 ## 1. API conventions and prerequisites
 

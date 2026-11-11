@@ -34,6 +34,25 @@ export class ExternalOfferRefundDto {
   @ApiProperty() @IsString() @MinLength(1) @MaxLength(200) reference!: string;
 }
 export class PricePreviewDto {
+  @ApiPropertyOptional({
+    description:
+      'Student invite code applied at checkout; separate from partner referralCode',
+  })
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(80)
+  studentReferralCode?: string;
+
+  @ApiPropertyOptional({
+    description: 'Student credit to spend in EGP minor units',
+    default: 0,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  creditAmountMinor?: number;
+
   @ApiProperty({ type: [CartTargetDto] })
   @ValidateNested({ each: true })
   @Type(() => CartTargetDto)
@@ -50,6 +69,25 @@ export class PricePreviewDto {
   referralCode?: string;
 }
 export class CheckoutDto {
+  @ApiPropertyOptional({
+    description:
+      'Student invite code applied at checkout; separate from partner referralCode',
+  })
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(80)
+  studentReferralCode?: string;
+
+  @ApiPropertyOptional({
+    description: 'Student credit to spend in EGP minor units',
+    default: 0,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  creditAmountMinor?: number;
+
   @ApiPropertyOptional({
     enum: [PaymentChannel.MANUAL, PaymentChannel.XPAY],
     default: PaymentChannel.MANUAL,
@@ -365,6 +403,8 @@ export class PaymentMethodSnapshotDto {
 }
 
 export class OrderItemDto {
+  @ApiProperty({ type: MoneyDto }) creditApplied!: MoneyDto;
+  @ApiProperty({ type: MoneyDto }) externalPayment!: MoneyDto;
   @ApiProperty({ example: 'order-item-id' }) id!: string;
   @ApiProperty({ enum: CommerceTargetType, example: CommerceTargetType.COURSE })
   targetType!: CommerceTargetType;
@@ -425,6 +465,8 @@ export class PaymentSubmissionSummaryDto {
 }
 
 export class OrderDto {
+  @ApiProperty({ type: MoneyDto }) creditApplied!: MoneyDto;
+  @ApiProperty({ type: MoneyDto }) priceAfterDiscount!: MoneyDto;
   @ApiProperty({ example: 'order-id' }) id!: string;
   @ApiProperty({ enum: OrderStatus }) status!: OrderStatus;
   @ApiProperty({ type: MoneyDto }) total!: MoneyDto;

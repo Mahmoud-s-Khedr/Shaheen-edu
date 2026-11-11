@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Optional,
   NotFoundException,
 } from '@nestjs/common';
 import {
@@ -13,6 +14,8 @@ import {
   ReferralCommissionKind,
 } from '../../common/types/roles.enum';
 import { AuditService } from '../audit/audit.service';
+import { StudentCreditService } from '../student-rewards/student-credit.service';
+import { StudentRewardsService } from '../student-rewards/student-rewards.service';
 import { allocateBundleReferral } from './bundle-allocation';
 
 function agreementSpecificity(agreement: {
@@ -34,7 +37,11 @@ export class SalesOfferUnavailableError extends ConflictException {
 
 @Injectable()
 export class FulfilmentService {
-  constructor(private readonly audit: AuditService) {}
+  constructor(
+    private readonly audit: AuditService,
+    @Optional() private readonly studentCredit?: StudentCreditService,
+    @Optional() private readonly studentRewards?: StudentRewardsService,
+  ) {}
 
   async fulfil(
     tx: any,
@@ -66,6 +73,9 @@ export class FulfilmentService {
           order.externalRefundReference))
     )
       return order;
+    if (this.studentRewards) await this.studentRewards.lock(tx);
+    if (this.studentCredit)
+      await this.studentCredit.assertReservation(tx, order);
     const purchases = [...(order.salesOfferPurchases ?? [])].sort(
       (a: any, b: any) => a.salesOfferId.localeCompare(b.salesOfferId),
     );
@@ -101,6 +111,8 @@ export class FulfilmentService {
     });
     if (claimed.count !== 1)
       throw new ConflictException('Order cannot be fulfilled');
+    if (this.studentCredit) await this.studentCredit.consume(tx, order);
+    if (this.studentRewards) await this.studentRewards.award(tx, order);
     const now = new Date();
     if (purchases.length)
       await tx.salesOfferPurchase.updateMany({
@@ -274,6 +286,9 @@ export class FulfilmentService {
             subtotalMinor: order.subtotalMinor,
             discountMinor: order.discountMinor,
             totalMinor: order.totalMinor,
+            creditAppliedMinor: order.creditAppliedMinor ?? 0,
+            priceAfterDiscountMinor:
+              order.totalMinor + (order.creditAppliedMinor ?? 0),
             currency: order.currency,
             approvedAt: now,
             items: order.items.map((item: any) => ({
@@ -281,6 +296,9 @@ export class FulfilmentService {
               basePriceMinor: item.basePriceMinor,
               discountMinor: item.discountMinor,
               totalMinor: item.priceMinor,
+              creditAppliedMinor: item.creditAppliedMinor ?? 0,
+              externalPaymentMinor:
+                item.priceMinor - (item.creditAppliedMinor ?? 0),
               appliedPromotion: item.appliedPromotionSnapshot,
               salesOfferPurchaseId: item.salesOfferPurchaseId,
             })),

@@ -3,6 +3,7 @@ import { Type } from 'class-transformer';
 import {
   ArrayMinSize,
   IsArray,
+  IsBoolean,
   IsDate,
   IsIn,
   IsInt,
@@ -30,6 +31,16 @@ export class SalesOfferItemDto {
 }
 
 export class SaveSalesOfferDto {
+  @ApiPropertyOptional({ default: 0 })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(2147483647)
+  creditRewardMinor?: number;
+  @ApiPropertyOptional({ default: false })
+  @IsOptional()
+  @IsBoolean()
+  firstPurchaseEligible?: boolean;
   @ApiProperty() @IsString() @MinLength(1) @MaxLength(160) name!: string;
   @ApiPropertyOptional()
   @IsOptional()
@@ -70,6 +81,8 @@ export class SalesOfferAdminItemDto extends SalesOfferItemDto {
   @ApiProperty({ type: String, nullable: true }) chapterId!: string | null;
 }
 export class SalesOfferAdminDto {
+  @ApiProperty() creditRewardMinor!: number;
+  @ApiProperty() firstPurchaseEligible!: boolean;
   @ApiProperty() id!: string;
   @ApiProperty() name!: string;
   @ApiProperty({ type: String, nullable: true }) description!: string | null;
@@ -106,6 +119,8 @@ export class StudentSalesOfferItemDto extends SalesOfferItemDto {
   @ApiProperty() owned!: boolean;
 }
 export class StudentSalesOfferDto {
+  @ApiProperty() creditRewardMinor!: number;
+  @ApiProperty() firstPurchaseEligible!: boolean;
   @ApiProperty() id!: string;
   @ApiProperty() name!: string;
   @ApiProperty({ type: String, nullable: true }) description!: string | null;

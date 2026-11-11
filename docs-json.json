@@ -21239,6 +21239,580 @@
         ]
       }
     },
+    "/api/v1/admin/student-rewards/settings": {
+      "get": {
+        "operationId": "AdminStudentRewardsController_settings_v1",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudentRewardsSettingsResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Read student credit and rewards configuration",
+        "tags": [
+          "admin/student-rewards"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
+        ]
+      },
+      "put": {
+        "operationId": "AdminStudentRewardsController_save_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveStudentRewardsSettingsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudentRewardsSettingsResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Replace student credit and rewards configuration",
+        "tags": [
+          "admin/student-rewards"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
+        ]
+      }
+    },
+    "/api/v1/admin/students/{id}/credit": {
+      "get": {
+        "operationId": "AdminStudentRewardsController_balance_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudentCreditBalanceDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Read student credit balance",
+        "tags": [
+          "admin/student-rewards"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
+        ]
+      }
+    },
+    "/api/v1/admin/students/{id}/credit/transactions": {
+      "get": {
+        "operationId": "AdminStudentRewardsController_history_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "One-based page number.",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Maximum records to return per page.",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudentCreditHistoryDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Read student credit history",
+        "tags": [
+          "admin/student-rewards"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
+        ]
+      }
+    },
+    "/api/v1/admin/students/{id}/credit/adjustments": {
+      "post": {
+        "operationId": "AdminStudentRewardsController_adjust_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdjustStudentCreditDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudentCreditBalanceDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Grant or adjust student credit with an audit reason",
+        "tags": [
+          "admin/student-rewards"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
+        ]
+      }
+    },
+    "/api/v1/admin/student-referrals": {
+      "get": {
+        "operationId": "AdminStudentRewardsController_referrals_v1",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "One-based page number.",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Maximum records to return per page.",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudentReferralAdminListDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Review student referral attribution and suspicious activity",
+        "tags": [
+          "admin/student-rewards"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
+        ]
+      }
+    },
+    "/api/v1/admin/student-referrals/{id}/review": {
+      "post": {
+        "operationId": "AdminStudentRewardsController_review_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewStudentReferralDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudentReferralAdminDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Activate or suspend student referral attribution",
+        "tags": [
+          "admin/student-rewards"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
+        ]
+      }
+    },
+    "/api/v1/admin/students/{id}/referral-code/status": {
+      "put": {
+        "operationId": "AdminStudentRewardsController_status_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetInviteCodeStatusDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudentInviteCodeAdminDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Activate or suspend a student invite code",
+        "tags": [
+          "admin/student-rewards"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
+        ]
+      }
+    },
+    "/api/v1/student/credit": {
+      "get": {
+        "operationId": "StudentRewardsController_balance_v1",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudentCreditBalanceDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get available, reserved, expiring credit and debt",
+        "tags": [
+          "student/rewards"
+        ],
+        "x-roles": [
+          "STUDENT"
+        ]
+      }
+    },
+    "/api/v1/student/credit/transactions": {
+      "get": {
+        "operationId": "StudentRewardsController_history_v1",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "One-based page number.",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Maximum records to return per page.",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudentCreditHistoryDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List credit movements",
+        "tags": [
+          "student/rewards"
+        ],
+        "x-roles": [
+          "STUDENT"
+        ]
+      }
+    },
+    "/api/v1/student/referrals/code": {
+      "get": {
+        "operationId": "StudentRewardsController_invite_v1",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudentInviteCodeDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get a personal student invite code",
+        "tags": [
+          "student/rewards"
+        ],
+        "x-roles": [
+          "STUDENT"
+        ]
+      }
+    },
+    "/api/v1/student/referrals": {
+      "get": {
+        "operationId": "StudentRewardsController_referrals_v1",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "One-based page number.",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Maximum records to return per page.",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudentReferralListDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List personal referral statuses without invited student details",
+        "tags": [
+          "student/rewards"
+        ],
+        "x-roles": [
+          "STUDENT"
+        ]
+      }
+    },
     "/api/v1/student/content-items/{id}/complete": {
       "post": {
         "operationId": "LearningController_complete_v1",
@@ -37928,6 +38502,15 @@
       "PricePreviewDto": {
         "type": "object",
         "properties": {
+          "studentReferralCode": {
+            "type": "string",
+            "description": "Student invite code applied at checkout; separate from partner referralCode"
+          },
+          "creditAmountMinor": {
+            "type": "number",
+            "description": "Student credit to spend in EGP minor units",
+            "default": 0
+          },
           "targets": {
             "type": "array",
             "items": {
@@ -37948,6 +38531,15 @@
       "CheckoutDto": {
         "type": "object",
         "properties": {
+          "studentReferralCode": {
+            "type": "string",
+            "description": "Student invite code applied at checkout; separate from partner referralCode"
+          },
+          "creditAmountMinor": {
+            "type": "number",
+            "description": "Student credit to spend in EGP minor units",
+            "default": 0
+          },
           "paymentChannel": {
             "type": "string",
             "enum": [
@@ -38002,6 +38594,12 @@
       "OrderItemDto": {
         "type": "object",
         "properties": {
+          "creditApplied": {
+            "$ref": "#/components/schemas/MoneyDto"
+          },
+          "externalPayment": {
+            "$ref": "#/components/schemas/MoneyDto"
+          },
           "id": {
             "type": "string",
             "example": "order-item-id"
@@ -38037,6 +38635,8 @@
           }
         },
         "required": [
+          "creditApplied",
+          "externalPayment",
           "id",
           "targetType",
           "targetId",
@@ -38130,6 +38730,12 @@
       "OrderDto": {
         "type": "object",
         "properties": {
+          "creditApplied": {
+            "$ref": "#/components/schemas/MoneyDto"
+          },
+          "priceAfterDiscount": {
+            "$ref": "#/components/schemas/MoneyDto"
+          },
           "id": {
             "type": "string",
             "example": "order-id"
@@ -38217,6 +38823,8 @@
           }
         },
         "required": [
+          "creditApplied",
+          "priceAfterDiscount",
           "id",
           "status",
           "total",
@@ -38433,6 +39041,9 @@
       "SalesOfferReviewItemDto": {
         "type": "object",
         "properties": {
+          "creditAppliedMinor": {
+            "type": "number"
+          },
           "id": {
             "type": "string"
           },
@@ -38484,6 +39095,7 @@
           }
         },
         "required": [
+          "creditAppliedMinor",
           "id",
           "orderId",
           "salesOfferPurchaseId",
@@ -38538,6 +39150,12 @@
       "StudentSalesOfferDto": {
         "type": "object",
         "properties": {
+          "creditRewardMinor": {
+            "type": "number"
+          },
+          "firstPurchaseEligible": {
+            "type": "boolean"
+          },
           "id": {
             "type": "string"
           },
@@ -38601,6 +39219,8 @@
           }
         },
         "required": [
+          "creditRewardMinor",
+          "firstPurchaseEligible",
           "id",
           "name",
           "description",
@@ -38766,6 +39386,9 @@
       "SalesOfferPaymentReviewDto": {
         "type": "object",
         "properties": {
+          "creditAppliedMinor": {
+            "type": "number"
+          },
           "id": {
             "type": "string"
           },
@@ -38867,6 +39490,7 @@
           }
         },
         "required": [
+          "creditAppliedMinor",
           "id",
           "studentUserId",
           "manualPaymentMethodId",
@@ -39547,6 +40171,12 @@
       "SalesOfferAdminDto": {
         "type": "object",
         "properties": {
+          "creditRewardMinor": {
+            "type": "number"
+          },
+          "firstPurchaseEligible": {
+            "type": "boolean"
+          },
           "id": {
             "type": "string"
           },
@@ -39613,6 +40243,8 @@
           }
         },
         "required": [
+          "creditRewardMinor",
+          "firstPurchaseEligible",
           "id",
           "name",
           "description",
@@ -39650,6 +40282,14 @@
       "SaveSalesOfferDto": {
         "type": "object",
         "properties": {
+          "creditRewardMinor": {
+            "type": "number",
+            "default": 0
+          },
+          "firstPurchaseEligible": {
+            "type": "boolean",
+            "default": false
+          },
           "name": {
             "type": "string"
           },
@@ -39720,6 +40360,542 @@
         "required": [
           "url",
           "expiresAt"
+        ]
+      },
+      "CreditPolicyDto": {
+        "type": "object",
+        "properties": {
+          "targetTypes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "COURSE",
+                "CHAPTER",
+                "BUNDLE"
+              ]
+            }
+          },
+          "excludedTargets": {
+            "description": "Excluded COURSE:id, CHAPTER:id, or BUNDLE:id keys",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "maximumUsageBps": {
+            "type": "number",
+            "description": "Maximum share of eligible price payable with credit, in basis points"
+          },
+          "maximumUsageMinor": {
+            "type": "object",
+            "nullable": true
+          },
+          "expiryDays": {
+            "type": "object",
+            "nullable": true
+          }
+        },
+        "required": [
+          "targetTypes",
+          "excludedTargets",
+          "enabled",
+          "maximumUsageBps"
+        ]
+      },
+      "PurchaseRewardPolicyDto": {
+        "type": "object",
+        "properties": {
+          "targetTypes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "COURSE",
+                "CHAPTER",
+                "BUNDLE"
+              ]
+            }
+          },
+          "excludedTargets": {
+            "description": "Excluded COURSE:id, CHAPTER:id, or BUNDLE:id keys",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "minimumPaymentMinor": {
+            "type": "number"
+          },
+          "rewardMinor": {
+            "type": "number"
+          },
+          "startsAt": {
+            "type": "object",
+            "nullable": true
+          },
+          "endsAt": {
+            "type": "object",
+            "nullable": true
+          }
+        },
+        "required": [
+          "targetTypes",
+          "excludedTargets",
+          "enabled",
+          "minimumPaymentMinor",
+          "rewardMinor"
+        ]
+      },
+      "StudentReferralPolicyDto": {
+        "type": "object",
+        "properties": {
+          "targetTypes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "COURSE",
+                "CHAPTER",
+                "BUNDLE"
+              ]
+            }
+          },
+          "excludedTargets": {
+            "description": "Excluded COURSE:id, CHAPTER:id, or BUNDLE:id keys",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "minimumPaymentMinor": {
+            "type": "number"
+          },
+          "rewardMinor": {
+            "type": "number"
+          },
+          "startsAt": {
+            "type": "object",
+            "nullable": true
+          },
+          "endsAt": {
+            "type": "object",
+            "nullable": true
+          },
+          "invitedRewardMinor": {
+            "type": "number"
+          },
+          "rewardLimit": {
+            "type": "object",
+            "nullable": true
+          },
+          "perReferrerLimit": {
+            "type": "object",
+            "nullable": true
+          }
+        },
+        "required": [
+          "targetTypes",
+          "excludedTargets",
+          "enabled",
+          "minimumPaymentMinor",
+          "rewardMinor",
+          "invitedRewardMinor"
+        ]
+      },
+      "SaveStudentRewardsSettingsDto": {
+        "type": "object",
+        "properties": {
+          "credit": {
+            "$ref": "#/components/schemas/CreditPolicyDto"
+          },
+          "firstPurchase": {
+            "$ref": "#/components/schemas/PurchaseRewardPolicyDto"
+          },
+          "referral": {
+            "$ref": "#/components/schemas/StudentReferralPolicyDto"
+          }
+        },
+        "required": [
+          "credit",
+          "firstPurchase",
+          "referral"
+        ]
+      },
+      "StudentRewardsSettingsResponseDto": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "number"
+          },
+          "config": {
+            "$ref": "#/components/schemas/SaveStudentRewardsSettingsDto"
+          }
+        },
+        "required": [
+          "version",
+          "config"
+        ]
+      },
+      "ExpiringStudentCreditDto": {
+        "type": "object",
+        "properties": {
+          "amountMinor": {
+            "type": "number"
+          },
+          "expiresAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "amountMinor",
+          "expiresAt"
+        ]
+      },
+      "StudentCreditBalanceDto": {
+        "type": "object",
+        "properties": {
+          "currency": {
+            "type": "string",
+            "example": "EGP"
+          },
+          "availableMinor": {
+            "type": "number"
+          },
+          "reservedMinor": {
+            "type": "number"
+          },
+          "debtMinor": {
+            "type": "number"
+          },
+          "expiring": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExpiringStudentCreditDto"
+            }
+          }
+        },
+        "required": [
+          "currency",
+          "availableMinor",
+          "reservedMinor",
+          "debtMinor",
+          "expiring"
+        ]
+      },
+      "StudentCreditEntryDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "studentUserId": {
+            "type": "string"
+          },
+          "key": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "GRANTED",
+              "RESERVED",
+              "SPENT",
+              "RETURNED",
+              "RELEASED",
+              "EXPIRED",
+              "ADJUSTED",
+              "REVERSED"
+            ]
+          },
+          "amountMinor": {
+            "type": "number"
+          },
+          "availableDeltaMinor": {
+            "type": "number"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "actorUserId": {
+            "type": "string",
+            "nullable": true
+          },
+          "orderId": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "studentUserId",
+          "key",
+          "type",
+          "amountMinor",
+          "availableDeltaMinor",
+          "reason",
+          "actorUserId",
+          "orderId",
+          "createdAt"
+        ]
+      },
+      "StudentRewardsPaginationDto": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "number"
+          },
+          "limit": {
+            "type": "number"
+          },
+          "total": {
+            "type": "number"
+          },
+          "totalPages": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "page",
+          "limit",
+          "total",
+          "totalPages"
+        ]
+      },
+      "StudentCreditHistoryDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StudentCreditEntryDto"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/StudentRewardsPaginationDto"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ]
+      },
+      "AdjustStudentCreditDto": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "description": "Unique operation key; retry with the same payload"
+          },
+          "amountMinor": {
+            "type": "number",
+            "description": "Signed EGP minor units; cannot be zero"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": "object",
+            "nullable": true
+          }
+        },
+        "required": [
+          "key",
+          "amountMinor",
+          "reason"
+        ]
+      },
+      "StudentReferralAdminDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "SUSPENDED"
+            ]
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "invitedStudentId": {
+            "type": "string"
+          },
+          "referrerStudentId": {
+            "type": "string"
+          },
+          "codeOwnerId": {
+            "type": "string"
+          },
+          "reviewReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "reviewNote": {
+            "type": "string",
+            "nullable": true
+          },
+          "reviewedById": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "createdAt",
+          "invitedStudentId",
+          "referrerStudentId",
+          "codeOwnerId",
+          "reviewReason",
+          "reviewNote",
+          "reviewedById"
+        ]
+      },
+      "StudentReferralAdminListDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StudentReferralAdminDto"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/StudentRewardsPaginationDto"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ]
+      },
+      "ReviewStudentReferralDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "SUSPENDED"
+            ]
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "note"
+        ]
+      },
+      "SetInviteCodeStatusDto": {
+        "type": "object",
+        "properties": {
+          "isActive": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "isActive",
+          "reason"
+        ]
+      },
+      "StudentInviteCodeAdminDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "studentUserId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "isActive",
+          "studentUserId"
+        ]
+      },
+      "StudentInviteCodeDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "isActive": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "code",
+          "isActive"
+        ]
+      },
+      "StudentReferralSummaryDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "SUSPENDED"
+            ]
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "createdAt"
+        ]
+      },
+      "StudentReferralListDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StudentReferralSummaryDto"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/StudentRewardsPaginationDto"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
         ]
       },
       "UpdateContentStudyStateDto": {

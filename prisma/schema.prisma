@@ -627,6 +627,12 @@ model User {
 }
 
 model StudentProfile {
+  creditAccount    StudentCreditAccount?
+  inviteCode       StudentInviteCode?
+  referralReceived StudentReferral?      @relation("InvitedStudent")
+  referralsSent    StudentReferral[]     @relation("ReferringStudent")
+  rewardAwards     StudentRewardAward[]
+
   userId                  String                     @id
   user                    User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
   archivedAccessSnapshots ArchivedAccessSnapshot[]
@@ -2571,22 +2577,24 @@ model Cart {
 }
 
 model SalesOffer {
-  id            String           @id @default(cuid())
-  name          String
-  description   String?
-  marketingCopy String?
-  coverAssetId  String?
-  coverAsset    Asset?           @relation("SalesOfferCover", fields: [coverAssetId], references: [id], onDelete: Restrict)
-  priceMinor    Int
-  startsAt      DateTime
-  endsAt        DateTime
-  purchaseLimit Int?
-  status        String           @default("ACTIVE")
-  items         SalesOfferItem[]
-  cartItems     CartItem[]
-  purchases     SalesOfferPurchase[]
-  createdAt     DateTime         @default(now())
-  updatedAt     DateTime         @updatedAt
+  creditRewardMinor     Int                  @default(0)
+  firstPurchaseEligible Boolean              @default(false)
+  id                    String               @id @default(cuid())
+  name                  String
+  description           String?
+  marketingCopy         String?
+  coverAssetId          String?
+  coverAsset            Asset?               @relation("SalesOfferCover", fields: [coverAssetId], references: [id], onDelete: Restrict)
+  priceMinor            Int
+  startsAt              DateTime
+  endsAt                DateTime
+  purchaseLimit         Int?
+  status                String               @default("ACTIVE")
+  items                 SalesOfferItem[]
+  cartItems             CartItem[]
+  purchases             SalesOfferPurchase[]
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
 
   @@index([status, startsAt, endsAt])
 }
@@ -2643,35 +2651,39 @@ model ManualPaymentMethod {
 }
 
 model Order {
-  id                    String                              @id @default(cuid())
-  studentUserId         String
-  student               StudentProfile                      @relation(fields: [studentUserId], references: [userId], onDelete: Restrict)
-  manualPaymentMethodId String?
-  manualPaymentMethod   ManualPaymentMethod?                @relation(fields: [manualPaymentMethodId], references: [id], onDelete: Restrict)
-  paymentChannel        PaymentChannel                      @default(MANUAL)
-  paymentMethodSnapshot Json
-  subtotalMinor         Int                                 @default(0)
-  discountMinor         Int                                 @default(0)
-  totalMinor            Int
-  currency              String
-  status                OrderStatus                         @default(AWAITING_PAYMENT)
-  items                 OrderItem[]
-  salesOfferPurchases   SalesOfferPurchase[]
-  paymentAttentionReason String?
+  creditAppliedMinor      Int                                 @default(0)
+  rewardsSnapshot         Json?
+  creditReservations      StudentCreditReservation[]
+  rewardAwards            StudentRewardAward[]
+  id                      String                              @id @default(cuid())
+  studentUserId           String
+  student                 StudentProfile                      @relation(fields: [studentUserId], references: [userId], onDelete: Restrict)
+  manualPaymentMethodId   String?
+  manualPaymentMethod     ManualPaymentMethod?                @relation(fields: [manualPaymentMethodId], references: [id], onDelete: Restrict)
+  paymentChannel          PaymentChannel                      @default(MANUAL)
+  paymentMethodSnapshot   Json
+  subtotalMinor           Int                                 @default(0)
+  discountMinor           Int                                 @default(0)
+  totalMinor              Int
+  currency                String
+  status                  OrderStatus                         @default(AWAITING_PAYMENT)
+  items                   OrderItem[]
+  salesOfferPurchases     SalesOfferPurchase[]
+  paymentAttentionReason  String?
   externalRefundReference String?
-  submissions           ManualPaymentSubmission[]
-  paymentAttempts       PaymentAttempt[]
-  couponReservation     CouponReservation?
-  receipt               PaymentReceipt?
-  referralAttribution   OrderReferralAttribution?
-  refundRequests        RefundRequest[]
-  reconciliationOrders  PartnerFinanceReconciliationOrder[]
-  createdAt             DateTime                            @default(now())
-  updatedAt             DateTime                            @updatedAt
-  approvedAt            DateTime?
-  cancelledAt           DateTime?
-  paymentExpiresAt      DateTime?
-  expiredAt             DateTime?
+  submissions             ManualPaymentSubmission[]
+  paymentAttempts         PaymentAttempt[]
+  couponReservation       CouponReservation?
+  receipt                 PaymentReceipt?
+  referralAttribution     OrderReferralAttribution?
+  refundRequests          RefundRequest[]
+  reconciliationOrders    PartnerFinanceReconciliationOrder[]
+  createdAt               DateTime                            @default(now())
+  updatedAt               DateTime                            @updatedAt
+  approvedAt              DateTime?
+  cancelledAt             DateTime?
+  paymentExpiresAt        DateTime?
+  expiredAt               DateTime?
 
   @@index([studentUserId, createdAt, id])
   @@index([status, createdAt, id])
@@ -2680,11 +2692,12 @@ model Order {
 }
 
 model OrderItem {
+  creditAppliedMinor          Int                         @default(0)
   id                          String                      @id @default(cuid())
   orderId                     String
   order                       Order                       @relation(fields: [orderId], references: [id], onDelete: Restrict)
   salesOfferPurchaseId        String?
-  salesOfferPurchase          SalesOfferPurchase? @relation(fields: [salesOfferPurchaseId], references: [id], onDelete: Restrict)
+  salesOfferPurchase          SalesOfferPurchase?         @relation(fields: [salesOfferPurchaseId], references: [id], onDelete: Restrict)
   targetType                  CommerceTargetType
   courseId                    String?
   course                      Course?                     @relation("OrderItemCourse", fields: [courseId], references: [id], onDelete: Restrict)
@@ -2932,14 +2945,15 @@ model RefundRequest {
 }
 
 model RefundRequestItem {
-  id              String        @id @default(cuid())
-  refundRequestId String
-  refundRequest   RefundRequest @relation(fields: [refundRequestId], references: [id], onDelete: Restrict)
-  orderItemId     String        @unique
-  orderItem       OrderItem     @relation(fields: [orderItemId], references: [id], onDelete: Restrict)
-  amountMinor     Int
-  currency        String
-  createdAt       DateTime      @default(now())
+  creditReturnMinor Int           @default(0)
+  id                String        @id @default(cuid())
+  refundRequestId   String
+  refundRequest     RefundRequest @relation(fields: [refundRequestId], references: [id], onDelete: Restrict)
+  orderItemId       String        @unique
+  orderItem         OrderItem     @relation(fields: [orderItemId], references: [id], onDelete: Restrict)
+  amountMinor       Int
+  currency          String
+  createdAt         DateTime      @default(now())
 
   @@index([refundRequestId])
 }
@@ -3486,4 +3500,128 @@ model FormAnswerSelection {
 
   @@id([answerId, optionId])
   @@index([optionId])
+}
+
+// Credit amounts use integer EGP minor units. Grants track expiring lots;
+// immutable entries record every movement. Debt offsets future grants.
+model StudentCreditAccount {
+  studentUserId String                     @id
+  student       StudentProfile             @relation(fields: [studentUserId], references: [userId], onDelete: Restrict)
+  debtMinor     Int                        @default(0)
+  grants        StudentCreditGrant[]
+  entries       StudentCreditEntry[]
+  reservations  StudentCreditReservation[]
+}
+
+model StudentCreditGrant {
+  id                String                    @id @default(cuid())
+  studentUserId     String
+  account           StudentCreditAccount      @relation(fields: [studentUserId], references: [studentUserId], onDelete: Restrict)
+  sourceKey         String                    @unique
+  amountMinor       Int
+  remainingMinor    Int
+  expiresAt         DateTime?
+  originalExpiresAt DateTime?
+  rootGrantId       String?
+  rootGrant         StudentCreditGrant?       @relation("ReturnedCreditOrigin", fields: [rootGrantId], references: [id], onDelete: Restrict)
+  returnedGrants    StudentCreditGrant[]      @relation("ReturnedCreditOrigin")
+  revokedAt         DateTime?
+  createdAt         DateTime                  @default(now())
+  allocations       StudentCreditAllocation[]
+
+  @@index([studentUserId, expiresAt])
+  @@index([rootGrantId])
+}
+
+model StudentCreditEntry {
+  id                  String               @id @default(cuid())
+  studentUserId       String
+  account             StudentCreditAccount @relation(fields: [studentUserId], references: [studentUserId], onDelete: Restrict)
+  key                 String               @unique
+  type                String
+  amountMinor         Int
+  availableDeltaMinor Int
+  reason              String
+  actorUserId         String?
+  orderId             String?
+  createdAt           DateTime             @default(now())
+
+  @@index([studentUserId, createdAt, id])
+}
+
+model StudentCreditReservation {
+  id            String                    @id @default(cuid())
+  studentUserId String
+  account       StudentCreditAccount      @relation(fields: [studentUserId], references: [studentUserId], onDelete: Restrict)
+  orderId       String                    @unique
+  order         Order                     @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  amountMinor   Int
+  status        String                    @default("RESERVED")
+  allocations   StudentCreditAllocation[]
+  createdAt     DateTime                  @default(now())
+
+  @@index([studentUserId, status])
+}
+
+model StudentCreditAllocation {
+  returnedMinor Int                      @default(0)
+  id            String                   @id @default(cuid())
+  reservationId String
+  reservation   StudentCreditReservation @relation(fields: [reservationId], references: [id], onDelete: Restrict)
+  grantId       String
+  grant         StudentCreditGrant       @relation(fields: [grantId], references: [id], onDelete: Restrict)
+  amountMinor   Int
+
+  @@unique([reservationId, grantId])
+}
+
+model StudentRewardsSettings {
+  id          String   @id @default("default")
+  version     Int      @default(1)
+  config      Json
+  updatedById String
+  updatedAt   DateTime @updatedAt
+}
+
+model StudentInviteCode {
+  studentUserId String            @id
+  student       StudentProfile    @relation(fields: [studentUserId], references: [userId], onDelete: Restrict)
+  code          String            @unique
+  isActive      Boolean           @default(true)
+  referrals     StudentReferral[]
+}
+
+model StudentReferral {
+  id                String            @id @default(cuid())
+  invitedStudentId  String            @unique
+  invitedStudent    StudentProfile    @relation("InvitedStudent", fields: [invitedStudentId], references: [userId], onDelete: Restrict)
+  referrerStudentId String
+  referrerStudent   StudentProfile    @relation("ReferringStudent", fields: [referrerStudentId], references: [userId], onDelete: Restrict)
+  codeOwnerId       String
+  inviteCode        StudentInviteCode @relation(fields: [codeOwnerId], references: [studentUserId], onDelete: Restrict)
+  status            String            @default("ACTIVE")
+  reviewReason      String?
+  reviewNote        String?
+  reviewedById      String?
+  createdAt         DateTime          @default(now())
+
+  @@index([referrerStudentId, createdAt])
+}
+
+model StudentRewardAward {
+  id                  String         @id @default(cuid())
+  key                 String         @unique
+  studentUserId       String
+  student             StudentProfile @relation(fields: [studentUserId], references: [userId], onDelete: Restrict)
+  orderId             String
+  order               Order          @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  kind                String
+  amountMinor         Int
+  grantSourceKey      String         @unique
+  eligibilitySnapshot Json
+  reversedAt          DateTime?
+  createdAt           DateTime       @default(now())
+
+  @@index([orderId])
+  @@index([studentUserId, kind])
 }

@@ -69,6 +69,8 @@ export const REPORT_EXPORT_POLICIES: Record<ReportType, ReportExportPolicy> = {
       'paymentChannel',
       'subtotalMinor',
       'discountMinor',
+      'creditAppliedMinor',
+      'priceAfterDiscountMinor',
       'totalMinor',
       'currency',
       'bundleSnapshots',
@@ -86,6 +88,8 @@ export const REPORT_EXPORT_POLICIES: Record<ReportType, ReportExportPolicy> = {
       'paymentChannel',
       'subtotalMinor',
       'discountMinor',
+      'creditAppliedMinor',
+      'priceAfterDiscountMinor',
       'totalMinor',
       'currency',
       'bundleSnapshots',
@@ -97,7 +101,14 @@ export const REPORT_EXPORT_POLICIES: Record<ReportType, ReportExportPolicy> = {
   },
   REFUNDS: {
     classification: ReportDataClassification.NON_PII,
-    columns: ['requestedAt', 'reviewedAt', 'status', 'amountMinor', 'currency'],
+    columns: [
+      'requestedAt',
+      'reviewedAt',
+      'status',
+      'amountMinor',
+      'creditReturnMinor',
+      'currency',
+    ],
     roles: [Role.SUPER_ADMIN],
     privileged: true,
     retentionMs: 24 * 60 * 60 * 1000,
@@ -523,7 +534,12 @@ export class ReportsService {
       by: ['status', 'paymentChannel', 'currency'],
       where: this.orderWhere(query, 'approvedAt', approvedAt),
       _count: true,
-      _sum: { subtotalMinor: true, discountMinor: true, totalMinor: true },
+      _sum: {
+        subtotalMinor: true,
+        discountMinor: true,
+        creditAppliedMinor: true,
+        totalMinor: true,
+      },
     });
     return {
       ...this.contract(
@@ -536,7 +552,7 @@ export class ReportsService {
           discountMinor:
             'Sum of immutable order discount snapshots in EGP minor units.',
           totalMinor:
-            'Sum of immutable order total snapshots in EGP minor units. Approved rows are recognized revenue.',
+            'External payment due in EGP minor units; credit is reported separately.',
         },
         query,
       ),
@@ -546,6 +562,9 @@ export class ReportsService {
         subtotalMinor: row._sum.subtotalMinor ?? 0,
         discountMinor: row._sum.discountMinor ?? 0,
         totalMinor: row._sum.totalMinor ?? 0,
+        creditAppliedMinor: row._sum.creditAppliedMinor ?? 0,
+        priceAfterDiscountMinor:
+          (row._sum.totalMinor ?? 0) + (row._sum.creditAppliedMinor ?? 0),
       })),
       retention: 'Financial source records are retained for seven years.',
     };
@@ -578,7 +597,7 @@ export class ReportsService {
         },
       } as any,
       _count: true,
-      _sum: { amountMinor: true },
+      _sum: { amountMinor: true, creditReturnMinor: true },
     });
     return {
       ...this.contract(
@@ -587,7 +606,7 @@ export class ReportsService {
           requests:
             'Refund requests created in the selected Cairo period, grouped by current request status.',
           approvedAmountMinor:
-            'Sum of complete order-item reimbursement amounts for approved requests; no fractional item refunds exist.',
+            'External money reimbursed for approved items; restored credit is reported separately.',
         },
         query,
       ),
@@ -596,6 +615,7 @@ export class ReportsService {
         currency: row.currency,
         refundedItems: row._count,
         approvedAmountMinor: row._sum.amountMinor ?? 0,
+        creditReturnedMinor: row._sum.creditReturnMinor ?? 0,
       })),
     };
   }
@@ -1087,6 +1107,9 @@ export class ReportsService {
     const { salesOfferPurchases = [], ...values } = row;
     return {
       ...values,
+      creditAppliedMinor: row.creditAppliedMinor ?? 0,
+      priceAfterDiscountMinor:
+        (row.totalMinor ?? 0) + (row.creditAppliedMinor ?? 0),
       bundleSnapshots: JSON.stringify(
         salesOfferPurchases.map((purchase: any) => {
           const snapshot = purchase.snapshot ?? {};
@@ -1123,6 +1146,7 @@ export class ReportsService {
           paymentChannel: true,
           subtotalMinor: true,
           discountMinor: true,
+          creditAppliedMinor: true,
           totalMinor: true,
           currency: true,
           salesOfferPurchases: {
@@ -1146,7 +1170,13 @@ export class ReportsService {
           requestedAt: true,
           reviewedAt: true,
           status: true,
-          items: { select: { amountMinor: true, currency: true } },
+          items: {
+            select: {
+              amountMinor: true,
+              creditReturnMinor: true,
+              currency: true,
+            },
+          },
         },
       });
       return rows.flatMap((row) =>
@@ -1155,6 +1185,7 @@ export class ReportsService {
           reviewedAt: row.reviewedAt,
           status: row.status,
           amountMinor: item.amountMinor,
+          creditReturnMinor: item.creditReturnMinor ?? 0,
           currency: item.currency,
         })),
       );
@@ -1214,6 +1245,7 @@ export class ReportsService {
           paymentChannel: true,
           subtotalMinor: true,
           discountMinor: true,
+          creditAppliedMinor: true,
           totalMinor: true,
           currency: true,
           salesOfferPurchases: {

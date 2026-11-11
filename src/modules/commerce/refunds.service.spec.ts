@@ -9,6 +9,7 @@ describe('RefundsService', () => {
     policy = { eligibilityWindowDays: 7, maximumConsumptionBps: 1_000 },
   ) {
     const tx: any = {
+      $executeRaw: jest.fn(),
       order: { findFirst: jest.fn() },
       contentItem: { count: jest.fn() },
       studentContentProgress: { count: jest.fn() },

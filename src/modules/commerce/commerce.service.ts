@@ -1,3 +1,8 @@
+import {
+  StudentCreditService,
+  CreditUnavailableError,
+} from '../student-rewards/student-credit.service';
+import { StudentRewardsService } from '../student-rewards/student-rewards.service';
 import { assertSuperAdmin } from '../../common/authorization/admin-authorization';
 import {
   BadRequestException,
@@ -79,6 +84,8 @@ export class CommerceService {
     private readonly fulfilment?: FulfilmentService,
     config?: ConfigService<AppConfig, true>,
     @Optional() private readonly salesOffers?: SalesOffersService,
+    @Optional() private readonly studentCredit?: StudentCreditService,
+    @Optional() private readonly studentRewards?: StudentRewardsService,
   ) {
     this.commerceConfig = config?.get('commerce', { infer: true }) ?? {
       xpayApiBaseUrl: '',
@@ -335,8 +342,37 @@ export class CommerceService {
           this.referralTargets(targets),
         )
       : null;
+    const credit = this.studentRewards
+      ? await this.prisma.$transaction(async (tx) => {
+          const credit = await this.studentRewards!.quoteCredit(
+            tx,
+            studentUserId,
+            quote,
+            dto.creditAmountMinor,
+          );
+          const rewardsSnapshot = await this.studentRewards!.snapshot(
+            tx,
+            studentUserId,
+            credit.settings,
+            Boolean(dto.referralCode),
+            dto.studentReferralCode,
+          );
+          return {
+            studentReferral: rewardsSnapshot.studentReferral,
+            maximumCreditMinor: credit.maximumCreditMinor,
+            creditAppliedMinor: credit.creditAppliedMinor,
+            paymentDueMinor: credit.paymentDueMinor,
+          };
+        })
+      : {
+          studentReferral: null,
+          maximumCreditMinor: 0,
+          creditAppliedMinor: 0,
+          paymentDueMinor: quote.totalMinor,
+        };
     return {
       ...quote,
+      ...credit,
       referral: referral
         ? { code: referral.code, programId: referral.programId }
         : null,
@@ -737,7 +773,31 @@ export class CommerceService {
             // determines whether this order requires payment. Keep this before
             // all paid-channel validation so a free enrolment has no dependency
             // on an active manual method or XPay configuration.
-            const isZeroTotal = quote.totalMinor === 0;
+            if (this.studentRewards) await this.studentRewards.lock(tx);
+            const credit = this.studentRewards
+              ? await this.studentRewards.quoteCredit(
+                  tx,
+                  studentUserId,
+                  quote,
+                  dto.creditAmountMinor,
+                )
+              : {
+                  creditAppliedMinor: 0,
+                  paymentDueMinor: quote.totalMinor,
+                  creditShares: new Map<string, number>(),
+                  settings: null,
+                };
+            const rewardsSnapshot = this.studentRewards
+              ? await this.studentRewards.snapshot(
+                  tx,
+                  studentUserId,
+                  credit.settings!,
+                  Boolean(dto.referralCode),
+                  dto.studentReferralCode,
+                  true,
+                )
+              : undefined;
+            const isZeroTotal = credit.paymentDueMinor === 0;
             if (
               requestedPaymentChannel !== PaymentChannel.MANUAL &&
               requestedPaymentChannel !== PaymentChannel.XPAY
@@ -789,13 +849,22 @@ export class CommerceService {
                     : { provider: 'XPAY', checkout: 'HOSTED_REDIRECT' },
                 subtotalMinor: quote.subtotalMinor,
                 discountMinor: quote.discountMinor,
-                totalMinor: quote.totalMinor,
+                totalMinor: credit.paymentDueMinor,
+                creditAppliedMinor: credit.creditAppliedMinor,
+                rewardsSnapshot: rewardsSnapshot
+                  ? JSON.parse(JSON.stringify(rewardsSnapshot))
+                  : undefined,
                 currency: 'EGP',
                 paymentExpiresAt,
                 items: {
                   create: quote.items
-                    .filter((x) => x.targetType !== CommerceTargetType.BUNDLE)
-                    .map((x) => ({
+                    .map((x, index) => ({ x, index }))
+                    .filter(
+                      ({ x }) => x.targetType !== CommerceTargetType.BUNDLE,
+                    )
+                    .map(({ x, index }) => ({
+                      creditAppliedMinor:
+                        credit.creditShares.get(String(index)) ?? 0,
                       targetType: x.targetType,
                       courseId: x.courseId,
                       chapterId: x.chapterId,
@@ -844,9 +913,8 @@ export class CommerceService {
                 },
               },
             });
-            for (const bundle of quote.items.filter(
-              (item) => item.targetType === CommerceTargetType.BUNDLE,
-            )) {
+            for (const [bundleIndex, bundle] of quote.items.entries()) {
+              if (bundle.targetType !== CommerceTargetType.BUNDLE) continue;
               const snapshot = bundle.bundleSnapshot;
               const purchase = await tx.salesOfferPurchase.create({
                 data: {
@@ -863,10 +931,18 @@ export class CommerceService {
                   weightMinor: item.weightMinor,
                 })),
               );
+              const bundleCreditShares = allocateBundleRevenue(
+                credit.creditShares.get(String(bundleIndex)) ?? 0,
+                [...shares].map(([key, weightMinor]) => ({ key, weightMinor })),
+              );
               await tx.orderItem.createMany({
                 data: snapshot.items.map((item: any) => ({
                   orderId: created.id,
                   salesOfferPurchaseId: purchase.id,
+                  creditAppliedMinor:
+                    bundleCreditShares.get(
+                      `${item.targetType}:${item.targetId}`,
+                    ) ?? 0,
                   targetType: item.targetType,
                   courseId:
                     item.targetType === CommerceTargetType.COURSE
@@ -899,6 +975,13 @@ export class CommerceService {
                 },
               });
             }
+            if (credit.creditAppliedMinor)
+              await this.studentCredit!.reserve(
+                tx,
+                studentUserId,
+                created.id,
+                credit.creditAppliedMinor,
+              );
             // Remove only the snapshot that was purchased. A concurrently added
             // cart item must survive this checkout.
             await tx.cartItem.deleteMany({
@@ -999,6 +1082,14 @@ export class CommerceService {
       subtotal: { amountMinor: order.subtotalMinor, currency: order.currency },
       discount: { amountMinor: order.discountMinor, currency: order.currency },
       total: { amountMinor: order.totalMinor, currency: order.currency },
+      creditApplied: {
+        amountMinor: order.creditAppliedMinor ?? 0,
+        currency: order.currency,
+      },
+      priceAfterDiscount: {
+        amountMinor: order.totalMinor + (order.creditAppliedMinor ?? 0),
+        currency: order.currency,
+      },
       paymentMethod: order.paymentMethodSnapshot,
       createdAt: order.createdAt,
       approvedAt: order.approvedAt,
@@ -1022,6 +1113,14 @@ export class CommerceService {
         basePrice: { amountMinor: x.basePriceMinor, currency: x.currency },
         discount: { amountMinor: x.discountMinor, currency: x.currency },
         price: { amountMinor: x.priceMinor, currency: x.currency },
+        creditApplied: {
+          amountMinor: x.creditAppliedMinor ?? 0,
+          currency: x.currency,
+        },
+        externalPayment: {
+          amountMinor: x.priceMinor - (x.creditAppliedMinor ?? 0),
+          currency: x.currency,
+        },
         promotion: x.appliedPromotionSnapshot,
         salesOfferPurchaseId: x.salesOfferPurchaseId ?? null,
       })),
@@ -1101,19 +1200,23 @@ export class CommerceService {
       where: { id, studentUserId },
     });
     if (!order) throw new NotFoundException('Order not found');
-    const cancelled = await this.prisma.order.updateMany({
-      where: {
-        id,
-        studentUserId,
-        status: { in: [OrderStatus.AWAITING_PAYMENT, OrderStatus.REJECTED] },
-      },
-      data: { status: OrderStatus.CANCELLED, cancelledAt: new Date() },
-    });
-    if (cancelled.count !== 1)
-      throw new ConflictException('Order cannot be cancelled');
-    await this.prisma.couponReservation.updateMany({
-      where: { orderId: id, status: 'RESERVED' },
-      data: { status: 'RELEASED', releasedAt: new Date() },
+    await this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`order-fulfilment:${id}`}))`;
+      const cancelled = await tx.order.updateMany({
+        where: {
+          id,
+          studentUserId,
+          status: { in: [OrderStatus.AWAITING_PAYMENT, OrderStatus.REJECTED] },
+        },
+        data: { status: OrderStatus.CANCELLED, cancelledAt: new Date() },
+      });
+      if (cancelled.count !== 1)
+        throw new ConflictException('Order cannot be cancelled');
+      await tx.couponReservation.updateMany({
+        where: { orderId: id, status: 'RESERVED' },
+        data: { status: 'RELEASED', releasedAt: new Date() },
+      });
+      if (this.studentCredit) await this.studentCredit.release(tx, id);
     });
     await this.audit.record({
       actorUserId: studentUserId,
@@ -1677,7 +1780,7 @@ export class CommerceService {
         amountMinor: order.totalMinor,
         items: order.items.map((item) => ({
           title: item.titleSnapshot,
-          amountMinor: item.priceMinor,
+          amountMinor: item.priceMinor - (item.creditAppliedMinor ?? 0),
         })),
         customer: {
           fullName: order.student.fullName,
@@ -1844,19 +1947,34 @@ export class CommerceService {
             )
           ) {
             try {
+              if (
+                attempt.order.creditAppliedMinor &&
+                (attempt.order.status === OrderStatus.CANCELLED ||
+                  attempt.order.status === OrderStatus.EXPIRED)
+              )
+                throw new CreditUnavailableError();
               await this.fulfilment!.fulfil(tx, {
                 orderId: attempt.orderId,
                 paymentAttemptId: attempt.id,
               });
             } catch (error) {
-              if (!(error instanceof SalesOfferUnavailableError)) throw error;
+              if (
+                !(error instanceof SalesOfferUnavailableError) &&
+                !(error instanceof CreditUnavailableError)
+              )
+                throw error;
               await tx.order.update({
                 where: { id: attempt.orderId },
                 data: {
                   status: OrderStatus.PAYMENT_REVIEW,
-                  paymentAttentionReason: 'OFFER_UNAVAILABLE_AFTER_PAYMENT',
+                  paymentAttentionReason:
+                    error instanceof CreditUnavailableError
+                      ? 'CREDIT_UNAVAILABLE_AFTER_PAYMENT'
+                      : 'OFFER_UNAVAILABLE_AFTER_PAYMENT',
                 },
               });
+              if (this.studentCredit)
+                await this.studentCredit.release(tx, attempt.orderId);
               await this.audit.recordWithClient(tx, {
                 actorUserId: attempt.order.studentUserId,
                 action: 'XPAY_OFFER_PAYMENT_REVIEW',
@@ -1864,7 +1982,10 @@ export class CommerceService {
                 targetId: attempt.orderId,
                 metadata: {
                   paymentAttemptId: attempt.id,
-                  reason: 'OFFER_UNAVAILABLE_AFTER_PAYMENT',
+                  reason:
+                    error instanceof CreditUnavailableError
+                      ? 'CREDIT_UNAVAILABLE_AFTER_PAYMENT'
+                      : 'OFFER_UNAVAILABLE_AFTER_PAYMENT',
                 },
               });
             }
@@ -1906,7 +2027,12 @@ export class CommerceService {
         where: {
           id: orderId,
           status: OrderStatus.PAYMENT_REVIEW,
-          paymentAttentionReason: 'OFFER_UNAVAILABLE_AFTER_PAYMENT',
+          paymentAttentionReason: {
+            in: [
+              'OFFER_UNAVAILABLE_AFTER_PAYMENT',
+              'CREDIT_UNAVAILABLE_AFTER_PAYMENT',
+            ],
+          },
           externalRefundReference: null,
         },
         data: {
@@ -1919,6 +2045,7 @@ export class CommerceService {
         throw new ConflictException(
           'Order is not awaiting an external offer refund',
         );
+      if (this.studentCredit) await this.studentCredit.release(tx, orderId);
       await tx.couponReservation.updateMany({
         where: { orderId, status: CouponReservationStatus.RESERVED },
         data: {
@@ -1947,7 +2074,12 @@ export class CommerceService {
       data: await this.prisma.order.findMany({
         where: {
           status: OrderStatus.PAYMENT_REVIEW,
-          paymentAttentionReason: 'OFFER_UNAVAILABLE_AFTER_PAYMENT',
+          paymentAttentionReason: {
+            in: [
+              'OFFER_UNAVAILABLE_AFTER_PAYMENT',
+              'CREDIT_UNAVAILABLE_AFTER_PAYMENT',
+            ],
+          },
         },
         include: {
           paymentAttempts: true,

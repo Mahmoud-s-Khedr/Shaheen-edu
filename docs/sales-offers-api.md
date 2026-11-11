@@ -1,6 +1,6 @@
 # Sales offers API
 
-All routes use the `/api/v1` prefix and require a bearer token. Prices and weights are integer EGP minor units. A bundle is an offer with one or more courses or chapters; a flash sale is an offer with a limited window and, optionally, a purchase limit. Credit and first-purchase rewards are outside this API.
+All routes use the `/api/v1` prefix and require a bearer token. Prices and weights are integer EGP minor units. A bundle is an offer with one or more courses or chapters; a flash sale is an offer with a limited window and, optionally, a purchase limit. Credit and first-purchase rewards are documented in [Student credit and rewards](student-credit-and-rewards-api.md).
 
 ## Administrator operations
 

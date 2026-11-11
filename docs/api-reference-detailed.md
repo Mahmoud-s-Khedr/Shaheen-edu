@@ -13,6 +13,58 @@ operation inventory aligned with that document.
 The [sales offers guide](sales-offers-api.md) describes bundle creation,
 availability, checkout snapshots, payment review, and whole-bundle refunds.
 
+The [student credit and rewards guide](student-credit-and-rewards-api.md) describes
+configuration, checkout attribution, payment splits, credit reservations,
+reward qualification, expiration, refunds, and rollout.
+
+### `GET /api/v1/admin/student-referrals`
+
+Review student referral attribution and suspicious activity. See the [student credit and rewards guide](student-credit-and-rewards-api.md) for authorization, payloads, and responses.
+
+### `GET /api/v1/admin/student-rewards/settings`
+
+Read student credit and rewards configuration. See the [student credit and rewards guide](student-credit-and-rewards-api.md) for authorization, payloads, and responses.
+
+### `GET /api/v1/admin/students/{id}/credit`
+
+Read student credit balance. See the [student credit and rewards guide](student-credit-and-rewards-api.md) for authorization, payloads, and responses.
+
+### `GET /api/v1/admin/students/{id}/credit/transactions`
+
+Read student credit history. See the [student credit and rewards guide](student-credit-and-rewards-api.md) for authorization, payloads, and responses.
+
+### `GET /api/v1/student/credit`
+
+Get available, reserved, expiring credit and debt. See the [student credit and rewards guide](student-credit-and-rewards-api.md) for authorization, payloads, and responses.
+
+### `GET /api/v1/student/credit/transactions`
+
+List credit movements. See the [student credit and rewards guide](student-credit-and-rewards-api.md) for authorization, payloads, and responses.
+
+### `GET /api/v1/student/referrals`
+
+List personal referral statuses without invited student details. See the [student credit and rewards guide](student-credit-and-rewards-api.md) for authorization, payloads, and responses.
+
+### `GET /api/v1/student/referrals/code`
+
+Get a personal student invite code. See the [student credit and rewards guide](student-credit-and-rewards-api.md) for authorization, payloads, and responses.
+
+### `POST /api/v1/admin/student-referrals/{id}/review`
+
+Activate or suspend student referral attribution. See the [student credit and rewards guide](student-credit-and-rewards-api.md) for authorization, payloads, and responses.
+
+### `POST /api/v1/admin/students/{id}/credit/adjustments`
+
+Grant or adjust student credit with an audit reason. See the [student credit and rewards guide](student-credit-and-rewards-api.md) for authorization, payloads, and responses.
+
+### `PUT /api/v1/admin/student-rewards/settings`
+
+Replace student credit and rewards configuration. See the [student credit and rewards guide](student-credit-and-rewards-api.md) for authorization, payloads, and responses.
+
+### `PUT /api/v1/admin/students/{id}/referral-code/status`
+
+Activate or suspend a student invite code. See the [student credit and rewards guide](student-credit-and-rewards-api.md) for authorization, payloads, and responses.
+
 ### `GET /api/v1/admin/sales-offer-payment-reviews`
 
 ### `GET /api/v1/admin/sales-offers`

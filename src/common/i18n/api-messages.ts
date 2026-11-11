@@ -39,6 +39,38 @@ const statusTitles: Record<number, LocalizedMessage> = {
 };
 
 const translations: Record<string, string> = {
+  'A different student referrer is already assigned':
+    'تم ربط الطالب بالفعل بطالب مُحيل آخر',
+  'Credit refund exceeds the amount spent':
+    'مبلغ الرصيد المسترد يتجاوز الرصيد المستخدم في الطلب',
+  'Reserved credit is no longer available':
+    'الرصيد المحجوز لهذا الطلب لم يعد متاحاً',
+  'Insufficient available student credit': 'رصيد الطالب المتاح غير كافٍ',
+  'A nonzero amount, key and reason are required':
+    'يجب إدخال مبلغ غير صفري ومعرّف للعملية وسبب التعديل',
+  'Credit expiry must be in the future':
+    'يجب أن يكون تاريخ انتهاء الرصيد في المستقبل',
+  'Adjustment key was already used for a different request':
+    'استُخدم معرّف التعديل مسبقاً لطلب مختلف',
+  'Adjustment key was already used for a different expiry':
+    'استُخدم معرّف التعديل مسبقاً بتاريخ انتهاء مختلف',
+  'Program end must be after start':
+    'يجب أن يكون تاريخ انتهاء البرنامج بعد تاريخ بدايته',
+  'An enabled reward program needs a reward amount':
+    'يجب تحديد مبلغ مكافأة للبرنامج المفعّل',
+  'Credit must be a non-negative integer':
+    'يجب أن يكون مبلغ الرصيد عدداً صحيحاً غير سالب',
+  'Student credit spending is disabled': 'استخدام رصيد الطالب معطّل حالياً',
+  'Requested credit exceeds the available balance or usage limit':
+    'مبلغ الرصيد المطلوب يتجاوز الرصيد المتاح أو حد الاستخدام',
+  'An order cannot use both student and partner referrals':
+    'لا يمكن الجمع بين إحالة طالب وإحالة شريك في الطلب نفسه',
+  'Student referral program is inactive':
+    'برنامج إحالات الطلاب غير مفعّل حالياً',
+  'Invalid student referral code': 'رمز إحالة الطالب غير صالح',
+  'Self-referrals are not allowed': 'لا يمكن للطالب إحالة نفسه',
+  'Student referral not found': 'لم يتم العثور على إحالة الطالب',
+  'Student invite code not found': 'لم يتم العثور على رمز دعوة الطالب',
   'Offer not found': 'لم يتم العثور على العرض',
   'Offer content is unavailable': 'محتوى العرض غير متاح',
   'Offer is not available for purchase': 'العرض غير متاح للشراء',
