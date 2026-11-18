@@ -1,6 +1,13 @@
+import {
+  assertCourseReader,
+  assertResource,
+  resourceWhere,
+  resourceSql,
+} from '../../common/authorization/course-scope';
 import { assertContentStaff } from '../../common/authorization/admin-authorization';
 import {
   HttpStatus,
+  ForbiddenException,
   BadRequestException,
   ConflictException,
   Injectable,
@@ -15,6 +22,7 @@ import {
 } from '../../common/hierarchy/hierarchy.helper';
 import { toPaginationMeta } from '../../common/dto/pagination-query.dto';
 import {
+  Role,
   AccessType,
   AssetStatus,
   ContentItemType,
@@ -255,9 +263,28 @@ export class ContentItemsService {
   }
 
   async create(actor: RequestUser, dto: CreateContentItemDto) {
-    this.assertActorRole(actor);
+    assertCourseReader(actor);
+    if (
+      actor.role === Role.TEACHER &&
+      (dto.type !== ContentItemType.VIDEO ||
+        Object.keys(dto)
+          .filter((key) => dto[key as keyof typeof dto] !== undefined)
+          .some(
+            (key) =>
+              !['type', 'title', 'description', 'placement'].includes(key),
+          ))
+    )
+      throw new ForbiddenException(
+        'Teachers can create draft videos with a title, description and placement',
+      );
     const target = this.targetFromDto(dto.placement);
     const resolvedTarget = await this.assertValidTarget(target);
+    await assertResource(
+      this.prisma,
+      actor,
+      'course',
+      this.resolvedPlacement(target, resolvedTarget).resolvedCourseId,
+    );
     this.assertTypeFields(
       dto.type,
       dto.textBody ?? null,
@@ -306,12 +333,12 @@ export class ContentItemsService {
   }
 
   async getById(actor: RequestUser, id: string) {
-    this.assertActorRole(actor);
+    await assertResource(this.prisma, actor, 'contentItem', id);
     return this.toDetail(await this.getDetailOrThrow(id));
   }
 
   async list(actor: RequestUser, query: QueryContentItemDto) {
-    this.assertActorRole(actor);
+    assertCourseReader(actor);
     const placementSelections = (
       [
         ['courseId', 'resolvedCourseId'],
@@ -339,6 +366,7 @@ export class ContentItemsService {
           }
         : {};
     const where: Prisma.ContentItemWhereInput = {
+      AND: [resourceWhere(actor, 'contentItem')],
       status: query.status ?? { not: ContentStatus.ARCHIVED },
       type: query.type,
       accessType: query.accessType,
@@ -364,6 +392,7 @@ export class ContentItemsService {
       scope: {
         join: Prisma.sql`JOIN "ContentPlacement" p ON p."contentItemId" = t.id`,
         where: sqlAnd(
+          resourceSql(actor, 'contentItem'),
           contentStatusScope(query.status),
           query.type
             ? Prisma.sql`t.type = ${query.type}::"ContentItemType"`
@@ -393,8 +422,20 @@ export class ContentItemsService {
   }
 
   async update(actor: RequestUser, id: string, dto: UpdateContentItemDto) {
-    this.assertActorRole(actor);
+    assertCourseReader(actor);
+    await assertResource(this.prisma, actor, 'contentItem', id);
     const item = await this.getOrThrow(id);
+    if (actor.role === Role.TEACHER && item.status !== ContentStatus.DRAFT)
+      throw new ForbiddenException('Teachers can modify only draft videos');
+    if (
+      actor.role === Role.TEACHER &&
+      Object.keys(dto)
+        .filter((key) => dto[key as keyof typeof dto] !== undefined)
+        .some((key) => !['title', 'description'].includes(key))
+    )
+      throw new ForbiddenException(
+        'Teachers can edit only title and description',
+      );
     const type = dto.type ?? item.type;
     const textBody = dto.textBody === undefined ? item.textBody : dto.textBody;
     const externalUrl =
@@ -404,19 +445,33 @@ export class ContentItemsService {
       throw new ConflictException(
         'Remove the video outline before changing this item to a non-video type',
       );
-    await this.prisma.contentItem.updateMany({
-      where: { id },
-      data: {
-        type,
-        title: dto.title,
-        description: dto.description,
-        textBody,
-        externalUrl,
-        accessType: dto.accessType,
-        estimatedDuration: dto.estimatedDuration,
-        updatedById: actor.id,
+    const updated = await this.prisma.contentItem.updateMany({
+      where: {
+        id,
+        ...(actor.role === Role.TEACHER
+          ? { status: ContentStatus.DRAFT, type: ContentItemType.VIDEO }
+          : {}),
       },
+      data:
+        actor.role === Role.TEACHER
+          ? {
+              title: dto.title,
+              description: dto.description,
+              updatedById: actor.id,
+            }
+          : {
+              type,
+              title: dto.title,
+              description: dto.description,
+              textBody,
+              externalUrl,
+              accessType: dto.accessType,
+              estimatedDuration: dto.estimatedDuration,
+              updatedById: actor.id,
+            },
     });
+    if (actor.role === Role.TEACHER && !updated.count)
+      throw new ForbiddenException('Teachers can modify only draft videos');
     await this.auditService.record({
       actorUserId: actor.id,
       action: 'CONTENT_ITEM_UPDATED',
@@ -747,9 +802,24 @@ export class ContentItemsService {
   }
 
   async setPrimaryAsset(actor: RequestUser, id: string, assetId: string) {
-    this.assertActorRole(actor);
+    assertCourseReader(actor);
+    await assertResource(this.prisma, actor, 'contentItem', id);
     const item = await this.getOrThrow(id);
+    if (actor.role === Role.TEACHER && item.status !== ContentStatus.DRAFT)
+      throw new ForbiddenException('Teachers can modify only draft videos');
     const asset = await this.assets.getReadyOrAny(assetId);
+    if (asset.deletionStartedAt)
+      throw new ConflictException('Video deletion is in progress');
+    if (
+      actor.role === Role.TEACHER &&
+      (item.primaryAssetId ||
+        asset.uploadContentItemId !== id ||
+        asset.uploadedById !== actor.id ||
+        asset.status !== AssetStatus.READY)
+    )
+      throw new ForbiddenException(
+        'Teachers can attach only their ready bound video to an empty draft',
+      );
     if (asset.status === AssetStatus.ARCHIVED)
       throw new ConflictException('Archived assets cannot be linked');
     this.assets.assertCompatible(asset, item.type);
@@ -763,7 +833,12 @@ export class ContentItemsService {
     const previousAssetId = item.primaryAssetId;
     try {
       await this.prisma.contentItem.update({
-        where: { id },
+        where: {
+          id,
+          ...(actor.role === Role.TEACHER
+            ? { primaryAssetId: null, status: ContentStatus.DRAFT }
+            : {}),
+        },
         data: { primaryAssetId: assetId, updatedById: actor.id },
       });
     } catch (error: any) {

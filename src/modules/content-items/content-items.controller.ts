@@ -1,3 +1,4 @@
+import { CourseScoped } from '../../common/guards/course-scope.guard';
 import {
   Body,
   Controller,
@@ -46,6 +47,8 @@ import { ReplaceVideoOutlineDto } from './dto/replace-video-outline.dto';
 export class ContentItemsController {
   constructor(private readonly contentItemsService: ContentItemsService) {}
 
+  @CourseScoped('contentItem')
+  @Roles(Role.ADMIN, Role.SUPER_ADMIN, Role.TEACHER)
   @Post()
   @ApiOperation({ summary: 'Create a content item at one hierarchy target' })
   @ApiCreatedResponse({ type: ContentItemSummaryDto })
@@ -54,6 +57,8 @@ export class ContentItemsController {
     return this.contentItemsService.create(actor, dto);
   }
 
+  @CourseScoped('contentItem')
+  @Roles(Role.ADMIN, Role.SUPER_ADMIN, Role.TEACHER)
   @Get()
   @ApiOperation({ summary: 'List content items' })
   @ApiOkResponse({ type: PaginatedContentItemResponseDto })
@@ -61,6 +66,8 @@ export class ContentItemsController {
     return this.contentItemsService.list(actor, query);
   }
 
+  @CourseScoped('contentItem')
+  @Roles(Role.ADMIN, Role.SUPER_ADMIN, Role.TEACHER)
   @Get(':id')
   @ApiOperation({ summary: 'Get a content item by ID' })
   @ApiOkResponse({ type: ContentItemDetailDto })
@@ -68,6 +75,8 @@ export class ContentItemsController {
     return this.contentItemsService.getById(actor, id);
   }
 
+  @CourseScoped('contentItem')
+  @Roles(Role.ADMIN, Role.SUPER_ADMIN, Role.TEACHER)
   @Patch(':id')
   @ApiOperation({ summary: 'Update a content item' })
   @ApiOkResponse({ type: ContentItemSummaryDto })
@@ -149,6 +158,8 @@ export class ContentItemsController {
     return this.contentItemsService.delete(actor, id);
   }
 
+  @CourseScoped('contentItem')
+  @Roles(Role.ADMIN, Role.SUPER_ADMIN, Role.TEACHER)
   @Post(':id/primary-asset')
   @ApiOperation({ summary: 'Set the content item primary asset' })
   setPrimaryAsset(

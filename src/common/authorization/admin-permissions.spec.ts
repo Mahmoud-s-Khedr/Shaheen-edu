@@ -103,6 +103,11 @@ describe('Every administrative route authorization', () => {
           });
         if (role === Role.ADMIN && !allowed)
           expect(check).toThrow(ForbiddenException);
+        else if (
+          controller.name === 'VideoDeletionRequestsController' &&
+          handler.name === 'create'
+        )
+          expect(check).toThrow(ForbiddenException);
         else check();
       }
     },
@@ -117,6 +122,58 @@ describe('Every administrative route authorization', () => {
       await expect(
         service[method!]({ id: 'admin', role: Role.ADMIN }, 'id', {}, {}),
       ).rejects.toBeInstanceOf(ForbiddenException);
+    },
+  );
+  it.each(handlers)(
+    '$label enforces the teacher endpoint allowlist',
+    ({ controller, handler, label }) => {
+      const [path, method] = label.split('/').slice(1);
+      const hierarchy = [
+        'academic-grades',
+        'subjects',
+        'courses',
+        'chapters',
+        'lessons',
+        'sections',
+      ];
+      const allowed =
+        (hierarchy.includes(path) && ['list', 'getById'].includes(method)) ||
+        (path === 'content-items' &&
+          ['list', 'getById', 'create', 'update', 'setPrimaryAsset'].includes(
+            method,
+          )) ||
+        (path === 'video-assets' &&
+          [
+            'create',
+            'get',
+            'playback',
+            'authorization',
+            'confirmation',
+            'retry',
+          ].includes(method)) ||
+        (path === 'video-feedback' && method === 'list') ||
+        (path === 'video-deletion-requests' &&
+          ['create', 'list', 'get'].includes(method));
+      const context = {
+        getClass: () => controller,
+        getHandler: () => handler,
+        switchToHttp: () => ({
+          getRequest: () => ({ user: { role: Role.TEACHER } }),
+        }),
+      } as unknown as ExecutionContext;
+      const guards = [
+        ...(Reflect.getMetadata(GUARDS_METADATA, controller) ?? []),
+        ...(Reflect.getMetadata(GUARDS_METADATA, handler) ?? []),
+      ];
+      const check = () =>
+        guards.forEach((guard) => {
+          if (guard === RolesGuard)
+            new RolesGuard(new Reflector()).canActivate(context);
+          if (guard === SuperAdminGuard)
+            new SuperAdminGuard().canActivate(context);
+        });
+      if (allowed) expect(check).not.toThrow();
+      else expect(check).toThrow(ForbiddenException);
     },
   );
   it.each(Object.values(Role))('service policy enforces %s', (role) => {

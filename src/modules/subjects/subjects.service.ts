@@ -1,4 +1,11 @@
 import {
+  assertCourseReader,
+  assertResource,
+  resourceWhere,
+  resourceSql,
+  courseWhere,
+} from '../../common/authorization/course-scope';
+import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
@@ -50,7 +57,7 @@ export class SubjectsService {
     }
   }
 
-  private async getOrThrow(id: string) {
+  private async getOrThrow(id: string, actor?: RequestUser) {
     const record = await this.prisma.subject.findUnique({
       where: { id },
       include: {
@@ -63,7 +70,12 @@ export class SubjectsService {
         coverAsset: { select: { filename: true } },
         _count: {
           select: {
-            courses: { where: { status: { not: ContentStatus.ARCHIVED } } },
+            courses: {
+              where: {
+                ...(actor ? courseWhere(actor) : {}),
+                status: { not: ContentStatus.ARCHIVED },
+              },
+            },
           },
         },
       },
@@ -145,14 +157,15 @@ export class SubjectsService {
   }
 
   async getById(actor: RequestUser, id: string) {
-    this.assertActorRole(actor);
-    return this.toSummary(await this.getOrThrow(id));
+    await assertResource(this.prisma, actor, 'subject', id);
+    return this.toSummary(await this.getOrThrow(id, actor));
   }
 
   async list(actor: RequestUser, query: QuerySubjectDto) {
-    this.assertActorRole(actor);
-    if (query.academicGradeId) return this.listGradeAssignments(query);
+    assertCourseReader(actor);
+    if (query.academicGradeId) return this.listGradeAssignments(actor, query);
     const where = {
+      AND: [resourceWhere(actor, 'subject')],
       status: query.status ?? { not: ContentStatus.ARCHIVED },
     };
     const { data: items, total } = await paginateArabicSearch({
@@ -161,7 +174,7 @@ export class SubjectsService {
       target: 'subject',
       q: query.q,
       scope: {
-        where: contentStatusScope(query.status),
+        where: sqlAnd(resourceSql(actor, 'subject'), contentStatusScope(query.status)),
       },
       orderBySql: Prisma.sql`t."sortOrder" ASC, t.id ASC`,
       orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
@@ -177,7 +190,12 @@ export class SubjectsService {
           coverAsset: { select: { filename: true } },
           _count: {
             select: {
-              courses: { where: { status: { not: ContentStatus.ARCHIVED } } },
+              courses: {
+                where: {
+                  ...courseWhere(actor),
+                  status: { not: ContentStatus.ARCHIVED },
+                },
+              },
             },
           },
         },
@@ -193,10 +211,16 @@ export class SubjectsService {
 
   /** Grade membership, rather than Subject's legacy primary-grade fields, is
    * the ordered parent relationship for a shared subject. */
-  private async listGradeAssignments(query: QuerySubjectDto) {
+  private async listGradeAssignments(
+    actor: RequestUser,
+    query: QuerySubjectDto,
+  ) {
     const assignmentWhere = {
       academicGradeId: query.academicGradeId!,
-      subject: { status: query.status ?? { not: ContentStatus.ARCHIVED } },
+      subject: {
+        AND: [resourceWhere(actor, 'subject')],
+        status: query.status ?? { not: ContentStatus.ARCHIVED },
+      },
     };
     const include = {
       subject: {
@@ -212,6 +236,7 @@ export class SubjectsService {
             select: {
               courses: {
                 where: {
+                  ...courseWhere(actor),
                   status: { not: ContentStatus.ARCHIVED },
                 },
               },
@@ -244,6 +269,7 @@ export class SubjectsService {
       scope: {
         join: Prisma.sql`JOIN "SubjectGrade" sg ON sg."subjectId" = t.id`,
         where: sqlAnd(
+          resourceSql(actor, 'subject'),
           contentStatusScope(query.status),
           Prisma.sql`sg."academicGradeId" = ${query.academicGradeId}`,
         ),
@@ -258,6 +284,7 @@ export class SubjectsService {
             academicGradeId: query.academicGradeId!,
             subjectId: { in: page.ids },
             subject: {
+              AND: [resourceWhere(actor, 'subject')],
               status: query.status ?? { not: ContentStatus.ARCHIVED },
             },
           },

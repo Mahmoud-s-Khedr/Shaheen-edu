@@ -1,3 +1,5 @@
+import { CourseScoped } from '../../common/guards/course-scope.guard';
+import { CreateVideoDto } from './dto/create-video.dto';
 import {
   BadRequestException,
   Body,
@@ -33,18 +35,27 @@ import { VideosService } from './videos.service';
 @Controller({ path: 'admin/video-assets', version: '1' })
 export class VideosController {
   constructor(private readonly videos: VideosService) {}
-  @Post() @ApiOperation({ summary: 'Create a video asset' }) create(
-    @CurrentUser() actor: RequestUser,
-    @Body() body: { title: string; filename?: string },
-  ) {
-    return this.videos.create(actor, body.title, body.filename);
+  @CourseScoped('videoAsset')
+  @Roles(Role.ADMIN, Role.SUPER_ADMIN, Role.TEACHER)
+  @Post()
+  @ApiOperation({ summary: 'Create a video asset' })
+  create(@CurrentUser() actor: RequestUser, @Body() body: CreateVideoDto) {
+    return this.videos.create(
+      actor,
+      body.title,
+      body.filename,
+      body.contentItemId,
+    );
   }
-  @Get(':id') @ApiOperation({ summary: 'Get a video asset by ID' }) get(
-    @CurrentUser() actor: RequestUser,
-    @Param('id') id: string,
-  ) {
+  @CourseScoped('videoAsset')
+  @Roles(Role.ADMIN, Role.SUPER_ADMIN, Role.TEACHER)
+  @Get(':id')
+  @ApiOperation({ summary: 'Get a video asset by ID' })
+  get(@CurrentUser() actor: RequestUser, @Param('id') id: string) {
     return this.videos.get(actor, id);
   }
+  @CourseScoped('videoAsset')
+  @Roles(Role.ADMIN, Role.SUPER_ADMIN, Role.TEACHER)
   @Get(':id/playback')
   @ApiOperation({
     summary: 'Get a short-lived preview URL for an admin video asset',
@@ -52,16 +63,22 @@ export class VideosController {
   playback(@CurrentUser() actor: RequestUser, @Param('id') id: string) {
     return this.videos.adminPlayback(actor, id);
   }
+  @CourseScoped('videoAsset')
+  @Roles(Role.ADMIN, Role.SUPER_ADMIN, Role.TEACHER)
   @Post(':id/upload-authorization')
   @ApiOperation({ summary: 'Create a short-lived direct-upload authorization' })
   authorization(@CurrentUser() actor: RequestUser, @Param('id') id: string) {
     return this.videos.authorization(actor, id);
   }
+  @CourseScoped('videoAsset')
+  @Roles(Role.ADMIN, Role.SUPER_ADMIN, Role.TEACHER)
   @Post(':id/upload-confirmation')
   @ApiOperation({ summary: 'Record client-reported direct-upload completion' })
   confirmation(@CurrentUser() actor: RequestUser, @Param('id') id: string) {
     return this.videos.confirmation(actor, id);
   }
+  @CourseScoped('videoAsset')
+  @Roles(Role.ADMIN, Role.SUPER_ADMIN, Role.TEACHER)
   @Post(':id/retry')
   @ApiOperation({ summary: 'Retry a failed video asset' })
   retry(@CurrentUser() actor: RequestUser, @Param('id') id: string) {

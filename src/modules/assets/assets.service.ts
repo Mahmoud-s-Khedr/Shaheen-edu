@@ -417,6 +417,8 @@ export class AssetsService {
   ) {
     const asset = await client.asset.findUnique({ where: { id } });
     if (!asset) throw new NotFoundException('Asset not found');
+    if (asset.deletionStartedAt)
+      throw new ConflictException('Video deletion is in progress');
     return asset;
   }
   async isReferenced(id: string, client?: Prisma.TransactionClient) {

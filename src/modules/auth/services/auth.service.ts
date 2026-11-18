@@ -1,3 +1,4 @@
+import { accountScope } from '../../../common/authorization/course-scope';
 import {
   Injectable,
   UnauthorizedException,
@@ -28,6 +29,7 @@ import { Prisma } from '@prisma/client';
 
 export interface UserSummary {
   id: string;
+  scope: { type: 'COURSES'; courseIds: string[] } | null;
   role: Role;
   loginIdentifier: string;
   mustChangePassword: boolean;
@@ -39,7 +41,7 @@ export interface LoginResult {
   user: UserSummary;
 }
 
-function toSummary(user: User): UserSummary {
+function toSummary(user: User): Omit<UserSummary, 'scope'> {
   return {
     id: user.id,
     role: user.role,
@@ -142,7 +144,14 @@ export class AuthService {
       data: { lastLoginAt: new Date() },
     });
 
-    return { accessToken, refreshToken, user: toSummary(user) };
+    return {
+      accessToken,
+      refreshToken,
+      user: {
+        ...toSummary(user),
+        scope: await accountScope(this.prisma, user),
+      },
+    };
   }
 
   async registerStudent(
@@ -306,6 +315,13 @@ export class AuthService {
       data: { lastLoginAt: new Date() },
     });
 
-    return { accessToken, refreshToken, user: toSummary(user) };
+    return {
+      accessToken,
+      refreshToken,
+      user: {
+        ...toSummary(user),
+        scope: await accountScope(this.prisma, user),
+      },
+    };
   }
 }

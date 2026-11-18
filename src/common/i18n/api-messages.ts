@@ -39,6 +39,63 @@ const statusTitles: Record<number, LocalizedMessage> = {
 };
 
 const translations: Record<string, string> = {
+  'Video has no curriculum target': 'الفيديو غير مرتبط بمحتوى في المنهج',
+  'Only teachers request deletion': 'يمكن للمعلمين فقط طلب حذف الفيديو',
+  'Video deletion is in progress': 'حذف الفيديو قيد التنفيذ',
+  'An active deletion request already exists':
+    'يوجد طلب حذف نشط لهذا الفيديو بالفعل',
+  'Request already decided': 'تم اتخاذ قرار بشأن هذا الطلب بالفعل',
+  'Video target changed; submit a fresh request':
+    'تغير المحتوى أو المقرر المرتبط بالفيديو؛ أرسل طلب حذف جديداً',
+  'Only interrupted or failed approved requests can be retried':
+    'يمكن إعادة محاولة الطلبات المعتمدة التي فشل تنفيذها أو توقف فقط',
+  'Deletion execution is already running': 'يجري تنفيذ الحذف بالفعل',
+  'Request is not approved': 'لم تتم الموافقة على طلب الحذف',
+  'Teachers can upload only their scoped unattached draft videos':
+    'يمكن للمعلم رفع فيديوهاته غير المرفقة فقط ضمن مسودات المقررات المسندة إليه',
+  'contentItemId is required': 'يجب تحديد معرّف محتوى الفيديو',
+  'Upload target must be an empty draft video':
+    'يجب أن يكون هدف الرفع محتوى فيديو مسودة دون فيديو مرفق',
+  'Teachers can create draft videos with a title, description and placement':
+    'يمكن للمعلم إنشاء مسودة فيديو بالعنوان والوصف وموضع المحتوى فقط',
+  'Teachers can modify only draft videos':
+    'يمكن للمعلم تعديل مسودات الفيديو فقط',
+  'Teachers can edit only title and description':
+    'يمكن للمعلم تعديل العنوان والوصف فقط',
+  'Teachers can attach only their ready bound video to an empty draft':
+    'يمكن للمعلم إرفاق الفيديو الجاهز المرتبط بمسودته الفارغة فقط',
+  'Only teachers accept course assignments':
+    'يمكن إسناد المقررات إلى حسابات المعلمين فقط',
+  'Only teacher scope can be assigned':
+    'يمكن تعديل نطاق المقررات لحساب المعلم فقط',
+  'Use either status or statuses, not both':
+    'استخدم status أو statuses دون الجمع بينهما',
+  'createdFrom must be before createdTo':
+    'يجب أن يسبق تاريخ بداية الإنشاء تاريخ نهايته',
+  'Error reflection is already locked':
+    'تم تثبيت سبب الخطأ بالفعل ولا يمكن تعديله',
+  'Send questionBankId or questionBankIds, not both':
+    'أرسل questionBankId أو questionBankIds دون الجمع بينهما',
+  'AI answer grading is disabled':
+    'تصحيح الإجابات بالذكاء الاصطناعي معطّل حالياً',
+  'Archived questions cannot be edited': 'لا يمكن تعديل الأسئلة المؤرشفة',
+  'Explanation format requires a structured explanation':
+    'يتطلب تنسيق الشرح تقديم شرح منظم',
+  'Four-section explanations require a written question':
+    'يتطلب الشرح المكون من أربعة أقسام سؤالاً كتابياً',
+  'Question body and positive maxPoints are required':
+    'يجب إدخال نص السؤال ودرجة قصوى أكبر من صفر',
+  'AI returned an invalid explanation format or metadata':
+    'أعاد الذكاء الاصطناعي تنسيق شرح أو بيانات وصفية غير صالحة',
+  'AI explanation format does not match question type':
+    'تنسيق شرح الذكاء الاصطناعي لا يتوافق مع نوع السؤال',
+  'Proposed maximum points differ from the saved question; approve the answer too or regenerate using the saved maximum points':
+    'تختلف الدرجة القصوى المقترحة عن السؤال المحفوظ؛ اعتمد الإجابة أيضاً أو أعد التوليد بالدرجة القصوى المحفوظة',
+  'Edited explanation format must match the stored run':
+    'يجب أن يتوافق تنسيق الشرح المعدّل مع التشغيل المحفوظ',
+  'Deletion request not found': 'لم يتم العثور على طلب الحذف',
+  'Resource not found': 'لم يتم العثور على المورد',
+
   'A different student referrer is already assigned':
     'تم ربط الطالب بالفعل بطالب مُحيل آخر',
   'Credit refund exceeds the amount spent':

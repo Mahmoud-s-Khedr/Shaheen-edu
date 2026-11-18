@@ -10,6 +10,7 @@ datasource db {
 enum Role {
   SUPER_ADMIN
   ADMIN
+  TEACHER
   PARTNER
   STUDENT
 }
@@ -544,21 +545,24 @@ enum QuestionDifficultyBand {
 }
 
 model User {
-  id                 String        @id @default(cuid())
-  role               Role
-  status             AccountStatus @default(ACTIVE)
-  loginIdentifier    String        @unique
-  passwordHash       String
-  mustChangePassword Boolean       @default(false)
-  passwordResetAt    DateTime?
-  deletedAt          DateTime?
-  deletedById        String?
-  deletionReason     String?
-  deletedBy          User?         @relation("UserDeletedBy", fields: [deletedById], references: [id], onDelete: Restrict)
-  deletedUsers       User[]        @relation("UserDeletedBy")
-  lastLoginAt        DateTime?
-  createdAt          DateTime      @default(now())
-  updatedAt          DateTime      @updatedAt
+  teacherCourses         TeacherCourseAssignment[]
+  videoDeletionRequests  VideoDeletionRequest[]    @relation("VideoDeletionRequester")
+  reviewedVideoDeletions VideoDeletionRequest[]    @relation("VideoDeletionReviewer")
+  id                     String                    @id @default(cuid())
+  role                   Role
+  status                 AccountStatus             @default(ACTIVE)
+  loginIdentifier        String                    @unique
+  passwordHash           String
+  mustChangePassword     Boolean                   @default(false)
+  passwordResetAt        DateTime?
+  deletedAt              DateTime?
+  deletedById            String?
+  deletionReason         String?
+  deletedBy              User?                     @relation("UserDeletedBy", fields: [deletedById], references: [id], onDelete: Restrict)
+  deletedUsers           User[]                    @relation("UserDeletedBy")
+  lastLoginAt            DateTime?
+  createdAt              DateTime                  @default(now())
+  updatedAt              DateTime                  @updatedAt
 
   formsCreated                        Form[]                            @relation("FormCreatedBy")
   formsUpdated                        Form[]                            @relation("FormUpdatedBy")
@@ -834,9 +838,10 @@ model SubjectGrade {
 }
 
 model Course {
-  id        String  @id @default(cuid())
-  subjectId String
-  subject   Subject @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  teacherAssignments TeacherCourseAssignment[]
+  id                 String                    @id @default(cuid())
+  subjectId          String
+  subject            Subject                   @relation(fields: [subjectId], references: [id], onDelete: Restrict)
 
   title       String
   slug        String
@@ -998,15 +1003,16 @@ model Section {
 }
 
 model ContentItem {
-  id                String          @id @default(cuid())
-  type              ContentItemType
-  title             String
-  description       String?
-  textBody          String?
-  externalUrl       String?
-  accessType        AccessType      @default(INHERIT)
-  estimatedDuration Int?
-  status            ContentStatus   @default(DRAFT)
+  pendingVideoUploads Asset[]         @relation("VideoUploadTarget")
+  id                  String          @id @default(cuid())
+  type                ContentItemType
+  title               String
+  description         String?
+  textBody            String?
+  externalUrl         String?
+  accessType          AccessType      @default(INHERIT)
+  estimatedDuration   Int?
+  status              ContentStatus   @default(DRAFT)
 
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -1030,6 +1036,9 @@ model ContentItem {
 }
 
 model Asset {
+  deletionStartedAt            DateTime?
+  uploadContentItemId          String?
+  uploadContentItem            ContentItem?                  @relation("VideoUploadTarget", fields: [uploadContentItemId], references: [id], onDelete: SetNull)
   id                           String                        @id @default(cuid())
   provider                     AssetProvider
   kind                         AssetKind
@@ -1067,6 +1076,7 @@ model Asset {
   questionImportMedia          QuestionImportMedia[]         @relation("QuestionImportMediaAsset")
   testimonialScreenshot        Testimonial?                  @relation("TestimonialScreenshot")
 
+  @@index([uploadContentItemId])
   @@index([status, kind, createdAt])
 }
 
@@ -2614,17 +2624,17 @@ model SalesOfferItem {
 }
 
 model CartItem {
-  id         String             @id @default(cuid())
-  cartId     String
-  cart       Cart               @relation(fields: [cartId], references: [id], onDelete: Cascade)
-  targetType CommerceTargetType
-  courseId   String?
-  course     Course?            @relation("CartItemCourse", fields: [courseId], references: [id], onDelete: Restrict)
-  chapterId  String?
-  chapter    Chapter?           @relation("CartItemChapter", fields: [chapterId], references: [id], onDelete: Restrict)
+  id           String             @id @default(cuid())
+  cartId       String
+  cart         Cart               @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  targetType   CommerceTargetType
+  courseId     String?
+  course       Course?            @relation("CartItemCourse", fields: [courseId], references: [id], onDelete: Restrict)
+  chapterId    String?
+  chapter      Chapter?           @relation("CartItemChapter", fields: [chapterId], references: [id], onDelete: Restrict)
   salesOfferId String?
-  salesOffer SalesOffer? @relation(fields: [salesOfferId], references: [id], onDelete: Restrict)
-  createdAt  DateTime           @default(now())
+  salesOffer   SalesOffer?        @relation(fields: [salesOfferId], references: [id], onDelete: Restrict)
+  createdAt    DateTime           @default(now())
 
   @@unique([cartId, courseId])
   @@unique([cartId, chapterId])
@@ -2722,17 +2732,17 @@ model OrderItem {
 }
 
 model SalesOfferPurchase {
-  id            String   @id @default(cuid())
+  id            String      @id @default(cuid())
   salesOfferId  String
-  salesOffer    SalesOffer @relation(fields: [salesOfferId], references: [id], onDelete: Restrict)
+  salesOffer    SalesOffer  @relation(fields: [salesOfferId], references: [id], onDelete: Restrict)
   orderId       String
-  order         Order @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  order         Order       @relation(fields: [orderId], references: [id], onDelete: Restrict)
   studentUserId String
   snapshot      Json
   allocatedAt   DateTime?
   releasedAt    DateTime?
   items         OrderItem[]
-  createdAt     DateTime @default(now())
+  createdAt     DateTime    @default(now())
 
   @@unique([orderId, salesOfferId])
   @@index([salesOfferId, allocatedAt, releasedAt])
@@ -3624,4 +3634,55 @@ model StudentRewardAward {
 
   @@index([orderId])
   @@index([studentUserId, kind])
+}
+
+model TeacherCourseAssignment {
+  teacherId String
+  courseId  String
+  teacher   User     @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@id([teacherId, courseId])
+  @@index([courseId])
+}
+
+enum VideoDeletionDecision {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum VideoDeletionExecution {
+  WAITING
+  IN_PROGRESS
+  FAILED
+  COMPLETED
+}
+
+// Target IDs and snapshots deliberately survive removal of curriculum/assets.
+model VideoDeletionRequest {
+  id             String                 @id @default(cuid())
+  requesterId    String
+  requester      User                   @relation("VideoDeletionRequester", fields: [requesterId], references: [id], onDelete: Restrict)
+  assetId        String
+  contentItemId  String
+  courseId       String
+  snapshot       Json
+  reason         String
+  decision       VideoDeletionDecision  @default(PENDING)
+  execution      VideoDeletionExecution @default(WAITING)
+  reviewerId     String?
+  reviewer       User?                  @relation("VideoDeletionReviewer", fields: [reviewerId], references: [id], onDelete: Restrict)
+  decisionReason String?
+  reviewedAt     DateTime?
+  startedAt      DateTime?
+  completedAt    DateTime?
+  failureDetails String?
+  attempts       Int                    @default(0)
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+
+  @@index([requesterId, createdAt, id])
+  @@index([decision, execution, createdAt])
 }

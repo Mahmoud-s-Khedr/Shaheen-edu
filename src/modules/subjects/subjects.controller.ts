@@ -1,3 +1,4 @@
+import { CourseScoped } from '../../common/guards/course-scope.guard';
 import {
   Body,
   Controller,
@@ -49,6 +50,8 @@ export class SubjectsController {
     return this.subjectsService.create(actor, dto);
   }
 
+  @CourseScoped('subject')
+  @Roles(Role.ADMIN, Role.SUPER_ADMIN, Role.TEACHER)
   @Get()
   @ApiOperation({
     summary: 'List subjects',
@@ -61,6 +64,8 @@ export class SubjectsController {
     return this.subjectsService.list(actor, query);
   }
 
+  @CourseScoped('subject')
+  @Roles(Role.ADMIN, Role.SUPER_ADMIN, Role.TEACHER)
   @Get(':id')
   @ApiOperation({ summary: 'Get a subject by ID' })
   @ApiOkResponse({ type: SubjectSummaryDto })

@@ -1,3 +1,8 @@
+import {
+  assertCourseReader,
+  resourceWhere,
+  assertTeacherVideo,
+} from '../../common/authorization/course-scope';
 import { assertContentStaff } from '../../common/authorization/admin-authorization';
 import {
   BadRequestException,
@@ -9,6 +14,7 @@ import { ConfigService } from '@nestjs/config';
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import { Prisma } from '@prisma/client';
 import {
+  Role,
   AssetKind,
   AssetStatus,
   VideoProcessingStatus,
@@ -57,24 +63,64 @@ export class VideosService {
     return body.guid;
   }
 
-  async create(actor: RequestUser, title: string, filename = 'video') {
-    this.assertAdmin(actor);
+  async create(
+    actor: RequestUser,
+    title: string,
+    filename = 'video',
+    contentItemId?: string,
+  ) {
+    assertCourseReader(actor);
+    if (actor.role === Role.TEACHER && !contentItemId)
+      throw new BadRequestException('contentItemId is required');
     if (!title?.trim()) throw new BadRequestException('title is required');
-    const bunnyVideoId = await this.createBunnyVideo(title.trim());
-    const asset = await this.prisma.asset.create({
-      data: {
-        provider: 'BUNNY_STREAM',
-        kind: AssetKind.VIDEO,
-        status: AssetStatus.PENDING_UPLOAD,
-        originalFilename: filename,
-        filename:
-          filename.replace(/[^A-Za-z0-9._-]/g, '_').slice(0, 180) || 'video',
-        mimeType: 'video/*',
-        uploadedById: actor.id,
-        video: { create: { libraryId: this.config.libraryId, bunnyVideoId } },
-      },
-      include: { video: true },
-    });
+    const create = async (db: Prisma.TransactionClient) => {
+      if (contentItemId) {
+        // Serialize binding creation with deletion approval and cleanup.
+        await db.$queryRaw`SELECT id FROM "ContentItem" WHERE id = ${contentItemId} FOR UPDATE`;
+        const item = await db.contentItem.findFirst({
+          where: { id: contentItemId, ...resourceWhere(actor, 'contentItem') },
+        });
+        if (!item && actor.role === Role.TEACHER)
+          throw new NotFoundException('Resource not found');
+        if (
+          !item ||
+          item.type !== 'VIDEO' ||
+          item.status !== 'DRAFT' ||
+          item.primaryAssetId
+        )
+          throw new ConflictException(
+            'Upload target must be an empty draft video',
+          );
+        const deleting = await db.asset.findFirst({
+          where: {
+            uploadContentItemId: contentItemId,
+            deletionStartedAt: { not: null },
+          },
+          select: { id: true },
+        });
+        if (deleting)
+          throw new ConflictException('Video deletion is in progress');
+      }
+      const bunnyVideoId = await this.createBunnyVideo(title.trim());
+      return db.asset.create({
+        data: {
+          provider: 'BUNNY_STREAM',
+          kind: AssetKind.VIDEO,
+          status: AssetStatus.PENDING_UPLOAD,
+          originalFilename: filename,
+          filename:
+            filename.replace(/[^A-Za-z0-9._-]/g, '_').slice(0, 180) || 'video',
+          mimeType: 'video/*',
+          uploadedById: actor.id,
+          uploadContentItemId: contentItemId,
+          video: { create: { libraryId: this.config.libraryId, bunnyVideoId } },
+        },
+        include: { video: true },
+      });
+    };
+    const asset = contentItemId
+      ? await this.prisma.$transaction(create, { timeout: 30_000 })
+      : await create(this.prisma);
     await this.audit.record({
       actorUserId: actor.id,
       action: 'VIDEO_ASSET_CREATED',
@@ -85,7 +131,7 @@ export class VideosService {
   }
 
   async authorization(actor: RequestUser, assetId: string) {
-    this.assertAdmin(actor);
+    await assertTeacherVideo(this.prisma, actor, assetId, true);
     const asset = await this.getWithVideo(assetId);
     if (
       asset.status === AssetStatus.READY ||
@@ -119,7 +165,7 @@ export class VideosService {
   }
 
   async confirmation(actor: RequestUser, assetId: string) {
-    this.assertAdmin(actor);
+    await assertTeacherVideo(this.prisma, actor, assetId, true);
     const asset = await this.getWithVideo(assetId);
     if (
       asset.status === AssetStatus.PENDING_UPLOAD ||
@@ -156,7 +202,7 @@ export class VideosService {
   }
 
   async retry(actor: RequestUser, assetId: string) {
-    this.assertAdmin(actor);
+    await assertTeacherVideo(this.prisma, actor, assetId, true);
     const old = await this.getWithVideo(assetId);
     if (old.status !== AssetStatus.FAILED)
       throw new ConflictException('Only failed video assets can be retried');
@@ -171,6 +217,7 @@ export class VideosService {
           failureMetadata: Prisma.JsonNull,
           attempt: { increment: 1 },
           lastWebhookAt: null,
+          clientUploadCompletedAt: null,
         },
       });
       return tx.asset.update({
@@ -194,7 +241,7 @@ export class VideosService {
   }
 
   async get(actor: RequestUser, assetId: string) {
-    this.assertAdmin(actor);
+    await assertTeacherVideo(this.prisma, actor, assetId, false);
     return this.summary(await this.getWithVideo(assetId));
   }
   async archive(actor: RequestUser, assetId: string) {
@@ -264,7 +311,7 @@ export class VideosService {
   }
 
   async adminPlayback(actor: RequestUser, assetId: string) {
-    this.assertAdmin(actor);
+    await assertTeacherVideo(this.prisma, actor, assetId, false);
     return this.playback(assetId);
   }
 
@@ -327,7 +374,7 @@ export class VideosService {
           where: { bunnyVideoId: payload.VideoGuid },
           include: { asset: true },
         });
-        if (!video) return { received: true };
+        if (!video || video.asset.deletionStartedAt) return { received: true };
         if (
           !next ||
           (video.processingStatus === VideoProcessingStatus.READY &&
@@ -386,6 +433,8 @@ export class VideosService {
       include: { video: true },
     });
     if (!asset?.video) throw new NotFoundException('Video asset not found');
+    if (asset.deletionStartedAt)
+      throw new ConflictException('Video deletion is in progress');
     return asset as typeof asset & { video: NonNullable<typeof asset.video> };
   }
   private summary(asset: any) {

@@ -1,3 +1,4 @@
+import { accountScope } from '../../../common/authorization/course-scope';
 import {
   BadRequestException,
   Body,
@@ -107,6 +108,7 @@ export class SharedAuthController {
     return {
       accessToken: result.accessToken,
       user: {
+        scope: await accountScope(this.prisma, result.user),
         id: result.user.id,
         role: result.user.role,
         loginIdentifier: result.user.loginIdentifier,
@@ -201,7 +203,9 @@ export class SharedAuthController {
         mustChangePassword: true,
       },
     });
-    return dbUser;
+    return dbUser
+      ? { ...dbUser, scope: await accountScope(this.prisma, dbUser) }
+      : dbUser;
   }
 
   @ApiBearerAuth()

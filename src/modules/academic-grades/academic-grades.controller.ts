@@ -1,3 +1,4 @@
+import { CourseScoped } from '../../common/guards/course-scope.guard';
 import {
   Body,
   Controller,
@@ -51,6 +52,8 @@ export class AcademicGradesController {
     return this.academicGradesService.create(actor, dto);
   }
 
+  @CourseScoped('academicGrade')
+  @Roles(Role.ADMIN, Role.SUPER_ADMIN, Role.TEACHER)
   @Get()
   @ApiOperation({
     summary: 'List academic grades',
@@ -66,6 +69,8 @@ export class AcademicGradesController {
     return this.academicGradesService.list(actor, query);
   }
 
+  @CourseScoped('academicGrade')
+  @Roles(Role.ADMIN, Role.SUPER_ADMIN, Role.TEACHER)
   @Get(':id')
   @ApiOperation({ summary: 'Get an academic grade by ID' })
   @ApiOkResponse({ type: AcademicGradeSummaryDto })

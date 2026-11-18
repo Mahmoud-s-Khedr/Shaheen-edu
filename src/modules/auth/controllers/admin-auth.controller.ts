@@ -41,7 +41,7 @@ export class AdminAuthController {
     const result = await this.authService.loginWithPassword({
       loginIdentifier: normalizedEmail,
       password: dto.password,
-      allowedRoles: [Role.SUPER_ADMIN, Role.ADMIN],
+      allowedRoles: [Role.SUPER_ADMIN, Role.ADMIN, Role.TEACHER],
       ip: req.ip,
       userAgent: req.headers['user-agent'],
       purpose: 'admin-login',

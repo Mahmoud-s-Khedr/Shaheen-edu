@@ -1,4 +1,10 @@
 import {
+  assertCourseReader,
+  assertResource,
+  resourceWhere,
+  resourceSql,
+} from '../../common/authorization/course-scope';
+import {
   ConflictException,
   ForbiddenException,
   Injectable,
@@ -149,7 +155,7 @@ export class ChaptersService {
   }
 
   async getById(actor: RequestUser, id: string) {
-    this.assertActorRole(actor);
+    await assertResource(this.prisma, actor, 'chapter', id);
     const record = await this.prisma.chapter.findUnique({
       where: { id },
       include: {
@@ -169,8 +175,9 @@ export class ChaptersService {
   }
 
   async list(actor: RequestUser, query: QueryChapterDto) {
-    this.assertActorRole(actor);
+    assertCourseReader(actor);
     const where = {
+      AND: [resourceWhere(actor, 'chapter')],
       courseId: query.courseId,
       status: query.status ?? { not: ContentStatus.ARCHIVED },
     };
@@ -181,6 +188,7 @@ export class ChaptersService {
       q: query.q,
       scope: {
         where: sqlAnd(
+          resourceSql(actor, 'chapter'),
           contentStatusScope(query.status),
           query.courseId
             ? Prisma.sql`t."courseId" = ${query.courseId}`

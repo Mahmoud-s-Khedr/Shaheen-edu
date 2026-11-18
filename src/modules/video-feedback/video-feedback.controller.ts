@@ -58,6 +58,7 @@ export class StudentVideoFeedbackController {
 export class AdminVideoFeedbackController {
   constructor(private readonly feedback: VideoFeedbackService) {}
 
+  @Roles(Role.ADMIN, Role.SUPER_ADMIN, Role.TEACHER)
   @Get()
   @ApiOperation({
     summary: 'List student video feedback',

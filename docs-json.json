@@ -1159,6 +1159,92 @@
         ]
       }
     },
+    "/api/v1/admin/admins/{id}/scope": {
+      "put": {
+        "operationId": "AdminsController_scope_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateTeacherScopeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminSummaryDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Replace all course assignments for a teacher",
+        "tags": [
+          "admin/admins"
+        ]
+      }
+    },
     "/api/v1/admin/admins/{id}/suspend": {
       "post": {
         "operationId": "AdminsController_suspend_v1",
@@ -1310,7 +1396,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PasswordResetResponseDto"
+                  "$ref": "#/components/schemas/AdminPasswordResetResponseDto"
                 }
               }
             }
@@ -3496,14 +3582,7 @@
             }
           },
           "403": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponseDto"
-                }
-              }
-            }
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -3517,7 +3596,8 @@
         ],
         "x-roles": [
           "ADMIN",
-          "SUPER_ADMIN"
+          "SUPER_ADMIN",
+          "TEACHER"
         ]
       }
     },
@@ -3556,14 +3636,7 @@
             }
           },
           "403": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponseDto"
-                }
-              }
-            }
+            "description": "The authenticated role is not permitted to perform this operation."
           },
           "404": {
             "description": "",
@@ -3587,7 +3660,8 @@
         ],
         "x-roles": [
           "ADMIN",
-          "SUPER_ADMIN"
+          "SUPER_ADMIN",
+          "TEACHER"
         ]
       },
       "patch": {
@@ -4329,14 +4403,7 @@
             }
           },
           "403": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponseDto"
-                }
-              }
-            }
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -4350,7 +4417,8 @@
         ],
         "x-roles": [
           "ADMIN",
-          "SUPER_ADMIN"
+          "SUPER_ADMIN",
+          "TEACHER"
         ]
       }
     },
@@ -4389,14 +4457,7 @@
             }
           },
           "403": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponseDto"
-                }
-              }
-            }
+            "description": "The authenticated role is not permitted to perform this operation."
           },
           "404": {
             "description": "",
@@ -4420,7 +4481,8 @@
         ],
         "x-roles": [
           "ADMIN",
-          "SUPER_ADMIN"
+          "SUPER_ADMIN",
+          "TEACHER"
         ]
       },
       "patch": {
@@ -5471,14 +5533,7 @@
             }
           },
           "403": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponseDto"
-                }
-              }
-            }
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -5492,7 +5547,8 @@
         ],
         "x-roles": [
           "ADMIN",
-          "SUPER_ADMIN"
+          "SUPER_ADMIN",
+          "TEACHER"
         ]
       }
     },
@@ -5531,14 +5587,7 @@
             }
           },
           "403": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponseDto"
-                }
-              }
-            }
+            "description": "The authenticated role is not permitted to perform this operation."
           },
           "404": {
             "description": "",
@@ -5562,7 +5611,8 @@
         ],
         "x-roles": [
           "ADMIN",
-          "SUPER_ADMIN"
+          "SUPER_ADMIN",
+          "TEACHER"
         ]
       },
       "patch": {
@@ -6382,14 +6432,7 @@
             }
           },
           "403": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponseDto"
-                }
-              }
-            }
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -6403,7 +6446,8 @@
         ],
         "x-roles": [
           "ADMIN",
-          "SUPER_ADMIN"
+          "SUPER_ADMIN",
+          "TEACHER"
         ]
       }
     },
@@ -6442,14 +6486,7 @@
             }
           },
           "403": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponseDto"
-                }
-              }
-            }
+            "description": "The authenticated role is not permitted to perform this operation."
           },
           "404": {
             "description": "",
@@ -6473,7 +6510,8 @@
         ],
         "x-roles": [
           "ADMIN",
-          "SUPER_ADMIN"
+          "SUPER_ADMIN",
+          "TEACHER"
         ]
       },
       "patch": {
@@ -7293,14 +7331,7 @@
             }
           },
           "403": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponseDto"
-                }
-              }
-            }
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -7314,7 +7345,8 @@
         ],
         "x-roles": [
           "ADMIN",
-          "SUPER_ADMIN"
+          "SUPER_ADMIN",
+          "TEACHER"
         ]
       }
     },
@@ -7353,14 +7385,7 @@
             }
           },
           "403": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponseDto"
-                }
-              }
-            }
+            "description": "The authenticated role is not permitted to perform this operation."
           },
           "404": {
             "description": "",
@@ -7384,7 +7409,8 @@
         ],
         "x-roles": [
           "ADMIN",
-          "SUPER_ADMIN"
+          "SUPER_ADMIN",
+          "TEACHER"
         ]
       },
       "patch": {
@@ -8204,14 +8230,7 @@
             }
           },
           "403": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponseDto"
-                }
-              }
-            }
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -8225,7 +8244,8 @@
         ],
         "x-roles": [
           "ADMIN",
-          "SUPER_ADMIN"
+          "SUPER_ADMIN",
+          "TEACHER"
         ]
       }
     },
@@ -8264,14 +8284,7 @@
             }
           },
           "403": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponseDto"
-                }
-              }
-            }
+            "description": "The authenticated role is not permitted to perform this operation."
           },
           "404": {
             "description": "",
@@ -8295,7 +8308,8 @@
         ],
         "x-roles": [
           "ADMIN",
-          "SUPER_ADMIN"
+          "SUPER_ADMIN",
+          "TEACHER"
         ]
       },
       "patch": {
@@ -8978,14 +8992,7 @@
             }
           },
           "403": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponseDto"
-                }
-              }
-            }
+            "description": "The authenticated role is not permitted to perform this operation."
           },
           "404": {
             "description": "",
@@ -9019,7 +9026,8 @@
         ],
         "x-roles": [
           "ADMIN",
-          "SUPER_ADMIN"
+          "SUPER_ADMIN",
+          "TEACHER"
         ]
       },
       "get": {
@@ -9202,7 +9210,8 @@
         ],
         "x-roles": [
           "ADMIN",
-          "SUPER_ADMIN"
+          "SUPER_ADMIN",
+          "TEACHER"
         ]
       }
     },
@@ -9245,7 +9254,8 @@
         ],
         "x-roles": [
           "ADMIN",
-          "SUPER_ADMIN"
+          "SUPER_ADMIN",
+          "TEACHER"
         ]
       },
       "patch": {
@@ -9296,7 +9306,8 @@
         ],
         "x-roles": [
           "ADMIN",
-          "SUPER_ADMIN"
+          "SUPER_ADMIN",
+          "TEACHER"
         ]
       },
       "delete": {
@@ -9689,9 +9700,6 @@
           }
         ],
         "responses": {
-          "201": {
-            "description": ""
-          },
           "403": {
             "description": "The authenticated role is not permitted to perform this operation."
           }
@@ -9707,7 +9715,8 @@
         ],
         "x-roles": [
           "ADMIN",
-          "SUPER_ADMIN"
+          "SUPER_ADMIN",
+          "TEACHER"
         ]
       }
     },
@@ -10548,10 +10557,17 @@
       "post": {
         "operationId": "VideosController_create_v1",
         "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateVideoDto"
+              }
+            }
+          }
+        },
         "responses": {
-          "201": {
-            "description": ""
-          },
           "403": {
             "description": "The authenticated role is not permitted to perform this operation."
           }
@@ -10567,7 +10583,8 @@
         ],
         "x-roles": [
           "ADMIN",
-          "SUPER_ADMIN"
+          "SUPER_ADMIN",
+          "TEACHER"
         ]
       }
     },
@@ -10585,9 +10602,6 @@
           }
         ],
         "responses": {
-          "200": {
-            "description": ""
-          },
           "403": {
             "description": "The authenticated role is not permitted to perform this operation."
           }
@@ -10603,7 +10617,8 @@
         ],
         "x-roles": [
           "ADMIN",
-          "SUPER_ADMIN"
+          "SUPER_ADMIN",
+          "TEACHER"
         ]
       },
       "delete": {
@@ -10655,9 +10670,6 @@
           }
         ],
         "responses": {
-          "200": {
-            "description": ""
-          },
           "403": {
             "description": "The authenticated role is not permitted to perform this operation."
           }
@@ -10673,7 +10685,8 @@
         ],
         "x-roles": [
           "ADMIN",
-          "SUPER_ADMIN"
+          "SUPER_ADMIN",
+          "TEACHER"
         ]
       }
     },
@@ -10691,9 +10704,6 @@
           }
         ],
         "responses": {
-          "201": {
-            "description": ""
-          },
           "403": {
             "description": "The authenticated role is not permitted to perform this operation."
           }
@@ -10709,7 +10719,8 @@
         ],
         "x-roles": [
           "ADMIN",
-          "SUPER_ADMIN"
+          "SUPER_ADMIN",
+          "TEACHER"
         ]
       }
     },
@@ -10727,9 +10738,6 @@
           }
         ],
         "responses": {
-          "201": {
-            "description": ""
-          },
           "403": {
             "description": "The authenticated role is not permitted to perform this operation."
           }
@@ -10745,7 +10753,8 @@
         ],
         "x-roles": [
           "ADMIN",
-          "SUPER_ADMIN"
+          "SUPER_ADMIN",
+          "TEACHER"
         ]
       }
     },
@@ -10763,9 +10772,6 @@
           }
         ],
         "responses": {
-          "201": {
-            "description": ""
-          },
           "403": {
             "description": "The authenticated role is not permitted to perform this operation."
           }
@@ -10781,7 +10787,8 @@
         ],
         "x-roles": [
           "ADMIN",
-          "SUPER_ADMIN"
+          "SUPER_ADMIN",
+          "TEACHER"
         ]
       }
     },
@@ -10895,6 +10902,534 @@
         "summary": "Receive a Bunny Stream processing webhook",
         "tags": [
           "integrations/bunny-stream"
+        ]
+      }
+    },
+    "/api/v1/admin/video-deletion-requests": {
+      "post": {
+        "operationId": "VideoDeletionRequestsController_create_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateVideoDeletionRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VideoDeletionRequestResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Request permanent deletion of a scoped video",
+        "tags": [
+          "admin/video-deletion-requests"
+        ],
+        "x-roles": [
+          "TEACHER"
+        ]
+      },
+      "get": {
+        "operationId": "VideoDeletionRequestsController_list_v1",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "One-based page number.",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Maximum records to return per page.",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VideoDeletionRequestPageDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List own teacher deletion requests or all requests as super admin",
+        "tags": [
+          "admin/video-deletion-requests"
+        ],
+        "x-roles": [
+          "TEACHER",
+          "SUPER_ADMIN"
+        ]
+      }
+    },
+    "/api/v1/admin/video-deletion-requests/{id}": {
+      "get": {
+        "operationId": "VideoDeletionRequestsController_get_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VideoDeletionRequestResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get deletion request and current global references for super admin review",
+        "tags": [
+          "admin/video-deletion-requests"
+        ],
+        "x-roles": [
+          "TEACHER",
+          "SUPER_ADMIN"
+        ]
+      }
+    },
+    "/api/v1/admin/video-deletion-requests/{id}/approve": {
+      "post": {
+        "operationId": "VideoDeletionRequestsController_approve_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApproveVideoDeletionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VideoDeletionRequestResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Approve and execute permanent global video deletion",
+        "tags": [
+          "admin/video-deletion-requests"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
+        ]
+      }
+    },
+    "/api/v1/admin/video-deletion-requests/{id}/reject": {
+      "post": {
+        "operationId": "VideoDeletionRequestsController_reject_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VideoDeletionReasonDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VideoDeletionRequestResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Reject deletion without modifying the video",
+        "tags": [
+          "admin/video-deletion-requests"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
+        ]
+      }
+    },
+    "/api/v1/admin/video-deletion-requests/{id}/retry": {
+      "post": {
+        "operationId": "VideoDeletionRequestsController_retry_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VideoDeletionRequestResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The authenticated role is not permitted to perform this operation."
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Retry failed or interrupted approved deletion",
+        "tags": [
+          "admin/video-deletion-requests"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -31426,14 +31961,7 @@
             }
           },
           "403": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponseDto"
-                }
-              }
-            }
+            "description": "The authenticated role is not permitted to perform this operation."
           }
         },
         "security": [
@@ -31447,7 +31975,8 @@
         ],
         "x-roles": [
           "ADMIN",
-          "SUPER_ADMIN"
+          "SUPER_ADMIN",
+          "TEACHER"
         ]
       }
     },
@@ -31601,9 +32130,40 @@
           "password"
         ]
       },
+      "TeacherCourseScopeDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "COURSES"
+            ]
+          },
+          "courseIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "type",
+          "courseIds"
+        ]
+      },
       "AuthUserDto": {
         "type": "object",
         "properties": {
+          "scope": {
+            "nullable": true,
+            "description": "Current course assignments for teachers; null for other roles.",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TeacherCourseScopeDto"
+              }
+            ]
+          },
           "id": {
             "type": "string"
           },
@@ -31612,6 +32172,7 @@
             "enum": [
               "SUPER_ADMIN",
               "ADMIN",
+              "TEACHER",
               "PARTNER",
               "STUDENT"
             ]
@@ -31625,6 +32186,7 @@
           }
         },
         "required": [
+          "scope",
           "id",
           "role",
           "loginIdentifier"
@@ -31915,6 +32477,16 @@
       "CurrentUserDto": {
         "type": "object",
         "properties": {
+          "scope": {
+            "nullable": true,
+            "description": "Current course assignments for teachers; null for other roles.",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TeacherCourseScopeDto"
+              }
+            ]
+          },
           "id": {
             "type": "string"
           },
@@ -31923,6 +32495,7 @@
             "enum": [
               "SUPER_ADMIN",
               "ADMIN",
+              "TEACHER",
               "PARTNER",
               "STUDENT"
             ]
@@ -31953,6 +32526,7 @@
           }
         },
         "required": [
+          "scope",
           "id",
           "role",
           "loginIdentifier",
@@ -31979,6 +32553,20 @@
       "CreateAdminDto": {
         "type": "object",
         "properties": {
+          "role": {
+            "type": "string",
+            "enum": [
+              "ADMIN",
+              "TEACHER"
+            ],
+            "default": "ADMIN"
+          },
+          "courseIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
           "email": {
             "type": "string",
             "example": "admin@example.com"
@@ -31997,6 +32585,16 @@
       "AdminSummaryDto": {
         "type": "object",
         "properties": {
+          "scope": {
+            "nullable": true,
+            "description": "Current course assignments for teachers; null for other roles.",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TeacherCourseScopeDto"
+              }
+            ]
+          },
           "id": {
             "type": "string"
           },
@@ -32005,6 +32603,7 @@
             "enum": [
               "SUPER_ADMIN",
               "ADMIN",
+              "TEACHER",
               "PARTNER",
               "STUDENT"
             ]
@@ -32035,6 +32634,7 @@
           }
         },
         "required": [
+          "scope",
           "id",
           "role",
           "loginIdentifier",
@@ -32072,7 +32672,22 @@
           "email"
         ]
       },
-      "PasswordResetResponseDto": {
+      "UpdateTeacherScopeDto": {
+        "type": "object",
+        "properties": {
+          "courseIds": {
+            "description": "Complete replacement; [] removes all course access.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "courseIds"
+        ]
+      },
+      "AdminPasswordResetResponseDto": {
         "type": "object",
         "properties": {
           "temporaryPassword": {
@@ -32081,11 +32696,32 @@
           "passwordResetAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "SUPER_ADMIN",
+              "ADMIN",
+              "TEACHER",
+              "PARTNER",
+              "STUDENT"
+            ]
+          },
+          "scope": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TeacherCourseScopeDto"
+              }
+            ]
           }
         },
         "required": [
           "temporaryPassword",
-          "passwordResetAt"
+          "passwordResetAt",
+          "role",
+          "scope"
         ]
       },
       "CreatePartnerDto": {
@@ -35061,6 +35697,182 @@
           "meta"
         ]
       },
+      "CreateVideoDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "filename": {
+            "type": "string"
+          },
+          "contentItemId": {
+            "type": "string",
+            "description": "Required for teachers: existing draft VIDEO in an assigned course."
+          }
+        },
+        "required": [
+          "title"
+        ]
+      },
+      "CreateVideoDeletionRequestDto": {
+        "type": "object",
+        "properties": {
+          "assetId": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "assetId",
+          "reason"
+        ]
+      },
+      "VideoDeletionRequestResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "requesterId": {
+            "type": "string"
+          },
+          "assetId": {
+            "type": "string"
+          },
+          "contentItemId": {
+            "type": "string"
+          },
+          "courseId": {
+            "type": "string"
+          },
+          "snapshot": {
+            "type": "object",
+            "description": "Frozen title, status, filename, Bunny identifiers and upload state; retained after deletion."
+          },
+          "reason": {
+            "type": "string"
+          },
+          "decision": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "APPROVED",
+              "REJECTED"
+            ]
+          },
+          "execution": {
+            "type": "string",
+            "enum": [
+              "WAITING",
+              "IN_PROGRESS",
+              "FAILED",
+              "COMPLETED"
+            ]
+          },
+          "reviewerId": {
+            "type": "string",
+            "nullable": true
+          },
+          "decisionReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "reviewedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "completedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "failureDetails": {
+            "type": "string",
+            "nullable": true
+          },
+          "attempts": {
+            "type": "number"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "affectedReferences": {
+            "type": "object",
+            "description": "Super admin detail only: current global references by model, each with count and ids."
+          }
+        },
+        "required": [
+          "id",
+          "requesterId",
+          "assetId",
+          "contentItemId",
+          "courseId",
+          "snapshot",
+          "reason",
+          "decision",
+          "execution",
+          "reviewerId",
+          "decisionReason",
+          "reviewedAt",
+          "startedAt",
+          "completedAt",
+          "failureDetails",
+          "attempts",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "VideoDeletionRequestPageDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VideoDeletionRequestResponseDto"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/PaginationMetaDto"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ]
+      },
+      "ApproveVideoDeletionDto": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string"
+          }
+        }
+      },
+      "VideoDeletionReasonDto": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ]
+      },
       "LocalizedDescriptionDto": {
         "type": "object",
         "properties": {
@@ -35681,6 +36493,11 @@
       "StudentEntitlementDto": {
         "type": "object",
         "properties": {
+          "availableQuestionCount": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Distinct questions available to this student in the entitled course or chapter and its descendants, before assessment filters."
+          },
           "id": {
             "type": "string"
           },
@@ -35725,6 +36542,7 @@
           }
         },
         "required": [
+          "availableQuestionCount",
           "id",
           "targetType",
           "targetId",

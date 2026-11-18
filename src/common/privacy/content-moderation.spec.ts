@@ -67,6 +67,7 @@ function build() {
   };
   const service: any = Object.create(AssessmentsService.prototype);
   service.prisma = prisma;
+  service.config = { get: jest.fn().mockReturnValue(true) };
   service.audit = { record: jest.fn() };
   service.gradePendingAiAnswers = jest.fn();
   service.aiGradingEligible = jest.fn().mockReturnValue(true);

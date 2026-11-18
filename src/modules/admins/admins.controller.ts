@@ -1,9 +1,11 @@
+import { UpdateTeacherScopeDto } from './dto/update-teacher-scope.dto';
 import {
   Body,
   Controller,
   Get,
   Param,
   Patch,
+  Put,
   Post,
   Query,
   UseGuards,
@@ -26,7 +28,7 @@ import { ApiStandardErrors } from '../../common/decorators/api-standard-errors.d
 import {
   AdminSummaryDto,
   PaginatedAdminResponseDto,
-  PasswordResetResponseDto,
+  AdminPasswordResetResponseDto,
 } from '../../common/dto/api-response.dto';
 
 @ApiTags('admin/admins')
@@ -78,6 +80,18 @@ export class AdminsController {
     return this.adminsService.update(actor, id, dto);
   }
 
+  @Put(':id/scope')
+  @ApiOperation({ summary: 'Replace all course assignments for a teacher' })
+  @ApiOkResponse({ type: AdminSummaryDto })
+  @ApiStandardErrors(400, 401, 403, 404)
+  scope(
+    @CurrentUser() actor: RequestUser,
+    @Param('id') id: string,
+    @Body() dto: UpdateTeacherScopeDto,
+  ) {
+    return this.adminsService.replaceScope(actor, id, dto.courseIds);
+  }
+
   @Post(':id/suspend')
   @ApiOperation({ summary: 'Suspend an administrator and revoke sessions' })
   @ApiCreatedResponse({ type: AdminSummaryDto })
@@ -96,7 +110,7 @@ export class AdminsController {
 
   @Post(':id/reset-password')
   @ApiOperation({ summary: 'Reset an administrator password' })
-  @ApiCreatedResponse({ type: PasswordResetResponseDto })
+  @ApiCreatedResponse({ type: AdminPasswordResetResponseDto })
   @ApiStandardErrors(401, 403, 404, 409)
   resetPassword(@CurrentUser() actor: RequestUser, @Param('id') id: string) {
     return this.adminsService.resetPassword(actor, id);

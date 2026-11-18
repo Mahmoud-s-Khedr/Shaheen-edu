@@ -1,4 +1,10 @@
 import {
+  assertCourseReader,
+  assertResource,
+  resourceWhere,
+  resourceSql,
+} from '../../common/authorization/course-scope';
+import {
   ConflictException,
   ForbiddenException,
   Injectable,
@@ -21,7 +27,10 @@ import type { QueryAcademicGradeDto } from './dto/query-academic-grade.dto';
 import type { ReorderAcademicGradeDto } from './dto/reorder-academic-grade.dto';
 import type { SearchPaginationQueryDto } from '../../common/dto/pagination-query.dto';
 import { PublicationService } from '../publication/publication.service';
-import { paginateArabicSearch } from '../../common/search/arabic-search';
+import {
+  paginateArabicSearch,
+  sqlAnd,
+} from '../../common/search/arabic-search';
 import {
   contentStatusScope,
   publishedScope,
@@ -76,7 +85,7 @@ export class AcademicGradesService {
     }
   }
 
-  private async getOrThrow(id: string) {
+  private async getOrThrow(id: string, actor?: RequestUser) {
     const record = await this.prisma.academicGrade.findUnique({
       where: { id },
       include: {
@@ -84,7 +93,12 @@ export class AcademicGradesService {
         _count: {
           select: {
             subjectAssignments: {
-              where: { subject: { status: { not: ContentStatus.ARCHIVED } } },
+              where: {
+                subject: {
+                  ...(actor ? resourceWhere(actor, 'subject') : {}),
+                  status: { not: ContentStatus.ARCHIVED },
+                },
+              },
             },
           },
         },
@@ -136,19 +150,27 @@ export class AcademicGradesService {
   }
 
   async getById(actor: RequestUser, id: string) {
-    this.assertActorRole(actor);
-    return this.toSummary(await this.getOrThrow(id));
+    await assertResource(this.prisma, actor, 'academicGrade', id);
+    return this.toSummary(await this.getOrThrow(id, actor));
   }
 
   async list(actor: RequestUser, query: QueryAcademicGradeDto) {
-    this.assertActorRole(actor);
-    const where = { status: query.status ?? { not: ContentStatus.ARCHIVED } };
+    assertCourseReader(actor);
+    const where = {
+      AND: [resourceWhere(actor, 'academicGrade')],
+      status: query.status ?? { not: ContentStatus.ARCHIVED },
+    };
     const { data: items, total } = await paginateArabicSearch({
       prisma: this.prisma,
       delegate: this.prisma.academicGrade,
       target: 'academicGrade',
       q: query.q,
-      scope: { where: contentStatusScope(query.status) },
+      scope: {
+        where: sqlAnd(
+          resourceSql(actor, 'academicGrade'),
+          contentStatusScope(query.status),
+        ),
+      },
       orderBySql: Prisma.sql`t."sortOrder" ASC, t.id ASC`,
       orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
       where,
@@ -158,7 +180,12 @@ export class AcademicGradesService {
           _count: {
             select: {
               subjectAssignments: {
-                where: { subject: { status: { not: ContentStatus.ARCHIVED } } },
+                where: {
+                  subject: {
+                    ...resourceWhere(actor, 'subject'),
+                    status: { not: ContentStatus.ARCHIVED },
+                  },
+                },
               },
             },
           },

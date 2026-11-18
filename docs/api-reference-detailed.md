@@ -4,6 +4,68 @@ Implementation-backed API contract. Every endpoint below is self-contained: its 
 
 DTO validation failures return HTTP 400 with code `BAD_REQUEST.VALIDATION_FAILED`. The top-level `message` contains the first validation issue in Arabic and English; render every entry in `details` for full form feedback. Each detail has `{ field, code, message: { ar, en } }`. Field paths use dots and array indexes (for example, `items.0.title.en`); an empty field denotes a request-level issue. Unknown fields are rejected with `VALIDATION.WHITELISTVALIDATION`. Use codes and field paths for client logic, rather than matching message text. Malformed JSON, oversized bodies, and unsupported content types return actionable HTTP 400, 413, and 415 errors respectively.
 
+
+## Teacher role and course scope
+
+The [teacher administration and video deletion handoff](teacher-admins-and-video-deletion-api.md)
+adds `TEACHER` to the existing admin login/session flow. Teacher-readable hierarchy
+and video endpoints intersect every query with current course assignments.
+Teachers may create VIDEO drafts, edit draft title/description, upload their bound
+video, attach it once ready, preview permitted videos and read anonymous feedback.
+Publication and unrelated administration remain restricted. Login, refresh,
+`/auth/me` and administrator management return `role` and `scope` (`COURSES` for
+teachers, `null` for admins/super admins). The OpenAPI schemas describe the
+additive account fields and deletion request state.
+
+### `PUT /api/v1/admin/admins/{id}/scope`
+
+Super admin only. Body `{ "courseIds": ["course-id"] }` replaces the complete
+assignment list of a teacher. `[]` removes all course access immediately for
+subsequent requests. Returns the administrator summary, including `role` and
+`scope`. Invalid courses return 404; assigning scope to an ordinary admin returns
+400. Role conversion is unsupported.
+
+### `POST /api/v1/admin/video-deletion-requests`
+
+Teacher only. Body `{ "assetId": "video-asset-id", "reason": "Reason" }` creates a
+persistent PENDING/WAITING request for an accessible attached video or the
+teacher's own scoped unfinished upload. Returns `VideoDeletionRequestResponseDto`.
+Duplicates return 409. The video remains unchanged until approval.
+
+### `GET /api/v1/admin/video-deletion-requests`
+
+Teacher or super admin. Supports `page` and `limit`, ordered newest first.
+Returns `VideoDeletionRequestPageDto`; teachers see only their own requests.
+
+### `GET /api/v1/admin/video-deletion-requests/{id}`
+
+Requester or super admin. Returns `VideoDeletionRequestResponseDto`. Super-admin
+detail adds current `affectedReferences` with IDs and counts by model, including
+references outside the teacher's assigned courses. Other teachers receive 404.
+
+### `POST /api/v1/admin/video-deletion-requests/{id}/approve`
+
+Super admin only. Body `{ "reason": "Optional decision note" }`. Revalidates the
+target, commits approval and a deletion marker, then attempts permanent global
+cleanup and Bunny deletion. Changed targets are rejected with 409 and require a
+fresh request. Returns the request; inspect `execution` (COMPLETED or FAILED),
+not just HTTP 201. Concurrent/already-decided approvals return 409. If other uploads
+remain bound to the owner, cleanup preserves it as an empty draft; otherwise it
+deletes the owner. New uploads to an owner undergoing deletion return 409.
+
+### `POST /api/v1/admin/video-deletion-requests/{id}/reject`
+
+Super admin only. Body `{ "reason": "Required decision reason" }`. Returns the
+rejected request without changing content or remote files. Already-decided
+requests return 409.
+
+### `POST /api/v1/admin/video-deletion-requests/{id}/retry`
+
+Super admin only. Retries an approved FAILED or interrupted IN_PROGRESS operation.
+Returns the persisted request. Concurrent execution returns 409. Completion
+requires both Bunny deletion (404 counts as success) and local cleanup. History
+survives asset/content deletion.
+
 ## Generated operations inventory
 
 The OpenAPI document in `docs-json.json` is the authoritative schema. The

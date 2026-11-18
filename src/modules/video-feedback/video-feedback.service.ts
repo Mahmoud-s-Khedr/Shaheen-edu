@@ -1,3 +1,7 @@
+import {
+  assertCourseReader,
+  resourceWhere,
+} from '../../common/authorization/course-scope';
 import { assertContentStaff } from '../../common/authorization/admin-authorization';
 import {
   BadRequestException,
@@ -38,10 +42,11 @@ export class VideoFeedbackService {
   ) {
     const video = await this.prisma.videoAsset.findUnique({
       where: { assetId: videoAssetId },
-      include: { asset: { select: { status: true } } },
+      include: { asset: { select: { status: true, deletionStartedAt: true } } },
     });
     if (
       !video ||
+      video.asset.deletionStartedAt ||
       video.asset.status !== AssetStatus.READY ||
       video.processingStatus !== VideoProcessingStatus.READY
     ) {
@@ -75,11 +80,23 @@ export class VideoFeedbackService {
   }
 
   async list(actor: RequestUser, query: QueryVideoFeedbackDto) {
-    assertContentStaff(actor);
-    if (actor.role === Role.ADMIN && query.studentId !== undefined)
+    assertCourseReader(actor);
+    if (actor.role !== Role.SUPER_ADMIN && query.studentId !== undefined)
       throw new ForbiddenException('The studentId filter requires Super Admin');
     const createdAt = this.createdAtRange(query.from, query.to);
     const where: any = {
+      AND:
+        actor.role === Role.TEACHER
+          ? [
+              {
+                videoAsset: {
+                  asset: {
+                    primaryFor: { some: resourceWhere(actor, 'contentItem') },
+                  },
+                },
+              },
+            ]
+          : [],
       ...(query.videoAssetId ? { videoAssetId: query.videoAssetId } : {}),
       ...(query.studentId ? { studentUserId: query.studentId } : {}),
       ...(query.rating ? { rating: query.rating } : {}),

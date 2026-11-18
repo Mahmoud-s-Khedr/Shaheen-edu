@@ -1,6 +1,8 @@
+import { accountScope } from '../../common/authorization/course-scope';
 import { Prisma } from '@prisma/client';
 import {
   ConflictException,
+  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -56,7 +58,7 @@ export class AdminsService {
         'The super admin account cannot be targeted by this endpoint',
       );
     }
-    if (target.role !== Role.ADMIN) {
+    if (target.role !== Role.ADMIN && target.role !== Role.TEACHER) {
       throw new NotFoundException('Admin not found');
     }
     return target;
@@ -73,10 +75,19 @@ export class AdminsService {
       throw new ConflictException('Email already in use');
     }
 
+    if (dto.role !== Role.TEACHER && dto.courseIds?.length)
+      throw new BadRequestException('Only teachers accept course assignments');
+    await this.validateCourses(dto.courseIds ?? []);
     const passwordHash = await this.passwordService.hash(dto.password);
     const created = await this.prisma.user.create({
       data: {
-        role: Role.ADMIN,
+        role: dto.role ?? Role.ADMIN,
+        teacherCourses:
+          dto.role === Role.TEACHER
+            ? {
+                create: (dto.courseIds ?? []).map((courseId) => ({ courseId })),
+              }
+            : undefined,
         status: AccountStatus.ACTIVE,
         loginIdentifier: normalizedEmail,
         passwordHash,
@@ -88,7 +99,12 @@ export class AdminsService {
       action: 'ADMIN_CREATED',
       targetType: 'User',
       targetId: created.id,
-      metadata: { email: normalizedEmail },
+      metadata: {
+        email: normalizedEmail,
+        ...(dto.role === Role.TEACHER
+          ? { courseIds: dto.courseIds ?? [] }
+          : {}),
+      },
     });
 
     return this.toSummary(created);
@@ -96,13 +112,13 @@ export class AdminsService {
 
   async list(actor: RequestUser, pagination: SearchPaginationQueryDto) {
     this.assertActorIsSuperAdmin(actor);
-    const where = { role: Role.ADMIN };
+    const where = { role: { in: [Role.ADMIN, Role.TEACHER] } };
     const { data: admins, total } = await paginateArabicSearch({
       prisma: this.prisma,
       delegate: this.prisma.user,
       target: 'user',
       q: pagination.q,
-      scope: { where: Prisma.sql`t.role = ${Role.ADMIN}::"Role"` },
+      scope: { where: Prisma.sql`t.role IN ('ADMIN', 'TEACHER')` },
       orderBySql: Prisma.sql`t."createdAt" DESC, t.id DESC`,
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       where,
@@ -110,7 +126,7 @@ export class AdminsService {
       limit: pagination.limit,
     });
     return {
-      data: admins.map((admin) => this.toSummary(admin)),
+      data: await Promise.all(admins.map((admin) => this.toSummary(admin))),
       meta: toPaginationMeta(pagination.page, pagination.limit, total),
     };
   }
@@ -120,7 +136,10 @@ export class AdminsService {
     const target = await this.prisma.user.findUnique({
       where: { id: targetId },
     });
-    if (!target || target.role !== Role.ADMIN) {
+    if (
+      !target ||
+      (target.role !== Role.ADMIN && target.role !== Role.TEACHER)
+    ) {
       throw new NotFoundException('Admin not found');
     }
     return this.toSummary(target);
@@ -218,10 +237,53 @@ export class AdminsService {
         targetId,
       });
     });
-    return { temporaryPassword, passwordResetAt };
+    return {
+      temporaryPassword,
+      passwordResetAt,
+      role: target.role,
+      scope: await accountScope(this.prisma, target),
+    };
   }
 
-  private toSummary(user: {
+  private async validateCourses(courseIds: string[]) {
+    if (!courseIds.length) return;
+    if (
+      (await this.prisma.course.count({ where: { id: { in: courseIds } } })) !==
+      courseIds.length
+    )
+      throw new NotFoundException('Course not found');
+  }
+
+  async replaceScope(
+    actor: RequestUser,
+    targetId: string,
+    courseIds: string[],
+  ) {
+    this.assertActorIsSuperAdmin(actor);
+    const target = await this.getMutableTargetOrThrow(targetId);
+    if (target.role !== Role.TEACHER)
+      throw new BadRequestException('Only teacher scope can be assigned');
+    await this.validateCourses(courseIds);
+    await this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "User" WHERE id = ${targetId} FOR UPDATE`;
+      await tx.teacherCourseAssignment.deleteMany({
+        where: { teacherId: targetId },
+      });
+      await tx.teacherCourseAssignment.createMany({
+        data: courseIds.map((courseId) => ({ teacherId: targetId, courseId })),
+      });
+      await this.auditService.recordWithClient(tx, {
+        actorUserId: actor.id,
+        action: 'TEACHER_SCOPE_REPLACED',
+        targetType: 'User',
+        targetId,
+        metadata: { courseIds },
+      });
+    });
+    return this.toSummary(target);
+  }
+
+  private async toSummary(user: {
     id: string;
     role: Role;
     status: AccountStatus;
@@ -232,6 +294,7 @@ export class AdminsService {
     return {
       id: user.id,
       role: user.role,
+      scope: await accountScope(this.prisma, user),
       status: user.status,
       loginIdentifier: user.loginIdentifier,
       createdAt: user.createdAt,

@@ -135,7 +135,22 @@ export class PaginationMetaDto {
   totalPages!: number;
 }
 
+export class TeacherCourseScopeDto {
+  @ApiProperty({ enum: ['COURSES'] })
+  type!: 'COURSES';
+  @ApiProperty({ type: [String] })
+  courseIds!: string[];
+}
+
 export class AuthUserDto {
+  @ApiProperty({
+    type: TeacherCourseScopeDto,
+    nullable: true,
+    description:
+      'Current course assignments for teachers; null for other roles.',
+  })
+  scope!: TeacherCourseScopeDto | null;
+
   @ApiProperty()
   id!: string;
 
@@ -313,6 +328,12 @@ export class PasswordResetResponseDto {
 
   @ApiProperty({ type: String, format: 'date-time' })
   passwordResetAt!: Date;
+}
+
+export class AdminPasswordResetResponseDto extends PasswordResetResponseDto {
+  @ApiProperty({ enum: Role }) role!: Role;
+  @ApiProperty({ type: TeacherCourseScopeDto, nullable: true })
+  scope!: TeacherCourseScopeDto | null;
 }
 
 export class CurrentUserDto extends UserSummaryDto {}

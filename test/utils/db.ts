@@ -13,6 +13,8 @@ export async function cleanDatabase(
   app: NestFastifyApplication,
 ): Promise<void> {
   const prisma = app.get(PrismaService);
+  await prisma.videoDeletionRequest.deleteMany();
+  await prisma.teacherCourseAssignment.deleteMany();
   await prisma.formSubmission.deleteMany();
   await prisma.form.deleteMany();
   await prisma.partnerFinanceDiscrepancy.deleteMany();

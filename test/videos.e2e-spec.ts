@@ -252,7 +252,7 @@ describe('Video assets (e2e)', () => {
           method: 'POST',
           url: '/api/v1/admin/subjects',
           headers: admin(),
-          payload: { title: 'Video Subject', academicGradeId: gradeId },
+          payload: { title: 'Video Subject', academicGradeIds: [gradeId] },
         }),
       ).id;
       await app.inject({
