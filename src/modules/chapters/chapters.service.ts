@@ -1,3 +1,4 @@
+import { directSaleWhere } from '../../common/commerce/sales-count';
 import {
   assertCourseReader,
   assertResource,
@@ -85,6 +86,7 @@ export class ChaptersService {
         _count: {
           select: {
             lessons: { where: { status: { not: ContentStatus.ARCHIVED } } },
+            orderItems: { where: directSaleWhere },
           },
         },
       },
@@ -164,6 +166,7 @@ export class ChaptersService {
         _count: {
           select: {
             lessons: { where: { status: { not: ContentStatus.ARCHIVED } } },
+            orderItems: { where: directSaleWhere },
           },
         },
       },
@@ -213,6 +216,7 @@ export class ChaptersService {
           _count: {
             select: {
               lessons: { where: { status: { not: ContentStatus.ARCHIVED } } },
+              orderItems: { where: directSaleWhere },
             },
           },
         },
@@ -560,7 +564,7 @@ export class ChaptersService {
     coverAssetId: string | null;
     coverAsset?: { filename: string } | null;
     course?: { title: string };
-    _count?: { lessons: number };
+    _count?: { lessons: number; orderItems?: number };
   }) {
     return {
       id: record.id,
@@ -575,6 +579,7 @@ export class ChaptersService {
       coverAssetId: record.coverAssetId,
       coverAssetName: record.coverAsset?.filename ?? null,
       hasChildren: (record._count?.lessons ?? 0) > 0,
+      soldCount: record._count?.orderItems ?? 0,
       createdAt: record.createdAt,
       updatedAt: record.updatedAt,
       publishedAt: record.publishedAt,

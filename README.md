@@ -143,6 +143,7 @@ resources; read [the testing guide](docs/testing/README.md) first.
 
 ## Documentation
 
+- [Frontend integration updates — 24 November 2026](docs/frontend-integration-updates-2026-11-24.md)
 - [Compact API reference](docs/api-reference-compact.md) and
   [detailed API reference](docs/api-reference-detailed.md)
 - [Student catalog guide](docs/student-content-catalog-api-guide.md),

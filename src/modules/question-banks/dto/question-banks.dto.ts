@@ -380,12 +380,22 @@ export class CreateQuestionDto {
 export class UpdateQuestionDto {
   @ApiPropertyOptional() @IsOptional() @IsString() bankId?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() sourceId?: string;
-  @ApiPropertyOptional() @IsOptional() @IsString() courseId?: string;
+  @ApiPropertyOptional({
+    description:
+      'Target course. Draft, rejected, and published questions may be relocated; changing course requires replacement placements and a bank in the same subject.',
+  })
+  @IsOptional()
+  @IsString()
+  courseId?: string;
   @ApiPropertyOptional({ enum: QuestionType })
   @IsOptional()
   @IsEnum(QuestionType)
   type?: QuestionType;
-  @ApiPropertyOptional({ type: [QuestionPlacementDto] })
+  @ApiPropertyOptional({
+    type: [QuestionPlacementDto],
+    description:
+      'Replaces all placements. Allowed for draft, rejected, and published questions. Every target must belong to the target course; published questions remain published.',
+  })
   @IsOptional()
   @IsArray()
   @ArrayMinSize(1)

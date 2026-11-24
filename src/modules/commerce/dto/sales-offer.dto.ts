@@ -94,7 +94,8 @@ export class SalesOfferAdminDto {
   @ApiProperty({ type: Number, nullable: true }) purchaseLimit!: number | null;
   @ApiProperty({ enum: ['ACTIVE', 'PAUSED', 'ENDED'] }) status!: string;
   @ApiPropertyOptional({
-    description: 'Allocated, unreleased purchases; included in lists',
+    description:
+      'Lifetime approved paid bundle purchases, excluding approved refunds; included in lists. Credit-funded purchases count.',
   })
   soldCount?: number;
   @ApiPropertyOptional({

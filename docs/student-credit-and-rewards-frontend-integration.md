@@ -5,7 +5,7 @@ This guide describes how to integrate the current student credit, first-purchase
 ## 1. API conventions and scope
 
 - Prefix every route below with `/api/v1`.
-- Send `Authorization: Bearer <token>` and JSON request bodies with `Content-Type: application/json`.
+- Send `Authorization: Bearer <token>` for protected routes and JSON request bodies with `Content-Type: application/json`. The public `GET /student-rewards/settings` does not need a token.
 - Student endpoints require `STUDENT`. Administrator endpoints require `SUPER_ADMIN`.
 - Money uses integer EGP minor units: `100` means EGP 1. Convert display inputs to integers before submitting.
 - Dates are ISO timestamps over HTTP. Display them in the user's timezone.
@@ -19,6 +19,7 @@ This update adds backend functionality; it does not provide frontend screens, fa
 | Area | Integration work |
 | --- | --- |
 | Shared API types | Add credit balances, history, referral types, and payment splits |
+| Public reward terms | Read `/student-rewards/settings` without authentication; reuse `{ version, config }` from the admin settings response |
 | Student account | Show available/reserved credit, expiry, debt, and transaction history |
 | Checkout | Add optional credit amount and student referral code; render server preview |
 | Payment return and order history | Show external payment and credit separately; support the new review reason |
@@ -237,7 +238,9 @@ An existing active student attribution can also conflict with a supplied partner
 
 ### What can be promised before approval
 
-The current preview returns credit usage and referral attribution, not a guaranteed reward amount or eligibility breakdown. There is no student-facing general rewards-settings endpoint. Avoid calculating or promising a first-purchase/referral award from cart totals alone.
+Read `GET /api/v1/student-rewards/settings` without authentication to display configured credit, first-purchase, and referral program terms. It returns `{ version, config }` using the admin settings GET shape; before configuration it returns version `0` with disabled default policies. Refresh it when loading program information to reflect administrator changes. Personal balances and referral codes still use authenticated student routes.
+
+The current preview returns credit usage and referral attribution, not a guaranteed reward amount or eligibility breakdown. Configured program terms do not establish a student's eligibility. Avoid calculating or promising a first-purchase/referral award from cart totals alone.
 
 Rules relevant to UI copy:
 

@@ -87,6 +87,10 @@ Review student referral attribution and suspicious activity. See the [student cr
 
 Read student credit and rewards configuration. See the [student credit and rewards guide](student-credit-and-rewards-api.md) for authorization, payloads, and responses.
 
+### `GET /api/v1/student-rewards/settings`
+
+Public; no authentication required. Returns HTTP 200 with the same `{ version, config }` as the administrator settings GET. Includes the credit, first-purchase, and referral policies, or version `0` and disabled defaults before configuration. Read-only; administrator updates remain protected. See the [student credit and rewards guide](student-credit-and-rewards-api.md#public-settings-api).
+
 ### `GET /api/v1/admin/students/{id}/credit`
 
 Read student credit balance. See the [student credit and rewards guide](student-credit-and-rewards-api.md) for authorization, payloads, and responses.
@@ -524,6 +528,12 @@ No path, query, or header input.
 ### `POST /api/v1/admin/manual-payment-methods`
 
 ### `PATCH /api/v1/admin/manual-payment-methods/{id}`
+
+### `DELETE /api/v1/admin/manual-payment-methods/{id}`
+
+Requires a `SUPER_ADMIN` bearer token. Deletes an unused payment method and records an audit event.
+Returns HTTP 200 with `{ "id": "payment-method-id", "deleted": true }`, or HTTP 404 when the method does not exist.
+Returns HTTP 409 if any order references the method, including pending or cancelled orders. Deactivate such methods with `PATCH` and `{ "isActive": false }` instead.
 
 ### `POST /api/v1/admin/manual-payment-methods/reorder`
 
@@ -6379,10 +6389,13 @@ No path, query, or header input.
 
 **Authorization:** Bearer token; role must be `ADMIN` or `SUPER_ADMIN`
 
+Results are ordered oldest first by `createdAt ASC`, then `id ASC` for equal timestamps. This ordering also applies when searching with `q` and across pages.
+
 **Request**
 
 - query `page` (optional)
 - query `limit` (optional)
+- query `q` (optional; text search)
 - query `status` (optional; DRAFT | IN_REVIEW | PUBLISHED | REJECTED | ARCHIVED)
 - query `bankId` (optional)
 - query `sourceId` (optional)
@@ -6437,6 +6450,17 @@ No path, query, or header input.
 ### `PATCH /api/v1/admin/questions/{id}`
 
 **Authorization:** Bearer token; role must be `ADMIN` or `SUPER_ADMIN`
+
+Draft, rejected, and published questions can be relocated using `placements`. This replaces the complete placement list and keeps a published question published, preserving its publication date. Existing assessment snapshots are unchanged.
+
+```http
+PATCH /api/v1/admin/questions/question-id
+Content-Type: application/json
+
+{ "placements": [{ "chapterId": "destination-chapter-id" }] }
+```
+
+Each placement must contain exactly one of `courseId`, `chapterId`, `lessonId`, or `sectionId`. Supply at least one placement, without duplicates. Targets must exist, must not be archived, and must belong to the question's course. To move to another course, supply the new top-level `courseId` and replacement `placements`; the question bank must belong to the destination course's subject (update `bankId` if needed). When relocating a published question, the destination course and subject, question bank, and question source must all be published; otherwise the API returns `409`. Invalid targets or incompatible scope leave the question unchanged. Archived questions cannot be edited; questions in review cannot be relocated.
 
 **Request**
 

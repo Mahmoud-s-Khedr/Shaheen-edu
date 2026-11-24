@@ -16948,6 +16948,7 @@
         ]
       },
       "get": {
+        "description": "Returns questions oldest first (createdAt ASC, id ASC), including when searching.",
         "operationId": "QuestionsController_list_v1",
         "parameters": [
           {
@@ -20236,6 +20237,84 @@
         "x-roles": [
           "SUPER_ADMIN"
         ]
+      },
+      "delete": {
+        "description": "Super Admin only. Methods referenced by any order cannot be deleted; deactivate them instead.",
+        "operationId": "ManualPaymentAdminController_deleteMethod_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdDeletedResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Delete an unused manual payment method",
+        "tags": [
+          "admin/manual-payments"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
+        ]
       }
     },
     "/api/v1/admin/manual-payment-methods/reorder": {
@@ -22345,6 +22424,29 @@
         ],
         "x-roles": [
           "STUDENT"
+        ]
+      }
+    },
+    "/api/v1/student-rewards/settings": {
+      "get": {
+        "description": "No authentication required. Returns the same version and config as the administrator settings GET, including defaults when settings have not been saved.",
+        "operationId": "PublicStudentRewardsController_settings_v1",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudentRewardsSettingsResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Read public student credit and rewards configuration",
+        "tags": [
+          "student-rewards"
         ]
       }
     },
@@ -33840,6 +33942,11 @@
             "format": "date-time",
             "nullable": true
           },
+          "soldCount": {
+            "type": "number",
+            "example": 12,
+            "description": "Lifetime approved direct paid purchases, excluding approved refunds and bundle components. Credit-funded purchases count."
+          },
           "subjectId": {
             "type": "string"
           },
@@ -33860,6 +33967,7 @@
           "status",
           "createdAt",
           "updatedAt",
+          "soldCount",
           "subjectId",
           "subjectName",
           "hasChildren"
@@ -33974,6 +34082,11 @@
             "format": "date-time",
             "nullable": true
           },
+          "soldCount": {
+            "type": "number",
+            "example": 12,
+            "description": "Lifetime approved direct paid purchases, excluding approved refunds and bundle components. Credit-funded purchases count."
+          },
           "subjectId": {
             "type": "string"
           },
@@ -33997,6 +34110,7 @@
           "status",
           "createdAt",
           "updatedAt",
+          "soldCount",
           "subjectId",
           "subjectName",
           "hasChildren",
@@ -34189,6 +34303,11 @@
             "format": "date-time",
             "nullable": true
           },
+          "soldCount": {
+            "type": "number",
+            "example": 12,
+            "description": "Lifetime approved direct paid purchases, excluding approved refunds and bundle components. Credit-funded purchases count."
+          },
           "courseId": {
             "type": "string"
           },
@@ -34209,6 +34328,7 @@
           "status",
           "createdAt",
           "updatedAt",
+          "soldCount",
           "courseId",
           "courseName",
           "hasChildren"
@@ -34276,6 +34396,11 @@
             "format": "date-time",
             "nullable": true
           },
+          "soldCount": {
+            "type": "number",
+            "example": 12,
+            "description": "Lifetime approved direct paid purchases, excluding approved refunds and bundle components. Credit-funded purchases count."
+          },
           "courseId": {
             "type": "string"
           },
@@ -34299,6 +34424,7 @@
           "status",
           "createdAt",
           "updatedAt",
+          "soldCount",
           "courseId",
           "courseName",
           "hasChildren",
@@ -38545,7 +38671,8 @@
             "type": "string"
           },
           "courseId": {
-            "type": "string"
+            "type": "string",
+            "description": "Target course. Draft, rejected, and published questions may be relocated; changing course requires replacement placements and a bank in the same subject."
           },
           "type": {
             "type": "string",
@@ -38558,6 +38685,7 @@
             ]
           },
           "placements": {
+            "description": "Replaces all placements. Allowed for draft, rejected, and published questions. Every target must belong to the target course; published questions remain published.",
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/QuestionPlacementDto"
@@ -41038,7 +41166,7 @@
           },
           "soldCount": {
             "type": "number",
-            "description": "Allocated, unreleased purchases; included in lists"
+            "description": "Lifetime approved paid bundle purchases, excluding approved refunds; included in lists. Credit-funded purchases count."
           },
           "remainingSpots": {
             "type": "number",

@@ -453,6 +453,13 @@ export class SubjectSummaryDto extends HierarchySummaryDto {
 }
 
 export class CourseSummaryDto extends HierarchySummaryDto {
+  @ApiProperty({
+    example: 12,
+    description:
+      'Lifetime approved direct paid purchases, excluding approved refunds and bundle components. Credit-funded purchases count.',
+  })
+  soldCount!: number;
+
   @ApiProperty()
   subjectId!: string;
 
@@ -501,6 +508,13 @@ export class AdminCourseReadDto extends CourseSummaryDto {
 }
 
 export class ChapterSummaryDto extends HierarchySummaryDto {
+  @ApiProperty({
+    example: 12,
+    description:
+      'Lifetime approved direct paid purchases, excluding approved refunds and bundle components. Credit-funded purchases count.',
+  })
+  soldCount!: number;
+
   @ApiProperty()
   courseId!: string;
 

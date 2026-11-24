@@ -238,7 +238,13 @@ export class QuestionsController {
   ) {
     return this.service.createQuestion(a, d);
   }
-  @Get() @ApiOperation({ summary: 'List questions' }) list(
+  @Get()
+  @ApiOperation({
+    summary: 'List questions',
+    description:
+      'Returns questions oldest first (createdAt ASC, id ASC), including when searching.',
+  })
+  list(
     @CurrentUser() a: RequestUser,
     @Query() q: QueryQuestionDto,
   ) {

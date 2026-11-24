@@ -175,6 +175,41 @@ describe('Admin question list hierarchy filters (e2e)', () => {
     await app?.close();
   });
 
+  it('returns oldest questions first with stable ties across searched and unsearched pages', async () => {
+    const prisma = app.get(PrismaService);
+    const dates = {
+      section1: '2000-01-01',
+      chapter1: '2001-01-01',
+      lesson1: '2001-01-01',
+      course1: '2002-01-01',
+    };
+    for (const [key, date] of Object.entries(dates))
+      await prisma.question.update({
+        where: { id: questions[key] },
+        data: { createdAt: new Date(date) },
+      });
+    const expected = [
+      questions.section1,
+      ...[questions.chapter1, questions.lesson1].sort(),
+      questions.course1,
+    ];
+    for (const search of ['', '&q=Hierarchy']) {
+      const returned: string[] = [];
+      for (const page of [1, 2]) {
+        const response = await app.inject({
+          method: 'GET',
+          url: `/api/v1/admin/questions?courseId=${ids.course1}&limit=2&page=${page}${search}`,
+          headers,
+        });
+        expect(response.statusCode).toBe(200);
+        const body = JSON.parse(response.body) as QuestionListResponse;
+        expect(body.meta).toMatchObject({ total: 4, totalPages: 2, page });
+        returned.push(...body.data.map((question) => question.id));
+      }
+      expect(returned).toEqual(expected);
+    }
+  });
+
   const cases: Array<[string, Record<string, string>, string[]]> = [
     [
       'course',
@@ -478,6 +513,160 @@ describe('Admin question list hierarchy filters (e2e)', () => {
         studentUserId: student.id,
         student: { fullName: 'Secret Student' },
       });
+    }
+  });
+
+  it('relocates a published question while preserving publication and validating replacement scope', async () => {
+    const prisma = app.get(PrismaService);
+    const original = await prisma.question.findUniqueOrThrow({
+      where: { id: questions.course1 },
+    });
+    const destination = await prisma.question.findUniqueOrThrow({
+      where: { id: questions.course2 },
+    });
+    const publishedAt = new Date('2026-01-01T00:00:00Z');
+    const question = await prisma.question.create({
+      data: {
+        bankId: original.bankId,
+        sourceId: original.sourceId,
+        courseId: original.courseId,
+        createdById: original.createdById,
+        updatedById: original.updatedById,
+        status: QuestionStatus.PUBLISHED,
+        publishedAt,
+        body: 'Published relocation marker',
+        moreExplanation: 'Keep this explanation',
+        placements: { create: { courseId: original.courseId } },
+        options: {
+          create: [
+            { body: 'Correct', isCorrect: true, sortOrder: 1 },
+            { body: 'Incorrect', isCorrect: false, sortOrder: 2 },
+          ],
+        },
+      },
+      include: { options: { orderBy: { sortOrder: 'asc' } } },
+    });
+    const patch = (payload: Record<string, unknown>) =>
+      app.inject({
+        method: 'PATCH',
+        url: `/api/v1/admin/questions/${question.id}`,
+        headers,
+        payload,
+      });
+    // Moving a published question does not require unpublishing it.
+    for (const target of ['chapter', 'lesson', 'section', 'course']) {
+      const response = await patch({
+        placements: [{ [`${target}Id`]: ids[`${target}1`] }],
+      });
+      expect(response.statusCode).toBe(200);
+      const stored = await prisma.question.findUniqueOrThrow({
+        where: { id: question.id },
+        include: {
+          placements: true,
+          options: { orderBy: { sortOrder: 'asc' } },
+        },
+      });
+      expect(stored).toMatchObject({
+        status: 'PUBLISHED',
+        publishedAt,
+        body: question.body,
+        moreExplanation: question.moreExplanation,
+      });
+      expect(stored.options).toEqual(question.options);
+      expect(stored.placements).toHaveLength(1);
+      expect(stored.placements[0]).toMatchObject({
+        [`${target}Id`]: ids[`${target}1`],
+      });
+    }
+    for (const payload of [
+      { placements: [] },
+      { placements: [{ chapterId: ids.chapter2 }] },
+      {
+        placements: [{ chapterId: ids.chapter1 }, { chapterId: ids.chapter1 }],
+      },
+      { placements: [{ chapterId: ids.chapter1, lessonId: ids.lesson1 }] },
+      { placements: [{ sectionId: 'missing-section' }] },
+      { courseId: ids.course2 },
+      { courseId: ids.course2, placements: [{ courseId: ids.course2 }] }, // bank belongs to a different subject
+    ]) {
+      expect([400, 404]).toContain((await patch(payload)).statusCode);
+      expect(
+        await prisma.question.findUniqueOrThrow({
+          where: { id: question.id },
+          include: { placements: true },
+        }),
+      ).toMatchObject({
+        courseId: ids.course1,
+        status: 'PUBLISHED',
+        placements: [{ courseId: ids.course1 }],
+      });
+    }
+    const beforeInvalidMove = await prisma.question.findUniqueOrThrow({
+      where: { id: question.id },
+      include: { placements: true },
+    });
+    const destinationNodes = [
+      (status: ContentStatus) =>
+        prisma.course.update({
+          where: { id: ids.course2 },
+          data: { status },
+        }),
+      (status: ContentStatus) =>
+        prisma.subject.update({
+          where: { id: ids.subject2 },
+          data: { status },
+        }),
+      (status: ContentStatus) =>
+        prisma.questionBank.update({
+          where: { id: destination.bankId },
+          data: { status },
+        }),
+      (status: ContentStatus) =>
+        prisma.questionSource.update({
+          where: { id: destination.sourceId },
+          data: { status },
+        }),
+    ];
+    for (const updateStatus of destinationNodes) {
+      await updateStatus(ContentStatus.DRAFT);
+      try {
+        const response = await patch({
+          courseId: ids.course2,
+          bankId: destination.bankId,
+          sourceId: destination.sourceId,
+          placements: [{ sectionId: ids.section2 }],
+        });
+        expect(response.statusCode).toBe(409);
+        expect(
+          await prisma.question.findUniqueOrThrow({
+            where: { id: question.id },
+            include: { placements: true },
+          }),
+        ).toEqual(beforeInvalidMove);
+      } finally {
+        await updateStatus(ContentStatus.PUBLISHED);
+      }
+    }
+    const moved = await patch({
+      courseId: ids.course2,
+      bankId: destination.bankId,
+      placements: [{ sectionId: ids.section2 }],
+    });
+    expect(moved.statusCode).toBe(200);
+    expect(JSON.parse(moved.body)).toMatchObject({
+      id: question.id,
+      status: 'PUBLISHED',
+      courseId: ids.course2,
+      placements: [{ sectionId: ids.section2 }],
+    });
+    for (const status of [QuestionStatus.IN_REVIEW, QuestionStatus.ARCHIVED]) {
+      await prisma.question.update({
+        where: { id: question.id },
+        data: { status },
+      });
+      expect(
+        (await patch({ placements: [{ courseId: ids.course2 }] })).statusCode,
+      ).toBe(409);
     }
   });
 });

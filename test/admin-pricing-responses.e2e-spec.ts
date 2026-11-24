@@ -4,6 +4,11 @@ import { createTestApp } from './utils/create-test-app';
 import { cleanDatabase, flushTestRedis, seedSuperAdmin } from './utils/db';
 import { PrismaService } from '../src/database/prisma.service';
 import { ContentStatus } from '../src/common/types/roles.enum';
+import type {
+  OrderStatus,
+  PaymentChannel,
+  RefundRequestStatus,
+} from '@prisma/client';
 
 describe('Admin course and chapter pricing responses (e2e)', () => {
   let app: NestFastifyApplication;
@@ -131,6 +136,192 @@ describe('Admin course and chapter pricing responses (e2e)', () => {
   });
 
   afterAll(async () => app.close());
+
+  it('counts approved direct and bundle sales without free purchases, refunds, or component double counting', async () => {
+    const governorate = await prisma.governorate.create({
+      data: { nameAr: 'Sales count governorate' },
+    });
+    const student = await prisma.user.create({
+      data: {
+        role: 'STUDENT',
+        loginIdentifier: 'sales-count-student',
+        passwordHash: 'unused',
+        studentProfile: {
+          create: {
+            fullName: 'Sales count student',
+            nationalIdHash: 'sales-count-national-id',
+            nationalIdLast4: '1234',
+            governorate: governorate.nameAr,
+            governorateId: governorate.id,
+            parentPhoneNormalized: '+201000000000',
+          },
+        },
+      },
+    });
+    const offer = await prisma.salesOffer.create({
+      data: {
+        name: 'Sales count bundle',
+        priceMinor: 200,
+        // Ended offers can retain allocated spots after refunds. Sales must
+        // still exclude those refunds independently of capacity accounting.
+        startsAt: new Date('2020-01-01'),
+        endsAt: new Date('2020-02-01'),
+        status: 'ENDED',
+      },
+    });
+    const emptyOffer = await prisma.salesOffer.create({
+      data: {
+        name: 'Unsold bundle',
+        priceMinor: 200,
+        startsAt: new Date('2020-01-01'),
+        endsAt: new Date('2020-02-01'),
+      },
+    });
+    const variants: Array<{
+      status: OrderStatus;
+      channel?: PaymentChannel;
+      price?: number;
+      credit?: number;
+      refund?: RefundRequestStatus;
+    }> = [
+      { status: 'APPROVED', channel: 'MANUAL' },
+      { status: 'APPROVED', channel: 'XPAY' },
+      { status: 'APPROVED', channel: 'ZERO_TOTAL', credit: 100 },
+      { status: 'APPROVED', refund: 'PENDING' },
+      { status: 'APPROVED', refund: 'REJECTED' },
+      { status: 'APPROVED', refund: 'APPROVED' },
+      { status: 'APPROVED', channel: 'ZERO_TOTAL', price: 0 },
+      ...(
+        [
+          'AWAITING_PAYMENT',
+          'SUBMITTED',
+          'REJECTED',
+          'CANCELLED',
+          'EXPIRED',
+          'PAYMENT_REVIEW',
+        ] as OrderStatus[]
+      ).map((status) => ({ status })),
+    ];
+    for (const bundle of [false, true]) {
+      for (const variant of variants) {
+        const price = variant.price ?? 100;
+        const credit = variant.credit ?? 0;
+        const order = await prisma.order.create({
+          data: {
+            studentUserId: student.id,
+            status: variant.status,
+            approvedAt: variant.status === 'APPROVED' ? new Date() : null,
+            paymentChannel: variant.channel ?? 'MANUAL',
+            paymentMethodSnapshot: {},
+            subtotalMinor: price * 2,
+            creditAppliedMinor: credit * 2,
+            totalMinor: (price - credit) * 2,
+            currency: 'EGP',
+          },
+        });
+        const purchase = bundle
+          ? await prisma.salesOfferPurchase.create({
+              data: {
+                salesOfferId: offer.id,
+                studentUserId: student.id,
+                orderId: order.id,
+                snapshot: {},
+                allocatedAt: variant.status === 'APPROVED' ? new Date() : null,
+              },
+            })
+          : null;
+        const items = await Promise.all(
+          [
+            { targetType: 'COURSE' as const, courseId },
+            { targetType: 'CHAPTER' as const, chapterId: inheritedChapterId },
+          ].map((target) =>
+            prisma.orderItem.create({
+              data: {
+                ...target,
+                orderId: order.id,
+                salesOfferPurchaseId: purchase?.id,
+                titleSnapshot: 'Sales count product',
+                basePriceMinor: price,
+                priceMinor: price,
+                creditAppliedMinor: credit,
+                currency: 'EGP',
+              },
+            }),
+          ),
+        );
+        if (variant.refund)
+          await prisma.refundRequest.create({
+            data: {
+              orderId: order.id,
+              studentUserId: student.id,
+              status: variant.refund,
+              reason: 'Sales count refund',
+              eligibilitySnapshot: {},
+              items: {
+                create: items.map((item) => ({
+                  orderItemId: item.id,
+                  amountMinor: price - credit,
+                  creditReturnMinor: credit,
+                  currency: 'EGP',
+                })),
+              },
+            },
+          });
+      }
+    }
+
+    for (const [resource, id, unsoldId] of [
+      ['courses', courseId, otherCourseId],
+      ['chapters', inheritedChapterId, overriddenChapterId],
+    ]) {
+      const detail = await app.inject({
+        method: 'GET',
+        url: `/api/v1/admin/${resource}/${id}`,
+        headers: admin(),
+      });
+      expect(detail.statusCode).toBe(200);
+      expect(json(detail)).toMatchObject({ id, soldCount: 5 });
+      // Exercise the Arabic-search path as well as regular pagination.
+      for (const search of ['', '?q=Paid', '?q=Inherited']) {
+        const list = await app.inject({
+          method: 'GET',
+          url: `/api/v1/admin/${resource}${search}`,
+          headers: admin(),
+        });
+        expect(list.statusCode).toBe(200);
+        const rows = json(list).data;
+        if (
+          !search ||
+          (resource === 'courses'
+            ? search === '?q=Paid'
+            : search === '?q=Inherited')
+        )
+          expect(rows).toEqual(
+            expect.arrayContaining([
+              expect.objectContaining({ id, soldCount: 5 }),
+            ]),
+          );
+        if (!search)
+          expect(rows).toEqual(
+            expect.arrayContaining([
+              expect.objectContaining({ id: unsoldId, soldCount: 0 }),
+            ]),
+          );
+      }
+    }
+    const bundles = await app.inject({
+      method: 'GET',
+      url: '/api/v1/admin/sales-offers',
+      headers: admin(),
+    });
+    expect(bundles.statusCode).toBe(200);
+    expect(json(bundles)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: offer.id, soldCount: 5 }),
+        expect.objectContaining({ id: emptyOffer.id, soldCount: 0 }),
+      ]),
+    );
+  });
 
   it('returns effective pricing for course list and detail responses', async () => {
     const pricing = {

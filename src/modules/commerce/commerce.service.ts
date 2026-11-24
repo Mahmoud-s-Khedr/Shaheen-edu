@@ -1536,6 +1536,33 @@ export class CommerceService {
     });
     return method;
   }
+  async deleteMethod(actor: RequestUser, id: string) {
+    this.admin(actor);
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(73122401)`;
+        // The restrictive order FK also protects against concurrent checkout.
+        await tx.manualPaymentMethod.delete({ where: { id } });
+        await this.audit.recordWithClient(tx, {
+          actorUserId: actor.id,
+          action: 'MANUAL_PAYMENT_METHOD_DELETED',
+          targetType: 'ManualPaymentMethod',
+          targetId: id,
+        });
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError) {
+        if (error.code === 'P2003')
+          throw new ConflictException(
+            'Payment methods referenced by orders cannot be deleted. Deactivate this method instead.',
+          );
+        if (error.code === 'P2025')
+          throw new NotFoundException('Manual payment method not found');
+      }
+      throw error;
+    }
+    return { id, deleted: true };
+  }
   async reorderMethods(actor: RequestUser, ids: string[]) {
     this.admin(actor);
     await this.prisma.$transaction(async (tx) => {

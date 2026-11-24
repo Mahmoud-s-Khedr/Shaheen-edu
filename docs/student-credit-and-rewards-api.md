@@ -1,6 +1,6 @@
 # Student credit and rewards backend
 
-This update adds student credit, student referrals, first qualifying purchase rewards, and optional bundle credit rewards. Routes use `/api/v1` and existing bearer authentication. Administrator operations require `SUPER_ADMIN`. All money uses integer EGP minor units: `100` means EGP 1.
+This update adds student credit, student referrals, first qualifying purchase rewards, and optional bundle credit rewards. Routes use `/api/v1`. The public settings GET needs no authentication; student routes use existing bearer authentication. Administrator operations require `SUPER_ADMIN`. All money uses integer EGP minor units: `100` means EGP 1.
 
 For frontend implementation steps, shared types, screen behavior, cache refresh rules, and acceptance checks, see the [frontend integration guide](student-credit-and-rewards-frontend-integration.md).
 
@@ -9,6 +9,12 @@ For frontend implementation steps, shared types, screen behavior, cache refresh 
 Apply `20261111120000_student_credit_rewards`, `20261111130000_student_credit_original_expiry`, and `20261111140000_student_credit_refund_lots`, then regenerate the Prisma client before deploying this code. Credit spending, first-purchase rewards, and student referrals default to disabled. There is no historical credit backfill or automatic award for past orders. Configure the programs through the administrator settings API before enabling them. Frontend integration is separate.
 
 The existing publisher and partner commission bases remain the discounted item price, including the portion funded by platform credit. Credit is a platform-funded payment source rather than an additional discount. Reports separate credit from external payment.
+
+## Public settings API
+
+`GET /api/v1/student-rewards/settings` requires no token and returns HTTP 200 with `{ version, config }`, using the same response as the administrator settings GET. `config` contains `credit`, `firstPurchase`, and `referral` policies, including eligibility, amounts, program dates, limits, and expiry settings. It contains no student balances, personal referral codes, or administrator audit metadata.
+
+Before configuration, the response contains `version: 0` and the disabled default policies. Reading does not create a settings record. Changes saved by the administrator are reflected on the next read. This endpoint is read-only; updates still require `PUT /admin/student-rewards/settings` with a Super Admin token.
 
 ## Student API
 

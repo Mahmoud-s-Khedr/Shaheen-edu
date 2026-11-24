@@ -17,6 +17,7 @@ import {
 } from '../../common/types/roles.enum';
 import type { SaveSalesOfferDto } from './dto/sales-offer.dto';
 import { purchasablePrice } from './purchasable-price';
+import { bundleSaleWhere } from '../../common/commerce/sales-count';
 
 @Injectable()
 export class SalesOffersService {
@@ -327,9 +328,22 @@ export class SalesOffersService {
       },
       orderBy: { createdAt: 'desc' },
     });
+    const sales = offers.length
+      ? await this.prisma.salesOfferPurchase.groupBy({
+          by: ['salesOfferId'],
+          where: {
+            ...bundleSaleWhere,
+            salesOfferId: { in: offers.map((offer) => offer.id) },
+          },
+          _count: true,
+        })
+      : [];
+    const soldCounts = new Map(
+      sales.map((row) => [row.salesOfferId, row._count]),
+    );
     return offers.map(({ _count, ...offer }) => ({
       ...offer,
-      soldCount: _count.purchases,
+      soldCount: soldCounts.get(offer.id) ?? 0,
       remainingSpots:
         offer.purchaseLimit == null
           ? null

@@ -382,6 +382,17 @@ export class ManualPaymentAdminController {
   ) {
     return this.commerce.updateMethod(user, id, dto);
   }
+  @Delete('manual-payment-methods/:id')
+  @ApiOperation({
+    summary: 'Delete an unused manual payment method',
+    description:
+      'Super Admin only. Methods referenced by any order cannot be deleted; deactivate them instead.',
+  })
+  @ApiOkResponse({ type: IdDeletedResponseDto })
+  @ApiStandardErrors(401, 403, 404, 409)
+  deleteMethod(@CurrentUser() user: RequestUser, @Param('id') id: string) {
+    return this.commerce.deleteMethod(user, id);
+  }
   @Post('manual-payment-methods/reorder')
   @ApiOperation({ summary: 'Reorder manual payment methods' })
   @ApiCreatedResponse({ type: ManualPaymentMethodsResponseDto })

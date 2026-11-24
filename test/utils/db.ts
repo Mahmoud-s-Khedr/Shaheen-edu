@@ -80,6 +80,7 @@ export async function cleanDatabase(
   // Question and Course/QuestionBank/QuestionSource in turn.
   await prisma.assessment.deleteMany();
   await prisma.studentQuestionAttempt.deleteMany();
+  await prisma.questionReport.deleteMany();
   await prisma.question.deleteMany();
   await prisma.questionBank.deleteMany();
   await prisma.questionSource.deleteMany();

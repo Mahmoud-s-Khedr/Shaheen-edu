@@ -1314,8 +1314,8 @@ export class QuestionBanksService {
             : undefined,
         ),
       },
-      orderBySql: Prisma.sql`t."createdAt" DESC, t.id ASC`,
-      orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
+      orderBySql: Prisma.sql`t."createdAt" ASC, t.id ASC`,
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
       where,
       args: { include },
       page: q.page,
@@ -1349,10 +1349,11 @@ export class QuestionBanksService {
     if (dto.courseId !== undefined || dto.placements !== undefined) {
       if (
         old.status !== QuestionStatus.DRAFT &&
-        old.status !== QuestionStatus.REJECTED
+        old.status !== QuestionStatus.REJECTED &&
+        old.status !== QuestionStatus.PUBLISHED
       )
         throw new ConflictException(
-          'Question scope can be changed only while draft or rejected',
+          'Question scope can be changed only while draft, rejected, or published',
         );
       if (dto.courseId !== undefined && !dto.placements)
         throw new BadRequestException(
@@ -1441,6 +1442,11 @@ export class QuestionBanksService {
         },
       });
       if (content) await this.syncQuestionAssets(tx, id, content.rows);
+      if (
+        old.status === QuestionStatus.PUBLISHED &&
+        (dto.courseId !== undefined || dto.placements !== undefined)
+      )
+        this.validatePublicationScope(await this.questionWithClient(tx, id));
     });
     if (
       !dto.structuredExplanation &&
@@ -1585,6 +1591,21 @@ export class QuestionBanksService {
     await this.log(actor, 'QUESTION_CONTEXT_DELETED', 'QuestionContext', id);
     return { id, deleted: true };
   }
+  private validatePublicationScope(
+    question: Awaited<ReturnType<QuestionBanksService['question']>>,
+  ) {
+    if (
+      question.source.status !== ContentStatus.PUBLISHED ||
+      question.bank.status !== ContentStatus.PUBLISHED
+    )
+      throw new ConflictException('Question source and bank must be published');
+    if (
+      [question.course, question.course.subject].some(
+        (node) => node.status !== ContentStatus.PUBLISHED,
+      )
+    )
+      throw new ConflictException('Question course ancestry must be published');
+  }
   private async validate(
     question: Awaited<ReturnType<QuestionBanksService['question']>>,
   ) {
@@ -1594,11 +1615,7 @@ export class QuestionBanksService {
       );
     // Explanation staleness is advisory; publication depends on the question's
     // required content and answer data, not the age of its AI explanation.
-    if (
-      question.source.status !== ContentStatus.PUBLISHED ||
-      question.bank.status !== ContentStatus.PUBLISHED
-    )
-      throw new ConflictException('Question source and bank must be published');
+    this.validatePublicationScope(question);
     const choice =
       question.type === QuestionType.SINGLE_CHOICE ||
       question.type === QuestionType.MULTIPLE_CHOICE;
@@ -1637,12 +1654,6 @@ export class QuestionBanksService {
       );
     if (!question.placements.length)
       throw new ConflictException('Question requires a placement');
-    if (
-      [question.course, question.course.subject].some(
-        (node: any) => node.status !== ContentStatus.PUBLISHED,
-      )
-    )
-      throw new ConflictException('Question course ancestry must be published');
     for (const reference of question.assets)
       if (
         reference.asset.status !== AssetStatus.READY ||

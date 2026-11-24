@@ -163,6 +163,49 @@ describe('Student credit and rewards (e2e)', () => {
     policy.credit.enabled = true;
     await rewards.saveSettings(admin, policy);
   });
+  it('exposes public reward settings, defaults, and updates without opening administrator routes', async () => {
+    const read = () =>
+      app.inject({
+        method: 'GET',
+        url: '/api/v1/student-rewards/settings',
+      });
+    const stored = await read();
+    expect(stored.statusCode).toBe(200);
+    expect(stored.json()).toEqual(await rewards.settings());
+    expect(Object.keys(stored.json()).sort()).toEqual(['config', 'version']);
+
+    await db.studentRewardsSettings.deleteMany();
+    const defaults = await read();
+    expect(defaults.statusCode).toBe(200);
+    expect(defaults.json()).toEqual({
+      version: 0,
+      config: DEFAULT_REWARDS_SETTINGS,
+    });
+    expect(await db.studentRewardsSettings.count()).toBe(0);
+
+    policy.firstPurchase.enabled = true;
+    policy.firstPurchase.rewardMinor = 250;
+    await rewards.saveSettings(admin, policy);
+    policy.firstPurchase.rewardMinor = 500;
+    await rewards.saveSettings(admin, policy);
+    const updated = await read();
+    expect(updated.statusCode).toBe(200);
+    expect(updated.json()).toEqual(await rewards.settings());
+    expect(updated.json()).toMatchObject({
+      version: 2,
+      config: { firstPurchase: { enabled: true, rewardMinor: 500 } },
+    });
+
+    for (const method of ['GET', 'PUT'] as const) {
+      const denied = await app.inject({
+        method,
+        url: '/api/v1/admin/student-rewards/settings',
+        ...(method === 'PUT' ? { payload: policy } : {}),
+      });
+      expect(denied.statusCode).toBe(401);
+    }
+    expect((await read()).json()).toEqual(updated.json());
+  });
   it('keeps an immutable history, expires unused lots and makes adjustments idempotent', async () => {
     await grant(students[0], 1000);
     await grant(students[0], 1000);
